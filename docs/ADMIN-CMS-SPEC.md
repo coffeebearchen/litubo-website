@@ -1,6 +1,6 @@
 # LITUBO 后台内容管理系统 — 一期规格文档
 
-> **版本：** 1.0 — 初稿
+> **版本：** 1.1 — 补充持久化、安全边界、验收链路、Products 范围确认
 > **状态：** 待审批后方可开始开发
 > **适用范围：** 一期上线所需最小可运行后台闭环
 > **技术栈锁定：** Nuxt 3 + Vue 3 + TypeScript / Directus + PostgreSQL / Docker Compose
@@ -27,7 +27,8 @@ LITUBO 管理后台是面向内部运营人员的内容操作界面，**不是**
 | 首页内容 | Hero 区域字段编辑 |
 | Blog / 资讯 | 全生命周期：草稿→发布→下架 |
 | 询盘管理 | Contact 和 Technical Matching 提交记录的查看与状态管理 |
-| 基础 SEO | 首页、Blog 文章的 title / description / OG 图片 |
+| 基础 SEO | 首页、Blog 文章、产品页面的 title / description / OG 图片 |
+| **Products（产品）** | **一期上线必需**：产品分类、型号管理、技术参数、媒体关联、草稿/发布/下架，前台产品列表与详情页实时更新 |
 
 ### 1.3 一期范围之外（二期及以后）
 
@@ -40,7 +41,8 @@ LITUBO 管理后台是面向内部运营人员的内容操作界面，**不是**
 - 公开 AI 对话（二期）
 - Excel 批量导入（二期）
 - 自动发布 / 自动邮件（二期）
-- Products / Applications / Downloads / Certificates / Company 页面的后台管理（随后扩展模块，见第五章）
+- Applications / Downloads / Certificates / Company 页面的后台管理（随后扩展模块，见第四章）
+- Products 后台管理属于一期范围，但开发顺序在管理员登录、媒体库、首页内容、Blog 发布、询盘管理全部验收通过之后（见第五章阶段 6）
 
 ---
 
@@ -54,27 +56,102 @@ LITUBO 管理后台是面向内部运营人员的内容操作界面，**不是**
 |---|---|---|
 | 后台 UI | **Directus** 内置管理界面 | 零前端开发量；字段、权限、媒体库开箱即用；可配置工作流和字段级权限 |
 | 数据库 | **PostgreSQL** | 与 Directus 原生集成；支持 JSONB 存储多语言字段；已在技术决策中确认 |
-| 文件存储 | **本地磁盘**（一期）→ 对象存储（二期） | 一期部署在腾讯云单机，挂载数据卷即可；二期迁移到 COS 时只需更换 Directus storage adapter |
-| 公开 API | Directus REST API（内网调用）+ Nuxt server 层封装 | 前台通过 content adapter 读取，不直接暴露 Directus 端点 |
+| 文件存储 | **宿主机持久化挂载卷**（一期）→ 腾讯云 COS（二期选项） | 详见 2.3 节 |
+| 公开 API | Directus REST API（容器内网）+ Nuxt server 层封装 | 前台通过 content adapter 读取，Directus API 不对外暴露；详见 2.4 节 |
 | 容器编排 | **Docker Compose**，与现有 Nginx 共存 | 沿用已有运维模型，单独 network 隔离 |
 
-### 2.2 后台路由与安全边界
+### 2.2 安全边界（强制规则）
+
+#### 访问地址架构
 
 ```
-公开域名            https://www.litubo.com/
-后台内网访问路径     https://admin.litubo.com/  (或 /admin/ 子路径，部署时确认)
-Directus API       http://directus:8055/  (容器内网，不暴露到公网)
+公开前台              https://www.litubo.com/
+                          ↓ Cloudflare 代理
+                       Nginx（腾讯云服务器）
+                          ↓
+                       Nuxt SSR 服务（:3000）
+
+管理后台              https://admin.litubo.com/   ← 部署时确认是子域还是子路径
+                          ↓ Nginx（IP 白名单拦截，不经 Cloudflare 缓存）
+                       Directus UI（容器内 :8055）
+
+Directus API          http://directus:8055/       ← 仅容器内网可达，不对外暴露
+                          ↑
+                       Nuxt server/api/ 函数（服务器内部调用）
+                          ↑
+                       前台 Vue 组件（useFetch / useAsyncData）
 ```
 
-**安全规则：**
+**前台数据链路规则（不可绕过）：**
+- 前台 Vue 组件**永远不**直接调用 Directus API；
+- 唯一合法路径：`Vue 组件 → Nuxt server/api/ → Directus REST API（内网）→ PostgreSQL`；
+- Nuxt server 函数对返回数据做字段过滤，不透传 Directus 内部字段（如 `directus_user_id` 等）。
 
-- Nginx 限制 `/admin/` 或 `admin.` 子域只允许办公室 IP 或 VPN 访问；
-- Directus 管理界面不在 Cloudflare 缓存路径内；
-- Directus API 不向公网开放；Nuxt server 函数在服务器内网调用 Directus；
-- 一期只设一个 `admin` 账号；禁止公开注册；Token 存储在 Directus 数据库，不写入 `.env` 明文；
-- 所有 API 调用使用 HTTPS；静态 token 只在 `.env` 内配置，不提交到 Git。
+#### Nginx 安全配置要求
 
-### 2.3 数据存储结构
+- 后台域名或路径仅允许指定 IP 段（办公室/VPN）访问；非白名单 IP 返回 403，不返回 404 或重定向；
+- 后台域名不加入 Cloudflare 代理（设为 DNS only），防止缓存管理界面；
+- `robots.txt` 的 `Disallow` 规则覆盖后台路径；后台地址不出现在 `sitemap.xml`。
+
+#### 管理员账号与凭据管理
+
+- 一期只创建一个管理员账号，通过 Directus 初始化环境变量注入（`ADMIN_EMAIL` / `ADMIN_PASSWORD`）；
+- **密码和 Token 的规则：**
+
+| 变量 | 存放位置 | 是否提交 Git |
+|---|---|---|
+| `ADMIN_EMAIL` | `.env`（服务器） | **否** |
+| `ADMIN_PASSWORD` | `.env`（服务器） | **否** |
+| `DIRECTUS_SECRET` | `.env`（服务器） | **否** |
+| `DIRECTUS_TOKEN`（Nuxt 用静态 token） | `.env`（服务器） | **否** |
+| 以上变量名（不含值） | `.env.example` | **是** |
+
+- 禁止将真实密码或 token 写入任何 `.ts`、`.vue`、`docker-compose.yml` 或文档文件；
+- 静态 token 仅在 Directus 数据库中生成，Nuxt server 从 `process.env.DIRECTUS_TOKEN` 读取；
+- 禁止在管理界面开启公开注册（`PUBLIC_REGISTRATION=false`）。
+
+### 2.3 媒体文件持久化方案
+
+#### 核心原则
+
+图片和 PDF 文件**必须存储在容器外部的宿主机目录**，以持久化挂载卷方式挂入容器。Docker 容器的可写层在 `docker-compose down --volumes` 或镜像重建时会丢失；文件绝对不能依赖容器层生存。
+
+#### 一期：宿主机持久化挂载卷
+
+```yaml
+# docker-compose.yml 示例（片段）
+services:
+  directus:
+    volumes:
+      - /data/litubo/uploads:/directus/uploads   # 图片/PDF 上传目录
+      - /data/litubo/db:/var/lib/postgresql/data  # PostgreSQL 数据目录（若 pg 在同一 compose）
+```
+
+- `/data/litubo/uploads` 是腾讯云服务器上的宿主机目录，**不在 Git 中**；
+- 该目录需纳入**服务器级备份**（腾讯云快照或 rsync 到 COS）；
+- Docker 升级、镜像拉取、`docker-compose up --build` 均不影响挂载目录的文件；
+- `docker-compose down` 不加 `--volumes` 不删除文件；`down --volumes` **会删除 named volume**，因此使用 bind mount（绝对路径）而非 named volume。
+
+#### 环境对照
+
+| 环境 | 上传目录（宿主机路径） | 挂载进容器路径 | 备注 |
+|---|---|---|---|
+| 本地开发 | `./dev-data/uploads`（项目内，已在 `.gitignore`） | `/directus/uploads` | 开发机本地，丢了重传即可 |
+| 腾讯云正式 | `/data/litubo/uploads` | `/directus/uploads` | **纳入服务器快照备份** |
+
+#### 备份策略（一期最低要求）
+
+1. **数据库**：每日 `pg_dump` 导出，存储到 `/data/litubo/backups/`，保留 14 天；
+2. **上传文件**：每日 rsync 或腾讯云磁盘快照，保留 7 天；
+3. 备份脚本通过 cron 执行，不依赖 Directus 或 Nuxt 服务正常运行。
+
+#### 二期选项：腾讯云 COS 对象存储
+
+Directus 支持通过 storage adapter 将文件直接存储到 S3 兼容的对象存储（腾讯云 COS 支持 S3 API）。迁移时只需更换 Directus 的 `STORAGE_*` 环境变量，前台代码和 URL 结构不变。一期无需实现，但挂载卷方案不阻止此迁移。
+
+---
+
+### 2.4 数据存储结构
 
 Directus 通过图形界面配置 Collections（对应数据库表）。以下为一期必须创建的 Collections：
 
@@ -153,19 +230,9 @@ Directus 通过图形界面配置 Collections（对应数据库表）。以下�
 
 > **迁移说明：** 一期前台 API（`server/api/contact.post.ts` 等）目前将提交写入本地 `.data/submissions/*.json`。后台接入后，将这三个 server API 改为写入 Directus `form_submissions` collection，原 JSON 文件记录一次性手动导入。
 
-### 2.4 前台读取数据的接口边界
+### 2.5 前台读取数据的接口边界
 
-**原则：** 前台组件永远不直接调用 Directus API，必须通过 Nuxt `server/` 层封装的 content adapter。
-
-```
-前台 Vue 组件
-    ↓ useFetch / useAsyncData
-Nuxt server/api/ 或 content adapter
-    ↓ 内网 HTTP（服务器内部）
-Directus REST API :8055
-    ↓
-PostgreSQL
-```
+**原则：** 前台组件永远不直接调用 Directus API，必须通过 Nuxt `server/` 层封装的 content adapter（已在 2.2 节安全规则中说明）。
 
 一期需要新增的 server adapter：
 
@@ -175,10 +242,13 @@ PostgreSQL
 | `server/api/cms/home.get.ts` | 返回首页内容字段 |
 | `server/api/cms/blog/index.get.ts` | 返回已发布 Blog 列表（分页、分类过滤） |
 | `server/api/cms/blog/[slug].get.ts` | 返回单篇 Blog 详情 |
+| `server/api/cms/products/index.get.ts` | 返回产品分类列表 |
+| `server/api/cms/products/[category].get.ts` | 返回某分类下的已发布产品列表 |
+| `server/api/cms/products/[category]/[slug].get.ts` | 返回单个产品详情 |
 
 现有 `content/fixtures/` 保持不变，作为本地开发无 CMS 时的 fallback；adapter 通过环境变量 `CMS_MODE=directus | fixtures` 切换。
 
-### 2.5 图片从 `public/images/` 迁移到媒体库的方案
+### 2.6 图片从 `public/images/` 迁移到媒体库的方案
 
 **迁移策略（上线前一次性操作，不影响现有代码）：**
 
@@ -197,7 +267,7 @@ PostgreSQL
 
 迁移期间前台保持兼容，两种路径均可读取（adapter 层判断）。
 
-### 2.6 本地开发、测试、正式部署差异
+### 2.7 本地开发、测试、正式部署差异
 
 | 环境 | CMS 数据来源 | 文件存储 | 说明 |
 |---|---|---|---|
@@ -214,7 +284,71 @@ CMS_MODE=directus
 
 ---
 
-## 三、一期最小闭环详细设计
+## 三、一期最小验收闭环——两条不可拆分链路
+
+在进入详细步骤设计之前，先明确一期后台上线的**最终交付物**是以下两条完整链路能够端到端跑通。每条链路中的每一步都是必需的，任何一步不通，链路即视为未完成。
+
+---
+
+### 链路 A — 媒体与首页内容管理闭环
+
+```
+管理员登录 Directus 后台
+    ↓
+进入 Files（媒体库）→ 上传或选择图片
+    ↓
+进入 page_home（首页内容）→ 替换 Hero 图片绑定 / 修改标题文字 / 修改 CTA 文本 → 保存
+    ↓
+打开前台 https://www.litubo.com/（或本地 localhost:3000）
+    ↓
+刷新页面 → Hero 区域显示新图片 + 新文字 + 新 CTA，布局和遮罩不变
+```
+
+**链路 A 验收标准（必须全部通过）：**
+1. 管理员账号密码正确 → 进入 Directus 管理界面，无需联系开发人员；
+2. 上传一张新 PNG/JPG → 在媒体库 `home` folder 中可见，`/assets/{uuid}` 可在浏览器直接访问；
+3. 在 `page_home` 中将 Hero 图片换绑为刚上传的新图 → 保存；
+4. 前台首页刷新 → Hero 背景图变为新图片；
+5. 在 `page_home` 中修改 `hero_title_en` → 保存 → 前台首页标题更新；
+6. 1280px 和 375px 下布局、遮罩、CTA 按钮样式无变化；
+7. `CMS_MODE=fixtures` 时前台仍正常显示（fallback 有效，不依赖 Directus 也不崩溃）。
+
+---
+
+### 链路 B — Blog 内容发布闭环
+
+```
+管理员登录 Directus 后台
+    ↓
+进入 blog_posts → 新建文章 → 填写 slug / 标题 / 摘要 / 正文 / 封面图 / SEO 字段
+    ↓
+状态设为 draft → 保存
+    ↓
+打开前台 /resources → 确认该文章不出现（草稿不公开）
+    ↓
+回到 Directus → 状态改为 published → 保存
+    ↓
+打开前台 /resources → 文章卡片出现（标题 / 摘要 / 封面图 / 日期）
+    ↓
+点击卡片 → 进入 /resources/insights/{slug} → 显示完整正文 + SEO title
+    ↓
+回到 Directus → 状态改为 archived → 保存
+    ↓
+前台 /resources 卡片消失；直接访问 /resources/insights/{slug} → 返回 404
+```
+
+**链路 B 验收标准（必须全部通过）：**
+1. 草稿状态 → 前台列表不出现；
+2. 发布 → 前台列表立即出现卡片，含标题、摘要、封面图（媒体库图片）、发布日期；
+3. 进入详情页 → Rich Text 正文正确渲染（粗体、列表、外链）；
+4. 浏览器 `<title>` 标签 = Directus 中设置的 `seo_title_en`；
+5. `<meta name="description">` = `seo_description_en`；
+6. 下架 → 列表消失，slug 返回 404，不返回空白页或 500；
+7. ES / PT 字段为空时前台降级显示 EN 内容，不报错。
+
+---
+
+## 四、一期最小闭环详细设计
 
 ### 步骤 A — 管理员登录 + 数据库基础
 
@@ -331,51 +465,157 @@ CMS_MODE=directus
 
 ---
 
-## 四、随后扩展的独立模块
+## 五、一期 Products 模块详细设计
 
-以下模块在一期 A–F 验收完成后，按需逐步开发，**互不依赖，可独立交付**。
+Products 是一期上线必需模块。开发顺序排在管理员登录、媒体库、首页内容闭环、Blog 发布闭环、询盘管理全部验收通过之后（见第六章阶段 6）。
 
-### 4.1 Products 模块
+### 5.1 Products 数据模型
 
-**Collections 需新增：**
-- `product_categories`：id、slug、title（多语言）、intro（多语言）、hero_image、order、seo
-- `products`：id、category_id、slug、name（多语言）、summary（多语言）、hero_image、gallery（图片数组）、highlights（JSONB）、specifications（JSONB）、downloads（关联 `download_assets`）、status、seo
+#### `product_categories`（产品分类）
 
-**前台变化：**
-- `pages/products/index.vue` 和 `pages/products/[category]/index.vue` 从 fixtures 切换到 CMS adapter；
-- `pages/products/[category]/[slug].vue` 读取 CMS 产品详情。
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | varchar | 业务 id（如 `cat-xray`） |
+| `slug` | varchar unique | URL 标识，与现有路由完全一致（见路由文档） |
+| `title_en` | varchar | 分类名称 EN（必填） |
+| `title_es` | varchar | 分类名称 ES（可为空，降级显示 EN） |
+| `title_pt` | varchar | 分类名称 PT |
+| `intro_en` | text | 分类简介 EN |
+| `intro_es` | text | 分类简介 ES |
+| `intro_pt` | text | 分类简介 PT |
+| `hero_image` | 外键 → `directus_files` | 分类列表卡片主图 |
+| `display_order` | integer | 排列顺序 |
+| `seo_title_en` | varchar | |
+| `seo_description_en` | text | |
+| `seo_og_image` | 外键 → `directus_files` | |
 
-**验收标准：** 管理员在后台新增一个产品 → 前台产品列表立即出现；修改规格表 → 前台详情页更新。
+> 分类 slug 固定为：`x-ray-inspection` / `metal-detection` / `checkweighers` / `combination-inspection` / `conveyors-reject-systems`，与前台路由 `[category]` 参数完全对应，**不可更改**。
 
-### 4.2 Applications 模块
+#### `products`（产品型号）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | UUID | 主键 |
+| `category_id` | 外键 → `product_categories` | 所属分类 |
+| `slug` | varchar unique | 产品页 URL 标识 |
+| `status` | enum: `draft` / `published` / `archived` | 发布状态 |
+| `name_en` | varchar | 产品型号名称 EN（必填） |
+| `name_es` | varchar | |
+| `name_pt` | varchar | |
+| `summary_en` | text | 列表摘要 EN（必填） |
+| `summary_es` | text | |
+| `summary_pt` | text | |
+| `body_en` | text (rich text) | 产品正文详情 EN |
+| `body_es` | text | |
+| `body_pt` | text | |
+| `hero_image` | 外键 → `directus_files` | 产品详情页主图 |
+| `gallery` | M2M → `directus_files` | 详情图集（多张，可排序） |
+| `highlights` | JSONB | 核心卖点列表，结构：`[{ icon, title_en, body_en, title_es, body_es, title_pt, body_pt }]` |
+| `specifications` | JSONB | 技术参数表，结构：`[{ label_en, value, unit }]`（行数组，可排序） |
+| `applications` | JSON array of slugs | 适用应用场景 slug（关联 applications 模块） |
+| `related_products` | M2M → `products` | 相关产品 |
+| `cta_primary_label_en` | varchar | 默认"Talk to an engineer" |
+| `cta_secondary_label_en` | varchar | 默认"Find a distributor" |
+| `seo_title_en` | varchar | |
+| `seo_description_en` | text | |
+| `seo_og_image` | 外键 → `directus_files` | |
+| `created_at` | timestamp | |
+| `updated_at` | timestamp | |
+
+#### `product_downloads`（产品资料关联，可选）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | UUID | |
+| `product_id` | 外键 → `products` | |
+| `file` | 外键 → `directus_files` | PDF 文件 |
+| `title_en` | varchar | 文件显示名 |
+| `document_type` | enum: `datasheet` / `manual` / `certificate` | |
+| `language` | varchar | `en` / `es` / `pt` / `all` |
+| `display_order` | integer | |
+
+### 5.2 Products 一期范围确认
+
+一期 Products 后台**必须支持**：
+
+- [x] 新建、编辑产品（草稿 / 发布 / 下架）；
+- [x] 产品分类（固定分类，不可在后台增删分类 slug，只能编辑内容）；
+- [x] 型号名称、简介、正文（Rich Text）；
+- [x] 核心卖点（highlights）：可在后台逐条添加、编辑、排序；
+- [x] 技术参数表（specifications）：可在后台逐行添加 label / value / unit、排序；
+- [x] 主图（hero_image）、详情图集（gallery）与媒体库关联；
+- [x] PDF 资料与媒体库关联（product_downloads）；
+- [x] 应用行业标记（applications slug 列表）；
+- [x] 相关产品关联；
+- [x] CTA 文本（一期可用默认值，管理员可覆盖）；
+- [x] 页面 title / description / OG 图片（SEO 字段）；
+- [x] EN / ES / PT 字段预留，一期只要求 EN 必填，ES / PT 可为空；
+- [x] 发布后前台 `/products`（分类列表）与 `/products/[category]/[slug]`（详情页）立即更新。
+
+一期**不要求**：
+- 产品对比功能；
+- 产品搜索索引（由 Blog+Products 内容积累后二期处理）；
+- 批量导入。
+
+### 5.3 Products 前台对接
+
+**需修改的前台文件（后台开发阶段进行）：**
+- `pages/products/index.vue` — 从 fixtures 切换到 CMS adapter；
+- `pages/products/[category]/index.vue` — 从 fixtures 切换到 CMS adapter；
+- `pages/products/[category]/[slug].vue` — 从 fixtures 切换到 CMS adapter，渲染 highlights、specifications、gallery、downloads。
+
+**新增 server adapter 文件：**
+- `server/api/cms/products/index.get.ts` — 返回分类列表（含 hero_image URL）；
+- `server/api/cms/products/[category].get.ts` — 返回该分类下 `status=published` 产品列表；
+- `server/api/cms/products/[category]/[slug].get.ts` — 返回产品详情全量字段。
+
+### 5.4 Products 浏览器验收标准
+
+1. 管理员在 Directus 新建一个产品，状态设为 `draft` → 前台 `/products` 不出现该产品；
+2. 状态改为 `published` → 前台对应分类列表立即出现该产品卡片（名称、摘要、主图）；
+3. 点击产品卡片 → 进入详情页，显示：主图、标题、正文、核心卖点、技术参数表、图集、PDF 下载链接；
+4. 管理员在 Directus 修改技术参数一行 → 前台详情页刷新后更新；
+5. 在 Directus 上传新图片并加入该产品 gallery → 前台详情页图集更新；
+6. 在 Directus 上传 PDF 并关联到该产品 → 前台详情页出现下载链接，点击可直接下载（无门槛）；
+7. 状态改为 `archived` → 列表消失，直接访问 slug → 404；
+8. 浏览器 `<title>` 和 `<meta name="description">` 与 Directus SEO 字段一致；
+9. 375px / 768px / 1280px 各断点布局无溢出，技术参数表在移动端可横向滚动或自适应。
+
+---
+
+## 六、随后扩展的独立模块（一期之后）
+
+以下模块在一期 A–F 及 Products 全部验收完成后，按需逐步开发，**互不依赖，可独立交付**。
+
+### 6.1 Applications 模块
 
 **Collections 需新增：**
 - `applications`：id、slug、title（多语言）、overview（多语言）、challenges（JSONB）、recommended_solutions（关联 product_categories）、hero_image、seo
 
 **验收标准：** 管理员修改某应用场景的挑战描述 → 前台对应页面内容更新。
 
-### 4.3 Resources / Downloads 模块
+### 6.2 Resources / Downloads 模块
 
 **Collections 需新增：**
 - `download_assets`：id、title（多语言）、file（关联 directus_files）、document_type（datasheet / manual / certificate）、language、related_products、version、publish_date、status
 
 **验收标准：** 管理员上传一份新数据表 PDF → 前台 Downloads 页面立即出现，可点击直接下载（无下载门槛）。
 
-### 4.4 Certificates 模块
+### 6.3 Certificates 模块
 
 **Collections 需新增：**
 - `certificates`：id、title（多语言）、cert_image（关联 directus_files）、issuing_body、valid_until、display_order
 
 **验收标准：** 管理员替换 ISO 9001 证书扫描件 → 前台 Quality & Manufacturing 页面图片更新。
 
-### 4.5 Company 页面内容
+### 6.4 Company 页面内容
 
 **Collections 需新增：**
 - `company_content`：多个 singleton 字段组，对应 about / quality / global-service 页面的可编辑文本段落和图片。
 
 **验收标准：** 管理员修改 About 页面公司简介段落 → 前台更新。
 
-### 4.6 Distributor / Partner Leads
+### 6.5 Distributor / Partner Leads
 
 **Collections 需新增：**
 - `distributor_leads`：与 `form_submissions` 结构类似，额外字段：territory、company_type、annual_turnover_range、status（new / qualified / rejected）。
@@ -384,7 +624,7 @@ CMS_MODE=directus
 
 ---
 
-## 五、后台一期开发顺序
+## 七、后台一期开发顺序
 
 ### 阶段 1 — 管理员登录 + 数据库基础
 
@@ -469,13 +709,28 @@ CMS_MODE=directus
 
 ---
 
-### 阶段 6 — 扩展模块（Products / Applications / Resources 等）
+### 阶段 6 — Products 模块（一期必需，排在 1–5 之后）
 
-按 4.1–4.6 节逐模块推进，每个模块完成后独立验收。
+**开发任务：**
+1. 在 Directus 创建 `product_categories` 和 `products` collections（含全部 5.1 节字段）；
+2. 在 Directus 创建 `product_downloads` collection；
+3. 录入现有 fixtures 中的 5 个分类的基础内容（分类名、hero_image），确认排序正确；
+4. 实现 `server/api/cms/products/` 下三个 adapter 文件；
+5. 修改 `pages/products/index.vue`、`pages/products/[category]/index.vue`、`pages/products/[category]/[slug].vue`，切换到 CMS adapter；
+6. `CMS_MODE=fixtures` 时保持 fixture fallback 有效。
+
+**浏览器验收：**
+- 见第 5.4 节 Products 浏览器验收标准（9 条全部通过）。
 
 ---
 
-## 六、二期功能边界（不在一期讨论范围）
+### 阶段 7 — 扩展模块（Applications / Resources / Certificates / Company 等）
+
+按第六章 6.1–6.5 节逐模块推进，每个模块完成后独立验收。
+
+---
+
+## 八、二期功能边界（不在一期讨论范围）
 
 | 功能 | 说明 |
 |---|---|
@@ -491,7 +746,7 @@ CMS_MODE=directus
 
 ---
 
-## 七、附录：关键文件路径对照
+## 九、附录：关键文件路径对照
 
 | 文件 | 说明 |
 |---|---|
