@@ -1,6 +1,6 @@
 # LITUBO 后台内容管理系统 — 一期规格文档
 
-> **版本：** 1.1 — 补充持久化、安全边界、验收链路、Products 范围确认
+> **版本：** 1.2 — 调整开发顺序：Products 提前至阶段 3，SEO 独立为阶段 7，共 8 阶段
 > **状态：** 待审批后方可开始开发
 > **适用范围：** 一期上线所需最小可运行后台闭环
 > **技术栈锁定：** Nuxt 3 + Vue 3 + TypeScript / Directus + PostgreSQL / Docker Compose
@@ -631,14 +631,14 @@ Products 是一期上线必需模块。开发顺序排在管理员登录、媒�
 **开发任务：**
 1. 在 `docker-compose.yml` 新增 `directus` 服务（`directus/directus:latest`）和 `postgres` 服务；
 2. 配置 Directus 初始账号（环境变量注入，不写入代码）；
-3. 在 Directus 中创建 `page_home`、`blog_posts`、`form_submissions` collections 及全部一期字段；
+3. 在 Directus 中创建所有一期 collections：`page_home`、`blog_posts`、`form_submissions`、`product_categories`、`products`、`product_downloads`；
 4. Nginx 配置后台路径 IP 白名单；
 5. `.env.example` 记录所有必需变量；
 6. `docker-compose.dev.yml` 供本地后台开发使用。
 
 **浏览器验收：**
 - 访问后台 URL → Directus 登录界面；
-- 正确账号 → 进入管理界面，三个 collections 均可见；
+- 正确账号 → 进入管理界面，所有 collections 均可见；
 - 错误 IP → 403。
 
 ---
@@ -646,53 +646,75 @@ Products 是一期上线必需模块。开发顺序排在管理员登录、媒�
 ### 阶段 2 — 媒体库
 
 **开发任务：**
-1. 在 Directus 创建 folder 层级；
+1. 在 Directus 创建 folder 层级（`home` / `products` / `applications` / `resources` / `company` / `certifications`）；
 2. 将现有 `public/images/` 下图片上传到对应 folder；
 3. 为每张图片填写 title 和 description（alt text）；
-4. 确认 `/assets/{uuid}` 可访问。
+4. 确认 `/assets/{uuid}` 路径可在浏览器访问。
 
 **浏览器验收：**
 - 媒体库按 folder 分类显示全部图片；
-- 新图片上传成功；
-- `/assets/{uuid}` 浏览器直接访问图片。
+- 新图片（PNG/JPG/WebP）和 PDF 上传成功；
+- `/assets/{uuid}` 浏览器直接访问，无 401/404。
 
 ---
 
-### 阶段 3 — 首页内容闭环
+### 阶段 3 — Products 产品管理闭环
 
 **开发任务：**
-1. 在 `page_home` 中录入首页 Hero 现有内容，绑定 Hero 图片；
-2. 实现 `server/utils/directus.ts` Directus client；
-3. 实现 `server/api/cms/home.get.ts`；
-4. 修改 `pages/index.vue` Hero 区域：`CMS_MODE=directus` 时从 API 读取，`fixtures` 时保持现状；
-5. 不修改 Hero CSS 和布局。
+1. 在 Directus `product_categories` 中录入全部 5 个分类内容，绑定 hero_image，确认排序；
+2. 新建一个测试产品，填写名称、简介、正文、核心卖点、技术参数，上传主图（选自媒体库），上传 PDF 并关联到 `product_downloads`；
+3. 实现 `server/utils/directus.ts` Directus client（若尚未创建）；
+4. 实现 `server/api/cms/products/index.get.ts`、`[category].get.ts`、`[category]/[slug].get.ts`；
+5. 修改 `pages/products/index.vue`、`pages/products/[category]/index.vue`、`pages/products/[category]/[slug].vue`，切换到 CMS adapter；
+6. `CMS_MODE=fixtures` 时保持 fixture fallback 有效。
 
 **浏览器验收：**
-- 后台修改标题 → 前台刷新显示新标题；
-- 替换 Hero 图片 → 前台更新；
-- 1280px / 375px 布局不变。
+1. 管理员在 Directus 新建产品，状态设为 `draft` → 前台 `/products` 不出现该产品；
+2. 状态改为 `published` → 前台对应分类列表立即出现该产品卡片（名称、摘要、主图）；
+3. 点击产品卡片 → 进入详情页，显示：主图、标题、正文、核心卖点、技术参数表；
+4. 管理员上传新主图并绑定到该产品 → 前台详情页刷新后图片更新；
+5. 管理员录入一行技术参数（label / value / unit）→ 前台详情页刷新后出现该参数；
+6. 管理员上传 PDF 并关联到该产品 → 前台详情页出现下载链接，点击可直接下载（无门槛）；
+7. 状态改为 `archived` → 列表消失，直接访问 slug → 404；
+8. 浏览器 `<title>` 和 `<meta name="description">` 与 Directus SEO 字段一致；
+9. 375px / 768px / 1280px 各断点无溢出。
 
 ---
 
-### 阶段 4 — Blog 发布闭环
+### 阶段 4 — 首页内容闭环
+
+**开发任务：**
+1. 在 `page_home` 中录入首页 Hero 现有内容，绑定 Hero 图片（选自媒体库）；
+2. 实现 `server/api/cms/home.get.ts`；
+3. 修改 `pages/index.vue` Hero 区域：`CMS_MODE=directus` 时从 API 读取，`fixtures` 时保持现状；
+4. 不修改 Hero CSS 和布局。
+
+**浏览器验收：**
+- 后台修改 `hero_title_en` → 前台刷新显示新标题；
+- 替换 Hero 图片绑定 → 前台更新；
+- 1280px / 375px 布局、遮罩、CTA 不变。
+
+---
+
+### 阶段 5 — Blog 发布闭环
 
 **开发任务：**
 1. 实现 `server/api/cms/blog/index.get.ts`（列表，过滤 `status=published`）；
 2. 实现 `server/api/cms/blog/[slug].get.ts`（详情）；
 3. 修改 `pages/resources/index.vue` 从 CMS 读取 Blog 列表；
 4. 完善 `pages/resources/insights/[slug].vue` 从 CMS 读取文章正文；
-5. 配置 Nuxt `generateRoutes` 或 `routeRules` 确保动态 slug 在 SSR 模式下正常；
+5. 配置 Nuxt `routeRules` 确保动态 slug 在 SSR 模式下正常；
 6. 实现 Rich Text 渲染（Directus 返回 Markdown 或 HTML，前台对应处理）。
 
 **浏览器验收：**
 - 草稿不出现在列表；
-- 发布 → 立即出现卡片；
+- 发布 → 前台 `/resources` 立即出现文章卡片（标题、摘要、封面图、日期）；
 - 进入详情页 → 正文、SEO title 正确；
-- 下架 → 404。
+- 下架 → 列表消失，slug → 404。
 
 ---
 
-### 阶段 5 — 询盘管理
+### 阶段 6 — 询盘管理
 
 **开发任务：**
 1. 修改 `server/api/contact.post.ts` 写入 Directus `form_submissions`；
@@ -702,29 +724,27 @@ Products 是一期上线必需模块。开发顺序排在管理员登录、媒�
 5. 在 Directus 界面配置列表视图字段和状态筛选器。
 
 **浏览器验收：**
-- 前台提交表单 → Directus 出现记录；
-- 状态可修改；
-- 备注可填写；
+- 前台提交表单 → Directus 出现记录，状态为 `new`；
+- 管理员可查看所有字段值，修改状态，填写备注；
 - Technical Matching 和 Contact 可通过 `form_id` 区分。
 
 ---
 
-### 阶段 6 — Products 模块（一期必需，排在 1–5 之后）
+### 阶段 7 — 基础 SEO
 
 **开发任务：**
-1. 在 Directus 创建 `product_categories` 和 `products` collections（含全部 5.1 节字段）；
-2. 在 Directus 创建 `product_downloads` collection；
-3. 录入现有 fixtures 中的 5 个分类的基础内容（分类名、hero_image），确认排序正确；
-4. 实现 `server/api/cms/products/` 下三个 adapter 文件；
-5. 修改 `pages/products/index.vue`、`pages/products/[category]/index.vue`、`pages/products/[category]/[slug].vue`，切换到 CMS adapter；
-6. `CMS_MODE=fixtures` 时保持 fixture fallback 有效。
+1. 前台 `useHead()` 全面切换为从 CMS 数据读取（`CMS_MODE=directus`）；
+2. 覆盖范围：首页、所有 Blog 文章页、所有产品详情页；
+3. OG 图片 URL 构建为 Directus assets 路径，带 `width=1200` 查询参数。
 
 **浏览器验收：**
-- 见第 5.4 节 Products 浏览器验收标准（9 条全部通过）。
+- 修改首页 `seo_title_en` → 前台 `<title>` 更新；
+- 访问 Blog 文章或产品页 → `<title>` / `<meta description>` / OG 图片 URL 与 Directus 字段一致；
+- 社交媒体预览工具检查 OG 图片 → 可访问。
 
 ---
 
-### 阶段 7 — 扩展模块（Applications / Resources / Certificates / Company 等）
+### 阶段 8 — 扩展模块（Applications / Downloads / Certificates / Company 等）
 
 按第六章 6.1–6.5 节逐模块推进，每个模块完成后独立验收。
 
