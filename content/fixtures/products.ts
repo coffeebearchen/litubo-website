@@ -18,7 +18,7 @@ export const DEMO_PRODUCT_CATEGORIES: ProductCategory[] = [
     },
     heroMedia: {
       id: 'hero-xray',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/products/products-xray-card.jpg',
       alt: { en: '[DEMO] X-Ray Inspection systems', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     order: 1,
@@ -39,7 +39,7 @@ export const DEMO_PRODUCT_CATEGORIES: ProductCategory[] = [
     },
     heroMedia: {
       id: 'hero-metal',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/products/products-metal-card.jpg',
       alt: { en: '[DEMO] Metal Detection systems', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     order: 2,
@@ -60,7 +60,7 @@ export const DEMO_PRODUCT_CATEGORIES: ProductCategory[] = [
     },
     heroMedia: {
       id: 'hero-check',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/products/products-checkweigher-card.jpg',
       alt: { en: '[DEMO] Checkweigher systems', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     order: 3,
@@ -81,7 +81,7 @@ export const DEMO_PRODUCT_CATEGORIES: ProductCategory[] = [
     },
     heroMedia: {
       id: 'hero-combo',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/products/products-combination-card.jpg',
       alt: { en: '[DEMO] Combination Inspection systems', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     order: 4,
@@ -102,7 +102,7 @@ export const DEMO_PRODUCT_CATEGORIES: ProductCategory[] = [
     },
     heroMedia: {
       id: 'hero-convey',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/products/products-conveyor-card.jpg',
       alt: { en: '[DEMO] Conveyor and reject systems', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     order: 5,
@@ -132,7 +132,7 @@ export const DEMO_PRODUCTS: Product[] = [
     },
     heroMedia: {
       id: 'hero-prod-xray-001',
-      url: '/images/demo/placeholder-product.jpg',
+      url: '/images/products/xr-demo-series-hero.jpg',
       alt: { en: '[DEMO] XR Series', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     gallery: [],

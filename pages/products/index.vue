@@ -29,6 +29,14 @@ useHead({
             class="category-card"
           >
             <div class="category-card__image-wrap">
+              <img
+                v-if="cat.heroMedia.url"
+                :src="cat.heroMedia.url"
+                :alt="cat.heroMedia.alt.en"
+                class="category-card__image"
+                loading="lazy"
+                @error="($event.target as HTMLImageElement).style.display = 'none'"
+              >
               <div class="category-card__image-placeholder" aria-hidden="true" />
             </div>
             <div class="category-card__body">
@@ -102,13 +110,27 @@ useHead({
 
 .category-card__image-wrap {
   aspect-ratio: 16 / 9;
-  background: var(--color-surface-alt);
+  position: relative;
+  overflow: hidden;
+}
+
+.category-card__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-normal);
+}
+
+.category-card:hover .category-card__image {
+  transform: scale(1.03);
 }
 
 .category-card__image-placeholder {
   width: 100%;
   height: 100%;
-  background: var(--color-line);
+  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
 }
 
 .category-card__body {

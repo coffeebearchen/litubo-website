@@ -29,6 +29,14 @@ useHead({
             class="app-card"
           >
             <div class="app-card__image-wrap">
+              <img
+                v-if="app.heroMedia.url"
+                :src="app.heroMedia.url"
+                :alt="app.heroMedia.alt.en"
+                class="app-card__image"
+                loading="lazy"
+                @error="($event.target as HTMLImageElement).style.display = 'none'"
+              >
               <div class="app-card__image-placeholder" aria-hidden="true" />
             </div>
             <div class="app-card__body">
@@ -101,13 +109,27 @@ useHead({
 
 .app-card__image-wrap {
   aspect-ratio: 4 / 3;
-  background: var(--color-surface-alt);
+  position: relative;
+  overflow: hidden;
+}
+
+.app-card__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-normal);
+}
+
+.app-card:hover .app-card__image {
+  transform: scale(1.03);
 }
 
 .app-card__image-placeholder {
   width: 100%;
   height: 100%;
-  background: var(--color-line);
+  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
 }
 
 .app-card__body {

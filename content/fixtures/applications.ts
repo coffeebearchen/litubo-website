@@ -14,7 +14,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     recommendedSolutionSlugs: [],
     heroMedia: {
       id: 'hero-app-pkg',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/applications/app-packaged-food.jpg',
       alt: { en: 'Packaged food inspection', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     seo: {
@@ -32,7 +32,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     recommendedSolutionSlugs: [],
     heroMedia: {
       id: 'hero-app-bottle',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/applications/app-bottled-canned.jpg',
       alt: { en: 'Bottled and canned products inspection', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     seo: {
@@ -50,7 +50,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     recommendedSolutionSlugs: [],
     heroMedia: {
       id: 'hero-app-meat',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/applications/app-meat-seafood.jpg',
       alt: { en: 'Meat and seafood inspection', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     seo: {
@@ -68,7 +68,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     recommendedSolutionSlugs: [],
     heroMedia: {
       id: 'hero-app-frozen',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/applications/app-frozen-food.jpg',
       alt: { en: 'Frozen food inspection', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     seo: {
@@ -86,7 +86,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     recommendedSolutionSlugs: [],
     heroMedia: {
       id: 'hero-app-bakery',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/applications/app-bakery-snacks.jpg',
       alt: { en: 'Bakery and snacks inspection', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     seo: {
@@ -104,7 +104,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     recommendedSolutionSlugs: [],
     heroMedia: {
       id: 'hero-app-nuts',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/applications/app-nuts-seeds.jpg',
       alt: { en: 'Nuts and dried food inspection', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     seo: {
@@ -122,7 +122,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     recommendedSolutionSlugs: [],
     heroMedia: {
       id: 'hero-app-powder',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/applications/app-powder-granules.jpg',
       alt: { en: 'Powder and granules inspection', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     seo: {
@@ -140,7 +140,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     recommendedSolutionSlugs: [],
     heroMedia: {
       id: 'hero-app-pharma',
-      url: '/images/demo/placeholder-hero.jpg',
+      url: '/images/applications/app-pharmaceutical.jpg',
       alt: { en: 'Pharmaceutical and daily chemical inspection', es: 'TODO_TRANSLATION', pt: 'TODO_TRANSLATION' },
     },
     seo: {

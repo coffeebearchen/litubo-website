@@ -11,6 +11,7 @@ defineProps<{
 }>()
 
 const NuxtLink = resolveComponent('NuxtLink')
+const imgError = ref(false)
 </script>
 
 <template>
@@ -18,11 +19,12 @@ const NuxtLink = resolveComponent('NuxtLink')
     <component :is="to ? NuxtLink : 'div'" :to="to" class="media-card__inner">
       <div class="media-card__image-wrap">
         <img
-          v-if="imageSrc"
+          v-if="imageSrc && !imgError"
           :src="imageSrc"
           :alt="imageAlt ?? title"
           class="media-card__image"
           loading="lazy"
+          @error="imgError = true"
         >
         <div v-else class="media-card__image-placeholder" aria-hidden="true" />
       </div>
