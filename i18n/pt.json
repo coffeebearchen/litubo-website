@@ -10,12 +10,19 @@
   },
   "nav_products": {
     "heading": "TODO_TRANSLATION",
+    "systemsHeading": "TODO_TRANSLATION",
+    "techHeading": "TODO_TRANSLATION",
+    "appHeading": "TODO_TRANSLATION",
     "xray": "TODO_TRANSLATION",
     "metal": "TODO_TRANSLATION",
     "checkweighers": "TODO_TRANSLATION",
     "combination": "TODO_TRANSLATION",
     "conveyors": "TODO_TRANSLATION",
-    "viewAll": "TODO_TRANSLATION"
+    "xrayTech": "TODO_TRANSLATION",
+    "metalTech": "TODO_TRANSLATION",
+    "checkTech": "TODO_TRANSLATION",
+    "viewAll": "TODO_TRANSLATION",
+    "exploreAll": "TODO_TRANSLATION"
   },
   "nav_applications": {
     "heading": "TODO_TRANSLATION",
@@ -31,28 +38,37 @@
   },
   "nav_resources": {
     "heading": "TODO_TRANSLATION",
+    "overview": "TODO_TRANSLATION",
     "insights": "TODO_TRANSLATION",
     "caseStudies": "TODO_TRANSLATION",
     "downloads": "TODO_TRANSLATION",
     "videos": "TODO_TRANSLATION",
-    "viewAll": "TODO_TRANSLATION"
+    "viewAll": "TODO_TRANSLATION",
+    "featuredHeading": "TODO_TRANSLATION",
+    "featuredTitle": "TODO_TRANSLATION",
+    "readArticle": "TODO_TRANSLATION"
   },
   "nav_support": {
     "heading": "TODO_TRANSLATION",
+    "directHeading": "TODO_TRANSLATION",
+    "docsHeading": "TODO_TRANSLATION",
     "overview": "TODO_TRANSLATION",
     "faq": "TODO_TRANSLATION",
     "spareParts": "TODO_TRANSLATION",
     "productTest": "TODO_TRANSLATION",
     "techSupport": "TODO_TRANSLATION",
     "manualRequest": "TODO_TRANSLATION",
-    "serviceTraining": "TODO_TRANSLATION"
+    "serviceTraining": "TODO_TRANSLATION",
+    "techDocs": "TODO_TRANSLATION"
   },
   "nav_company": {
     "heading": "TODO_TRANSLATION",
     "about": "TODO_TRANSLATION",
     "quality": "TODO_TRANSLATION",
     "globalService": "TODO_TRANSLATION",
-    "partner": "TODO_TRANSLATION"
+    "partner": "TODO_TRANSLATION",
+    "promoTitle": "TODO_TRANSLATION",
+    "promoBody": "TODO_TRANSLATION"
   },
   "common": {
     "talkToEngineer": "TODO_TRANSLATION",
@@ -72,14 +88,22 @@
     "errorBody": "TODO_TRANSLATION",
     "loading": "TODO_TRANSLATION"
   },
+  "mobile_bar": {
+    "whatsapp": "TODO_TRANSLATION",
+    "matching": "TODO_TRANSLATION"
+  },
   "footer": {
     "tagline": "TODO_TRANSLATION",
+    "description": "TODO_TRANSLATION",
     "legalName": "Shanghai NingPin Industrial Dev. Co., Ltd.",
     "address": "TODO_TRANSLATION",
     "newsletter": "TODO_TRANSLATION",
     "copyright": "TODO_TRANSLATION",
+    "links_products": "TODO_TRANSLATION",
+    "links_applications": "TODO_TRANSLATION",
     "links_company": "TODO_TRANSLATION",
     "links_support": "TODO_TRANSLATION",
+    "links_resources": "TODO_TRANSLATION",
     "links_legal": "TODO_TRANSLATION",
     "privacy": "TODO_TRANSLATION",
     "terms": "TODO_TRANSLATION",
@@ -103,10 +127,28 @@
   },
   "pages": {
     "home": {
+      "heroEyebrow": "TODO_TRANSLATION",
       "heroTitle": "TODO_TRANSLATION",
       "heroSubtitle": "TODO_TRANSLATION",
       "heroCta": "TODO_TRANSLATION",
-      "heroCtaSecondary": "TODO_TRANSLATION"
+      "heroCtaSecondary": "TODO_TRANSLATION",
+      "pathTitle": "TODO_TRANSLATION",
+      "pathCard1Title": "TODO_TRANSLATION",
+      "pathCard1Cta1": "TODO_TRANSLATION",
+      "pathCard1Cta2": "TODO_TRANSLATION",
+      "pathCard2Title": "TODO_TRANSLATION",
+      "pathCard2Cta1": "TODO_TRANSLATION",
+      "pathCard2Cta2": "TODO_TRANSLATION",
+      "latestTitle": "TODO_TRANSLATION",
+      "latestCta": "TODO_TRANSLATION",
+      "faqTitle": "TODO_TRANSLATION",
+      "faqSubtitle": "TODO_TRANSLATION",
+      "faqSearch": "TODO_TRANSLATION",
+      "faqCta": "TODO_TRANSLATION",
+      "ctaTitle": "TODO_TRANSLATION",
+      "ctaBody": "TODO_TRANSLATION",
+      "ctaCta": "TODO_TRANSLATION",
+      "demoNotice": "TODO_TRANSLATION"
     },
     "products": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION" },
     "applications": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION" },

@@ -10,12 +10,19 @@
   },
   "nav_products": {
     "heading": "Products",
+    "systemsHeading": "INSPECTION SYSTEMS",
+    "techHeading": "BY TECHNOLOGY",
+    "appHeading": "BY APPLICATION",
     "xray": "X-Ray Inspection",
     "metal": "Metal Detection",
     "checkweighers": "Checkweighers",
     "combination": "Combination Inspection",
     "conveyors": "Conveyors & Reject Systems",
-    "viewAll": "View all products"
+    "xrayTech": "X-ray Technology",
+    "metalTech": "Metal Detection Technology",
+    "checkTech": "Checkweighing Technology",
+    "viewAll": "View all products",
+    "exploreAll": "Explore all systems"
   },
   "nav_applications": {
     "heading": "Applications",
@@ -31,28 +38,37 @@
   },
   "nav_resources": {
     "heading": "Resources",
-    "insights": "Insights",
+    "overview": "Resource Overview",
+    "insights": "LITUBO Insights",
     "caseStudies": "Case Studies",
     "downloads": "Downloads",
     "videos": "Videos",
-    "viewAll": "View all resources"
+    "viewAll": "View all resources",
+    "featuredHeading": "FEATURED INSIGHT",
+    "featuredTitle": "Choosing the right inspection solution for your line",
+    "readArticle": "Read article"
   },
   "nav_support": {
     "heading": "Support",
+    "directHeading": "DIRECT SUPPORT",
+    "docsHeading": "SUPPORT DOCUMENTS",
     "overview": "Support Overview",
     "faq": "FAQ",
     "spareParts": "Request Spare Parts",
     "productTest": "Send Product for Test",
     "techSupport": "Technical Support",
     "manualRequest": "Request a Manual",
-    "serviceTraining": "Service & Training"
+    "serviceTraining": "Service & Training",
+    "techDocs": "Technical Documents"
   },
   "nav_company": {
     "heading": "Company",
     "about": "About LITUBO",
     "quality": "Quality & Manufacturing",
     "globalService": "Global Service Capability",
-    "partner": "Become a Partner"
+    "partner": "Become a Partner",
+    "promoTitle": "Built for reliable inspection",
+    "promoBody": "Discover LITUBO's approach to quality, manufacturing and global support."
   },
   "common": {
     "talkToEngineer": "Talk to an engineer",
@@ -74,16 +90,24 @@
   },
   "footer": {
     "tagline": "Food & Packaging Inspection Solutions",
+    "description": "Helping food and packaging manufacturers protect consumers and brands with reliable inspection solutions.",
     "legalName": "Shanghai NingPin Industrial Dev. Co., Ltd.",
     "address": "No. 23, Huangtu Rd., Huaqiao Town, Kunshan, Jiangsu Province, China",
     "newsletter": "Stay informed — visit our Resources section for the latest insights.",
     "copyright": "© {year} LITUBO. All rights reserved.",
+    "links_products": "Products",
+    "links_applications": "Applications",
     "links_company": "Company",
     "links_support": "Support",
+    "links_resources": "Resources",
     "links_legal": "Legal",
     "privacy": "Privacy Policy",
     "terms": "Terms of Use",
     "sitemap": "Sitemap"
+  },
+  "mobile_bar": {
+    "whatsapp": "WhatsApp",
+    "matching": "Technical Matching"
   },
   "seo": {
     "home": {
@@ -145,10 +169,28 @@
   },
   "pages": {
     "home": {
-      "heroTitle": "Inspection Solutions for Safer Food",
-      "heroSubtitle": "X-Ray, Metal Detection, Checkweighing and Combination systems — engineered for global food manufacturers.",
-      "heroCta": "Explore our systems",
-      "heroCtaSecondary": "Find a distributor"
+      "heroEyebrow": "FOOD & PACKAGING INSPECTION",
+      "heroTitle": "Built for safer production.",
+      "heroSubtitle": "Reliable inspection systems and expert support help food and packaging producers deliver safe, high-quality products.",
+      "heroCta": "Explore solutions",
+      "heroCtaSecondary": "Talk to an engineer",
+      "pathTitle": "Find the right path for you",
+      "pathCard1Title": "Looking for inspection equipment?",
+      "pathCard1Cta1": "Explore by product",
+      "pathCard1Cta2": "Explore by application",
+      "pathCard2Title": "Already working with LITUBO?",
+      "pathCard2Cta1": "Technical matching",
+      "pathCard2Cta2": "Talk to an engineer",
+      "latestTitle": "Latest from LITUBO",
+      "latestCta": "All resources",
+      "faqTitle": "Questions about your line?",
+      "faqSubtitle": "Find quick answers to common questions about our systems and solutions.",
+      "faqSearch": "Search the Knowledge Center…",
+      "faqCta": "View all FAQs",
+      "ctaTitle": "Talk to the team who understands your line.",
+      "ctaBody": "From product selection to integration and ongoing support, our engineers are ready to help.",
+      "ctaCta": "Start a conversation",
+      "demoNotice": "DEMO — NOT FOR PUBLIC"
     },
     "products": {
       "heroTitle": "Inspection Systems",

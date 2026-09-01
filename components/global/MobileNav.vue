@@ -15,6 +15,10 @@ interface MenuItem {
   label: string
   to: string
   sections: NavSection[]
+  menuType?: string
+  cta?: { label: string; to: string }
+  featured?: unknown
+  promo?: unknown
 }
 
 const props = defineProps<{

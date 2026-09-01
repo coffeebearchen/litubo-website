@@ -5,6 +5,7 @@
       <slot />
     </main>
     <SiteFooter />
+    <MobileConversionBar />
   </div>
 </template>
 
