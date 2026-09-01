@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import type { ProductCategory } from '~/types/content'
+
 const { t } = useI18n()
 const localePath = useLocalePath()
-const categories = useProductCategories()
+
+const { data: categories } = await useAsyncData<ProductCategory[]>(
+  'product-categories',
+  () => $fetch('/api/cms/products/categories')
+)
 
 useHead({
   title: t('seo.products.title'),

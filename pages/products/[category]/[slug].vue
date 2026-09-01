@@ -1,15 +1,26 @@
 <script setup lang="ts">
+import type { Product, ProductCategory } from '~/types/content'
+
 const { t } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
-const categorySlug = computed(() => route.params.category as string)
-const slug = computed(() => route.params.slug as string)
-const product = computed(() => useProduct(categorySlug.value, slug.value))
-const category = computed(() => useProductCategory(categorySlug.value))
+const categorySlug = route.params.category as string
+const slug = route.params.slug as string
 
-if (!product.value) {
+const { data: product, error: productError } = await useAsyncData<Product>(
+  `product-${categorySlug}-${slug}`,
+  () => $fetch(`/api/cms/products/${categorySlug}/${slug}`)
+)
+
+if (productError.value || !product.value) {
   throw createError({ statusCode: 404, statusMessage: 'Product not found' })
 }
+
+const { data: categoryData } = await useAsyncData<{ category: ProductCategory; products: Product[] }>(
+  `product-category-${categorySlug}`,
+  () => $fetch(`/api/cms/products/${categorySlug}`)
+)
+const category = computed(() => categoryData.value?.category)
 
 useHead({
   title: product.value?.seo.title.en ?? t('seo.products.title'),
