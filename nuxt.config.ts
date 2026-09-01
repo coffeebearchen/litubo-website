@@ -69,6 +69,7 @@ export default defineNuxtConfig({
     // CMS adapter — server-side only, not exposed to the browser.
     // Populated when CMS_MODE=directus; ignored when CMS_MODE=fixtures (default).
     directusUrl: process.env.DIRECTUS_URL ?? '',
+    directusToken: process.env.DIRECTUS_TOKEN ?? '',
     cmsMode: process.env.CMS_MODE ?? 'fixtures',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://litubo.com',

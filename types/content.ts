@@ -53,6 +53,7 @@ export interface ProductHighlight {
 export interface ProductSpecRow {
   label: LocalizedString
   value: LocalizedString
+  unit?: string
 }
 
 export interface Product {
