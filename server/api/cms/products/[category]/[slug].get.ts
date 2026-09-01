@@ -71,8 +71,17 @@ export default defineEventHandler(async (event) => {
       alt: { en: p.name_en, es: p.name_es ?? '', pt: p.name_pt ?? '' },
     },
     gallery: [],
-    highlights: (p.highlights ?? []) as Product['highlights'],
-    specifications: (p.specifications ?? []) as Product['specifications'],
+    highlights: ((p.highlights ?? []) as Array<{ label_en: string; label_es?: string; label_pt?: string; body_en?: string; body_es?: string; body_pt?: string }>).map(h => ({
+      title: { en: h.label_en ?? '', es: h.label_es ?? '', pt: h.label_pt ?? '' },
+      body: { en: h.body_en ?? '', es: h.body_es ?? '', pt: h.body_pt ?? '' },
+    })),
+    specifications: ((p.specifications ?? []) as Array<{ label_en: string; label_es?: string; label_pt?: string; value_en?: string; value_es?: string; value_pt?: string; unit?: string; visible?: boolean }>)
+      .filter(s => s.visible !== false)
+      .map(s => ({
+        label: { en: s.label_en ?? '', es: s.label_es ?? '', pt: s.label_pt ?? '' },
+        value: { en: s.value_en ?? '', es: s.value_es ?? '', pt: s.value_pt ?? '' },
+        unit: s.unit,
+      })),
     options: [],
     downloadIds: [],
     relatedProductIds: p.related_product_slugs ?? [],
