@@ -2,6 +2,9 @@
 const { t } = useI18n()
 const localePath = useLocalePath()
 
+const heroSrc = '/images/home/home-hero-inspection-line.png'
+const heroImgError = ref(false)
+
 useHead({
   title: t('seo.home.title'),
   meta: [
@@ -48,6 +51,19 @@ const faqQuestions = [
 
     <!-- ─── Hero ──────────────────────────────────────── -->
     <section class="home-hero" aria-label="Hero">
+      <!-- Full-bleed background image; falls back to dark-green CSS when missing -->
+      <div class="home-hero__bg" aria-hidden="true">
+        <img
+          v-if="!heroImgError"
+          :src="heroSrc"
+          alt=""
+          class="home-hero__bg-img"
+          loading="eager"
+          fetchpriority="high"
+          @error="heroImgError = true"
+        >
+        <div class="home-hero__bg-overlay" />
+      </div>
       <div class="home-hero__inner">
         <!-- Text side -->
         <div class="home-hero__content">
@@ -274,6 +290,36 @@ const faqQuestions = [
   flex-direction: column;
 }
 
+/* ─── Hero background image layer ─────────────────────── */
+.home-hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.home-hero__bg-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
+.home-hero__bg-overlay {
+  position: absolute;
+  inset: 0;
+  /* Desktop: strong left (text legibility), lighter right (image visible) */
+  background: linear-gradient(
+    90deg,
+    rgba(18, 60, 50, 0.94) 0%,
+    rgba(18, 60, 50, 0.90) 38%,
+    rgba(18, 60, 50, 0.55) 62%,
+    rgba(18, 60, 50, 0.28) 100%
+  );
+}
+
 .home-hero__inner {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -282,6 +328,8 @@ const faqQuestions = [
   margin: 0 auto;
   width: 100%;
   padding-inline: var(--container-pad);
+  position: relative;
+  z-index: 1;
 }
 
 .home-hero__content {
@@ -366,17 +414,12 @@ const faqQuestions = [
 }
 
 .home-hero__photo-area {
+  /* Transparent — image visible via .home-hero__bg-img background layer.
+     Fallback: .home-hero { background: var(--color-primary-deep) } takes effect. */
   width: 100%;
   height: 100%;
   min-height: 400px;
-  background: linear-gradient(135deg, rgba(15, 92, 75, 0.6) 0%, rgba(18, 60, 50, 0.9) 100%),
-    repeating-linear-gradient(
-      45deg,
-      rgba(255, 255, 255, 0.02) 0px,
-      rgba(255, 255, 255, 0.02) 1px,
-      transparent 1px,
-      transparent 8px
-    );
+  background: transparent;
 }
 
 .home-hero__dots {
@@ -387,6 +430,8 @@ const faqQuestions = [
   max-width: var(--container-max);
   margin: 0 auto;
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .home-hero__dot {
@@ -753,7 +798,15 @@ const faqQuestions = [
 }
 
 @media (max-width: 767px) {
-  /* Hero: stack vertically */
+  /* Hero: stack vertically, image visible as full-bleed bg behind text */
+  .home-hero__bg-overlay {
+    /* Uniform strong overlay — text spans full width on mobile */
+    background: rgba(18, 60, 50, 0.87);
+  }
+  .home-hero__bg-img {
+    /* Crop to mid-conveyor / device area */
+    object-position: center 40%;
+  }
   .home-hero__inner {
     grid-template-columns: 1fr;
     padding-inline: var(--space-5);
