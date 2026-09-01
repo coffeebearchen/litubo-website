@@ -1,0 +1,32 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Nuxt build
+.nuxt/
+.output/
+dist/
+.cache/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Local form submissions (development only)
+.data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Type declarations (generated)
+*.d.ts
+!types/**/*.d.ts

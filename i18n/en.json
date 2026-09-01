@@ -1,0 +1,275 @@
+{
+  "nav": {
+    "products": "Products",
+    "applications": "Applications",
+    "resources": "Resources",
+    "support": "Support",
+    "company": "Company",
+    "contact": "Contact",
+    "findDistributor": "Find a distributor"
+  },
+  "nav_products": {
+    "heading": "Products",
+    "xray": "X-Ray Inspection",
+    "metal": "Metal Detection",
+    "checkweighers": "Checkweighers",
+    "combination": "Combination Inspection",
+    "conveyors": "Conveyors & Reject Systems",
+    "viewAll": "View all products"
+  },
+  "nav_applications": {
+    "heading": "Applications",
+    "packaged": "Packaged Food",
+    "bottled": "Bottled & Canned Products",
+    "meat": "Meat & Seafood",
+    "frozen": "Frozen Food",
+    "bakery": "Bakery & Snacks",
+    "nuts": "Nuts, Seeds & Dried Food",
+    "powder": "Powder & Granules",
+    "pharma": "Pharmaceutical & Daily Chemical",
+    "viewAll": "View all applications"
+  },
+  "nav_resources": {
+    "heading": "Resources",
+    "insights": "Insights",
+    "caseStudies": "Case Studies",
+    "downloads": "Downloads",
+    "videos": "Videos",
+    "viewAll": "View all resources"
+  },
+  "nav_support": {
+    "heading": "Support",
+    "overview": "Support Overview",
+    "faq": "FAQ",
+    "spareParts": "Request Spare Parts",
+    "productTest": "Send Product for Test",
+    "techSupport": "Technical Support",
+    "manualRequest": "Request a Manual",
+    "serviceTraining": "Service & Training"
+  },
+  "nav_company": {
+    "heading": "Company",
+    "about": "About LITUBO",
+    "quality": "Quality & Manufacturing",
+    "globalService": "Global Service Capability",
+    "partner": "Become a Partner"
+  },
+  "common": {
+    "talkToEngineer": "Talk to an engineer",
+    "findDistributor": "Find a distributor",
+    "learnMore": "Learn more",
+    "viewAll": "View all",
+    "downloadPdf": "Download PDF",
+    "contactUs": "Contact us",
+    "submit": "Submit",
+    "required": "Required",
+    "optional": "Optional",
+    "privacyConsent": "I agree to the processing of my personal data in accordance with the {0}.",
+    "privacyPolicy": "Privacy Policy",
+    "successTitle": "Thank you",
+    "successBody": "Your message has been received. Our team will be in touch shortly.",
+    "errorTitle": "Submission failed",
+    "errorBody": "Something went wrong. Please try again or email us directly.",
+    "loading": "Sending…"
+  },
+  "footer": {
+    "tagline": "Food & Packaging Inspection Solutions",
+    "legalName": "Shanghai NingPin Industrial Dev. Co., Ltd.",
+    "address": "No. 23, Huangtu Rd., Huaqiao Town, Kunshan, Jiangsu Province, China",
+    "newsletter": "Stay informed — visit our Resources section for the latest insights.",
+    "copyright": "© {year} LITUBO. All rights reserved.",
+    "links_company": "Company",
+    "links_support": "Support",
+    "links_legal": "Legal",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "sitemap": "Sitemap"
+  },
+  "seo": {
+    "home": {
+      "title": "LITUBO — Food & Packaging Inspection Solutions",
+      "description": "Industrial X-Ray, Metal Detection, Checkweighing and Combination Inspection systems for food manufacturers worldwide."
+    },
+    "products": {
+      "title": "Products — Inspection Systems | LITUBO",
+      "description": "Explore LITUBO's full range of food and packaging inspection systems."
+    },
+    "applications": {
+      "title": "Applications — LITUBO",
+      "description": "Inspection solutions for packaged food, meat, beverages, pharmaceuticals and more."
+    },
+    "resources": {
+      "title": "Resources — Insights, Downloads & Videos | LITUBO",
+      "description": "Technical insights, case studies, product downloads and video demonstrations."
+    },
+    "contact": {
+      "title": "Contact Us — LITUBO",
+      "description": "Get in touch with LITUBO to discuss your inspection requirements."
+    },
+    "technicalMatching": {
+      "title": "Technical Matching — Find the Right System | LITUBO",
+      "description": "Describe your line requirements and we will recommend the right inspection solution."
+    },
+    "findDistributor": {
+      "title": "Find a Distributor — LITUBO",
+      "description": "Locate an authorised LITUBO distributor in your region."
+    },
+    "support": {
+      "title": "Support — LITUBO",
+      "description": "Technical support, manuals, spare parts and service resources."
+    },
+    "faq": {
+      "title": "FAQ — LITUBO",
+      "description": "Frequently asked questions about LITUBO inspection systems."
+    },
+    "about": {
+      "title": "About LITUBO",
+      "description": "LITUBO is a global manufacturer of food and packaging inspection systems."
+    },
+    "quality": {
+      "title": "Quality & Manufacturing — LITUBO",
+      "description": "Our quality standards and manufacturing capabilities."
+    },
+    "globalService": {
+      "title": "Global Service Capability — LITUBO",
+      "description": "Worldwide sales, installation and after-sales support."
+    },
+    "partner": {
+      "title": "Become a Partner — LITUBO",
+      "description": "Join the LITUBO distributor network."
+    },
+    "404": {
+      "title": "Page Not Found — LITUBO",
+      "description": "The page you are looking for could not be found."
+    }
+  },
+  "pages": {
+    "home": {
+      "heroTitle": "Inspection Solutions for Safer Food",
+      "heroSubtitle": "X-Ray, Metal Detection, Checkweighing and Combination systems — engineered for global food manufacturers.",
+      "heroCta": "Explore our systems",
+      "heroCtaSecondary": "Find a distributor"
+    },
+    "products": {
+      "heroTitle": "Inspection Systems",
+      "heroSubtitle": "Five proven technology lines, configurable for your production environment."
+    },
+    "applications": {
+      "heroTitle": "Applications",
+      "heroSubtitle": "Inspection solutions across eight core food and packaging industries."
+    },
+    "resources": {
+      "heroTitle": "Resources",
+      "heroSubtitle": "Insights, case studies, downloads and video demonstrations."
+    },
+    "contact": {
+      "heroTitle": "Contact Us",
+      "heroSubtitle": "Tell us about your requirements. We will respond promptly.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "countryLabel": "Country / Region",
+      "phoneLabel": "Phone (optional)",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Describe your inspection challenge or question.",
+      "submitLabel": "Send message"
+    },
+    "technicalMatching": {
+      "heroTitle": "Technical Matching",
+      "heroSubtitle": "Describe your line requirements for a tailored product recommendation.",
+      "productLabel": "Product / application of interest",
+      "formatLabel": "Product format",
+      "speedLabel": "Line speed (ppm or kg/hr)",
+      "dimensionsLabel": "Package dimensions",
+      "contaminantLabel": "Contaminant concern",
+      "existingEquipLabel": "Existing equipment on the line",
+      "messageLabel": "Additional notes",
+      "submitLabel": "Request recommendation"
+    },
+    "findDistributor": {
+      "heroTitle": "Find a Distributor",
+      "heroSubtitle": "Request contact with an authorised LITUBO distributor in your region.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "countryLabel": "Country / Region",
+      "phoneLabel": "Phone (optional)",
+      "messageLabel": "How can we help?",
+      "submitLabel": "Request distributor contact"
+    },
+    "support": {
+      "heroTitle": "Support",
+      "heroSubtitle": "Spare parts, technical support, service requests and manuals."
+    },
+    "faq": {
+      "heroTitle": "Frequently Asked Questions",
+      "heroSubtitle": "Common questions about LITUBO inspection systems."
+    },
+    "spareParts": {
+      "heroTitle": "Request Spare Parts",
+      "heroSubtitle": "Submit a spare-parts inquiry. Our team will reply with availability and lead times.",
+      "modelLabel": "Machine model",
+      "serialLabel": "Serial number",
+      "partsLabel": "Parts required",
+      "countryLabel": "Installation country",
+      "emailLabel": "Email address",
+      "messageLabel": "Additional notes",
+      "submitLabel": "Submit inquiry"
+    },
+    "productTest": {
+      "heroTitle": "Send Product for Test",
+      "heroSubtitle": "Ship a sample to our application lab for a free detection evaluation.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "productLabel": "Product description",
+      "concernLabel": "Contaminant or issue",
+      "countryLabel": "Country",
+      "messageLabel": "Additional notes",
+      "submitLabel": "Request test"
+    },
+    "serviceRequest": {
+      "heroTitle": "Service Request",
+      "heroSubtitle": "Submit a service or technical support request.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "modelLabel": "Machine model",
+      "serialLabel": "Serial number",
+      "countryLabel": "Installation country",
+      "issueLabel": "Issue description",
+      "urgencyLabel": "Urgency",
+      "submitLabel": "Submit request"
+    },
+    "about": {
+      "heroTitle": "About LITUBO"
+    },
+    "quality": {
+      "heroTitle": "Quality & Manufacturing"
+    },
+    "globalService": {
+      "heroTitle": "Global Service Capability"
+    },
+    "partner": {
+      "heroTitle": "Become a Partner",
+      "heroSubtitle": "Join the LITUBO global distributor network.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company name",
+      "emailLabel": "Email address",
+      "countryLabel": "Country / Region",
+      "messageLabel": "Tell us about your market and experience",
+      "submitLabel": "Submit application"
+    },
+    "privacy": {
+      "heroTitle": "Privacy Policy"
+    },
+    "terms": {
+      "heroTitle": "Terms of Use"
+    },
+    "404": {
+      "title": "Page not found",
+      "body": "The page you are looking for may have moved or no longer exists.",
+      "cta": "Return to home"
+    }
+  }
+}
