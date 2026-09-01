@@ -1,6 +1,6 @@
 # LITUBO 后台内容管理系统 — 一期规格文档
 
-> **版本：** 1.3 — 新增第 2.8 节 Collection 预算与合并原则；统一命名：`blog_posts`→`posts`、`form_submissions`→`inquiries`、`page_home`→`site_content`、`product_downloads`→合并入 `products_files`
+> **版本：** 1.4 — 第 2.8 节补齐产品参数方案、多语言实现方式、全量 M2M Junction 清单与最坏情况预算核算
 > **状态：** 待审批后方可开始开发
 > **适用范围：** 一期上线所需最小可运行后台闭环
 > **技术栈锁定：** Nuxt 3 + Vue 3 + TypeScript / Directus + PostgreSQL / Docker Compose
@@ -299,23 +299,76 @@ LITUBO 使用 **Directus Core（免费方案）**，受以下限制约束：
 
 > ⚠️ **上线前须以 Directus Admin → Settings → Project 实际显示的授权限额为准复核**，以防版本更新或定价政策变化影响上述数字。
 
-#### 2.8.2 预算分配原则
+#### 2.8.2 关键架构决策
 
-| 分配项 | 限额 |
-|---|---|
-| 一期（上线前）目标 | 最多 **18 个** Collection（含 M2M Junction 表） |
-| 二期及后续扩展 | 最多再使用 **5 个** |
-| 始终保留余量 | 任何阶段规划总数 **≤ 23 个**，即至少保留 2 个余量 |
+**决策 1：产品技术参数（specifications）——采用 JSONB Repeater（方案 A）**
 
-**新增 Collection 的审批规则（硬性约束）：** 任何新 Collection 在开发前必须：
+`products` Collection 中增加一个 `specifications` 字段，类型为 **JSON / Repeater**，每行结构如下：
 
-1. 在第 2.8.5 节预算表中新增一行，注明用途和预计数量；
-2. 说明为何无法通过现有 Collection 的类型字段（`content_type`、`inquiry_type`、`page_key` 等）合并管理；
-3. 经明确确认后方可开始开发。
+```json
+{
+  "label_en": "Detection Width",
+  "label_es": "Ancho de detección",
+  "label_pt": "Largura de detecção",
+  "value": "500",
+  "unit": "mm",
+  "display_order": 1,
+  "visible": true
+}
+```
 
-未经上述流程而新增 Collection，视为违反规格。
+- Directus Repeater 界面原生支持行的新增、删除、拖拽排序；
+- 不新增任何额外 Collection；
+- 一期无跨产品参数对比筛选需求，JSONB 完全满足；
+- 如二期需要跨产品参数检索，可迁移为独立 `product_specifications` Collection（届时再计入预算）。
 
-#### 2.8.3 合并原则（禁止拆分）
+**决策 2：多语言（EN / ES / PT）——采用扁平列命名**
+
+所有需要多语言的文本字段，在同一 Collection 内以 `_en` / `_es` / `_pt` 后缀区分，例如：
+
+- `products.name_en`、`products.name_es`、`products.name_pt`
+- `posts.title_en`、`posts.title_es`、`posts.title_pt`
+- `site_content.value_en`、`site_content.value_es`、`site_content.value_pt`
+
+**不使用** Directus 内置翻译功能（Translations Junction）。原因：Directus Translations 功能会为每个启用该功能的 Collection 自动创建一个 `*_translations` Junction 表，每个 Junction 均计入 25 个限额。若对 `products`、`product_categories`、`posts`、`site_content` 4 个 Collection 启用，则额外占用 **4 个**额度，得不偿失。
+
+一期 `_es` 和 `_pt` 字段可为 `null`；前台 adapter 按优先级回退：`_es`/`_pt` → `_en`。后续填充 ES/PT 内容无需任何数据库迁移。
+
+#### 2.8.3 M2M / Junction 表完整清单
+
+Directus 为每个 M2M 关系自动创建 Junction 表，**每个 Junction 均计入 25 个限额**，无论表本身是否有自定义字段。
+
+| Junction 名称 | 关联关系 | 一期状态 | 说明 |
+|---|---|---|---|
+| `products_files` | `products` ↔ `directus_files` | **一期建立** | 含 `file_role` 字段（`gallery` / `datasheet` / `manual` / `certificate`），替代原 `product_downloads`；计入限额 |
+| `products_related` | `products` ↔ `products`（自关联） | **暂不创建** | 一期相关产品以 JSONB 数组存储 slug；如二期需要双向管理，届时申请 |
+| `products_applications` | `products` ↔ `applications` | **暂不创建** | `applications` Collection 本身为二期条件性建立；建立前此 Junction 无意义 |
+| `posts_tags` | `posts` ↔ `tags` | **暂不创建** | `tags` 集合与此 Junction 均为二期可选；一期标签用枚举字段 |
+| `products_translations` | Directus Translations Junction | **永不创建** | 采用扁平列方案，不使用 Directus Translations 功能 |
+| `product_categories_translations` | Directus Translations Junction | **永不创建** | 同上 |
+| `posts_translations` | Directus Translations Junction | **永不创建** | 同上 |
+| `site_content_translations` | Directus Translations Junction | **永不创建** | 同上 |
+
+#### 2.8.4 `site_content` 固定页面覆盖范围
+
+`site_content` 以 `page_key` + `section_key` 两个字段唯一标识每条记录，覆盖以下所有固定页面，**不为任何单页新建独立 Collection**：
+
+| `page_key` | 对应页面路由 | 典型 `section_key` 举例 |
+|---|---|---|
+| `home` | `/` | `hero`、`intro`、`stats`、`cta` |
+| `company-about` | `/company/about` | `mission`、`history`、`team-intro` |
+| `company-quality` | `/company/quality` | `certifications`、`process` |
+| `company-facilities` | `/company/facilities` | `intro`、`gallery-caption` |
+| `company-global` | `/company/global` | `coverage`、`distributors-intro` |
+| `contact` | `/contact` | `hero`、`office-address`、`form-intro` |
+| `support-spare-parts` | `/support/spare-parts` | `hero`、`form-intro` |
+| `support-technical-matching` | `/support/technical-matching` | `hero`、`form-intro` |
+| `legal-privacy` | `/legal/privacy` | `body` |
+| `legal-terms` | `/legal/terms` | `body` |
+
+如后续新增固定页面，新增 `page_key` 记录即可，无需新建 Collection。
+
+#### 2.8.5 合并原则（禁止拆分）
 
 以下合并规则为强制规则，**不得**因产品类型、内容类别或表单来源增加而拆分：
 
@@ -326,48 +379,97 @@ LITUBO 使用 **Directus Core（免费方案）**，受以下限制约束：
 | 表单询盘 | Contact、Technical Matching、Spare Parts、Support 各建 Collection | 统一 `inquiries`，以 `inquiry_type` 枚举字段区分 |
 | 媒体文件 | 为产品图片、PDF、质量证书各建 Collection | 使用 Directus 内置 `directus_files` + 文件夹（Folder）分组，**不额外建 Collection** |
 | SEO 字段 | 建立全局 SEO Collection | SEO 字段随内容实体（`products`、`posts`、`site_content`）保存在同一 Collection |
-| 固定页面 | 每页建一个 singleton Collection（如 `page_home`、`page_company`） | 统一 `site_content`，以 `page_key`（如 `home`、`company-about`）和 `section_key` 区分记录 |
+| 固定页面 | 每页建一个 singleton Collection | 统一 `site_content`，以 `page_key` + `section_key` 区分；具体 `page_key` 见第 2.8.4 节 |
 | 应用场景 / 下载 / 证书 / 合作伙伴 | 默认提前建立 Collection | **仅当**确定需要独立的、有结构化筛选的前台列表页面时，方可申请新建 Collection |
+| 产品技术参数 | 建立独立 `product_specifications` Collection | `products.specifications` JSONB Repeater 字段；见第 2.8.2 节 |
+| 多语言内容 | 启用 Directus Translations（产生 `*_translations` Junction 表） | 扁平列命名（`_en` / `_es` / `_pt`）；见第 2.8.2 节 |
 
-#### 2.8.4 计数规则说明
+**新增 Collection 的审批规则（硬性约束）：** 任何新 Collection 在开发前必须：
+
+1. 在预算表中新增一行，注明用途和预计数量；
+2. 说明为何无法通过现有 Collection 的类型字段或 JSONB 字段解决；
+3. 确认最坏情况总数仍 ≤ 23（保留至少 2 个真实余量）；
+4. 经明确确认后方可开始开发。
+
+#### 2.8.6 计数规则说明
 
 **不计入** 25 个限额的内容：
 
-- Directus 内置系统 Collection：`directus_users`、`directus_files`、`directus_folders`、`directus_roles`、`directus_permissions`、`directus_settings`、`directus_activity`、`directus_revisions`、`directus_sessions` 等；
-- 文件夹（Folder）：不计入，可自由创建用于媒体分组。
+- Directus 内置系统 Collection（`directus_users`、`directus_files`、`directus_folders`、`directus_roles` 等）；
+- 文件夹（Folder）：可自由创建用于媒体分组，不占用额度。
 
 **计入** 25 个限额的内容：
 
 - 通过 Settings → Data Model 创建的所有自定义 Collection；
-- Directus 为 M2M 关系**自动创建的 Junction 表**（如 `products_files`）——每个 M2M 关系对应一个 Junction，均占用一个额度。
+- Directus 为 M2M 关系**自动创建的 Junction 表**——每个 M2M 关系对应一个 Junction，每个均占用一个额度，无论是否有自定义字段。
 
-> **实践建议：** 对"相关产品"等场景，一期优先使用 JSONB 数组存储 slug，而非建立 M2M Junction，以节省额度。
+#### 2.8.7 预算核算
 
-#### 2.8.5 一期 Collection 预算表
+**已规划实际 Collection（一期确定建立）**
 
-| 序号 | Collection 名称 | 用途 | 一期必需 | 合并 / 精简说明 | 累计 |
-|---|---|---|---|---|---|
-| 1 | `products` | 所有产品型号（5 个分类通过 `category_id` 区分） | **✓** | 5 类产品统一管理；无需拆表 | 1 |
-| 2 | `product_categories` | 产品分类定义（5 条固定记录，含 slug、名称、简介、SEO） | **✓** | 产品路由与分类 slug 直接对应，必须独立管理 | 2 |
-| 3 | `products_files` | 产品 ↔ 文件 M2M Junction（`file_role` 字段区分：`gallery` / `datasheet` / `manual` / `certificate`） | **✓** | 合并原 `product_downloads` 与图集关联；避免建立两个 Junction | 3 |
-| 4 | `posts` | 全部博客与资讯内容（Insights / Technical Guides / Case Studies / News），以 `content_type` 字段区分 | **✓** | 4 类内容结构完全相同；统一管理，列表页按类型筛选 | 4 |
-| 5 | `inquiries` | 全部前台表单提交（Contact / Technical Matching / Spare Parts / Support），以 `inquiry_type` 字段区分 | **✓** | 4 类表单字段高度一致；均无独立前台展示，统一管理后按类型筛选 | 5 |
-| 6 | `site_content` | 固定页面内容（首页 Hero、Company、About 等），以 `page_key` + `section_key` 区分记录 | **✓** | 替代原 `page_home` singleton；后续新增页面无需建新 Collection | 6 |
-| — | — | **一期必需合计** | — | — | **6** |
-| 7 | `applications` | 应用场景结构化页面（行业挑战描述、推荐产品关联） | 条件（二期） | 仅当需要独立的、可筛选前台列表时建立；纯文本内容可归入 `site_content` | 7 |
-| 8 | `partners` | 经销商 / 合作伙伴目录 | 条件（二期） | 仅当需要公开的合作伙伴查询页面时建立 | 8 |
-| 9 | `certificates` | 质量证书结构化列表（含有效期、签发机构、证书图片） | 条件（二期） | 单张证书图片可存 Files；仅在需要独立证书目录页时建立 | 9 |
-| 10 | `download_assets` | 独立通用可下载资料（白皮书、行业目录等，无特定产品归属） | 条件（二期） | 产品专属下载通过 `products_files` 管理；本 Collection 仅用于通用资料 | 10 |
-| 11 | 预留槽 A | 未规划功能 | — | 不限定用途；须经审批流程后填入 | 11 |
-| 12 | 预留槽 B | 未规划功能 | — | 不限定用途；须经审批流程后填入 | 12 |
-| — | — | **全部规划合计（含条件项与预留）** | — | — | **12** |
-| — | — | Directus Core 硬限额 | — | — | **25** |
-| — | — | **当前余量** | — | — | **13** |
+| 序号 | Collection 名称 | 类型 | 说明 |
+|---|---|---|---|
+| 1 | `products` | 主 Collection | 所有产品型号 |
+| 2 | `product_categories` | 主 Collection | 5 条分类定义 |
+| 3 | `products_files` | M2M Junction | 产品 ↔ 文件；含 `file_role` |
+| 4 | `posts` | 主 Collection | 全部博客与资讯 |
+| 5 | `inquiries` | 主 Collection | 全部表单询盘 |
+| 6 | `site_content` | 主 Collection | 所有固定页面内容 |
 
-> **备注：**
-> - `related_products`（相关产品关联）一期使用 JSONB 数组存储产品 slug，不建立 M2M Junction，节省 1 个额度；二期如需更灵活的管理可申请新增 Junction。
-> - `directus_files` 为内置 Collection，不计入 25 个限额；Files 文件夹同样不计入，可按第 2.8.3 节媒体规范自由创建。
-> - **上线前须以 Directus 实际授权界面复核限额数字，以防版本更新改变政策。**
+**一期确定建立小计：6 个**
+
+---
+
+**二期条件性 Collection（确认需要时再建）**
+
+| 序号 | Collection 名称 | 类型 | 触发条件 |
+|---|---|---|---|
+| 7 | `applications` | 主 Collection | 需要独立可筛选前台列表 |
+| 8 | `partners` | 主 Collection | 需要公开合作伙伴查询页 |
+| 9 | `certificates` | 主 Collection | 需要独立证书目录页 |
+| 10 | `download_assets` | 主 Collection | 需要通用资料下载库 |
+
+**二期条件性小计（若全部建立）：4 个**
+
+---
+
+**二期若建立关系 Collection 所需 Junction**
+
+| 序号 | Junction 名称 | 触发条件 |
+|---|---|---|
+| 11 | `products_related` | 需要双向相关产品管理 |
+| 12 | `products_applications` | `applications` Collection 建立后 |
+
+**二期 Junction 小计（若全部建立）：2 个**
+
+---
+
+**永不计入（已明确排除）**
+
+| 名称 | 原因 |
+|---|---|
+| `products_translations` 等 4 个翻译 Junction | 采用扁平列方案，Directus Translations 功能不启用 |
+| `product_specifications` Collection | 采用 JSONB Repeater，不建立独立 Collection |
+| `posts_tags` / `tags` | 一期不建标签系统；如需建立须重新核算 |
+
+---
+
+**最坏情况核算（所有条件性项均建立）**
+
+| 分项 | 数量 |
+|---|---|
+| 一期确定建立 | 6 |
+| 二期条件性主 Collection（全建） | 4 |
+| 二期条件性 Junction（全建） | 2 |
+| 多语言 Junction（永不建立） | 0 |
+| `product_specifications` Collection（永不建立） | 0 |
+| **最坏情况总数** | **12** |
+| Directus Core 硬限额 | 25 |
+| **最坏情况余量** | **13** |
+
+> **结论：** 即使一期 + 二期所有条件性 Collection 全部建立，最坏情况总数为 **12 个**，远低于 23 个上限，余量 **13 个**，满足"至少保留 2 个真实余量"的硬性约束。
+>
+> ⚠️ **上线前须以 Directus 实际授权界面复核限额数字，以防版本更新改变政策。**
 
 ---
 
