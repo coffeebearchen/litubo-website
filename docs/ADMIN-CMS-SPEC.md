@@ -1,6 +1,6 @@
 # LITUBO 后台内容管理系统 — 一期规格文档
 
-> **版本：** 1.2 — 调整开发顺序：Products 提前至阶段 3，SEO 独立为阶段 7，共 8 阶段
+> **版本：** 1.3 — 新增第 2.8 节 Collection 预算与合并原则；统一命名：`blog_posts`→`posts`、`form_submissions`→`inquiries`、`page_home`→`site_content`、`product_downloads`→合并入 `products_files`
 > **状态：** 待审批后方可开始开发
 > **适用范围：** 一期上线所需最小可运行后台闭环
 > **技术栈锁定：** Nuxt 3 + Vue 3 + TypeScript / Directus + PostgreSQL / Docker Compose
@@ -153,6 +153,8 @@ Directus 支持通过 storage adapter 将文件直接存储到 S3 兼容的对�
 
 ### 2.4 数据存储结构
 
+> **v1.3 命名更新：** 本节中出现的旧 Collection 名称已按第 2.8 节合并原则替换：`page_home` → `site_content`（以 `page_key` 区分）；`blog_posts` → `posts`（以 `content_type` 区分）；`form_submissions` → `inquiries`（以 `inquiry_type` 区分）；`product_downloads` → 合并入 M2M Junction `products_files`（以 `file_role` 区分）。下方字段设计保留作参考，实际开发以新命名和第 2.8 节预算表为准。
+
 Directus 通过图形界面配置 Collections（对应数据库表）。以下为一期必须创建的 Collections：
 
 #### `directus_users`（Directus 内置）
@@ -281,6 +283,91 @@ DIRECTUS_URL=http://directus:8055
 DIRECTUS_TOKEN=<static-admin-token>
 CMS_MODE=directus
 ```
+
+---
+
+### 2.8 Directus Collection 预算与合并原则
+
+#### 2.8.1 许可证限额
+
+LITUBO 使用 **Directus Core（免费方案）**，受以下限制约束：
+
+| 限制项 | 值 |
+|---|---|
+| 最大自定义 Collection 数 | **25 个** |
+| 最大后台用户数 | **3 个** |
+
+> ⚠️ **上线前须以 Directus Admin → Settings → Project 实际显示的授权限额为准复核**，以防版本更新或定价政策变化影响上述数字。
+
+#### 2.8.2 预算分配原则
+
+| 分配项 | 限额 |
+|---|---|
+| 一期（上线前）目标 | 最多 **18 个** Collection（含 M2M Junction 表） |
+| 二期及后续扩展 | 最多再使用 **5 个** |
+| 始终保留余量 | 任何阶段规划总数 **≤ 23 个**，即至少保留 2 个余量 |
+
+**新增 Collection 的审批规则（硬性约束）：** 任何新 Collection 在开发前必须：
+
+1. 在第 2.8.5 节预算表中新增一行，注明用途和预计数量；
+2. 说明为何无法通过现有 Collection 的类型字段（`content_type`、`inquiry_type`、`page_key` 等）合并管理；
+3. 经明确确认后方可开始开发。
+
+未经上述流程而新增 Collection，视为违反规格。
+
+#### 2.8.3 合并原则（禁止拆分）
+
+以下合并规则为强制规则，**不得**因产品类型、内容类别或表单来源增加而拆分：
+
+| 资源类型 | ❌ 禁止做法 | ✓ 正确做法 |
+|---|---|---|
+| 产品型号 | 每类产品（X-Ray、金属检测等）各建一个 Collection | 统一 `products`，以 `category_id` 外键关联 `product_categories` |
+| 博客与资讯 | Insights、Technical Guides、Case Studies、News 各建 Collection | 统一 `posts`，以 `content_type` 枚举字段区分 |
+| 表单询盘 | Contact、Technical Matching、Spare Parts、Support 各建 Collection | 统一 `inquiries`，以 `inquiry_type` 枚举字段区分 |
+| 媒体文件 | 为产品图片、PDF、质量证书各建 Collection | 使用 Directus 内置 `directus_files` + 文件夹（Folder）分组，**不额外建 Collection** |
+| SEO 字段 | 建立全局 SEO Collection | SEO 字段随内容实体（`products`、`posts`、`site_content`）保存在同一 Collection |
+| 固定页面 | 每页建一个 singleton Collection（如 `page_home`、`page_company`） | 统一 `site_content`，以 `page_key`（如 `home`、`company-about`）和 `section_key` 区分记录 |
+| 应用场景 / 下载 / 证书 / 合作伙伴 | 默认提前建立 Collection | **仅当**确定需要独立的、有结构化筛选的前台列表页面时，方可申请新建 Collection |
+
+#### 2.8.4 计数规则说明
+
+**不计入** 25 个限额的内容：
+
+- Directus 内置系统 Collection：`directus_users`、`directus_files`、`directus_folders`、`directus_roles`、`directus_permissions`、`directus_settings`、`directus_activity`、`directus_revisions`、`directus_sessions` 等；
+- 文件夹（Folder）：不计入，可自由创建用于媒体分组。
+
+**计入** 25 个限额的内容：
+
+- 通过 Settings → Data Model 创建的所有自定义 Collection；
+- Directus 为 M2M 关系**自动创建的 Junction 表**（如 `products_files`）——每个 M2M 关系对应一个 Junction，均占用一个额度。
+
+> **实践建议：** 对"相关产品"等场景，一期优先使用 JSONB 数组存储 slug，而非建立 M2M Junction，以节省额度。
+
+#### 2.8.5 一期 Collection 预算表
+
+| 序号 | Collection 名称 | 用途 | 一期必需 | 合并 / 精简说明 | 累计 |
+|---|---|---|---|---|---|
+| 1 | `products` | 所有产品型号（5 个分类通过 `category_id` 区分） | **✓** | 5 类产品统一管理；无需拆表 | 1 |
+| 2 | `product_categories` | 产品分类定义（5 条固定记录，含 slug、名称、简介、SEO） | **✓** | 产品路由与分类 slug 直接对应，必须独立管理 | 2 |
+| 3 | `products_files` | 产品 ↔ 文件 M2M Junction（`file_role` 字段区分：`gallery` / `datasheet` / `manual` / `certificate`） | **✓** | 合并原 `product_downloads` 与图集关联；避免建立两个 Junction | 3 |
+| 4 | `posts` | 全部博客与资讯内容（Insights / Technical Guides / Case Studies / News），以 `content_type` 字段区分 | **✓** | 4 类内容结构完全相同；统一管理，列表页按类型筛选 | 4 |
+| 5 | `inquiries` | 全部前台表单提交（Contact / Technical Matching / Spare Parts / Support），以 `inquiry_type` 字段区分 | **✓** | 4 类表单字段高度一致；均无独立前台展示，统一管理后按类型筛选 | 5 |
+| 6 | `site_content` | 固定页面内容（首页 Hero、Company、About 等），以 `page_key` + `section_key` 区分记录 | **✓** | 替代原 `page_home` singleton；后续新增页面无需建新 Collection | 6 |
+| — | — | **一期必需合计** | — | — | **6** |
+| 7 | `applications` | 应用场景结构化页面（行业挑战描述、推荐产品关联） | 条件（二期） | 仅当需要独立的、可筛选前台列表时建立；纯文本内容可归入 `site_content` | 7 |
+| 8 | `partners` | 经销商 / 合作伙伴目录 | 条件（二期） | 仅当需要公开的合作伙伴查询页面时建立 | 8 |
+| 9 | `certificates` | 质量证书结构化列表（含有效期、签发机构、证书图片） | 条件（二期） | 单张证书图片可存 Files；仅在需要独立证书目录页时建立 | 9 |
+| 10 | `download_assets` | 独立通用可下载资料（白皮书、行业目录等，无特定产品归属） | 条件（二期） | 产品专属下载通过 `products_files` 管理；本 Collection 仅用于通用资料 | 10 |
+| 11 | 预留槽 A | 未规划功能 | — | 不限定用途；须经审批流程后填入 | 11 |
+| 12 | 预留槽 B | 未规划功能 | — | 不限定用途；须经审批流程后填入 | 12 |
+| — | — | **全部规划合计（含条件项与预留）** | — | — | **12** |
+| — | — | Directus Core 硬限额 | — | — | **25** |
+| — | — | **当前余量** | — | — | **13** |
+
+> **备注：**
+> - `related_products`（相关产品关联）一期使用 JSONB 数组存储产品 slug，不建立 M2M Junction，节省 1 个额度；二期如需更灵活的管理可申请新增 Junction。
+> - `directus_files` 为内置 Collection，不计入 25 个限额；Files 文件夹同样不计入，可按第 2.8.3 节媒体规范自由创建。
+> - **上线前须以 Directus 实际授权界面复核限额数字，以防版本更新改变政策。**
 
 ---
 
