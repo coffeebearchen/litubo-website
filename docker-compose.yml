@@ -1,0 +1,60 @@
+name: litubo-cms
+
+# Production base configuration.
+# Local development: docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+# Production:        docker compose -f docker-compose.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${POSTGRES_DATA_DIR}:/var/lib/postgresql/data
+    networks:
+      - litubo-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  directus:
+    image: directus/directus:11
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # Bound to loopback only — never 0.0.0.0.
+      # Local: access via http://localhost:8055
+      # Production: access only via SSH tunnel (ssh -L 8055:localhost:8055 user@server)
+      - "127.0.0.1:8055:8055"
+    environment:
+      SECRET: ${DIRECTUS_SECRET}
+      DB_CLIENT: pg
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
+      PUBLIC_URL: ${DIRECTUS_PUBLIC_URL}
+      STORAGE_LOCATIONS: local
+      STORAGE_LOCAL_ROOT: /directus/uploads
+      WEBSOCKETS_ENABLED: "false"
+      PUBLIC_REGISTRATION: "false"
+    volumes:
+      - ${DIRECTUS_UPLOADS_DIR}:/directus/uploads
+      # Read-write: snapshot output lands directly in Git working tree
+      - ./directus/schema:/schema
+    networks:
+      - litubo-internal
+
+networks:
+  litubo-internal:
+    driver: bridge

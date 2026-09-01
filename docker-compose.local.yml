@@ -1,0 +1,10 @@
+# Local development overrides.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#
+# This file is NEVER loaded on the production server.
+# Production uses: docker compose -f docker-compose.yml up -d
+
+services:
+  directus:
+    environment:
+      LOG_LEVEL: "info"

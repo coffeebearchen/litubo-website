@@ -66,6 +66,10 @@ export default defineNuxtConfig({
     smtpPort: process.env.SMTP_PORT ?? '587',
     smtpUser: process.env.SMTP_USER ?? '',
     smtpPass: process.env.SMTP_PASS ?? '',
+    // CMS adapter — server-side only, not exposed to the browser.
+    // Populated when CMS_MODE=directus; ignored when CMS_MODE=fixtures (default).
+    directusUrl: process.env.DIRECTUS_URL ?? '',
+    cmsMode: process.env.CMS_MODE ?? 'fixtures',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://litubo.com',
       publishedLocales: ['en'],
