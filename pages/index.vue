@@ -1,9 +1,39 @@
 <script setup lang="ts">
-const { t } = useI18n()
+import type { HomeContent } from '~/types/content'
+
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 
-const heroSrc = '/images/home/home-hero-inspection-line.png'
+const { data: homeContent } = await useAsyncData<HomeContent>(
+  'home-content',
+  () => $fetch('/api/cms/home'),
+  { server: true, lazy: false }
+)
+
+// locale 优先选择对应语言，空值时回退到 EN，EN 也为空时回退到 i18n key
+function cmsText(
+  obj: { en: string; es: string; pt: string } | undefined,
+  i18nKey: string
+): string {
+  if (!obj) return t(i18nKey)
+  const l = locale.value as 'en' | 'es' | 'pt'
+  return obj[l] || obj.en || t(i18nKey)
+}
+
+const hero = computed(() => homeContent.value?.hero ?? null)
+
+const heroImgSrc = computed(() =>
+  hero.value?.imageUrl || '/images/home/home-hero-inspection-line.png'
+)
 const heroImgError = ref(false)
+
+const heroEyebrow = computed(() => cmsText(hero.value?.eyebrow, 'pages.home.heroEyebrow'))
+const heroTitle = computed(() => cmsText(hero.value?.title, 'pages.home.heroTitle'))
+const heroBody = computed(() => cmsText(hero.value?.body, 'pages.home.heroSubtitle'))
+const heroPrimaryLabel = computed(() => cmsText(hero.value?.ctaPrimary.label, 'pages.home.heroCta'))
+const heroPrimaryPath = computed(() => hero.value?.ctaPrimary.path || '/products')
+const heroSecondaryLabel = computed(() => cmsText(hero.value?.ctaSecondary.label, 'pages.home.heroCtaSecondary'))
+const heroSecondaryPath = computed(() => hero.value?.ctaSecondary.path || '/contact')
 
 useHead({
   title: t('seo.home.title'),
@@ -55,7 +85,7 @@ const faqQuestions = [
       <div class="home-hero__bg" aria-hidden="true">
         <img
           v-if="!heroImgError"
-          :src="heroSrc"
+          :src="heroImgSrc"
           alt=""
           class="home-hero__bg-img"
           loading="eager"
@@ -67,18 +97,18 @@ const faqQuestions = [
       <div class="home-hero__inner">
         <!-- Text side -->
         <div class="home-hero__content">
-          <p class="home-hero__eyebrow">{{ t('pages.home.heroEyebrow') }}</p>
-          <h1 class="home-hero__title">{{ t('pages.home.heroTitle') }}</h1>
-          <p class="home-hero__subtitle">{{ t('pages.home.heroSubtitle') }}</p>
+          <p class="home-hero__eyebrow">{{ heroEyebrow }}</p>
+          <h1 class="home-hero__title">{{ heroTitle }}</h1>
+          <p class="home-hero__subtitle">{{ heroBody }}</p>
           <div class="home-hero__actions">
-            <NuxtLink :to="localePath('/products')" class="hero-btn hero-btn--primary">
-              {{ t('pages.home.heroCta') }}
+            <NuxtLink :to="localePath(heroPrimaryPath)" class="hero-btn hero-btn--primary">
+              {{ heroPrimaryLabel }}
               <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
                 <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </NuxtLink>
-            <NuxtLink :to="localePath('/contact')" class="hero-btn hero-btn--outline">
-              {{ t('pages.home.heroCtaSecondary') }}
+            <NuxtLink :to="localePath(heroSecondaryPath)" class="hero-btn hero-btn--outline">
+              {{ heroSecondaryLabel }}
             </NuxtLink>
           </div>
         </div>

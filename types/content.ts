@@ -15,6 +15,25 @@ export type Locale = 'en' | 'es' | 'pt'
 
 export type ContentStatus = 'published' | 'draft' | 'archived'
 
+/* ─── Homepage ─────────────────────────────────────────────── */
+export interface HomeHeroCta {
+  label: LocalizedString
+  path: string
+}
+
+export interface HomeHeroContent {
+  imageUrl: string
+  eyebrow: LocalizedString
+  title: LocalizedString
+  body: LocalizedString
+  ctaPrimary: HomeHeroCta
+  ctaSecondary: HomeHeroCta
+}
+
+export interface HomeContent {
+  hero: HomeHeroContent | null
+}
+
 export interface SEOMeta {
   title: LocalizedString
   description: LocalizedString
