@@ -20,9 +20,22 @@ async function submit() {
   if (!validate()) return
   status.value = 'loading'
   try {
-    await $fetch('/api/spare-parts', {
+    await $fetch('/api/inquiries', {
       method: 'POST',
-      body: { ...form, formId: 'spare-parts', sourceUrl: useRoute().fullPath, locale: useI18n().locale.value },
+      body: {
+        inquiry_type: 'spare_parts',
+        locale: useI18n().locale.value,
+        contact_email: form.email,
+        model_number: form.model,
+        serial_number: form.serial,
+        contact_country: form.country,
+        // parts description is the primary message; append optional additional notes
+        message: form.message
+          ? `${form.parts}\n\nAdditional notes: ${form.message}`
+          : form.parts,
+        consent: form.consent,
+        website: '',
+      },
     })
     status.value = 'success'
   } catch {

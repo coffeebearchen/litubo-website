@@ -20,9 +20,21 @@ async function submit() {
   if (!validate()) return
   status.value = 'loading'
   try {
-    await $fetch('/api/support-request', {
+    await $fetch('/api/inquiries', {
       method: 'POST',
-      body: { ...form, formId: 'send-product-test', sourceUrl: useRoute().fullPath, locale: useI18n().locale.value },
+      body: {
+        inquiry_type: 'send_product_test',
+        locale: useI18n().locale.value,
+        contact_name: form.name,
+        contact_company: form.company,
+        contact_email: form.email,
+        contact_country: form.country,
+        tm_product_interest: form.product,
+        concern: form.concern,
+        message: form.message,
+        consent: form.consent,
+        website: '',
+      },
     })
     status.value = 'success'
   } catch {

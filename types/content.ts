@@ -211,7 +211,50 @@ export interface FAQ {
   noIndex?: boolean
 }
 
-/* ─── Form ─────────────────────────────────────────────────────────── */
+/* ─── Inquiry (Phase 6 — unified form submission to Directus) ───────── */
+export type InquiryType =
+  | 'contact'
+  | 'technical_matching'
+  | 'distributor'
+  | 'spare_parts'
+  | 'support_request'
+  | 'send_product_test'
+
+export type InquiryStatus = 'new' | 'in_progress' | 'resolved' | 'spam'
+
+export interface InquiryPayload {
+  inquiry_type: InquiryType
+  status: InquiryStatus
+  locale: Locale
+  consent_given: boolean
+  consented_at: string
+  privacy_policy_version: string
+  contact_name: string | null
+  contact_email: string
+  contact_phone: string | null
+  contact_company: string | null
+  contact_country: string | null
+  contact_title: string | null
+  message: string | null
+  related_product_slug: string | null
+  related_application_slug: string | null
+  model_number: string | null
+  serial_number: string | null
+  tm_product_interest: string | null
+  tm_product_format: string | null
+  tm_line_speed: string | null
+  tm_package_dimensions: string | null
+  tm_contaminant_concern: string | null
+  tm_existing_equipment: string | null
+  source_url: string
+  referrer: string | null
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  raw_fields: Record<string, unknown>
+}
+
+/* ─── Form (legacy shape kept for reference) ────────────────────────── */
 export type FormPurpose = 'contact' | 'technical-matching' | 'find-a-distributor'
   | 'spare-parts' | 'send-product-test' | 'support-request' | 'become-a-partner'
 

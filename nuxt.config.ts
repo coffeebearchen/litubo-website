@@ -66,6 +66,10 @@ export default defineNuxtConfig({
     smtpPort: process.env.SMTP_PORT ?? '587',
     smtpUser: process.env.SMTP_USER ?? '',
     smtpPass: process.env.SMTP_PASS ?? '',
+    smtpFrom: process.env.SMTP_FROM ?? 'noreply@litubo.com',
+    // Inquiry security — server-side only
+    submissionIpSecret: process.env.SUBMISSION_IP_SECRET ?? '',
+    privacyPolicyVersion: process.env.PRIVACY_POLICY_VERSION ?? '1.0',
     // CMS adapter — server-side only, not exposed to the browser.
     // Populated when CMS_MODE=directus; ignored when CMS_MODE=fixtures (default).
     directusUrl: process.env.DIRECTUS_URL ?? '',
