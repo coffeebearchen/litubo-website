@@ -75,6 +75,10 @@ export default defineNuxtConfig({
     directusUrl: process.env.DIRECTUS_URL ?? '',
     directusToken: process.env.DIRECTUS_TOKEN ?? '',
     cmsMode: process.env.CMS_MODE ?? 'fixtures',
+    // HubSpot Contact sync (Phase 7A framework — Phase 7B configures token)
+    hubspotAccessToken: process.env.HUBSPOT_ACCESS_TOKEN ?? '',
+    // Override API base for local mock testing only; always https://api.hubapi.com in production
+    hubspotApiBase: process.env.HUBSPOT_API_BASE_URL ?? '',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://litubo.com',
       publishedLocales: ['en'],

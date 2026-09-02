@@ -5,7 +5,8 @@ import { useRuntimeConfig } from '#imports'
 import { checkRateLimit } from '~/server/utils/rateLimit'
 import { writeInquiry } from '~/server/utils/writeInquiry'
 import { sendInquiryEmail } from '~/server/utils/sendInquiryEmail'
-import type { InquiryType } from '~/types/content'
+import { syncHubspot } from '~/server/utils/syncHubspot'
+import type { InquiryType, HubspotSyncStatus } from '~/types/content'
 
 const VALID_INQUIRY_TYPES: InquiryType[] = [
   'contact', 'technical_matching', 'distributor',
@@ -94,6 +95,7 @@ function safeSourceUrl(
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
+  const hasHubspotToken = Boolean(config.hubspotAccessToken)
   const body = await readBody<Record<string, unknown>>(event)
 
   // Step 1 — IP hash (never stored, only used in rate-limit key)
@@ -166,6 +168,7 @@ export default defineEventHandler(async (event) => {
 
   // Step 7 — Build Directus payload
   const now = new Date().toISOString()
+  const hubspotSyncStatus: HubspotSyncStatus = hasHubspotToken ? 'pending' : 'not_configured'
   const payload: Record<string, unknown> = {
     inquiry_type: san.inquiry_type,
     status: 'new',
@@ -196,6 +199,7 @@ export default defineEventHandler(async (event) => {
     utm_medium: san.utm_medium || null,
     utm_campaign: san.utm_campaign || null,
     raw_fields: rawFields,
+    hubspot_sync_status: hubspotSyncStatus,
   }
 
   // Step 8 — Write to Directus; surface 503 on failure (never silent)
@@ -206,5 +210,23 @@ export default defineEventHandler(async (event) => {
     console.error('[inquiry] email notification failed', { id: result.id })
   })
 
-  return { ok: true, ...(result.id !== null ? { id: result.id } : {}) }
+  // Step 10 — HubSpot Contact sync (controlled await, bounded by HUBSPOT_REQUEST_TIMEOUT_MS).
+  // Any outcome (success, error, timeout) is written back to the Directus record.
+  // The form response is always { ok: true } as long as Directus write succeeded.
+  if (hasHubspotToken && result.id !== null) {
+    await syncHubspot(result.id, {
+      contact_email: String(san.contact_email),
+      contact_name: san.contact_name ? String(san.contact_name) : null,
+      contact_company: san.contact_company ? String(san.contact_company) : null,
+      contact_phone: san.contact_phone ? String(san.contact_phone) : null,
+      inquiry_type: String(san.inquiry_type),
+      locale: String(san.locale || 'en'),
+      related_product_slug: san.related_product_slug ? String(san.related_product_slug) : null,
+      source_url: sourceUrl,
+    }).catch(() => {
+      // syncHubspot handles its own error logging and Directus write-back
+    })
+  }
+
+  return { ok: true }
 })

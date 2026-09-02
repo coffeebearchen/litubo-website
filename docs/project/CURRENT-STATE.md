@@ -111,11 +111,42 @@
 
 ---
 
-## 4. 当前待办 — HubSpot Phase 7A
+## 4. 当前状态 — HubSpot Phase 7A 已完成
 
-**状态：计划已确认，尚未实施。**
+**状态：Phase 7A 本地实施完成，已提交，等待 Phase 7B Token 真实验收。**
 
-### 7A 不需要的内容（不要向用户索取）
+### Phase 7A 完成内容
+
+| 类别 | 完成项 |
+|------|--------|
+| Directus 字段 | `inquiries` 新增 4 个 `hubspot_*` 字段 |
+| Directus 权限 | nuxt-server READ=id、CREATE+hubspot_sync_status、UPDATE=hubspot 字段 |
+| 新建文件 | `server/utils/syncHubspot.ts`、`directus/schema/phase6-before-hubspot.yaml`、`directus/schema/phase7-hubspot.yaml` |
+| 修改文件 | `server/utils/writeInquiry.ts`（?fields=id）、`server/api/inquiries.post.ts`（syncHubspot 集成）、`nuxt.config.ts`、`.env.example`、`pages/privacy-policy.vue`、`docs/OPERATIONS-HANDBOOK.md` |
+| 类型 | `types/content.ts` 新增 `HubspotSyncStatus` 类型 |
+| 验收 | typecheck 0 错误、lint 0 错误、build 通过、隐私政策页面浏览器验证通过、mock 分支验证（success/error/timeout/INVALID_PROPERTY）通过 |
+
+### 无 Token 状态说明
+
+当前所有询盘写入后 `hubspot_sync_status = not_configured`，这是正确的预期状态。
+
+### Phase 7B 仍需用户完成的内容
+
+### Phase 7B 需要用户完成（开发人员不可代劳）
+
+1. 在 HubSpot 账户中创建 **Private App**（不是 API Key），权限：`crm.objects.contacts.read`、`crm.objects.contacts.write`
+2. 在 HubSpot **联系人属性** 中创建 4 个自定义属性：`litubo_inquiry_type`、`litubo_locale`、`litubo_related_product_slug`、`litubo_source_url`
+3. 将 Private App 的 Access Token 写入服务器 `.env`：`HUBSPOT_ACCESS_TOKEN=<token>`
+4. 重启 Nuxt（`docker compose restart nuxt`）
+5. 提交真实测试询盘，验证 HubSpot Contact 和 `hubspot_sync_status=success`
+
+**不需要创建 Deal、Pipeline 或 Stage——Phase 7A/B 只同步 Contact。**
+
+---
+
+### 历史待办（已完成的 7A）——不需要的内容
+
+#### 7A 不需要的内容（不要向用户索取）
 
 - HubSpot Access Token
 - HubSpot Portal ID

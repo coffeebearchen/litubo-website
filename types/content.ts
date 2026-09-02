@@ -222,6 +222,14 @@ export type InquiryType =
 
 export type InquiryStatus = 'new' | 'in_progress' | 'resolved' | 'spam'
 
+/* Phase 7A: HubSpot Contact sync status stored on each inquiry record */
+export type HubspotSyncStatus =
+  | 'not_configured'
+  | 'pending'
+  | 'success'
+  | 'error'
+  | 'timeout'
+
 export interface InquiryPayload {
   inquiry_type: InquiryType
   status: InquiryStatus
@@ -252,6 +260,7 @@ export interface InquiryPayload {
   utm_medium: string | null
   utm_campaign: string | null
   raw_fields: Record<string, unknown>
+  hubspot_sync_status: HubspotSyncStatus
 }
 
 /* ─── Form (legacy shape kept for reference) ────────────────────────── */

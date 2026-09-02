@@ -8,7 +8,7 @@ export async function writeInquiry(
   // Directus returns 204 No Content when CREATE succeeds but READ is not granted.
   // ofetch resolves 204 as null — we treat null as a successful write.
   try {
-    const res = await directusFetch<{ data: { id: number } } | null>('/items/inquiries', {
+    const res = await directusFetch<{ data: { id: number } } | null>('/items/inquiries?fields=id', {
       method: 'POST',
       body: payload,
     })

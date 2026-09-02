@@ -451,33 +451,48 @@ tar -czf uploads_backup_$(date +%Y%m%d).tar.gz /path/to/directus/uploads
 
 ---
 
-## 8. 未来 HubSpot / AI 集成
+## 8. HubSpot / AI 集成
 
-### 当前状态
+### 当前状态（Phase 7A 完成后）
 
-**HubSpot 集成：尚未连接。**  
-所有询盘目前只存储在 Directus 数据库中，不会自动同步到 HubSpot CRM。
+**HubSpot 同步代码已就绪，尚未配置 Token。**  
+同步代码框架已在 Phase 7A 实施完成。当前所有询盘写入 Directus 后，`hubspot_sync_status` 字段值为 `not_configured`，表示尚未连接真实 HubSpot 账户。
+
+**当前询盘的 hubspot_sync_status = `not_configured`**，这是预期的正常状态，不是错误。
 
 **AI 辅助回复：尚未启用。**  
 `inquiries` 表中预留了 `ai_draft_reply` 字段（AI 建议回复草稿），当前字段为空，AI 功能未接入任何真实 API。
 
+### Directus inquiries 新增字段说明
+
+Phase 7A 在 `inquiries` 表中新增了以下 4 个字段，运营人员可在 Directus 后台查看：
+
+| 字段 | 含义 | 可能值 |
+|------|------|--------|
+| `hubspot_sync_status` | HubSpot 同步状态 | `not_configured`（未配置 Token）/ `pending`（同步中）/ `success`（成功）/ `error`（失败）/ `timeout`（超时） |
+| `hubspot_contact_id` | HubSpot Contact ID | 同步成功后自动填入，否则为空 |
+| `hubspot_synced_at` | 同步时间戳 | 同步操作发生时自动记录 |
+| `hubspot_error_summary` | 错误摘要 | 同步失败时记录技术性错误码，不含个人信息 |
+
 ### 密钥存放原则
 
-当 HubSpot 和 AI 功能启用后：
-
-- `HUBSPOT_ACCESS_TOKEN`：只能放在腾讯云服务器的 `.env` 文件中
+- `HUBSPOT_ACCESS_TOKEN`：只能放在腾讯云服务器的 `.env` 文件中，不写入代码、文档或 Git
 - `OPENAI_API_KEY` 或其他 AI 服务密钥：同上
-- **绝对不可以**将密钥写入代码、文档、聊天记录或 Git 提交
 
-### 运营人员未来的操作步骤
+### Phase 7B 运营人员操作步骤
 
-当开发团队通知 HubSpot 集成已就绪后：
+Phase 7B 由开发团队在 HubSpot 账户中完成以下设置后通知运营：
 
-1. 开发人员在服务器 `.env` 中添加 `HUBSPOT_ACCESS_TOKEN`
-2. 重启 Nuxt 服务（`docker compose restart nuxt`）
-3. 向前台提交一个真实测试询盘
-4. 登录 HubSpot 后台，确认该询盘已作为 Contact / Deal 出现
-5. 如未出现，联系开发人员查看日志（不要反复测试，避免产生大量假数据）
+1. 在 HubSpot 中创建 Private App，获取 Access Token
+2. 在 HubSpot 联系人属性中创建 `litubo_inquiry_type`、`litubo_locale`、`litubo_related_product_slug`、`litubo_source_url` 四个自定义属性
+3. 在服务器 `.env` 中添加 `HUBSPOT_ACCESS_TOKEN=<token值>`
+4. 重启 Nuxt 服务（`docker compose restart nuxt`）
+5. 向前台提交一个真实测试询盘
+6. 登录 HubSpot 后台，确认该询盘已作为 Contact 出现，且自定义属性有值
+7. 查看 Directus 中该询盘的 `hubspot_sync_status` 是否变为 `success`
+8. 如状态为 `error` 或 `timeout`，联系开发人员查看日志
+
+**注意**：Phase 7A / 7B 只同步 HubSpot Contact，不创建 Deal，不关联 Pipeline。
 
 ### 各功能计划状态说明
 
@@ -485,7 +500,8 @@ tar -czf uploads_backup_$(date +%Y%m%d).tar.gz /path/to/directus/uploads
 |------|---------|---------|
 | 询盘写入 Directus | ✅ 已启用 | — |
 | 邮件通知 | ⏸ 待配置 | 服务器配置 SMTP_HOST |
-| HubSpot 同步 | ❌ 尚未连接 | 需开发人员接入 |
+| HubSpot Contact 同步 | ⏸ 代码已就绪，待配置 Token | Phase 7B：在 .env 设置 HUBSPOT_ACCESS_TOKEN |
+| HubSpot Deal 创建 | 🚫 本期不实施 | 后续独立模块 |
 | AI 辅助草稿 | ❌ 尚未启用 | 需开发人员接入 |
 | AI 自动发邮件 | 🚫 永不允许 | — |
 
