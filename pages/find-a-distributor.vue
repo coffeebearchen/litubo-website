@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 
 useHead({
@@ -28,7 +28,7 @@ async function submit() {
       method: 'POST',
       body: {
         inquiry_type: 'distributor',
-        locale: useI18n().locale.value,
+        locale: locale.value,
         contact_name: form.name,
         contact_company: form.company,
         contact_email: form.email,

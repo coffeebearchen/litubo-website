@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
 const requestType = computed(() => route.params.requestType as string)
@@ -35,7 +35,7 @@ async function submit() {
       method: 'POST',
       body: {
         inquiry_type: 'support_request',
-        locale: useI18n().locale.value,
+        locale: locale.value,
         contact_name: form.name,
         contact_company: form.company,
         contact_email: form.email,

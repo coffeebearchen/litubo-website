@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 useHead({ title: `${t('pages.spareParts.heroTitle')} — LITUBO` })
 
@@ -24,7 +24,7 @@ async function submit() {
       method: 'POST',
       body: {
         inquiry_type: 'spare_parts',
-        locale: useI18n().locale.value,
+        locale: locale.value,
         contact_email: form.email,
         model_number: form.model,
         serial_number: form.serial,
