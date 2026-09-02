@@ -42,6 +42,59 @@ export interface SEOMeta {
   noIndex?: boolean
 }
 
+/* ─── Posts (Blog / Knowledge) ─────────────────────────────────── */
+
+export type ContentType = 'insight' | 'technical_guide' | 'case_study' | 'news' | 'faq'
+
+export type FaqGroup =
+  | 'xray'
+  | 'metal-detection'
+  | 'checkweighing'
+  | 'applications'
+  | 'service-support'
+  | 'general'
+
+export type PostTopic =
+  | 'xray'
+  | 'metal-detection'
+  | 'checkweighing'
+  | 'combination-inspection'
+  | 'food-safety'
+  | 'product-selection'
+  | 'applications'
+  | 'regulations-compliance'
+  | 'service-maintenance'
+  | 'company-news'
+
+export interface PostListItem {
+  id: string
+  contentType: ContentType
+  slug: string
+  publishDate: string | null
+  author: string | null
+  topics: PostTopic[]
+  coverImageUrl: string
+  title: LocalizedString
+  excerpt: LocalizedString
+  /** Populated only when the list endpoint is called with content_type=faq */
+  faqGroup?: FaqGroup | null
+  /** Populated only when the list endpoint is called with content_type=faq */
+  bodyHtml?: LocalizedString
+}
+
+export interface Post extends PostListItem {
+  faqGroup: FaqGroup | null
+  relatedProductSlugs: string[]
+  relatedApplicationSlugs: string[]
+  bodyHtml: LocalizedString
+  seo: SEOMeta
+}
+
+export interface PostsResult {
+  posts: PostListItem[]
+  cmsError?: boolean
+}
+
 export interface MediaAsset {
   id: string
   url: string

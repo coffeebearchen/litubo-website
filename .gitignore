@@ -26,6 +26,9 @@ Thumbs.db
 # Local CMS data volumes (bind mounts — never commit)
 dev-data/
 
+# Local database backups (never commit)
+backups/
+
 # Logs
 *.log
 npm-debug.log*
