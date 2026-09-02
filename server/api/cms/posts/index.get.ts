@@ -78,9 +78,8 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
   const filters: string[] = ['filter[status][_eq]=published']
   if (type) filters.push(`filter[content_type][_eq]=${encodeURIComponent(type)}`)
   if (excludeType) filters.push(`filter[content_type][_neq]=${encodeURIComponent(excludeType)}`)
-  if (topics && topics.length > 0) {
-    filters.push(`filter[topics][_contains_any]=${encodeURIComponent(JSON.stringify(topics))}`)
-  }
+  // Note: Directus 11 json field type does not support array subset operators.
+  // Topics filtering is applied server-side after fetching.
 
   const isFaqQuery = type === 'faq'
   const fields = [
@@ -90,17 +89,26 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
     ...(isFaqQuery ? ['body_en', 'body_es', 'body_pt'] : []),
   ].join(',')
 
+  // When topics filter is active, fetch all (up to 500) then filter server-side
+  const effectiveLimit = (topics && topics.length > 0) ? 500 : limit
+  const effectiveOffset = (topics && topics.length > 0) ? 0 : offset
+
   const qs = [
     ...filters,
     `fields=${fields}`,
-    `limit=${limit}`,
-    `offset=${offset}`,
+    `limit=${effectiveLimit}`,
+    `offset=${effectiveOffset}`,
     'sort=-publish_date',
   ].join('&')
 
   try {
     const res = await directusFetch<{ data: DirectusPost[] }>(`/items/posts?${qs}`)
-    return { posts: res.data.map(r => toListItem(r, isFaqQuery)) }
+    let items = res.data.map(r => toListItem(r, isFaqQuery))
+    if (topics && topics.length > 0) {
+      items = items.filter(p => topics.some(t => p.topics.includes(t as PostListItem['topics'][number])))
+      items = items.slice(offset, offset + limit)
+    }
+    return { posts: items }
   }
   catch (err) {
     console.error('[cms/posts] Directus fetch failed:', err instanceof Error ? err.message : err)
