@@ -16,9 +16,13 @@ const bodyHtml = computed(() => localized(post.value?.bodyHtml))
 const seoTitle = computed(() => localized(post.value?.seo?.title) || `${title.value} | LITUBO`)
 const seoDesc = computed(() => localized(post.value?.seo?.description) || excerpt.value)
 
-useHead({
+useSeoHead({
   title: seoTitle,
-  meta: [{ name: 'description', content: seoDesc }],
+  description: seoDesc,
+  canonicalPath: computed(() => post.value?.seo?.canonicalPath ?? ''),
+  ogImage: computed(() => post.value?.seo?.ogImage),
+  noIndex: computed(() => post.value?.seo?.noIndex),
+  ogType: 'article',
 })
 </script>
 

@@ -2,9 +2,10 @@
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 
-useHead({
+useSeoHead({
   title: t('seo.technicalMatching.title'),
-  meta: [{ name: 'description', content: t('seo.technicalMatching.description') }],
+  description: t('seo.technicalMatching.description'),
+  canonicalPath: '/technical-matching',
 })
 
 const form = reactive({

@@ -1,10 +1,7 @@
 <script setup lang="ts">
 const { t } = useI18n()
 
-useHead({
-  title: t('seo.404.title'),
-  meta: [{ name: 'robots', content: 'noindex' }],
-})
+useSeoHead({ title: t('seo.404.title'), description: '', canonicalPath: '', noIndex: true })
 
 throw createError({ statusCode: 404, fatal: true })
 </script>

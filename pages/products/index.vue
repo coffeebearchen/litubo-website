@@ -9,9 +9,10 @@ const { data: categories } = await useAsyncData<ProductCategory[]>(
   () => $fetch('/api/cms/products/categories')
 )
 
-useHead({
+useSeoHead({
   title: t('seo.products.title'),
-  meta: [{ name: 'description', content: t('seo.products.description') }],
+  description: t('seo.products.description'),
+  canonicalPath: '/products',
 })
 </script>
 

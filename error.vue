@@ -6,10 +6,7 @@ defineProps<{
   error: { statusCode: number; message?: string }
 }>()
 
-useHead({
-  title: t('seo.404.title'),
-  meta: [{ name: 'robots', content: 'noindex' }],
-})
+useSeoHead({ title: t('seo.404.title'), description: '', canonicalPath: '', noIndex: true })
 </script>
 
 <template>

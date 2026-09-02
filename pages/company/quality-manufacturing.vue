@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const { t } = useI18n()
 const localePath = useLocalePath()
-useHead({ title: t('seo.quality.title'), meta: [{ name: 'description', content: t('seo.quality.description') }] })
+useSeoHead({ title: t('seo.quality.title'), description: t('seo.quality.description'), canonicalPath: '/company/quality-manufacturing' })
 
 const imgErrors = ref({ lab: false, floor: false })
 const labSrc = '/images/company/company-quality-lab.jpg'

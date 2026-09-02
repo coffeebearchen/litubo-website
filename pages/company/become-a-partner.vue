@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const { t } = useI18n()
 const localePath = useLocalePath()
-useHead({ title: t('seo.partner.title'), meta: [{ name: 'description', content: t('seo.partner.description') }] })
+useSeoHead({ title: t('seo.partner.title'), description: t('seo.partner.description'), canonicalPath: '/company/become-a-partner' })
 
 const form = reactive({ name: '', company: '', email: '', country: '', message: '', consent: false })
 const errors = reactive<Record<string, string>>({})

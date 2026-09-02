@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
 const app = computed(() => useApplication(route.params.slug as string))
@@ -9,9 +9,18 @@ if (!app.value) {
   throw createError({ statusCode: 404, statusMessage: 'Application not found' })
 }
 
-useHead({
-  title: app.value?.seo.title.en ?? t('seo.applications.title'),
-  meta: [{ name: 'description', content: app.value?.seo.description.en ?? '' }],
+const appLocale = computed(() => locale.value as 'en' | 'es' | 'pt')
+const appSeoTitle = computed(() =>
+  app.value?.seo.title[appLocale.value] || app.value?.seo.title.en || t('seo.applications.title')
+)
+const appSeoDesc = computed(() =>
+  app.value?.seo.description[appLocale.value] || app.value?.seo.description.en || ''
+)
+useSeoHead({
+  title: appSeoTitle,
+  description: appSeoDesc,
+  canonicalPath: computed(() => app.value?.seo.canonicalPath ?? ''),
+  noIndex: computed(() => app.value?.seo.noIndex),
 })
 
 const imgError = ref(false)

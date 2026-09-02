@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const { t } = useI18n()
 const localePath = useLocalePath()
-useHead({ title: t('seo.support.title'), meta: [{ name: 'description', content: t('seo.support.description') }] })
+useSeoHead({ title: t('seo.support.title'), description: t('seo.support.description'), canonicalPath: '/support' })
 </script>
 
 <template>

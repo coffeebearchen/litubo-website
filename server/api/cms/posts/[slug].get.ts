@@ -86,11 +86,22 @@ function safeHtml(raw: string | null): string {
   return sanitizeHtml(raw, SANITIZE_CONFIG)
 }
 
+// Maps content_type to its public URL path prefix.
+// faq is intentionally excluded: FAQ items have no individual detail route.
+const CONTENT_TYPE_PATH: Record<string, string> = {
+  insight: '/resources/insights',
+  case_study: '/resources/case-studies',
+  technical_guide: '/resources/technical-guides',
+  news: '/resources/news',
+}
+
 function toPost(r: DirectusPostDetail, slug: string): Post {
+  const postSlug = r.slug ?? slug
+  const pathPrefix = CONTENT_TYPE_PATH[r.content_type]
   return {
     id: String(r.id),
     contentType: r.content_type as Post['contentType'],
-    slug: r.slug ?? slug,
+    slug: postSlug,
     publishDate: r.publish_date ?? null,
     author: r.author ?? null,
     topics: (r.topics ?? []) as Post['topics'],
@@ -116,7 +127,7 @@ function toPost(r: DirectusPostDetail, slug: string): Post {
         es: r.seo_description_es ?? '',
         pt: r.seo_description_pt ?? '',
       },
-      canonicalPath: '',
+      canonicalPath: pathPrefix ? `${pathPrefix}/${postSlug}` : '',
       ogImage: r.seo_og_image ? `/api/cms/media/${r.seo_og_image}` : undefined,
     },
   }

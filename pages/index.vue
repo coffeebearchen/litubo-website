@@ -35,14 +35,10 @@ const heroPrimaryPath = computed(() => hero.value?.ctaPrimary.path || '/products
 const heroSecondaryLabel = computed(() => cmsText(hero.value?.ctaSecondary.label, 'pages.home.heroCtaSecondary'))
 const heroSecondaryPath = computed(() => hero.value?.ctaSecondary.path || '/contact')
 
-useHead({
+useSeoHead({
   title: t('seo.home.title'),
-  meta: [
-    { name: 'description', content: t('seo.home.description') },
-    { property: 'og:title', content: t('seo.home.title') },
-    { property: 'og:description', content: t('seo.home.description') },
-    { property: 'og:type', content: 'website' },
-  ],
+  description: t('seo.home.description'),
+  canonicalPath: '/',
 })
 
 const demoResources = [

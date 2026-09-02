@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Product, ProductCategory } from '~/types/content'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
 const categorySlug = route.params.category as string
@@ -22,9 +22,21 @@ const { data: categoryData } = await useAsyncData<{ category: ProductCategory; p
 )
 const category = computed(() => categoryData.value?.category)
 
-useHead({
-  title: product.value?.seo.title.en ?? t('seo.products.title'),
-  meta: [{ name: 'description', content: product.value?.seo.description.en ?? '' }],
+const prodSeoTitle = computed(() => {
+  const l = locale.value as 'en' | 'es' | 'pt'
+  return (product.value?.seo.title[l] || product.value?.seo.title.en) ?? t('seo.products.title')
+})
+const prodSeoDesc = computed(() => {
+  const l = locale.value as 'en' | 'es' | 'pt'
+  return product.value?.seo.description[l] || product.value?.seo.description.en || ''
+})
+useSeoHead({
+  title: prodSeoTitle,
+  description: prodSeoDesc,
+  canonicalPath: computed(() => product.value?.seo.canonicalPath ?? ''),
+  ogImage: computed(() => product.value?.seo.ogImage),
+  noIndex: computed(() => product.value?.seo.noIndex),
+  ogType: 'website',
 })
 </script>
 

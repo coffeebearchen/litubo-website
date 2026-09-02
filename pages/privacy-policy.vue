@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const { t } = useI18n()
 const localePath = useLocalePath()
-useHead({ title: 'Privacy Policy — LITUBO', meta: [{ name: 'robots', content: 'noindex' }] })
+useSeoHead({ title: 'Privacy Policy — LITUBO', description: 'LITUBO privacy policy and data handling information.', canonicalPath: '', noIndex: true })
 </script>
 
 <template>

@@ -5,7 +5,7 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 const { locale } = useI18n()
 
-useHead({ title: t('seo.faq.title'), meta: [{ name: 'description', content: t('seo.faq.description') }] })
+useSeoHead({ title: t('seo.faq.title'), description: t('seo.faq.description'), canonicalPath: '/support/faq' })
 
 const { data: faqData } = await useAsyncData<PostsResult>(
   'cms-faq-list',

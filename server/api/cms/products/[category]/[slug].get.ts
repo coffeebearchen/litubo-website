@@ -25,6 +25,7 @@ interface DirectusProduct {
   seo_description_en: string | null
   seo_description_es: string | null
   seo_description_pt: string | null
+  seo_image: string | null
   seo_noindex: boolean | null
   status: string
 }
@@ -53,8 +54,18 @@ export default defineEventHandler(async (event) => {
   if (!catRes.data.length) throw createError({ statusCode: 404 })
   const categoryId = catRes.data[0].id
 
+  const prodFields = [
+    'id', 'slug', 'category_id', 'status',
+    'name_en', 'name_es', 'name_pt',
+    'summary_en', 'summary_es', 'summary_pt',
+    'hero_image', 'highlights', 'specifications',
+    'related_product_slugs', 'application_slugs',
+    'seo_title_en', 'seo_title_es', 'seo_title_pt',
+    'seo_description_en', 'seo_description_es', 'seo_description_pt',
+    'seo_image', 'seo_noindex',
+  ].join(',')
   const prodRes = await directusFetch<{ data: DirectusProduct[] }>(
-    `/items/products?filter[slug][_eq]=${encodeURIComponent(productSlug)}&filter[category_id][_eq]=${categoryId}&filter[status][_eq]=published&limit=1`
+    `/items/products?filter[slug][_eq]=${encodeURIComponent(productSlug)}&filter[category_id][_eq]=${categoryId}&filter[status][_eq]=published&fields=${prodFields}&limit=1`
   )
   if (!prodRes.data.length) throw createError({ statusCode: 404 })
 
@@ -90,6 +101,7 @@ export default defineEventHandler(async (event) => {
       title: { en: p.seo_title_en ?? p.name_en, es: p.seo_title_es ?? '', pt: p.seo_title_pt ?? '' },
       description: { en: p.seo_description_en ?? '', es: p.seo_description_es ?? '', pt: p.seo_description_pt ?? '' },
       canonicalPath: `/products/${categorySlug}/${p.slug}`,
+      ogImage: p.seo_image ? `/api/cms/media/${p.seo_image}` : undefined,
       noIndex: p.seo_noindex ?? false,
     },
     status: p.status as Product['status'],

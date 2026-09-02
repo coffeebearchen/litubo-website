@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProductCategory, Product } from '~/types/content'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
 const categorySlug = route.params.category as string
@@ -18,9 +18,17 @@ if (error.value || !data.value) {
 const category = computed(() => data.value!.category)
 const products = computed(() => data.value!.products)
 
-useHead({
-  title: category.value?.seo.title.en ?? t('seo.products.title'),
-  meta: [{ name: 'description', content: category.value?.seo.description.en ?? '' }],
+const catLocale = computed(() => locale.value as 'en' | 'es' | 'pt')
+const catSeoTitle = computed(() =>
+  category.value?.seo.title[catLocale.value] || category.value?.seo.title.en || t('seo.products.title')
+)
+const catSeoDesc = computed(() =>
+  category.value?.seo.description[catLocale.value] || category.value?.seo.description.en || ''
+)
+useSeoHead({
+  title: catSeoTitle,
+  description: catSeoDesc,
+  canonicalPath: `/products/${categorySlug}`,
 })
 </script>
 

@@ -2,9 +2,10 @@
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 
-useHead({
+useSeoHead({
   title: t('seo.contact.title'),
-  meta: [{ name: 'description', content: t('seo.contact.description') }],
+  description: t('seo.contact.description'),
+  canonicalPath: '/contact',
 })
 
 const form = reactive({

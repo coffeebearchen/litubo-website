@@ -3,9 +3,10 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 const applications = useApplications()
 
-useHead({
+useSeoHead({
   title: t('seo.applications.title'),
-  meta: [{ name: 'description', content: t('seo.applications.description') }],
+  description: t('seo.applications.description'),
+  canonicalPath: '/applications',
 })
 </script>
 

@@ -4,9 +4,10 @@ import type { PostsResult, PostListItem, ContentType } from '~/types/content'
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 
-useHead({
+useSeoHead({
   title: t('seo.resources.title'),
-  meta: [{ name: 'description', content: t('seo.resources.description') }],
+  description: t('seo.resources.description'),
+  canonicalPath: '/resources',
 })
 
 const { data: postsData } = await useAsyncData<PostsResult>(

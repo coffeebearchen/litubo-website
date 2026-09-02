@@ -1,3 +1,8 @@
+<script setup lang="ts">
+const { locale } = useI18n()
+useHead(computed(() => ({ htmlAttrs: { lang: locale.value } })))
+</script>
+
 <template>
   <div class="layout">
     <SiteHeader />

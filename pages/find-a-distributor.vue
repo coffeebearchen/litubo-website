@@ -2,9 +2,10 @@
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 
-useHead({
+useSeoHead({
   title: t('seo.findDistributor.title'),
-  meta: [{ name: 'description', content: t('seo.findDistributor.description') }],
+  description: t('seo.findDistributor.description'),
+  canonicalPath: '/find-a-distributor',
 })
 
 const form = reactive({ name: '', company: '', email: '', country: '', phone: '', message: '', consent: false })
