@@ -110,9 +110,38 @@
 
 ---
 
-## 4. 当前状态 — HubSpot Phase 7A 已完成
+## 4. 当前状态 — Phase 8B-1 已完成
 
-**状态：Phase 7A 本地实施完成并通过完整 mock 链路验收，等待 Phase 7B 用户配置 HubSpot 属性与 Token。**
+**状态：Phase 8B-1 SEO 基础技术框架本地实施完成，全部验收通过，本地 commit 8c356eb 已创建。等待用户授权 push 或继续 Phase 8B-2。**
+
+### Phase 8B-1 完成内容
+
+| 类别 | 完成项 |
+|------|--------|
+| 新建文件 | `composables/useSeoHead.ts`（canonical、hreflang、OG、Twitter Card、robots meta 统一输出）、`public/robots.txt`（三行，无 Sitemap） |
+| 修改文件 | `nuxt.config.ts`（移除硬编码 lang=en）、`layouts/default.vue`（动态 html lang）、`error.vue`（迁移至 useSeoHead） |
+| 页面文件 | 28 个页面全部替换 useHead → useSeoHead，含响应式 MaybeRefOrGetter 接口 |
+| Bug 修复 | Bug #1：products/[category]/[slug].vue locale-aware SEO；Bug #2：posts adapter canonicalPath 推导（faq 返回空字符串）；Bug #3：products adapter seo_image 映射 |
+| EN 路由规则 | canonical（首页含尾斜杠，其余无尾斜杠）+ hreflang=en + hreflang=x-default |
+| /es/ /pt/ 路由 | noindex, follow；无 canonical；无 hreflang；不进 sitemap |
+| 验收结果 | typecheck 0 errors、lint 0 errors、build SUCCESS、浏览器源码全部通过、375px 无溢出 |
+
+### Phase 8B-1 浏览器验收通过项
+
+| 页面 | 验收结果 |
+|------|---------|
+| 首页 | html lang=en，canonical=https://litubo.com/，hreflang=en+x-default ✅ |
+| /es/ | html lang=es，noindex,follow，无 canonical，无 hreflang ✅ |
+| robots.txt | 三行，无 Sitemap 行 ✅ |
+| privacy-policy | noindex,follow，无 canonical ✅ |
+| terms-of-use | noindex,follow，无 canonical ✅ |
+| /support/faq | canonical=https://litubo.com/support/faq，hreflang=en+x-default ✅ |
+| 404（error.vue） | noindex,follow，无 canonical ✅ |
+| 375px | 无水平溢出 ✅ |
+
+### Phase 7A — HubSpot（历史完成）
+
+**Phase 7A 本地实施完成并通过完整 mock 链路验收，等待 Phase 7B 用户配置 HubSpot 属性与 Token。**
 
 ### Phase 7A 完成内容
 
