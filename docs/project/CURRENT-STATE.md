@@ -11,8 +11,7 @@
 | 仓库名称 | `litubo-website` |
 | GitHub 远程 | `git@github.com:coffeebearchen/litubo-website.git` |
 | 当前分支 | `master` |
-| 最新 commit SHA | `e0c12f9` |
-| 最新 commit 说明 | `fix(cms): align HubSpot sync statuses and mappings` |
+| 当前 Git 基线 | 以 `git log -1 --oneline` 为准（此文件本身会产生提交，不硬编码 SHA）|
 
 **技术架构：** Nuxt 3 + Vue 3 + TypeScript（SSR/hybrid）/ Directus 11 + PostgreSQL 16 / Docker Compose / 本地开发中，未来部署至腾讯云美国服务器，Cloudflare Free 作为前端边缘（DNS、TLS、缓存）。
 

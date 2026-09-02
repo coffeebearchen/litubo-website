@@ -50,6 +50,21 @@ async function hubspotFetch<T>(
   }
 }
 
+function extractPostErrorSummary(httpStatus: number, data: unknown): string {
+  if (httpStatus === 400) {
+    const d = data as { category?: string; errors?: Array<{ error?: string; name?: string }> } | null
+    if (d?.category === 'VALIDATION_ERROR' && Array.isArray(d.errors)) {
+      const propErr = d.errors.find(e => e.error === 'PROPERTY_DOESNT_EXIST')
+      if (propErr?.name) {
+        // Allow only [a-z0-9_] — HubSpot internal property names; strips any PII or free-text
+        const safe = propErr.name.replace(/[^a-z0-9_]/g, '').substring(0, 100)
+        if (safe) return `INVALID_PROPERTY: ${safe}`
+      }
+    }
+  }
+  return `hubspot_post_${httpStatus}`
+}
+
 async function upsertContact(
   apiBase: string,
   accessToken: string,
@@ -79,7 +94,7 @@ async function upsertContact(
   if (post.ok && post.data?.id) return post.data.id
 
   if (post.status !== 409) {
-    throw new Error(`hubspot_post_${post.status}`)
+    throw new Error(extractPostErrorSummary(post.status, post.data))
   }
 
   // 3. 409 — contact exists (race condition): re-PATCH by email (max one retry)
