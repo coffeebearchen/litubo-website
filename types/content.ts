@@ -226,9 +226,8 @@ export type InquiryStatus = 'new' | 'in_progress' | 'resolved' | 'spam'
 export type HubspotSyncStatus =
   | 'not_configured'
   | 'pending'
-  | 'success'
-  | 'error'
-  | 'timeout'
+  | 'synced'
+  | 'failed'
 
 export interface InquiryPayload {
   inquiry_type: InquiryType

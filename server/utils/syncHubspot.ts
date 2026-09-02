@@ -8,9 +8,11 @@ export interface HubspotSyncInput {
   contact_company: string | null
   contact_phone: string | null
   inquiry_type: string
-  locale: string
-  related_product_slug: string | null
   source_url: string
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  product_interest: string | null
 }
 
 const HUBSPOT_API_PROD = 'https://api.hubapi.com'
@@ -134,22 +136,24 @@ export async function syncHubspot(
   if (input.contact_name) properties.firstname = input.contact_name
   if (input.contact_company) properties.company = input.contact_company
   if (input.contact_phone) properties.phone = input.contact_phone
-  // Custom litubo_* properties — must be created in HubSpot Settings before Phase 7B
+  // Confirmed litubo_* custom properties — must be created in HubSpot Settings before Phase 7B
   properties.litubo_inquiry_type = input.inquiry_type
-  properties.litubo_locale = input.locale
-  if (input.related_product_slug) properties.litubo_related_product_slug = input.related_product_slug
-  if (input.source_url) properties.litubo_source_url = input.source_url
+  properties.litubo_source_url = input.source_url
+  properties.litubo_last_inquiry_at = new Date().toISOString()
+  if (input.utm_source) properties.litubo_utm_source = input.utm_source
+  if (input.utm_medium) properties.litubo_utm_medium = input.utm_medium
+  if (input.utm_campaign) properties.litubo_utm_campaign = input.utm_campaign
+  if (input.product_interest) properties.litubo_product_interest = input.product_interest
 
   try {
     const contactId = await upsertContact(apiBase, accessToken, input.contact_email, properties)
-    await writeSyncResult(inquiryId, 'success', contactId, null)
+    await writeSyncResult(inquiryId, 'synced', contactId, null)
   }
   catch (err: unknown) {
     const isTimeout = err instanceof Error && err.name === 'AbortError'
-    const status: HubspotSyncStatus = isTimeout ? 'timeout' : 'error'
-    // Safe summary: error code only, no PII, no token, no stack
-    const summary = err instanceof Error ? err.message.substring(0, 200) : 'unknown_error'
-    console.error('[hubspot] sync failed', { inquiryId, status })
-    await writeSyncResult(inquiryId, status, null, summary).catch(() => {})
+    // Safe summary: error code only, no PII, no token, no stack. TIMEOUT distinguishes abort cause.
+    const summary = isTimeout ? 'TIMEOUT' : (err instanceof Error ? err.message.substring(0, 200) : 'unknown_error')
+    console.error('[hubspot] sync failed', { inquiryId, isTimeout })
+    await writeSyncResult(inquiryId, 'failed', null, summary).catch(() => {})
   }
 }

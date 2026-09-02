@@ -469,7 +469,7 @@ Phase 7A 在 `inquiries` 表中新增了以下 4 个字段，运营人员可在 
 
 | 字段 | 含义 | 可能值 |
 |------|------|--------|
-| `hubspot_sync_status` | HubSpot 同步状态 | `not_configured`（未配置 Token）/ `pending`（同步中）/ `success`（成功）/ `error`（失败）/ `timeout`（超时） |
+| `hubspot_sync_status` | HubSpot 同步状态 | `not_configured`（未配置 Token）/ `pending`（同步中）/ `synced`（成功）/ `failed`（失败，含超时） |
 | `hubspot_contact_id` | HubSpot Contact ID | 同步成功后自动填入，否则为空 |
 | `hubspot_synced_at` | 同步时间戳 | 同步操作发生时自动记录 |
 | `hubspot_error_summary` | 错误摘要 | 同步失败时记录技术性错误码，不含个人信息 |
@@ -483,14 +483,15 @@ Phase 7A 在 `inquiries` 表中新增了以下 4 个字段，运营人员可在 
 
 Phase 7B 由开发团队在 HubSpot 账户中完成以下设置后通知运营：
 
-1. 在 HubSpot 中创建 Private App，获取 Access Token
-2. 在 HubSpot 联系人属性中创建 `litubo_inquiry_type`、`litubo_locale`、`litubo_related_product_slug`、`litubo_source_url` 四个自定义属性
+1. 在 HubSpot 中创建 Private App，获取 Access Token（所需权限：`crm.objects.contacts.write`）
+2. 在 HubSpot 联系人属性中创建以下 7 个自定义属性：
+   `litubo_inquiry_type`、`litubo_source_url`、`litubo_utm_source`、`litubo_utm_medium`、`litubo_utm_campaign`、`litubo_product_interest`、`litubo_last_inquiry_at`
 3. 在服务器 `.env` 中添加 `HUBSPOT_ACCESS_TOKEN=<token值>`
-4. 重启 Nuxt 服务（`docker compose restart nuxt`）
+4. 按当时实际部署方式重启 Nuxt 服务（本地与生产的重启命令需按实际服务名称确认后再执行，不要自行推断）
 5. 向前台提交一个真实测试询盘
 6. 登录 HubSpot 后台，确认该询盘已作为 Contact 出现，且自定义属性有值
-7. 查看 Directus 中该询盘的 `hubspot_sync_status` 是否变为 `success`
-8. 如状态为 `error` 或 `timeout`，联系开发人员查看日志
+7. 查看 Directus 中该询盘的 `hubspot_sync_status` 是否变为 `synced`
+8. 如状态为 `failed`，联系开发人员查看日志（`hubspot_error_summary` 会显示错误码）
 
 **注意**：Phase 7A / 7B 只同步 HubSpot Contact，不创建 Deal，不关联 Pipeline。
 
@@ -500,7 +501,7 @@ Phase 7B 由开发团队在 HubSpot 账户中完成以下设置后通知运营�
 |------|---------|---------|
 | 询盘写入 Directus | ✅ 已启用 | — |
 | 邮件通知 | ⏸ 待配置 | 服务器配置 SMTP_HOST |
-| HubSpot Contact 同步 | ⏸ 代码已就绪，待配置 Token | Phase 7B：在 .env 设置 HUBSPOT_ACCESS_TOKEN |
+| HubSpot Contact 同步 | ⏸ 代码已就绪，待配置 Token（Phase 7B） | Phase 7B：在 .env 设置 HUBSPOT_ACCESS_TOKEN 后重启服务 |
 | HubSpot Deal 创建 | 🚫 本期不实施 | 后续独立模块 |
 | AI 辅助草稿 | ❌ 尚未启用 | 需开发人员接入 |
 | AI 自动发邮件 | 🚫 永不允许 | — |

@@ -11,8 +11,8 @@
 | 仓库名称 | `litubo-website` |
 | GitHub 远程 | `git@github.com:coffeebearchen/litubo-website.git` |
 | 当前分支 | `master` |
-| 最新 commit SHA | `4fb5c0a` |
-| 最新 commit 说明 | `feat(cms): add HubSpot contact sync foundation` |
+| 最新 commit SHA | 待本次修复提交后更新 |
+| 最新 commit 说明 | `fix(cms): align HubSpot sync statuses and mappings` |
 
 **技术架构：** Nuxt 3 + Vue 3 + TypeScript（SSR/hybrid）/ Directus 11 + PostgreSQL 16 / Docker Compose / 本地开发中，未来部署至腾讯云美国服务器，Cloudflare Free 作为前端边缘（DNS、TLS、缓存）。
 
@@ -113,7 +113,7 @@
 
 ## 4. 当前状态 — HubSpot Phase 7A 已完成
 
-**状态：Phase 7A 本地实施完成，已提交，等待 Phase 7B Token 真实验收。**
+**状态：Phase 7A 本地实施完成并通过完整 mock 链路验收，等待 Phase 7B 用户配置 HubSpot 属性与 Token。**
 
 ### Phase 7A 完成内容
 
@@ -123,8 +123,20 @@
 | Directus 权限 | nuxt-server READ=id、CREATE+hubspot_sync_status、UPDATE=hubspot 字段 |
 | 新建文件 | `server/utils/syncHubspot.ts`、`directus/schema/phase6-before-hubspot.yaml`、`directus/schema/phase7-hubspot.yaml` |
 | 修改文件 | `server/utils/writeInquiry.ts`（?fields=id）、`server/api/inquiries.post.ts`（syncHubspot 集成）、`nuxt.config.ts`、`.env.example`、`pages/privacy-policy.vue`、`docs/OPERATIONS-HANDBOOK.md` |
-| 类型 | `types/content.ts` 新增 `HubspotSyncStatus` 类型 |
-| 验收 | typecheck 0 错误、lint 0 错误、build 通过、隐私政策页面浏览器验证通过、mock 分支验证（success/error/timeout/INVALID_PROPERTY）通过 |
+| 类型 | `types/content.ts` 新增 `HubspotSyncStatus`（`not_configured \| pending \| synced \| failed`） |
+| HubSpot 属性映射 | 7 个确认属性：`litubo_inquiry_type`、`litubo_source_url`、`litubo_utm_source`、`litubo_utm_medium`、`litubo_utm_campaign`、`litubo_product_interest`、`litubo_last_inquiry_at` |
+
+### Phase 7A mock 链路验收结果
+
+| 场景 | 条件 | Directus 结果 | 通过 |
+|------|------|---------------|------|
+| 1 无 Token | 真实表单提交，`HUBSPOT_ACCESS_TOKEN` 为空 | `not_configured`，无 contact_id | ✅ |
+| 2 fake token + mock 成功 | mock 返回 `{id:"mock-contact-42"}` | `synced`，`hubspot_contact_id=mock-contact-42` | ✅ |
+| 3 fake token + mock 401 | mock 返回 HTTP 401 | `failed`，`error_summary=hubspot_patch_401`（无 PII）| ✅ |
+| 4 fake token + mock 慢响应 | mock 延迟 3100ms（超过 AbortController 2500ms） | `failed`，`error_summary=TIMEOUT`，表单响应 2679ms | ✅ |
+| 5 fake token + INVALID_PROPERTY | mock 返回 HTTP 400 属性校验失败 | `failed`，`error_summary=hubspot_post_400`（无 PII）| ✅ |
+
+所有场景：前台均返回 `{ok:true}`，无 inquiry id、Token、Directus URL 泄露。测试记录已从 Directus 删除。
 
 ### 无 Token 状态说明
 
@@ -134,11 +146,11 @@
 
 ### Phase 7B 需要用户完成（开发人员不可代劳）
 
-1. 在 HubSpot 账户中创建 **Private App**（不是 API Key），权限：`crm.objects.contacts.read`、`crm.objects.contacts.write`
-2. 在 HubSpot **联系人属性** 中创建 4 个自定义属性：`litubo_inquiry_type`、`litubo_locale`、`litubo_related_product_slug`、`litubo_source_url`
+1. 在 HubSpot 账户中创建 **Private App**（不是 API Key），权限：`crm.objects.contacts.write`（代码无 GET/READ 调用，无需 read 权限）
+2. 在 HubSpot **联系人属性** 中创建以下 7 个自定义属性：`litubo_inquiry_type`、`litubo_source_url`、`litubo_utm_source`、`litubo_utm_medium`、`litubo_utm_campaign`、`litubo_product_interest`、`litubo_last_inquiry_at`
 3. 将 Private App 的 Access Token 写入服务器 `.env`：`HUBSPOT_ACCESS_TOKEN=<token>`
-4. 重启 Nuxt（`docker compose restart nuxt`）
-5. 提交真实测试询盘，验证 HubSpot Contact 和 `hubspot_sync_status=success`
+4. 按当时实际部署方式重启 Nuxt 服务（具体命令须在部署服务名称确认后执行，不要自行推断命令）
+5. 提交真实测试询盘，验证 HubSpot Contact 和 `hubspot_sync_status=synced`
 
 **不需要创建 Deal、Pipeline 或 Stage——Phase 7A/B 只同步 Contact。**
 
@@ -163,7 +175,7 @@ Phase 7A 只编写 Contact 同步代码框架；无 Token 时同步状态落为 
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `hubspot_sync_status` | string | `not_configured` / `success` / `error` / `timeout` |
+| `hubspot_sync_status` | string | `not_configured` / `pending` / `synced` / `failed` |
 | `hubspot_contact_id` | string | HubSpot Contact ID（有 Token 后填入） |
 | `hubspot_synced_at` | timestamp | 同步时间戳 |
 | `hubspot_error_summary` | text | 错误摘要（可读，不含敏感信息） |

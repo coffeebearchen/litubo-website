@@ -220,9 +220,11 @@ export default defineEventHandler(async (event) => {
       contact_company: san.contact_company ? String(san.contact_company) : null,
       contact_phone: san.contact_phone ? String(san.contact_phone) : null,
       inquiry_type: String(san.inquiry_type),
-      locale: String(san.locale || 'en'),
-      related_product_slug: san.related_product_slug ? String(san.related_product_slug) : null,
       source_url: sourceUrl,
+      utm_source: san.utm_source ? String(san.utm_source) : null,
+      utm_medium: san.utm_medium ? String(san.utm_medium) : null,
+      utm_campaign: san.utm_campaign ? String(san.utm_campaign) : null,
+      product_interest: san.tm_product_interest ? String(san.tm_product_interest) : null,
     }).catch(() => {
       // syncHubspot handles its own error logging and Directus write-back
     })
