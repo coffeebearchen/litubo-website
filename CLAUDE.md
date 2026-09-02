@@ -53,3 +53,52 @@ The approved visual reference images are stored outside this repository during p
 - All page content goes through the models and translation keys; no duplicated hard-coded EN/ES/PT copy in Vue templates.
 - Each public route needs an editable SEO title, description, canonical path, Open Graph image, and indexability setting.
 - Downloads are direct in Phase 1; do not create a download gate. Do not create HubSpot submission, live newsletter subscription, public AI chat, automatic publication, automatic email, or outbound customer messaging until separately authorized.
+
+---
+
+## New session handoff protocol (mandatory for every new conversation)
+
+**Before touching any file, a new Claude session MUST:**
+
+1. Read in this order:
+   - `docs/project/CURRENT-STATE.md`
+   - `docs/ADMIN-CMS-SPEC.md`
+   - `docs/OPERATIONS-HANDBOOK.md`
+2. Run and report these read-only commands:
+   - `git status --short`
+   - `git branch --show-current`
+   - `git log -12 --oneline`
+   - `git remote -v`
+   - `docker compose ps`
+3. If the live state contradicts `CURRENT-STATE.md`, stop and report — do not guess, do not patch silently.
+
+## Language rule
+
+All work logs, progress updates, error explanations, plans, and final reports must be written in **Chinese (中文)**. The user reads Chinese; no English or Japanese translation is needed.
+
+## Hard prohibitions (never do without explicit per-action authorization)
+
+- `git push` or any remote deployment
+- Force push or rewriting Git history
+- Sending real emails, creating external App registrations, or using live API tokens
+- Outputting, logging, or committing `.env` values, tokens, passwords, database connection strings, customer data, or uploaded media
+- Dropping or renaming Directus collections or PostgreSQL tables
+- Modifying production infrastructure, DNS, Docker networking, or firewall rules
+
+## Directus schema / database change protocol
+
+Before any Directus collection or field change:
+1. Export a schema snapshot: `npx directus schema snapshot ./directus/schema/<phase>-<name>.yaml`
+2. Create a local database backup
+3. Commit the snapshot file before applying changes
+
+## Module completion checklist
+
+Every module must complete all of the following before a local commit:
+- `npm run typecheck` (or `npx vue-tsc --noEmit`) — 0 errors
+- `npm run lint` — 0 errors
+- `npx nuxt build` — build passes
+- Browser or API acceptance check at relevant breakpoints
+- `docs/project/CURRENT-STATE.md` updated to reflect new state
+
+GitHub push requires separate user authorization after the above checklist passes.
