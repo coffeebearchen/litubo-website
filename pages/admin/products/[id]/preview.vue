@@ -34,6 +34,13 @@ function toggleFaq(faqId: number) {
   else openFaqs.value.add(faqId)
 }
 
+const SAFE_NOTE = 'Internal test source — TEST ONLY, unverified, do not publish'
+const LOCAL_PATH_RE = /private-product-source[\\/]|[A-Za-z]:[/\\]|(?:^|\s)\/[a-z]/i
+function safeNote(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  return LOCAL_PATH_RE.test(raw) ? SAFE_NOTE : raw
+}
+
 const imgMedia = computed(() => preview.value?.media.filter(m => {
   const id = m.directus_files_id
   return id && m.file_role !== 'brochure' && m.file_role !== 'datasheet' && m.file_role !== 'drawing' && m.file_role !== 'manual' && m.file_role !== 'certificate'
@@ -97,8 +104,8 @@ function mediaUrl(
       </section>
 
       <!-- Review note -->
-      <div v-if="preview.product.review_notes" class="pv-review-note">
-        <strong>Admin note:</strong> {{ preview.product.review_notes }}
+      <div v-if="safeNote(preview.product.review_notes)" class="pv-review-note">
+        <strong>Admin note:</strong> {{ safeNote(preview.product.review_notes) }}
       </div>
 
       <!-- Sections -->
