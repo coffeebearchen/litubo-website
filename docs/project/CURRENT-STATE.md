@@ -136,14 +136,37 @@
 | Directus Admin 地址 | 仅内网访问（127.0.0.1:8055），不对公网开放 |
 | 前台访问 CMS 的方式 | 仅通过 Nuxt server API 层（`server/api/`、`server/utils/`），Directus REST API 不暴露给浏览器 |
 | Directus Token | `.env` 中管理，不进 Git，不写入任何文档 |
-| Directus Collection 数量 | 上限 25（Directus 社区版限制）；当前已用：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries`、`product_page_presets` = **7 个**（含 M2M junction 1 个） |
+| Directus Collection 数量 | 上限 25（Directus 社区版限制）；当前已用：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries`、`product_page_presets`、`product_sections`、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`、`product_source_records` = **13 个**（含 M2M junction 1 个） |
 | 不进 Git 的内容 | `.env`、PostgreSQL 数据文件、`directus/uploads/`、数据库备份 |
 
 ---
 
-## 4. 当前状态 — Phase 9A-1 完全收口，等待 push 授权
+## 4. 当前状态 — Phase 9A-2A 完全收口，等待 push 授权
 
-**状态：Phase 9A-1 LITUBO Admin 产品 CMS 基础完全收口，所有安全验收、响应式验收、构建验收全部通过，历史遗留 [TEST] 产品已删除，本地 commit 已创建。等待用户授权 push 或继续 Phase 9A-2。Phase 9A-2 尚未开始。**
+**状态：Phase 9A-2A 产品 CMS 扩展层（Directus schema + Admin API + Admin UI）本地完全收口，所有验收通过，本地 commit 待创建。Phase 9A-2B（多语言字段扩展）尚未开始。Phase 9B（公开前台产品页联通）尚未开始。**
+
+### Phase 9A-2A 完成内容
+
+| 类别 | 完成项 |
+|------|--------|
+| Directus schema 扩展 | `products_files` 新增 7 字段（`alt_en`、`caption_en`、`enabled`、`language`、`version_label`、`sort`、`file_date`）；`file_role` enum 从 5 值扩展至 11 值 |
+| 新建 Directus collection | `product_sections`（10字段）、`product_section_items`（7字段）、`product_spec_groups`（6字段）、`product_spec_items`（8字段）、`product_faqs`（8字段）、`product_source_records`（11字段）共 6 个 |
+| Directus 权限 | `nuxt-server` role → `site-readonly-policy`：新增 5 个 collection 的 READ 权限（`product_sections`、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`）；`product_source_records` 无任何权限 |
+| TypeScript 类型 | `types/product-cms.ts` 完整重写：新增 `SectionType`（11值）、`FileRole`（11值）、`SourceReviewStatus`；新增 `ProductMedia`、`ProductSection`、`ProductSectionItem`、`ProductSpecGroup`、`ProductSpecItem`、`ProductFaq`、`ProductSourceRecord`、`ProductSeoFields` 接口 |
+| Admin 子导航组件 | `components/admin/product/ProductSubNav.vue`（6标签：基础信息/页面模块/技术参数/图片与资料/产品FAQ/SEO；移动端横向滚动） |
+| Admin 页面更新 | `pages/admin/products/[id]/index.vue` 集成 ProductSubNav |
+| Admin 新页面（5个）| `pages/admin/products/[id]/content.vue`、`specs.vue`、`media.vue`、`faq.vue`、`seo.vue` |
+| Admin API 端点（25个）| sections（5端点）、section_items（5端点）、spec_groups（5端点）、spec_items（5端点）、faqs（5端点）、seo（2端点 GET+PATCH） |
+| 安全保证 | 所有端点：httpOnly Cookie 鉴权 + Administrator 角色验证 + CSRF + 所有权链校验（sub-resource → product_id 归属验证）；SEO 字段长度服务端强校验（title ≤120、desc ≤320） |
+| .gitignore | 新增 `/private-product-source/` 排除规则 |
+
+**验收结果（全部通过）：**
+- vue-tsc --noEmit：0 errors ✅
+- npm run lint：0 errors, 0 warnings ✅
+- npx nuxt build：Build complete ✅
+
+**Schema 快照：** before=`directus/schema/phase9a2a-before.yaml`（163,906 B）、after=`directus/schema/phase9a2a-after.yaml`（250,374 B）
+**数据库备份：** `backups/phase9a2a-before-20260903-165135.sql`（402,579 B）
 
 ### Phase 8B-1 完成内容
 

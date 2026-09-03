@@ -84,6 +84,8 @@ async function changeStatus(newStatus: ProductStatus) {
       <h1 class="page-title">{{ productData?.name_en ?? '产品详情' }}</h1>
     </div>
 
+    <ProductSubNav :product-id="id" />
+
     <p v-if="error" class="error-banner">{{ error }}</p>
     <p v-if="success" class="success-banner">{{ success }}</p>
 
