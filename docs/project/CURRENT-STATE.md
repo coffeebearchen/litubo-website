@@ -108,12 +108,24 @@
 - Admin JWT 安全层：`server/utils/loginRateLimit.ts`（5次失败/IP → 15min锁）、`server/utils/adminDirectusClient.ts`、`server/middleware/admin-auth.ts`（全路由管理员角色验证 + CSRF Origin 检查）
 - Admin API 端点：auth（login/logout/me）、products（list/get/create/patch）、categories、presets
 - 9A-1 服务端状态限制：PATCH 时只允许 draft↔review；尝试 published/archived → 403
-- Admin UI：`layouts/admin.vue`、`components/admin/StatusBadge.vue`、`components/admin/product/ProductBasicForm.vue`、`components/admin/product/PublishPanel.vue`
+- Admin UI：`layouts/admin.vue`（白色侧边栏桌面端，< 768px 抽屉菜单）、`components/admin/StatusBadge.vue`、`components/admin/product/ProductBasicForm.vue`、`components/admin/product/PublishPanel.vue`
 - Admin 页面：`/admin/login`、`/admin/products`（列表 + 5 状态筛选）、`/admin/products/new`、`/admin/products/[id]`（双列编辑 + 发布面板）
 - 响应式修复：< 768px 侧边栏隐藏、主内容全宽；产品列表表格 `overflow-x: auto` 允许横向滚动
+- **安全修复**：`server/middleware/admin-auth.ts` CSRF 增强（缺少 Origin 头 → 403）；`server/api/admin/auth/me.get.ts` 增加管理员角色验证（`/api/admin/auth/*` 路径不在中间件覆盖范围内，me 端点独立检查 `role.name === 'Administrator'`）
+- **数据清理**：删除历史遗留 [TEST] 产品 `[TEST] XR-001 X-Ray Inspection System`（ID=1，archived 状态），无文件关联，已彻底清除
+
+**验收结果（全部通过）：**
+- vue-tsc --noEmit：0 errors ✅
+- npm run lint：0 errors ✅
+- npx nuxt build：Build complete ✅
+- 非管理员 403 验收：GET /api/admin/auth/me → 403、GET /api/admin/products → 403、POST /api/admin/products → 403（全部 PASS）✅
+- 登录限流：6次失败第6次 → HTTP 429 ✅
+- CSRF 缺少 Origin → 403 ✅
+- Directus Activity Log 有效 ✅
+- 桌面端（1440px）无溢出 ✅；移动端（375px）无溢出 ✅
 
 **Schema 快照：** before=`directus/schema/phase9a1-before.yaml`（156,688 B）、after=`directus/schema/phase9a1-after.yaml`（167,831 B）
-**数据库备份：** `backups/phase9a1-before-20260903.sql`（396,395 B）
+**数据库备份：** `backups/phase9a1-before-20260903.sql`（396,395 B）、`backups/phase9a1-final-2026-09-03T08-36-06.sql`（399.0 KB，[TEST] 产品删除前最终备份）
 
 ---
 
@@ -129,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — Phase 9A-1 已完成
+## 4. 当前状态 — Phase 9A-1 完全收口，等待 push 授权
 
-**状态：Phase 9A-1 LITUBO Admin 产品 CMS 基础本地实施完成，全部验收通过，本地 commit 已创建。等待用户授权 push 或继续 Phase 9A-2。**
+**状态：Phase 9A-1 LITUBO Admin 产品 CMS 基础完全收口，所有安全验收、响应式验收、构建验收全部通过，历史遗留 [TEST] 产品已删除，本地 commit 已创建。等待用户授权 push 或继续 Phase 9A-2。Phase 9A-2 尚未开始。**
 
 ### Phase 8B-1 完成内容
 

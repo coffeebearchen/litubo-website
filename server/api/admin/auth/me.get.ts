@@ -18,6 +18,10 @@ export default defineEventHandler(async (event) => {
     headers: { Authorization: `Bearer ${token}` },
   })
 
+  if (me.data?.role?.name !== 'Administrator') {
+    throw createError({ statusCode: 403, message: 'Insufficient privileges' })
+  }
+
   return {
     id: me.data.id,
     email: me.data.email,
