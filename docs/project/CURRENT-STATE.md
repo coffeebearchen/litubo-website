@@ -98,6 +98,25 @@
 
 ---
 
+### Phase 9A-1 — LITUBO Admin 产品 CMS 基础（本地完成，等待 push 授权）
+
+**commit：** 见第 4 节
+
+- 三个项目总控文档：`docs/project/MASTER-ROADMAP.md`、`docs/product-cms/PHASE-9-BASELINE.md`、`docs/product-cms/RESPONSIVE-ACCEPTANCE.md`
+- Directus schema：`products` 新增 4 字段（`model_or_series`、`page_preset_id`、`published_at`、`review_notes`）；新建 `product_page_presets` collection；`nuxt-server` 已授权读 `product_page_presets`（active=true）
+- 类型定义：`types/product-cms.ts`（`ProductStatus`、`ProductPreset`、`AdminProduct` 等）
+- Admin JWT 安全层：`server/utils/loginRateLimit.ts`（5次失败/IP → 15min锁）、`server/utils/adminDirectusClient.ts`、`server/middleware/admin-auth.ts`（全路由管理员角色验证 + CSRF Origin 检查）
+- Admin API 端点：auth（login/logout/me）、products（list/get/create/patch）、categories、presets
+- 9A-1 服务端状态限制：PATCH 时只允许 draft↔review；尝试 published/archived → 403
+- Admin UI：`layouts/admin.vue`、`components/admin/StatusBadge.vue`、`components/admin/product/ProductBasicForm.vue`、`components/admin/product/PublishPanel.vue`
+- Admin 页面：`/admin/login`、`/admin/products`（列表 + 5 状态筛选）、`/admin/products/new`、`/admin/products/[id]`（双列编辑 + 发布面板）
+- 响应式修复：< 768px 侧边栏隐藏、主内容全宽；产品列表表格 `overflow-x: auto` 允许横向滚动
+
+**Schema 快照：** before=`directus/schema/phase9a1-before.yaml`（156,688 B）、after=`directus/schema/phase9a1-after.yaml`（167,831 B）
+**数据库备份：** `backups/phase9a1-before-20260903.sql`（396,395 B）
+
+---
+
 ## 3. CMS 与安全边界
 
 | 边界 | 说明 |
@@ -105,14 +124,14 @@
 | Directus Admin 地址 | 仅内网访问（127.0.0.1:8055），不对公网开放 |
 | 前台访问 CMS 的方式 | 仅通过 Nuxt server API 层（`server/api/`、`server/utils/`），Directus REST API 不暴露给浏览器 |
 | Directus Token | `.env` 中管理，不进 Git，不写入任何文档 |
-| Directus Collection 数量 | 上限 25（Directus 社区版限制）；当前已用：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries` = **6 个**（含 M2M junction 1 个） |
+| Directus Collection 数量 | 上限 25（Directus 社区版限制）；当前已用：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries`、`product_page_presets` = **7 个**（含 M2M junction 1 个） |
 | 不进 Git 的内容 | `.env`、PostgreSQL 数据文件、`directus/uploads/`、数据库备份 |
 
 ---
 
-## 4. 当前状态 — Phase 8B-1 已完成
+## 4. 当前状态 — Phase 9A-1 已完成
 
-**状态：Phase 8B-1 SEO 基础技术框架本地实施完成，全部验收通过，本地 commit 8c356eb 已创建。等待用户授权 push 或继续 Phase 8B-2。**
+**状态：Phase 9A-1 LITUBO Admin 产品 CMS 基础本地实施完成，全部验收通过，本地 commit 已创建。等待用户授权 push 或继续 Phase 9A-2。**
 
 ### Phase 8B-1 完成内容
 
