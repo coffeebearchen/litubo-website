@@ -29,6 +29,10 @@ dev-data/
 # Local database backups (never commit)
 backups/
 
+# Temporary credential files (never commit)
+/jwt.txt
+*.token.txt
+
 # Logs
 *.log
 npm-debug.log*

@@ -34,16 +34,19 @@ export default defineEventHandler(async (event) => {
   const method = event.node.req.method ?? 'GET'
   if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
     const origin = getHeader(event, 'origin')
-    const host = getHeader(event, 'host')
-    if (origin && host) {
-      try {
-        const originHost = new URL(origin).host
-        if (originHost !== host) {
-          throw createError({ statusCode: 403, message: 'CSRF check failed' })
-        }
-      } catch {
-        throw createError({ statusCode: 403, message: 'Invalid Origin header' })
+    const host = getHeader(event, 'host') ?? ''
+    if (!origin) {
+      throw createError({ statusCode: 403, message: 'CSRF: Origin header required' })
+    }
+    try {
+      const originHost = new URL(origin).host
+      if (originHost !== host) {
+        throw createError({ statusCode: 403, message: 'CSRF: Origin mismatch' })
       }
+    } catch (e: unknown) {
+      const ce = e as { statusCode?: number }
+      if (ce.statusCode === 403) throw e
+      throw createError({ statusCode: 403, message: 'CSRF: Invalid Origin header' })
     }
   }
 })
