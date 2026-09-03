@@ -188,5 +188,8 @@ async function toggleEnabled(faq: ProductFaq) {
 @media (max-width: 767px) {
   .page { padding: var(--space-4); }
   .card-header { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+  .btn { min-height: 44px; }
+  .btn-icon { min-width: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; }
+  .form-input, .form-textarea { min-height: 44px; }
 }
 </style>

@@ -1,0 +1,262 @@
+/*
+ * Admin UI design tokens — scoped to .admin-shell
+ * Overrides the public site tokens to give the admin a larger, more readable size.
+ * Applied globally (nuxt.config.ts css array); all rules live under .admin-shell
+ * so they never affect the public-facing site pages.
+ */
+
+/* ── Desktop: ~60 % larger feel than default site tokens ── */
+.admin-shell {
+  /* Typography */
+  --text-xs:   0.875rem;    /* 14px  (was 12px) */
+  --text-sm:   1rem;        /* 16px  (was 14px) */
+  --text-base: 1.125rem;    /* 18px  (was 16px) */
+  --text-lg:   1.25rem;     /* 20px  (was 18px) */
+  --text-xl:   1.4375rem;   /* 23px  (was 20px) */
+  --text-2xl:  1.75rem;     /* 28px  (was 24px) */
+
+  /* Spacing — slightly larger for breathing room */
+  --space-1: 0.3125rem;   /*  5px  (was  4px) */
+  --space-2: 0.625rem;    /* 10px  (was  8px) */
+  --space-3: 0.9375rem;   /* 15px  (was 12px) */
+  --space-4: 1.25rem;     /* 20px  (was 16px) */
+  --space-5: 1.5625rem;   /* 25px  (was 20px) */
+  --space-6: 1.875rem;    /* 30px  (was 24px) */
+
+  /* Input / touch targets */
+  --admin-input-h: 2.75rem;    /* 44px */
+  --admin-btn-h:   2.75rem;    /* 44px */
+  --admin-label-size: 0.9375rem; /* 15px */
+  --admin-label-weight: 500;
+  --admin-row-h: 3rem;         /* 48px min row height */
+
+  /* Sidebar */
+  --admin-sidebar-w: 260px;
+  --admin-nav-item-fs: 1rem;   /* 16px */
+  --admin-nav-item-py: 0.625rem; /* 10px */
+  --admin-nav-item-px: 0.875rem; /* 14px */
+  --admin-nav-icon-size: 18px;
+}
+
+/* ── Sidebar layout ── */
+.admin-shell .admin-sidebar {
+  width: var(--admin-sidebar-w);
+}
+.admin-shell .admin-main {
+  margin-left: var(--admin-sidebar-w);
+}
+
+/* ── Sidebar brand ── */
+.admin-shell .brand-mark {
+  width: 34px;
+  height: 34px;
+  font-size: 17px;
+}
+.admin-shell .brand-name {
+  font-size: var(--text-sm);
+}
+
+/* ── Nav items ── */
+.admin-shell .nav-section-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: var(--space-3) var(--admin-nav-item-px) var(--space-2);
+}
+.admin-shell .nav-item {
+  font-size: var(--admin-nav-item-fs);
+  padding: var(--admin-nav-item-py) var(--admin-nav-item-px);
+  gap: var(--space-3);
+  min-height: var(--admin-row-h);
+  line-height: 1.4;
+}
+.admin-shell .nav-item svg {
+  width: var(--admin-nav-icon-size);
+  height: var(--admin-nav-icon-size);
+  flex-shrink: 0;
+}
+
+/* ── Sidebar footer ── */
+.admin-shell .user-name {
+  font-size: var(--text-sm);
+}
+.admin-shell .logout-btn {
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  min-height: 36px;
+}
+
+/* ── Sub-nav tabs (ProductSubNav) ── */
+.admin-shell .subnav {
+  font-size: var(--text-sm) !important;
+}
+.admin-shell .subnav a,
+.admin-shell .subnav-item {
+  font-size: var(--text-sm);
+  padding: var(--space-3) var(--space-4) !important;
+  min-height: 44px;
+}
+
+/* ── Page chrome ── */
+.admin-shell .page {
+  padding: var(--space-6) var(--space-8) !important;
+}
+.admin-shell .page-title {
+  font-size: var(--text-2xl) !important;
+}
+.admin-shell .page-header h1 {
+  font-size: var(--text-2xl) !important;
+}
+
+/* ── Card / panel headers ── */
+.admin-shell .card-title {
+  font-size: var(--text-lg) !important;
+}
+.admin-shell .card-note {
+  font-size: var(--text-sm) !important;
+}
+
+/* ── Form elements ── */
+.admin-shell label,
+.admin-shell .form-label {
+  font-size: var(--admin-label-size) !important;
+  font-weight: var(--admin-label-weight) !important;
+}
+
+.admin-shell input[type="text"],
+.admin-shell input[type="email"],
+.admin-shell input[type="number"],
+.admin-shell input[type="url"],
+.admin-shell input[type="password"],
+.admin-shell select,
+.admin-shell textarea {
+  font-size: var(--text-sm) !important;
+  min-height: var(--admin-input-h);
+  padding: var(--space-2) var(--space-3) !important;
+  border-radius: var(--radius-sm);
+  line-height: 1.5;
+}
+
+.admin-shell textarea {
+  min-height: 6rem;
+  line-height: 1.6;
+}
+
+/* ── Buttons ── */
+.admin-shell button:not(.btn-icon):not(.topbar-menu-btn):not(.sidebar-close),
+.admin-shell .btn {
+  font-size: var(--text-sm) !important;
+  min-height: var(--admin-btn-h);
+  padding: var(--space-2) var(--space-5) !important;
+}
+
+/* Icon buttons — keep compact but larger click target */
+.admin-shell .btn-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+/* ── Table ── */
+.admin-shell table th,
+.admin-shell table td {
+  font-size: var(--text-sm) !important;
+  padding: var(--space-3) var(--space-4) !important;
+}
+.admin-shell table th {
+  font-weight: 600;
+}
+
+/* ── Status badges ── */
+.admin-shell .status-badge,
+.admin-shell .media-role-badge {
+  font-size: var(--text-sm) !important;
+  padding: var(--space-1) var(--space-3) !important;
+  line-height: 1.6;
+}
+
+/* ── Help text / hints ── */
+.admin-shell .field-hint,
+.admin-shell .empty-hint,
+.admin-shell .empty-note,
+.admin-shell small {
+  font-size: var(--text-sm) !important;
+}
+
+/* ── Error / success banners ── */
+.admin-shell .error-banner,
+.admin-shell .success-banner {
+  font-size: var(--text-sm) !important;
+  padding: var(--space-3) var(--space-5) !important;
+}
+
+/* ── Toggle / switch area ── */
+.admin-shell .toggle-label {
+  font-size: var(--text-sm) !important;
+}
+
+/* ── FAQ, spec, SEO rows ── */
+.admin-shell .faq-item,
+.admin-shell .spec-row,
+.admin-shell .seo-preview {
+  font-size: var(--text-sm) !important;
+}
+
+/* ──────────────────────────────────────
+   Mobile: 375px — single column, clear,
+   no horizontal page overflow
+   ────────────────────────────────────── */
+@media (max-width: 767px) {
+  .admin-shell {
+    /* Reset to sensible mobile sizes — don't mechanically apply 60% desktop scale */
+    --text-xs:   0.8125rem;  /* 13px */
+    --text-sm:   0.9375rem;  /* 15px */
+    --text-base: 1rem;       /* 16px */
+    --admin-input-h: 2.5rem; /* 40px */
+    --admin-btn-h:   2.5rem;
+    /* Reset spacing scale to base values on mobile */
+    --space-4: 1rem;         /* 16px */
+    --space-5: 1.25rem;      /* 20px */
+    --space-6: 1.5rem;       /* 24px */
+    --space-8: 1.5rem;       /* 24px — keeps content-card padding reasonable */
+  }
+
+  /* Page-level padding: override the !important desktop rule */
+  .admin-shell .page {
+    padding: var(--space-4) var(--space-4) !important;  /* 16px all sides */
+  }
+
+  /* Page title: allow long product names to wrap */
+  .admin-shell .page-title,
+  .admin-shell .page-header h1 {
+    font-size: var(--text-xl) !important;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Subnav tab padding reset */
+  .admin-shell .subnav a,
+  .admin-shell .subnav-item {
+    padding: var(--space-2) var(--space-3) !important;
+    min-height: 40px;
+  }
+
+  /* Table cell padding — reduce for narrow screens */
+  .admin-shell table th,
+  .admin-shell table td {
+    padding: var(--space-2) var(--space-3) !important;
+    font-size: 0.8125rem !important;
+  }
+
+  /* Admin sidebar — slide-in width on mobile */
+  .admin-shell .admin-sidebar {
+    width: 280px;
+  }
+
+  /* Main content area: no left margin (sidebar is off-canvas) */
+  .admin-shell .admin-main {
+    margin-left: 0 !important;
+  }
+}

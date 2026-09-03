@@ -30,6 +30,8 @@ if (!productData.value) {
 const sections = computed(() => sectionsData.value ?? [])
 
 const SECTION_LABELS: Record<SectionType, string> = {
+  text: '文本',
+  feature_list: '功能列表',
   overview: '概览',
   image_text: '图文',
   benefits: '优势亮点',
@@ -236,5 +238,7 @@ async function addSection() {
   .card-header { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
   .section-row { flex-wrap: wrap; }
   .section-title { width: 100%; flex: none; }
+  .btn, .btn--primary, .btn--secondary { min-height: 44px; }
+  .form-input, .form-select, .form-textarea { min-height: 44px; }
 }
 </style>

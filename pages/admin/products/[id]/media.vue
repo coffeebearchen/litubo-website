@@ -18,10 +18,32 @@ if (!productData.value) await navigateTo('/admin/products')
 
 const mediaList = computed(() => mediaData.value ?? [])
 
+// Editing state
+const editingId = ref<number | null>(null)
+const editForm = ref<Partial<ProductMedia>>({})
+
+function startEdit(item: ProductMedia) {
+  editingId.value = item.id
+  editForm.value = {
+    file_role: item.file_role,
+    alt_en: item.alt_en,
+    caption_en: item.caption_en,
+    sort: item.sort,
+    enabled: item.enabled,
+    focal_point_x: item.focal_point_x ?? 50,
+    focal_point_y: item.focal_point_y ?? 50,
+  }
+}
+
+function cancelEdit() {
+  editingId.value = null
+  editForm.value = {}
+}
+
 const FILE_ROLE_LABELS: Record<FileRole, string> = {
-  hero: '主图',
+  hero: 'Hero 主图',
   overview: '概览图',
-  application: '应用场景图',
+  application: '应用场景',
   detail: '细节图',
   gallery: '图库',
   video_poster: '视频封面',
@@ -30,6 +52,76 @@ const FILE_ROLE_LABELS: Record<FileRole, string> = {
   drawing: '工程图纸',
   manual: '操作手册',
   certificate: '认证证书',
+}
+
+const FILE_ROLES: FileRole[] = [
+  'hero', 'overview', 'application', 'detail', 'gallery',
+  'video_poster', 'brochure', 'datasheet', 'drawing', 'manual', 'certificate',
+]
+
+function isImage(type: string | null | undefined) {
+  return type?.startsWith('image/') ?? false
+}
+
+function formatSize(bytes: number | null | undefined) {
+  if (!bytes) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function thumbUrl(fileId: string | null | undefined, fpx?: number | null, fpy?: number | null) {
+  if (!fileId) return ''
+  const x = fpx ?? 50
+  const y = fpy ?? 50
+  return `/api/admin/media/${fileId}?width=240&height=180&fit=cover&focal_point_x=${x}&focal_point_y=${y}`
+}
+
+// 3×3 focal point grid
+const FOCAL_GRID = [
+  { label: '左上', x: 10, y: 10 }, { label: '上', x: 50, y: 10 }, { label: '右上', x: 90, y: 10 },
+  { label: '左',  x: 10, y: 50 }, { label: '中', x: 50, y: 50 }, { label: '右',  x: 90, y: 50 },
+  { label: '左下', x: 10, y: 90 }, { label: '下', x: 50, y: 90 }, { label: '右下', x: 90, y: 90 },
+]
+
+function setFocal(x: number, y: number) {
+  editForm.value.focal_point_x = x
+  editForm.value.focal_point_y = y
+}
+
+async function saveEdit(item: ProductMedia) {
+  error.value = ''
+  try {
+    // Save focal point directly to directus_files
+    if (item.directus_files_id &&
+        (editForm.value.focal_point_x !== undefined || editForm.value.focal_point_y !== undefined)) {
+      await $fetch(`/api/admin/files/${item.directus_files_id}/focal`, {
+        method: 'PATCH',
+        body: {
+          focal_point_x: editForm.value.focal_point_x ?? 50,
+          focal_point_y: editForm.value.focal_point_y ?? 50,
+        },
+      })
+    }
+    // Save junction fields
+    await $fetch(`/api/admin/products/${id}/media/${item.id}`, {
+      method: 'PATCH',
+      body: {
+        file_role: editForm.value.file_role,
+        alt_en: editForm.value.alt_en,
+        caption_en: editForm.value.caption_en,
+        sort: editForm.value.sort,
+        enabled: editForm.value.enabled,
+      },
+    })
+    success.value = '已保存'
+    setTimeout(() => (success.value = ''), 3000)
+    cancelEdit()
+    await refreshMedia()
+  } catch (e: unknown) {
+    const fe = e as { data?: { message?: string } }
+    error.value = fe.data?.message ?? '保存失败，请重试'
+  }
 }
 
 async function toggleEnabled(item: ProductMedia) {
@@ -46,7 +138,7 @@ async function toggleEnabled(item: ProductMedia) {
 }
 
 async function removeMedia(mid: number) {
-  if (!confirm('确认移除此媒体记录？这只会删除与产品的关联，不会删除原始文件。')) return
+  if (!confirm('确认移除此媒体记录？只删除关联，不删除原始文件。')) return
   error.value = ''
   try {
     await $fetch(`/api/admin/products/${id}/media/${mid}`, { method: 'DELETE' })
@@ -75,42 +167,138 @@ async function removeMedia(mid: number) {
     <div class="content-card">
       <div class="card-header">
         <h2 class="card-title">图片与资料</h2>
-        <span class="card-note">通过 Directus 媒体库上传文件后，在此绑定到产品</span>
+        <span class="card-note">已绑定 {{ mediaList.length }} 个文件 · 批量管理建议桌面端操作</span>
       </div>
 
       <div v-if="mediaList.length === 0" class="empty-state">
         <p class="empty-title">此产品暂无媒体文件</p>
-        <p class="empty-hint">请先在 Directus 后台（:8055）上传产品图片或文件，然后通过 API 绑定到此产品。</p>
-        <p class="empty-note">支持角色：主图、概览图、应用图、规格书、手册、证书等 11 种类型。</p>
+        <p class="empty-hint">在 Directus 媒体库（:8055）上传文件后，通过 API 绑定到此产品。</p>
       </div>
 
-      <div v-else class="media-list">
+      <div v-else class="media-grid">
         <div
           v-for="item in mediaList"
           :key="item.id"
-          class="media-row"
-          :class="{ 'media-row--disabled': !item.enabled }"
+          class="media-card"
+          :class="{ 'media-card--disabled': !item.enabled }"
         >
-          <div class="media-info">
-            <span v-if="item.file_role" class="media-role-badge">
-              {{ FILE_ROLE_LABELS[item.file_role as FileRole] ?? item.file_role }}
-            </span>
-            <span v-else class="media-role-badge media-role-badge--none">未设置角色</span>
-            <span class="media-file-id">文件 ID: {{ item.directus_files_id?.slice(0, 12) ?? '—' }}…</span>
-            <span v-if="item.alt_en" class="media-alt">alt: {{ item.alt_en }}</span>
+          <!-- Thumbnail / Icon -->
+          <div class="media-card__thumb">
+            <img
+              v-if="isImage(item.type) && item.directus_files_id"
+              :src="thumbUrl(item.directus_files_id, item.focal_point_x, item.focal_point_y)"
+              :alt="item.alt_en ?? item.filename_download ?? ''"
+              class="media-card__img"
+              loading="lazy"
+            >
+            <div v-else class="media-card__icon">
+              <span v-if="item.type?.includes('pdf')">PDF</span>
+              <span v-else-if="item.type?.includes('video')">▶</span>
+              <span v-else>📄</span>
+            </div>
+            <span class="media-card__sort">{{ item.sort ?? '—' }}</span>
           </div>
-          <div class="media-actions">
-            <button class="btn-icon" :title="item.enabled ? '隐藏' : '启用'" @click="toggleEnabled(item)">
-              {{ item.enabled ? '✅' : '⬜' }}
-            </button>
-            <button class="btn-icon btn-icon--danger" title="移除关联" @click="removeMedia(item.id)">🗑</button>
+
+          <!-- Meta info -->
+          <div class="media-card__info">
+            <p class="media-card__filename" :title="item.filename_download ?? ''">
+              {{ item.filename_download ?? item.directus_files_id?.slice(0, 16) + '…' }}
+            </p>
+            <p class="media-card__meta">
+              <span v-if="item.type" class="meta-pill">{{ item.type.split('/')[1]?.toUpperCase() }}</span>
+              <span v-if="item.width && item.height" class="meta-dim">{{ item.width }}×{{ item.height }}</span>
+              <span class="meta-size">{{ formatSize(item.filesize) }}</span>
+            </p>
+            <p class="media-card__role">
+              <span class="role-badge" :class="item.file_role ? 'role-badge--set' : 'role-badge--none'">
+                {{ item.file_role ? (FILE_ROLE_LABELS[item.file_role as FileRole] ?? item.file_role) : '未设置角色' }}
+              </span>
+            </p>
+            <p v-if="item.caption_en" class="media-card__caption">{{ item.caption_en }}</p>
+          </div>
+
+          <!-- Actions -->
+          <div class="media-card__actions">
+            <button
+              class="btn-toggle"
+              :class="item.enabled ? 'btn-toggle--on' : 'btn-toggle--off'"
+              :title="item.enabled ? '已启用 — 点击禁用' : '已禁用 — 点击启用'"
+              @click="toggleEnabled(item)"
+            >{{ item.enabled ? '启用' : '禁用' }}</button>
+            <button class="btn-edit" title="编辑" @click="startEdit(item)">编辑</button>
+            <button class="btn-del" title="移除关联" @click="removeMedia(item.id)">移除</button>
+          </div>
+
+          <!-- Inline edit panel -->
+          <div v-if="editingId === item.id" class="media-card__edit">
+            <h4 class="edit-title">编辑媒体记录</h4>
+
+            <div class="field-row">
+              <label class="field-label">文件角色</label>
+              <select v-model="editForm.file_role" class="field-input">
+                <option value="">— 未设置 —</option>
+                <option v-for="r in FILE_ROLES" :key="r" :value="r">{{ FILE_ROLE_LABELS[r] }}</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label class="field-label">Alt 文字 (EN)</label>
+              <input v-model="editForm.alt_en" type="text" class="field-input" placeholder="图片替代文字">
+            </div>
+
+            <div class="field-row">
+              <label class="field-label">说明文字 (EN)</label>
+              <input v-model="editForm.caption_en" type="text" class="field-input" placeholder="图片说明">
+            </div>
+
+            <div class="field-row">
+              <label class="field-label">排序</label>
+              <input v-model.number="editForm.sort" type="number" class="field-input field-input--short">
+            </div>
+
+            <!-- Focal point selector -->
+            <div v-if="isImage(item.type)" class="field-row focal-row">
+              <label class="field-label">图片焦点</label>
+              <div class="focal-wrap">
+                <div class="focal-grid">
+                  <button
+                    v-for="pt in FOCAL_GRID"
+                    :key="pt.label"
+                    class="focal-btn"
+                    :class="{
+                      'focal-btn--active':
+                        editForm.focal_point_x === pt.x && editForm.focal_point_y === pt.y
+                    }"
+                    :title="pt.label"
+                    @click="setFocal(pt.x, pt.y)"
+                  >·</button>
+                </div>
+                <div class="focal-preview">
+                  <img
+                    v-if="item.directus_files_id"
+                    :src="thumbUrl(item.directus_files_id, editForm.focal_point_x, editForm.focal_point_y)"
+                    alt="焦点预览"
+                    class="focal-preview__img"
+                    loading="lazy"
+                  >
+                  <span class="focal-label">
+                    焦点：{{ editForm.focal_point_x ?? 50 }},{{ editForm.focal_point_y ?? 50 }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="edit-actions">
+              <button class="btn-save" @click="saveEdit(item)">保存</button>
+              <button class="btn-cancel" @click="cancelEdit">取消</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="desktop-hint">
-      <p>💡 上传新文件、批量管理、设置 alt 文字建议在桌面端操作。媒体文件通过 Directus Admin（:8055）上传后绑定此产品。</p>
+      <p>💡 上传新文件、批量排序请在 Directus 后台（:8055）完成后刷新此页绑定。大量文件建议桌面端管理。</p>
     </div>
   </div>
 </template>
@@ -124,34 +312,250 @@ async function removeMedia(mid: number) {
 
 .content-card { background: white; border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: var(--space-6); }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-5); padding-bottom: var(--space-4); border-bottom: 1px solid var(--color-line); flex-wrap: wrap; gap: var(--space-2); }
-.card-title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); margin: 0; }
-.card-note { font-size: var(--text-xs); color: var(--color-ink-muted); }
+.card-title { font-size: var(--text-lg); font-weight: 600; color: var(--color-ink); margin: 0; }
+.card-note { font-size: var(--text-sm); color: var(--color-ink-muted); }
 
 .empty-state { text-align: center; padding: var(--space-12) var(--space-8); }
 .empty-title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); margin: 0 0 var(--space-3); }
-.empty-hint { font-size: var(--text-sm); color: var(--color-ink-muted); margin: 0 0 var(--space-2); }
-.empty-note { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; }
+.empty-hint { font-size: var(--text-sm); color: var(--color-ink-muted); margin: 0; }
 
-.media-list { display: flex; flex-direction: column; gap: var(--space-2); }
-.media-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-line); border-radius: var(--radius-sm); }
-.media-row--disabled { opacity: 0.55; }
-.media-info { display: flex; align-items: center; gap: var(--space-3); flex: 1; min-width: 0; flex-wrap: wrap; }
-.media-role-badge { font-size: var(--text-xs); background: #e8f4f1; color: var(--color-primary); padding: 2px 8px; border-radius: 99px; flex-shrink: 0; }
-.media-role-badge--none { background: #f0f0f0; color: var(--color-ink-muted); }
-.media-file-id { font-size: var(--text-xs); color: var(--color-ink-muted); font-family: monospace; }
-.media-alt { font-size: var(--text-xs); color: var(--color-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.media-actions { display: flex; gap: var(--space-2); flex-shrink: 0; }
+/* Media grid */
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
 
-.btn-icon { background: none; border: none; cursor: pointer; padding: 4px; font-size: 14px; border-radius: var(--radius-sm); }
-.btn-icon:hover { background: var(--color-line); }
-.btn-icon--danger:hover { background: #fdf0ee; }
+.media-card {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+  transition: box-shadow var(--transition-fast);
+}
+.media-card:hover { box-shadow: var(--shadow-card); }
+.media-card--disabled { opacity: 0.55; }
 
+/* Thumbnail */
+.media-card__thumb {
+  position: relative;
+  height: 160px;
+  background: #e8edf0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.media-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.media-card__icon {
+  font-size: 2rem;
+  color: var(--color-ink-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.media-card__sort {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+
+/* Info */
+.media-card__info {
+  padding: var(--space-3) var(--space-4);
+  flex: 1;
+  min-width: 0;
+}
+.media-card__filename {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+  margin: 0 0 var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.media-card__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  flex-wrap: wrap;
+}
+.meta-pill {
+  font-size: var(--text-xs);
+  background: #e8f4f1;
+  color: var(--color-primary);
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-weight: 600;
+}
+.meta-dim, .meta-size {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
+.media-card__role { margin: 0 0 var(--space-1); }
+.role-badge {
+  font-size: var(--text-xs);
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-weight: 500;
+}
+.role-badge--set { background: #d1f0e8; color: #0f5c4b; }
+.role-badge--none { background: #f0f0f0; color: var(--color-ink-muted); }
+.media-card__caption { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Actions row */
+.media-card__actions {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-line);
+  background: white;
+}
+
+.btn-toggle {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  cursor: pointer;
+  min-height: 32px;
+}
+.btn-toggle--on { background: #d1f0e8; color: #0f5c4b; border-color: #a3dbc8; }
+.btn-toggle--off { background: #f0f0f0; color: var(--color-ink-muted); border-color: var(--color-line); }
+.btn-toggle--on:hover { background: #a3dbc8; }
+.btn-toggle--off:hover { background: #e0e0e0; }
+
+.btn-edit {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-line);
+  background: white;
+  color: var(--color-ink);
+  cursor: pointer;
+  min-height: 32px;
+}
+.btn-edit:hover { background: var(--color-line); }
+
+.btn-del {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid #f5c6c2;
+  background: white;
+  color: #c0392b;
+  cursor: pointer;
+  min-height: 32px;
+  margin-left: auto;
+}
+.btn-del:hover { background: #fdf0ee; }
+
+/* Inline edit panel */
+.media-card__edit {
+  padding: var(--space-4);
+  border-top: 2px solid var(--color-primary);
+  background: #f6faf9;
+}
+.edit-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-primary-deep);
+  margin: 0 0 var(--space-4);
+}
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+.field-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.field-input {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  background: white;
+  width: 100%;
+}
+.field-input--short { max-width: 120px; }
+.field-input:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; border-color: var(--color-primary); }
+
+/* Focal point */
+.focal-row { align-items: flex-start; }
+.focal-wrap { display: flex; gap: var(--space-4); align-items: flex-start; flex-wrap: wrap; }
+.focal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 4px;
+  flex-shrink: 0;
+}
+.focal-btn {
+  width: 44px; height: 44px;
+  background: var(--color-line);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: var(--color-ink-muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.focal-btn:hover { background: #d0e8e3; }
+.focal-btn--active { background: var(--color-primary); color: white; border-color: var(--color-primary-deep); }
+
+.focal-preview { display: flex; flex-direction: column; gap: var(--space-2); }
+.focal-preview__img { width: 120px; height: 90px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--color-line); display: block; }
+.focal-label { font-size: var(--text-xs); color: var(--color-ink-muted); }
+
+.edit-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.btn-save {
+  font-size: var(--text-sm); font-weight: 600;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary); color: white; border: none; cursor: pointer;
+  min-height: 40px;
+}
+.btn-save:hover { background: var(--color-primary-deep); }
+.btn-cancel {
+  font-size: var(--text-sm); padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: white; color: var(--color-ink-muted); border: 1px solid var(--color-line); cursor: pointer;
+  min-height: 40px;
+}
+.btn-cancel:hover { background: var(--color-line); }
+
+.error-banner { background: #fdf0ee; border: 1px solid #f5c6c2; border-radius: var(--radius-sm); color: #c0392b; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
+.success-banner { background: #d1f0e8; border: 1px solid #a3dbc8; border-radius: var(--radius-sm); color: #0f5c4b; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
 .desktop-hint { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); background: #fffbf0; border: 1px solid #f0e0b0; border-radius: var(--radius-sm); font-size: var(--text-xs); color: #7a6030; }
-.error-banner { background: #FDF0EE; border: 1px solid #F5C6C2; border-radius: var(--radius-sm); color: #C0392B; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
-.success-banner { background: #D1F0E8; border: 1px solid #A3DBC8; border-radius: var(--radius-sm); color: #0F5C4B; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
 
 @media (max-width: 767px) {
   .page { padding: var(--space-4); }
-  .card-header { flex-direction: column; align-items: flex-start; }
+  .media-grid { grid-template-columns: 1fr; }
+  .focal-wrap { flex-direction: column; }
 }
 </style>

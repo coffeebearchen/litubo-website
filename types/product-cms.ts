@@ -3,11 +3,13 @@
 export type ProductStatus = 'draft' | 'review' | 'published' | 'archived'
 
 export type SectionType =
+  | 'text' | 'feature_list'
   | 'overview' | 'image_text' | 'benefits' | 'applications'
   | 'detection_targets' | 'working_principle' | 'configuration_options'
   | 'line_integration' | 'quotation_reminder' | 'video' | 'case_studies'
 
 export const SECTION_TYPES: SectionType[] = [
+  'text', 'feature_list',
   'overview', 'image_text', 'benefits', 'applications',
   'detection_targets', 'working_principle', 'configuration_options',
   'line_integration', 'quotation_reminder', 'video', 'case_studies',
@@ -97,6 +99,11 @@ export interface ProductMedia {
   // Joined from directus_files:
   filename_download?: string | null
   type?: string | null
+  filesize?: number | null
+  width?: number | null
+  height?: number | null
+  focal_point_x?: number | null
+  focal_point_y?: number | null
 }
 
 export interface ProductSection {

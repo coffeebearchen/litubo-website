@@ -14,6 +14,7 @@ export default defineNuxtConfig({
   css: [
     '@/assets/css/tokens.css',
     '@/assets/css/base.css',
+    '@/assets/css/admin-tokens.css',
   ],
 
   i18n: {

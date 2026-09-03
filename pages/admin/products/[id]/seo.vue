@@ -172,6 +172,8 @@ async function save() {
 @media (max-width: 767px) {
   .page { padding: var(--space-4); }
   .layout-grid { grid-template-columns: 1fr; }
-  .side-col { order: -1; }
+  /* side preview 放在 form 下方 (order: 1 默认) */
+  .btn { min-height: 44px; }
+  .form-input, .form-textarea { min-height: 44px; }
 }
 </style>

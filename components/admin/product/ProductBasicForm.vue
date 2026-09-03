@@ -154,4 +154,9 @@ function update(field: keyof AdminProduct, value: unknown) {
 .btn--primary { background: var(--color-primary); color: white; }
 .btn--primary:hover:not(:disabled) { background: var(--color-primary-deep); }
 .btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 720px) {
+  .form-input, .form-select, .form-textarea { min-height: 44px; }
+  .btn { min-height: 44px; padding-left: var(--space-5); padding-right: var(--space-5); }
+}
 </style>

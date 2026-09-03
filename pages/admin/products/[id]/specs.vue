@@ -141,7 +141,8 @@ async function deleteItem(gid: number, iid: number) {
 
           <div v-if="expandedGroups.has(group.id)" class="group-body">
             <div v-if="!group.items?.length" class="items-empty">暂无参数条目</div>
-            <table v-else class="items-table">
+            <div v-else class="table-wrap">
+            <table class="items-table">
               <thead>
                 <tr><th>标签（EN）</th><th>值（EN）</th><th>备注</th><th/></tr>
               </thead>
@@ -156,6 +157,7 @@ async function deleteItem(gid: number, iid: number) {
                 </tr>
               </tbody>
             </table>
+            </div>
 
             <!-- 快速添加条目 -->
             <div class="item-add-row">
@@ -240,5 +242,9 @@ async function deleteItem(gid: number, iid: number) {
   .form-input--sm { width: 100%; }
   .items-table { font-size: var(--text-xs); }
   .items-table th:nth-child(3), .items-table td:nth-child(3) { display: none; }
+  .items-table td { word-break: break-word; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .btn, .btn-secondary { min-height: 44px; }
+  .form-input { min-height: 44px; }
 }
 </style>

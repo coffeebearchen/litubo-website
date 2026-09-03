@@ -177,6 +177,13 @@ async function changeStatus(newStatus: ProductStatus) {
 .meta-value { font-size: var(--text-sm); color: var(--color-ink); margin: 0 0 var(--space-3); font-family: monospace; }
 .meta-value:last-child { margin-bottom: 0; }
 
+@media (max-width: 720px) {
+  .page { padding: var(--space-4); }
+  .page-title { font-size: var(--text-xl); word-break: break-word; }
+  .layout-grid { grid-template-columns: 1fr; }
+  /* status card stays in DOM order (after main-col) */
+}
+
 .error-banner {
   background: #FDF0EE;
   border: 1px solid #F5C6C2;
