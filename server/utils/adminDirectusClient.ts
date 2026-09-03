@@ -24,3 +24,16 @@ export async function adminFetch<T = unknown>(
   })
   return result as T
 }
+
+// Verify product exists; throws 404 if not.
+// Uses filter list query because Directus returns 403 (not 404) for a missing single-item request.
+// Call AFTER admin-auth middleware has already verified Administrator role.
+export async function assertProductExists(event: H3Event, productId: number): Promise<void> {
+  const result = await adminFetch<{ data: { id: number }[] }>(
+    event, `/items/products?filter[id][_eq]=${productId}&fields=id&limit=1`,
+  )
+  const rows = (result as { data: { id: number }[] }).data
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw createError({ statusCode: 404, message: `产品 ID ${productId} 不存在` })
+  }
+}

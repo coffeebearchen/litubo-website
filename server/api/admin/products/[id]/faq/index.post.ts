@@ -1,9 +1,10 @@
 import { getRouterParam, readBody, createError } from 'h3'
-import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: '无效的产品 ID' })
+  await assertProductExists(event, Number(id))
 
   const body = await readBody(event)
   if (!body.question_en?.trim()) throw createError({ statusCode: 400, message: '问题（EN）为必填项' })

@@ -141,9 +141,35 @@
 
 ---
 
-## 4. 当前状态 — Phase 9A-2A 完全收口，等待 push 授权
+## 4. 当前状态 — Phase 9A-2A Fix 收口完成，等待 push 授权
 
-**状态：Phase 9A-2A 产品 CMS 扩展层（Directus schema + Admin API + Admin UI）本地完全收口，所有验收通过，本地 commit 待创建。Phase 9A-2B（多语言字段扩展）尚未开始。Phase 9B（公开前台产品页联通）尚未开始。**
+**状态：Phase 9A-2A Fix（补做验收收口）本地完全收口，所有验收通过，本地 commit 已创建。Phase 9A-2B（多语言字段扩展）尚未开始。Phase 9B（公开前台产品页联通）尚未开始。**
+
+### Phase 9A-2A Fix — 补做验收收口（完成）
+
+| 类别 | 内容 |
+|------|------|
+| Directus schema 字段补充 | `product_spec_groups` 新增 `description_es`、`description_pt`（text, nullable）；`product_spec_items` 新增 `note_es`、`note_pt`（string, max 500, nullable） |
+| Directus 关系注册（8条） | `product_sections→products`（CASCADE）、`product_section_items→product_sections`（CASCADE）、`product_spec_groups→products`（CASCADE）、`product_spec_items→product_spec_groups`（CASCADE）、`product_faqs→products`（CASCADE）、`product_source_records→products`（CASCADE）、`products_files→products`（CASCADE）、`products_files→directus_files`（SET NULL） |
+| `nuxt-server` 权限修复 | `products_files` READ 字段从 5 个扩展至 14 个（含所有 alt/caption/language/version/sort 字段） |
+| 全局父产品存在性校验 | `server/utils/adminDirectusClient.ts` 新增 `assertProductExists()`；全部 21 个子产品 API 端点统一注入（产品不存在 → 404）；实现用 filter 列表查询（规避 Directus 对缺失单项返回 403 的行为） |
+| 错误码修正 | `external_url` 格式无效 → 422（原 400）；`media_id` 跨产品 → 422（原 400） |
+| TypeScript 类型更新 | `types/product-cms.ts`：`ProductSpecGroup` 新增 `description_es/pt`；`ProductSpecItem` 新增 `note_es/pt` |
+| API 白名单字段更新 | `specs/[gid].patch` 增加 `description_es/pt`；`specs/[gid]/items.post` payload 增加 `note_es/pt`；`specs/[gid]/items/[iid].patch` allowed 增加 `note_es/pt` |
+
+**验收结果（全部通过）：**
+- vue-tsc --noEmit：0 errors ✅
+- npm run lint：0 errors ✅
+- npx nuxt build：Build complete ✅
+- 非存在产品（ID=99999）所有 5 个 GET 端点 → 404 + "产品 ID 99999 不存在" ✅
+- 非管理员用户（nuxt-server 角色）尝试 admin 登录 → 403 ✅（临时用户已删除）
+- 无效 Cookie → 401 ✅
+
+**Schema 快照：** fix-before=`directus/schema/phase9a2a-fix-before.yaml`（250,374 B）、fix-after=`directus/schema/phase9a2a-fix-after.yaml`（259,463 B）
+
+**延期测试（留至 LT-180C 草稿阶段）：** 跨产品 media_id 422 实测、子页内部空状态、合法 HTTPS URL 成功写入
+
+---
 
 ### Phase 9A-2A 完成内容
 

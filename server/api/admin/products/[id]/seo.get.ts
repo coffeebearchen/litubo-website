@@ -1,10 +1,11 @@
 import { getRouterParam, createError } from 'h3'
-import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
 import type { ProductSeoFields } from '~/types/product-cms'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: '无效的产品 ID' })
+  await assertProductExists(event, Number(id))
 
   const result = await adminFetch<{ data: ProductSeoFields }>(
     event,

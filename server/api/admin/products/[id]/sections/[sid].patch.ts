@@ -1,5 +1,5 @@
 import { getRouterParam, readBody, createError } from 'h3'
-import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
 import { SECTION_TYPES } from '~/types/product-cms'
 import type { SectionType, SectionLayoutVariant } from '~/types/product-cms'
 
@@ -11,6 +11,7 @@ export default defineEventHandler(async (event) => {
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: '无效的产品 ID' })
   if (!sid || isNaN(Number(sid))) throw createError({ statusCode: 400, message: '无效的 section ID' })
   const productId = Number(id)
+  await assertProductExists(event, productId)
 
   // Ownership check
   const existing = await adminFetch<{ data: { product_id: number } | null }>(
@@ -33,7 +34,7 @@ export default defineEventHandler(async (event) => {
 
   if (body.external_url !== undefined && body.external_url !== null && body.external_url !== '') {
     if (!/^https:\/\/.+/.test(String(body.external_url))) {
-      throw createError({ statusCode: 400, message: 'external_url 必须以 https:// 开头' })
+      throw createError({ statusCode: 422, message: 'external_url 必须以 https:// 开头' })
     }
   }
 
@@ -49,7 +50,7 @@ export default defineEventHandler(async (event) => {
     )
     const mData = (mediaCheck as { data: { products_id: number } | null }).data
     if (!mData || mData.products_id !== productId) {
-      throw createError({ statusCode: 400, message: 'media_id 必须属于本产品的 products_files 记录' })
+      throw createError({ statusCode: 422, message: 'media_id 必须属于本产品的 products_files 记录' })
     }
   }
 

@@ -143,6 +143,8 @@ export interface ProductSpecGroup {
   title_es: string | null
   title_pt: string | null
   description_en: string | null
+  description_es: string | null
+  description_pt: string | null
   enabled: boolean
   sort: number | null
   items?: ProductSpecItem[]
@@ -158,6 +160,8 @@ export interface ProductSpecItem {
   value_es: string | null
   value_pt: string | null
   note_en: string | null
+  note_es: string | null
+  note_pt: string | null
   sort: number | null
   enabled: boolean
 }

@@ -1,5 +1,5 @@
 import { getRouterParam, readBody, createError } from 'h3'
-import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -8,6 +8,7 @@ export default defineEventHandler(async (event) => {
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: '无效的产品 ID' })
   if (!gid || isNaN(Number(gid))) throw createError({ statusCode: 400, message: '无效的参数组 ID' })
   if (!iid || isNaN(Number(iid))) throw createError({ statusCode: 400, message: '无效的条目 ID' })
+  await assertProductExists(event, Number(id))
 
   const itemCheck = await adminFetch<{ data: { spec_group_id: number } | null }>(
     event, `/items/product_spec_items/${iid}?fields=spec_group_id`,
@@ -26,7 +27,7 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody(event)
   const payload: Record<string, unknown> = {}
-  const allowed = ['label_en','label_es','label_pt','value_en','value_es','value_pt','note_en','sort','enabled']
+  const allowed = ['label_en','label_es','label_pt','value_en','value_es','value_pt','note_en','note_es','note_pt','sort','enabled']
   for (const key of allowed) {
     if (body[key] !== undefined) payload[key] = body[key]
   }

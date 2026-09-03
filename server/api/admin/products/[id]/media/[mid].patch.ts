@@ -1,5 +1,5 @@
 import { getRouterParam, readBody, createError } from 'h3'
-import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
 import { FILE_ROLES } from '~/types/product-cms'
 import type { FileRole } from '~/types/product-cms'
 
@@ -8,6 +8,7 @@ export default defineEventHandler(async (event) => {
   const mid = getRouterParam(event, 'mid')
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: '无效的产品 ID' })
   if (!mid || isNaN(Number(mid))) throw createError({ statusCode: 400, message: '无效的媒体记录 ID' })
+  await assertProductExists(event, Number(id))
 
   const check = await adminFetch<{ data: { products_id: number } | null }>(
     event, `/items/products_files/${mid}?fields=products_id`,

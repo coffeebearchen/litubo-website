@@ -1,11 +1,12 @@
 import { getRouterParam, readBody, createError } from 'h3'
-import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   const gid = getRouterParam(event, 'gid')
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: '无效的产品 ID' })
   if (!gid || isNaN(Number(gid))) throw createError({ statusCode: 400, message: '无效的参数组 ID' })
+  await assertProductExists(event, Number(id))
 
   const check = await adminFetch<{ data: { product_id: number } | null }>(
     event, `/items/product_spec_groups/${gid}?fields=product_id`,
@@ -25,6 +26,8 @@ export default defineEventHandler(async (event) => {
     value_es: body.value_es ?? null,
     value_pt: body.value_pt ?? null,
     note_en: body.note_en ?? null,
+    note_es: body.note_es ?? null,
+    note_pt: body.note_pt ?? null,
     sort: body.sort ?? null,
     enabled: body.enabled !== false,
   }
