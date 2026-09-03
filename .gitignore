@@ -33,6 +33,9 @@ backups/
 /jwt.txt
 *.token.txt
 
+# Private product source materials (local only, never commit)
+/private-product-source/
+
 # Logs
 *.log
 npm-debug.log*
