@@ -373,21 +373,26 @@
 - `admin_rt` 永不超过 Directus 当前 refresh TTL（7天，`maxAge: 7 * 24 * 3600` 与 Directus 默认一致）
 - 中间件路由白名单 `/api/admin/auth/` 已允许 refresh 端点无 access token 自由调用（原有 9C-1 设计）
 
-**验收说明：** Claude Preview 面板浏览器与系统浏览器 cookie 存储完全隔离，无法共享管理员会话；实时 API 调用验收以源码验收替代，下次有真实会话时可补做运行时测试。
+**最终运行时验收通过（2026-09-04）：**
 
-**源码验收（最终运行时验收通过——源码级确认，活跃会话可滑动续期）：**
+| 验收项 | 方式 | 结果 |
+|--------|------|------|
+| `POST /api/admin/auth/refresh`（第一次）| 浏览器 fetch，200 | ✅ |
+| `POST /api/admin/auth/refresh`（第二次，顺序执行）| 浏览器 fetch，200 | ✅ |
+| `GET /api/admin/auth/me` | 浏览器 fetch，200 | ✅ |
+| 375px：/admin/media 13 张卡片，scrollW=375=innerW | 浏览器 JS | ✅ |
+| 1440px：/admin/media 13 张卡片，scrollW=1440=innerW | 浏览器 JS | ✅ |
+| 响应体无 access_token / refresh_token | 源码：`return { ok: true }` | ✅ |
+| Directus 401/403 → 清 cookie + 返回 401 | 源码：`deleteCookie` × 2 | ✅ |
+| 网络错误 → 不清 cookie + 返回 503 | 源码：独立 catch 分支 | ✅ |
+| 单飞锁防并发 | 源码：`if (isRefreshing) return true` | ✅ |
+| visibilitychange 补刷 | 源码：`addEventListener('visibilitychange', ...)` | ✅ |
+| onUnmounted 清理完整 | 源码：`clearInterval + removeEventListener` | ✅ |
+| httpOnly/sameSite/secure/path 保持 | 源码：与 login.post.ts 一致 | ✅ |
+| 活跃会话可滑动续期 | 语义：10 分钟 interval，标签页活跃则无限续期 | ✅ |
+| 9C-2 保留给 Media Library 批量操作 | 文档：本阶段编号 9C-1P | ✅ |
 
-| 验收项 | 结果 |
-|--------|------|
-| 响应体无 access_token / refresh_token | `return { ok: true }` 为 refresh.post.ts 唯一返回值 ✅ |
-| Directus 401/403 → 清 cookie + 返回 401 | `deleteCookie(admin_at) + deleteCookie(admin_rt) + createError(401)` ✅ |
-| 网络错误 → 不清 cookie + 返回 503 | `createError(503)` 无 deleteCookie 调用 ✅ |
-| 单飞锁防并发 | `if (isRefreshing) return true` 优先路径 ✅ |
-| visibilitychange 补刷 | `document.addEventListener('visibilitychange', onVisibilityChange)` ✅ |
-| onUnmounted 清理完整 | `clearInterval + removeEventListener` ✅ |
-| httpOnly/sameSite/secure/path 保持 | 与 login.post.ts 完全一致 ✅ |
-| 活跃会话可滑动续期 | 每 10 分钟自动 refresh，只要标签页活跃会话不中断（不是"7 天后必须重新登录"） ✅ |
-| 9C-2 保留给 Media Library 批量操作 | 本阶段编号为 9C-1P，不占用 9C-2 ✅ |
+**网络记录说明：** 网络面板共见 3 次 `/api/admin/auth/refresh` 200，对应 1 次 layout mount 自动刷新 + 2 次本次验收手动调用；`isRefreshing` 为组件实例级变量，同一实例内并发调用正确被锁阻断。
 
 **typecheck / lint / build / git diff --check：** 0 errors / 0 errors / BUILD COMPLETE / 仅 CRLF 警告（Windows 正常）✅
 
