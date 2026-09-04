@@ -47,6 +47,30 @@ const uploadErrors = ref<Array<{ filename: string; message: string }>>([])
 const uploadFolder = ref<string>('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
+// Multi-select
+const selectedIds = ref<Set<string>>(new Set())
+const batchMovingFolder = ref(false)
+const batchTargetFolder = ref('')
+
+// Lifecycle / archived filter
+const showArchivedView = ref(false)
+const archivedFileIds = ref<Set<string>>(new Set())
+
+// Detail panel: references + lifecycle
+interface RefsResult {
+  product_count: number
+  section_count: number
+  total: number
+  can_archive: boolean
+  references: Array<{ product_id: number; product_name: string; file_role: string }>
+}
+const detailRefs = ref<RefsResult | null>(null)
+const detailArchived = ref(false)
+const detailRefsLoading = ref(false)
+const archiveConfirm = ref(false)
+const restoreConfirm = ref(false)
+const lifecycleWorking = ref(false)
+
 // Folder tree
 const { data: foldersData } = await useFetch<FolderNode[]>('/api/admin/media/folders')
 const folderTree = computed(() => foldersData.value ?? [])
@@ -67,22 +91,46 @@ async function loadFiles(reset = false) {
   loading.value = true
   errorMsg.value = ''
   try {
-    const params: Record<string, string> = {
-      limit: String(PAGE),
-      offset: String(offset.value),
-    }
-    if (selectedFolder.value) params.folder = selectedFolder.value
-    if (typeFilter.value) params.type = typeFilter.value
-    if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
-
-    const res = await $fetch<ApiFilesResult>('/api/admin/media/files', { query: params })
-    if (reset) {
-      files.value = res.data ?? []
+    if (showArchivedView.value) {
+      // Load archived files by cross-referencing lifecycle + files API
+      const lcRes = await $fetch<{ data: Array<{ file_id: string }> }>('/api/admin/media/lifecycle')
+      archivedFileIds.value = new Set(lcRes.data.map(r => r.file_id))
+      const uuids = lcRes.data.map(r => r.file_id)
+      if (uuids.length === 0) {
+        files.value = []
+        totalCount.value = 0
+        return
+      }
+      // Fetch files in those UUIDs (use search by id list)
+      const allFiles: MediaFile[] = []
+      for (const uuid of uuids) {
+        try {
+          const res = await $fetch<ApiFilesResult>(`/api/admin/media/files`, {
+            query: { search: uuid, limit: '1' },
+          })
+          if (res.data?.length) allFiles.push(res.data[0])
+        } catch { /* skip */ }
+      }
+      files.value = allFiles
+      totalCount.value = allFiles.length
     } else {
-      files.value = [...files.value, ...(res.data ?? [])]
+      const params: Record<string, string> = {
+        limit: String(PAGE),
+        offset: String(offset.value),
+      }
+      if (selectedFolder.value) params.folder = selectedFolder.value
+      if (typeFilter.value) params.type = typeFilter.value
+      if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
+
+      const res = await $fetch<ApiFilesResult>('/api/admin/media/files', { query: params })
+      if (reset) {
+        files.value = res.data ?? []
+      } else {
+        files.value = [...files.value, ...(res.data ?? [])]
+      }
+      totalCount.value = res.meta?.filter_count ?? res.data?.length ?? 0
+      offset.value += res.data?.length ?? 0
     }
-    totalCount.value = res.meta?.filter_count ?? res.data?.length ?? 0
-    offset.value += res.data?.length ?? 0
   } catch (e: unknown) {
     const fe = e as { data?: { message?: string } }
     errorMsg.value = fe.data?.message ?? '加载文件列表失败'
@@ -91,11 +139,24 @@ async function loadFiles(reset = false) {
   }
 }
 
+// Load archived file IDs once on mount for grid badges
+async function loadArchivedIds() {
+  try {
+    const res = await $fetch<{ data: Array<{ file_id: string }> }>('/api/admin/media/lifecycle')
+    archivedFileIds.value = new Set(res.data.map(r => r.file_id))
+  } catch {
+    archivedFileIds.value = new Set()
+  }
+}
+
 // Initial load deferred to onMounted to avoid SSR/CSR hydration mismatch on admin pages
-onMounted(() => loadFiles(true))
+onMounted(() => {
+  loadFiles(true)
+  loadArchivedIds()
+})
 
 // Reload when filters change
-watch([selectedFolder, typeFilter], () => loadFiles(true))
+watch([selectedFolder, typeFilter, showArchivedView], () => loadFiles(true))
 
 let searchTimer: ReturnType<typeof setTimeout>
 watch(searchQuery, () => {
@@ -105,11 +166,56 @@ watch(searchQuery, () => {
 
 // ── Folder selection ──────────────────────────────────────────────────────────
 function selectFolder(id: string | null) {
+  showArchivedView.value = false
   selectedFolder.value = id
 }
 
+function toggleArchivedView() {
+  showArchivedView.value = !showArchivedView.value
+  if (showArchivedView.value) selectedFolder.value = null
+}
+
+// ── Multi-select ──────────────────────────────────────────────────────────────
+function toggleSelect(id: string, evt: Event) {
+  evt.stopPropagation()
+  const s = new Set(selectedIds.value)
+  if (s.has(id)) s.delete(id)
+  else s.add(id)
+  selectedIds.value = s
+}
+
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+
+async function batchMoveToFolder() {
+  if (!batchTargetFolder.value || selectedIds.value.size === 0) return
+  batchMovingFolder.value = true
+  errorMsg.value = ''
+  let failed = 0
+  for (const id of selectedIds.value) {
+    try {
+      await $fetch(`/api/admin/media/${id}/meta`, {
+        method: 'PATCH',
+        body: { folder: batchTargetFolder.value || null },
+      })
+    } catch {
+      failed++
+    }
+  }
+  batchMovingFolder.value = false
+  if (failed === 0) {
+    successMsg.value = `已将 ${selectedIds.value.size} 个文件移动到所选文件夹`
+    setTimeout(() => (successMsg.value = ''), 3000)
+    clearSelection()
+    await loadFiles(true)
+  } else {
+    errorMsg.value = `${failed} 个文件移动失败，请重试`
+  }
+}
+
 // ── File detail ───────────────────────────────────────────────────────────────
-function openFile(f: MediaFile) {
+async function openFile(f: MediaFile) {
   selectedFile.value = f
   editForm.value = {
     title: f.title ?? '',
@@ -117,10 +223,72 @@ function openFile(f: MediaFile) {
     folder: f.folder ?? '',
   }
   editSaving.value = false
+  archiveConfirm.value = false
+  restoreConfirm.value = false
+  detailRefs.value = null
+  detailArchived.value = archivedFileIds.value.has(f.id)
+  await loadDetailRefs(f.id)
 }
 
 function closeDetail() {
   selectedFile.value = null
+  detailRefs.value = null
+  archiveConfirm.value = false
+  restoreConfirm.value = false
+}
+
+async function loadDetailRefs(uuid: string) {
+  detailRefsLoading.value = true
+  try {
+    const res = await $fetch<RefsResult>(`/api/admin/media/${uuid}/references`)
+    detailRefs.value = res
+  } catch {
+    detailRefs.value = null
+  } finally {
+    detailRefsLoading.value = false
+  }
+}
+
+async function archiveFile() {
+  if (!selectedFile.value) return
+  lifecycleWorking.value = true
+  archiveConfirm.value = false
+  errorMsg.value = ''
+  try {
+    await $fetch(`/api/admin/media/${selectedFile.value.id}/archive`, { method: 'POST' })
+    successMsg.value = '文件已归档'
+    setTimeout(() => (successMsg.value = ''), 3000)
+    detailArchived.value = true
+    archivedFileIds.value = new Set([...archivedFileIds.value, selectedFile.value.id])
+    await loadDetailRefs(selectedFile.value.id)
+  } catch (e: unknown) {
+    const fe = e as { data?: { message?: string } }
+    errorMsg.value = fe.data?.message ?? '归档失败'
+  } finally {
+    lifecycleWorking.value = false
+  }
+}
+
+async function restoreFile() {
+  if (!selectedFile.value) return
+  lifecycleWorking.value = true
+  restoreConfirm.value = false
+  errorMsg.value = ''
+  try {
+    await $fetch(`/api/admin/media/${selectedFile.value.id}/restore`, { method: 'POST' })
+    successMsg.value = '文件已恢复'
+    setTimeout(() => (successMsg.value = ''), 3000)
+    detailArchived.value = false
+    const ids = new Set(archivedFileIds.value)
+    ids.delete(selectedFile.value.id)
+    archivedFileIds.value = ids
+    await loadDetailRefs(selectedFile.value.id)
+  } catch (e: unknown) {
+    const fe = e as { data?: { message?: string } }
+    errorMsg.value = fe.data?.message ?? '恢复失败'
+  } finally {
+    lifecycleWorking.value = false
+  }
 }
 
 async function saveMetadata() {
@@ -262,15 +430,33 @@ const hasMore = computed(() => files.value.length < totalCount.value)
     <div class="ml-topbar">
       <h1 class="ml-title">Media Library</h1>
       <div class="ml-topbar-actions">
-        <select v-model="uploadFolder" class="folder-select" title="上传目标文件夹">
-          <option value="">— 不选文件夹 —</option>
-          <option v-for="f in flatFolders" :key="f.id" :value="f.id">
-            {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
-          </option>
-        </select>
-        <button class="btn-upload" :disabled="uploading" @click="triggerUpload">
-          {{ uploading ? '上传中…' : '上传文件' }}
-        </button>
+        <!-- Batch actions (visible when files are selected) -->
+        <template v-if="selectedIds.size > 0">
+          <span class="selection-count">{{ selectedIds.size }} 已选</span>
+          <select v-model="batchTargetFolder" class="folder-select" title="移动到文件夹">
+            <option value="">— 移动到文件夹 —</option>
+            <option v-for="f in flatFolders" :key="f.id" :value="f.id">
+              {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
+            </option>
+          </select>
+          <button class="btn-batch-move" :disabled="batchMovingFolder || !batchTargetFolder" @click="batchMoveToFolder">
+            {{ batchMovingFolder ? '移动中…' : '批量移动' }}
+          </button>
+          <button class="btn-cancel-sel" @click="clearSelection">取消选择</button>
+        </template>
+
+        <!-- Normal upload actions -->
+        <template v-else>
+          <select v-model="uploadFolder" class="folder-select" title="上传目标文件夹">
+            <option value="">— 不选文件夹 —</option>
+            <option v-for="f in flatFolders" :key="f.id" :value="f.id">
+              {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
+            </option>
+          </select>
+          <button class="btn-upload" :disabled="uploading" @click="triggerUpload">
+            {{ uploading ? '上传中…' : '上传文件' }}
+          </button>
+        </template>
         <input
           ref="fileInputRef"
           type="file"
@@ -300,24 +486,31 @@ const hasMore = computed(() => files.value.length < totalCount.value)
         <p class="sidebar-label">文件夹</p>
         <button
           class="folder-item"
-          :class="{ 'folder-item--active': selectedFolder === null }"
+          :class="{ 'folder-item--active': selectedFolder === null && !showArchivedView }"
           @click="selectFolder(null)"
         >
           全部文件
         </button>
         <button
           class="folder-item"
-          :class="{ 'folder-item--active': selectedFolder === 'root' }"
+          :class="{ 'folder-item--active': selectedFolder === 'root' && !showArchivedView }"
           @click="selectFolder('root')"
         >
           未分类
+        </button>
+        <button
+          class="folder-item folder-item--archived"
+          :class="{ 'folder-item--active': showArchivedView }"
+          @click="toggleArchivedView"
+        >
+          已归档
         </button>
         <div class="folder-divider" />
         <button
           v-for="f in flatFolders"
           :key="f.id"
           class="folder-item"
-          :class="{ 'folder-item--active': selectedFolder === f.id }"
+          :class="{ 'folder-item--active': selectedFolder === f.id && !showArchivedView }"
           :style="{ paddingLeft: `calc(var(--space-3) + ${f.depth * 12}px)` }"
           @click="selectFolder(f.id)"
         >
@@ -356,13 +549,31 @@ const hasMore = computed(() => files.value.length < totalCount.value)
 
         <!-- File grid -->
         <div v-else class="file-grid">
-          <button
+          <div
             v-for="f in files"
             :key="f.id"
             class="file-card"
-            :class="{ 'file-card--selected': selectedFile?.id === f.id }"
+            :class="{
+              'file-card--selected': selectedFile?.id === f.id,
+              'file-card--checked': selectedIds.has(f.id),
+              'file-card--archived': archivedFileIds.has(f.id),
+            }"
+            role="button"
+            tabindex="0"
             @click="openFile(f)"
+            @keydown.enter="openFile(f)"
           >
+            <!-- Multi-select checkbox -->
+            <label class="file-card__check" @click.stop>
+              <input
+                type="checkbox"
+                :checked="selectedIds.has(f.id)"
+                class="check-input"
+                @change="toggleSelect(f.id, $event)"
+              >
+            </label>
+            <!-- Archived badge -->
+            <span v-if="archivedFileIds.has(f.id)" class="archived-badge">归档</span>
             <div class="file-card__thumb">
               <img
                 v-if="isImage(f.type)"
@@ -386,7 +597,7 @@ const hasMore = computed(() => files.value.length < totalCount.value)
                 📁 {{ folderMap[f.folder] }}
               </p>
             </div>
-          </button>
+          </div>
         </div>
 
         <!-- Load more -->
@@ -431,6 +642,68 @@ const hasMore = computed(() => files.value.length < totalCount.value)
           <dt>上传时间</dt>
           <dd>{{ selectedFile.uploaded_on ? selectedFile.uploaded_on.slice(0, 10) : '—' }}</dd>
         </dl>
+
+        <!-- References & lifecycle section -->
+        <div class="detail-lifecycle">
+          <div class="lifecycle-header">
+            <span class="lifecycle-label">引用 / 归档</span>
+            <span v-if="detailArchived" class="lifecycle-archived-tag">已归档</span>
+          </div>
+
+          <div v-if="detailRefsLoading" class="lifecycle-loading">查询引用中…</div>
+          <div v-else-if="detailRefs" class="lifecycle-refs">
+            <p v-if="detailRefs.total === 0" class="refs-none">无引用，可以归档</p>
+            <p v-else class="refs-count">
+              被引用 {{ detailRefs.total }} 次（{{ detailRefs.product_count }} 个产品，{{ detailRefs.section_count }} 个章节）
+            </p>
+            <ul v-if="detailRefs.references.length" class="refs-list">
+              <li v-for="ref in detailRefs.references" :key="`${ref.product_id}-${ref.file_role}`">
+                {{ ref.product_name }} · {{ ref.file_role }}
+              </li>
+            </ul>
+          </div>
+
+          <!-- Archive action -->
+          <div v-if="!detailArchived" class="lifecycle-action">
+            <template v-if="!archiveConfirm">
+              <button
+                class="btn-lifecycle btn-archive"
+                :disabled="lifecycleWorking || !detailRefs || !detailRefs.can_archive"
+                :title="detailRefs && !detailRefs.can_archive ? '有引用，无法归档' : ''"
+                @click="archiveConfirm = true"
+              >
+                归档文件
+              </button>
+            </template>
+            <template v-else>
+              <p class="confirm-msg">确认归档此文件？归档后可随时恢复。</p>
+              <div class="confirm-btns">
+                <button class="btn-lifecycle btn-archive-confirm" :disabled="lifecycleWorking" @click="archiveFile">
+                  {{ lifecycleWorking ? '归档中…' : '确认归档' }}
+                </button>
+                <button class="btn-lifecycle btn-lifecycle-cancel" @click="archiveConfirm = false">取消</button>
+              </div>
+            </template>
+          </div>
+
+          <!-- Restore action -->
+          <div v-if="detailArchived" class="lifecycle-action">
+            <template v-if="!restoreConfirm">
+              <button class="btn-lifecycle btn-restore" :disabled="lifecycleWorking" @click="restoreConfirm = true">
+                恢复文件
+              </button>
+            </template>
+            <template v-else>
+              <p class="confirm-msg">确认恢复此文件？</p>
+              <div class="confirm-btns">
+                <button class="btn-lifecycle btn-restore-confirm" :disabled="lifecycleWorking" @click="restoreFile">
+                  {{ lifecycleWorking ? '恢复中…' : '确认恢复' }}
+                </button>
+                <button class="btn-lifecycle btn-lifecycle-cancel" @click="restoreConfirm = false">取消</button>
+              </div>
+            </template>
+          </div>
+        </div>
 
         <!-- Editable fields -->
         <div class="detail-edit">
@@ -854,6 +1127,132 @@ const hasMore = computed(() => files.value.length < totalCount.value)
   border-radius: var(--radius-sm); font-size: var(--text-sm); cursor: pointer;
 }
 .btn-cancel:hover { background: var(--color-line); }
+
+/* ── Batch actions ── */
+.selection-count {
+  font-size: var(--text-sm); font-weight: 600;
+  color: var(--color-primary-deep);
+  white-space: nowrap;
+}
+
+.btn-batch-move {
+  height: 38px; padding: 0 var(--space-4);
+  background: var(--color-primary-deep); color: white;
+  border: none; border-radius: var(--radius-sm);
+  font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.btn-batch-move:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-batch-move:hover:not(:disabled) { background: var(--color-primary); }
+
+.btn-cancel-sel {
+  height: 38px; padding: 0 var(--space-3);
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink-muted);
+  background: white; cursor: pointer;
+}
+.btn-cancel-sel:hover { background: var(--color-line); }
+
+/* ── File card additions ── */
+.file-card {
+  position: relative;
+}
+
+.file-card__check {
+  position: absolute; top: 6px; left: 6px; z-index: 2;
+  display: flex; cursor: pointer;
+}
+.check-input {
+  width: 16px; height: 16px; cursor: pointer; accent-color: var(--color-primary);
+}
+
+.archived-badge {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  background: rgba(0,0,0,0.55); color: white;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+  padding: 2px 6px; border-radius: 99px;
+}
+
+.file-card--checked { border-color: var(--color-primary); background: rgba(18,60,50,0.03); }
+.file-card--archived { opacity: 0.65; }
+
+/* ── Archived folder item ── */
+.folder-item--archived { color: #8a5a00; }
+.folder-item--archived.folder-item--active { background: rgba(180,120,0,0.12); color: #7a4e00; }
+
+/* ── Lifecycle panel ── */
+.detail-lifecycle {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lifecycle-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lifecycle-label {
+  font-size: 10px; font-weight: 600;
+  color: var(--color-ink-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+.lifecycle-archived-tag {
+  font-size: 10px; font-weight: 700;
+  background: rgba(180,120,0,0.15); color: #7a4e00;
+  padding: 1px 8px; border-radius: 99px;
+}
+
+.lifecycle-loading { font-size: var(--text-xs); color: var(--color-ink-muted); }
+
+.refs-none { font-size: var(--text-xs); color: #0f5c4b; margin: 0; }
+.refs-count { font-size: var(--text-xs); color: var(--color-ink); margin: 0; }
+
+.refs-list {
+  margin: var(--space-1) 0 0 var(--space-3);
+  padding: 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  list-style: disc;
+  max-height: 80px;
+  overflow-y: auto;
+}
+.refs-list li { margin: 1px 0; }
+
+.lifecycle-action { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.confirm-msg { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; }
+
+.confirm-btns { display: flex; gap: var(--space-2); }
+
+.btn-lifecycle {
+  height: 34px; padding: 0 var(--space-3);
+  border: none; border-radius: var(--radius-sm);
+  font-size: var(--text-xs); font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+.btn-lifecycle:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn-archive { background: #fef3e2; color: #8a5a00; border: 1px solid #f0d090; }
+.btn-archive:hover:not(:disabled) { background: #fde8c0; }
+.btn-archive[title]:not([title=""]) { cursor: not-allowed; opacity: 0.5; }
+
+.btn-archive-confirm { background: #e74c3c; color: white; }
+.btn-archive-confirm:hover:not(:disabled) { background: #c0392b; }
+
+.btn-restore { background: #e8f4f1; color: var(--color-primary-deep); border: 1px solid #a3dbc8; }
+.btn-restore:hover:not(:disabled) { background: #d1f0e8; }
+
+.btn-restore-confirm { background: var(--color-primary); color: white; }
+.btn-restore-confirm:hover:not(:disabled) { background: var(--color-primary-deep); }
+
+.btn-lifecycle-cancel { background: white; color: var(--color-ink-muted); border: 1px solid var(--color-line); }
+.btn-lifecycle-cancel:hover { background: var(--color-line); }
 
 /* ── Responsive ── */
 @media (max-width: 1023px) {

@@ -136,14 +136,14 @@
 | Directus Admin 地址 | 仅内网访问（127.0.0.1:8055），不对公网开放 |
 | 前台访问 CMS 的方式 | 仅通过 Nuxt server API 层（`server/api/`、`server/utils/`），Directus REST API 不暴露给浏览器 |
 | Directus Token | `.env` 中管理，不进 Git，不写入任何文档 |
-| Directus Collection 数量 | 上限 25（Directus 社区版限制）；当前已用：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries`、`product_page_presets`、`product_sections`、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`、`product_source_records`、`site_settings`、`site_social_links` = **15 个**（含 M2M junction 1 个） |
+| Directus Collection 数量 | 上限 25（Directus 社区版限制）；当前已用：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries`、`product_page_presets`、`product_sections`、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`、`product_source_records`、`site_settings`、`site_social_links`、`media_file_lifecycle` = **16 个**（含 M2M junction 1 个，9C-2 新增 1 个） |
 | 不进 Git 的内容 | `.env`、PostgreSQL 数据文件、`directus/uploads/`、数据库备份 |
 
 ---
 
-## 4. 当前状态 — Phase 9C-2 规划已确认，等待代码开发授权
+## 4. 当前状态 — Phase 9C-2 代码已完成，等待用户验收
 
-**状态：Phase 9C-2（M4-Next-2）Media Library 基础版规划已正式确认（2026-09-04）。规划文档 `docs/project/PHASE-9C-2-MEDIA-LIBRARY-FOUNDATION-SPEC.md` 已定稿并写入 commit。决策 #10/#11/#12 已明确（见规划文档第八节）。9C-2 代码开发尚未开始，须用户单独授权后方可实施。未 push、未部署。**
+**状态：Phase 9C-2（M4-Next-2）Media Library 基础版代码开发已完成（2026-09-04），本地 commit 已建立，等待用户业务验收。未 push、未部署。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -172,14 +172,15 @@
 | `ae29d14`  | docs：M4-Next-3 业务验收结果写入 CURRENT-STATE.md（已 push） |
 | `c555d9c`  | docs：B0-0 媒体治理规范 v0.1 + 决策 #1/#2/#3 已确认 + 状态机术语统一 |
 | `82b4329`  | docs：9A-2C 本地发布/撤回验收结果写入 CURRENT-STATE.md |
-| （本次）     | docs(9c-2)：9C-2 规划定稿 — PHASE-9C-2 规划文档 + CURRENT-STATE 更新 |
+| `abfd69a`  | docs(9c-2)：9C-2 规划定稿 — PHASE-9C-2 规划文档 + CURRENT-STATE 更新 |
+| （本次）     | feat(9c-2)：Media Library 生命周期管理 — 软归档、引用保护、恢复、批量归类 |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
 1. ~~**Media Library 基础版**~~：✅ 已在 Phase 9C-1 完成
 2. ~~**管理员会话续期**~~：✅ 已在 Phase 9C-1P 完成（含安全强化收口）+ Phase 9C-1P-R 多标签并发安全强化（见下方专节）
 3. ~~**Settings 最小版**~~：✅ 已在 M4-Next-3 完成
-4. **9C-2：Media Library 批量选择/归类**（预留编号，待授权）
+4. ~~**9C-2：Media Library 批量选择/归类**~~：✅ 本次完成（代码已 commit，等待业务验收）
 5. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
 6. **Content Center**：内容运营中心（博文、资源、页面等综合管理）
 7. **真实产品资料录入与正式上线**
@@ -518,6 +519,28 @@
 **ID=3 最终状态：`status=draft`、`seo_noindex=true`、TEST ONLY 标识保留（不对外可见）**
 
 **确认：** 验收全程未修改任何代码或 schema；验收期间未产生 commit；未 push、部署或调用 AI；未读取或输出任何凭证。
+
+---
+
+### Phase 9C-2 代码已完成（2026-09-04，等待业务验收）
+
+**新增文件（本次 commit）：**
+
+| 文件 | 说明 |
+|------|------|
+| `directus/schema/phase-9c2-before.yaml` | schema 快照（变更前） |
+| `directus/schema/phase-9c2-after.yaml` | schema 快照（含 `media_file_lifecycle` collection） |
+| `server/utils/mediaLifecycle.ts` | 生命周期业务逻辑（可注入依赖，便于单测） |
+| `server/api/admin/media/[id]/references.get.ts` | `GET /api/admin/media/:uuid/references`（引用查询） |
+| `server/api/admin/media/[id]/archive.post.ts` | `POST /api/admin/media/:uuid/archive`（软归档） |
+| `server/api/admin/media/[id]/restore.post.ts` | `POST /api/admin/media/:uuid/restore`（恢复） |
+| `server/api/admin/media/lifecycle.get.ts` | `GET /api/admin/media/lifecycle`（归档文件列表） |
+| `tests/mediaLifecycle.test.ts` | 9 个单元测试，全部通过 |
+| `pages/admin/media/index.vue` | 新增：多选 checkbox、批量文件夹移动、引用查询面板、归档/恢复按钮、已归档视图 |
+
+**Directus Collection：** `media_file_lifecycle`（16/25，2026-09-04 通过 API 创建）
+
+**验证结果：** typecheck 0 errors、lint 0 errors、build exit 0、vitest 23/23 通过、375px 无水平溢出
 
 ---
 
