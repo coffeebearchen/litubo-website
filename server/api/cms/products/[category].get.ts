@@ -131,7 +131,7 @@ export default defineEventHandler(async (event) => {
   // appropriate "unavailable" message rather than silently appearing as an empty category.
   try {
     const prodRes = await directusFetch<{ data: DirectusProduct[] }>(
-      `/items/products?filter[category_id][_eq]=${catRes.data[0].id}&filter[status][_eq]=published&sort=sort,name_en&limit=-1`
+      `/items/products?filter[category_id][_eq]=${catRes.data[0].id}&filter[status][_eq]=published&sort=sort,name_en&limit=200`
     )
     const products = prodRes.data.map(p => mapProduct(p, categorySlug))
     return { category, products, cmsError: false as const }

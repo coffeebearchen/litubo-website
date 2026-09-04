@@ -54,7 +54,7 @@ export default defineEventHandler(async () => {
 
   try {
     const data = await directusFetch<{ data: DirectusCategory[] }>(
-      '/items/product_categories?filter[status][_eq]=published&sort=sort,name_en&limit=-1'
+      '/items/product_categories?filter[status][_eq]=published&sort=sort,name_en&limit=100'
     )
     return data.data.map(toProductCategory) as ProductCategory[]
   }
