@@ -5,12 +5,34 @@ const user = ref<AdminUser | null>(null)
 const router = useRouter()
 const menuOpen = ref(false)
 
+// Refresh interval: 10 min (Directus access token expires at 15 min)
+const REFRESH_MS = 10 * 60 * 1000
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+async function refreshSession() {
+  try {
+    await $fetch('/api/admin/auth/refresh', { method: 'POST' })
+  } catch {
+    user.value = null
+    clearInterval(refreshTimer!)
+    router.push('/admin/login')
+  }
+}
+
 onMounted(async () => {
   try {
+    // Immediately refresh to extend session, then verify identity
+    await refreshSession()
     user.value = await $fetch<AdminUser>('/api/admin/auth/me')
   } catch {
     router.push('/admin/login')
+    return
   }
+  refreshTimer = setInterval(refreshSession, REFRESH_MS)
+})
+
+onUnmounted(() => {
+  if (refreshTimer !== null) clearInterval(refreshTimer)
 })
 
 async function logout() {
