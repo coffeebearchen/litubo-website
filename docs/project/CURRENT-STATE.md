@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — B0-0 媒体治理规划完成，等待 9C-2 或产品录入授权
+## 4. 当前状态 — 9A-2C 本地发布/撤回验收通过，等待 9C-2 或产品录入授权
 
-**状态：M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化均已完成。B0-1 代码已 push 至 GitHub（commit `ae29d14`）。已写入媒体治理规范文档 `docs/project/MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md`。未 push 该文档（待用户审核后授权），未部署。等待用户按序授权后续模块。**
+**状态：M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化均已完成。9A-2C 本地发布/撤回可逆验收通过（2026-09-04）。B0-1 代码已 push 至 GitHub（commit `ae29d14`）。已写入媒体治理规范文档 `docs/project/MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md`。未 push 该文档（待用户审核后授权），未部署。等待用户按序授权后续模块。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -170,7 +170,8 @@
 | （上次收口）| Phase 9C-1P 收口：refresh 安全分支 + 前端单飞锁 + visibilitychange 补刷 |
 | `0209ffa`  | M4-Next-3 + 9C-1P-R：Settings 最小版 + 多标签会话并发安全强化 + Vitest |
 | `ae29d14`  | docs：M4-Next-3 业务验收结果写入 CURRENT-STATE.md（已 push） |
-| （本次）     | docs：B0-0 媒体治理规范 v0.1 + 决策 #1/#2/#3 已确认 + 状态机术语统一 |
+| `c555d9c`  | docs：B0-0 媒体治理规范 v0.1 + 决策 #1/#2/#3 已确认 + 状态机术语统一 |
+| （本次）     | docs：9A-2C 本地发布/撤回验收结果写入 CURRENT-STATE.md |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
@@ -474,6 +475,51 @@
 
 ---
 
+### 9A-2C — 本地发布/撤回完整验收（2026-09-04，完成）
+
+**验收类型：** 可逆本地验收（无代码/schema 变更，无 commit，测试结束后 ID=3 已恢复 draft）
+
+**状态机转移（实测）：**
+
+| 操作 | HTTP 状态 | 产品状态 |
+|------|-----------|---------|
+| draft → review | 200 | review |
+| review → published | 200 | published |
+| published → draft（撤回）| 200 | draft |
+
+> 注：直接 `draft → published` 返回 403（状态机不允许跨步），须经 review 中转，行为符合预期。
+
+**Published 状态验证（全部通过）：**
+
+| 验收项 | 实际值 | 结果 |
+|--------|--------|------|
+| 公开详情 API | HTTP 200 | ✅ |
+| H1 标题 | `[TEST ONLY — NOT FOR PUBLICATION] LT-180C Free-Fall Metal Detector` | ✅ |
+| `<meta name="robots">` | `noindex, follow` | ✅ |
+| OG title | `[TEST ONLY] LT-180C Free-Fall Metal Detector` | ✅ |
+| Sitemap 排除（seo_noindex=true）| 产品不出现在 sitemap.xml | ✅ |
+| 产品分类列表 | 出现在 Metal Detection 列表 | ✅ |
+| FAQ 区块 | 8 条 FAQ 可见 | ✅ |
+| CTA 按钮 | "Talk to an engineer" + "Find a distributor" 可见 | ✅ |
+| 桌面端 1440px | scrollWidth=1425 ≤ innerWidth=1440，无横向溢出 | ✅ |
+| 桌面端 1280px | scrollWidth=1265 ≤ innerWidth=1280，无横向溢出 | ✅ |
+| 手机端 375px | scrollWidth=375 = innerWidth=375，无横向溢出 | ✅ |
+
+**撤回后验证（全部通过）：**
+
+| 验收项 | 实际值 | 结果 |
+|--------|--------|------|
+| 公开详情 API | HTTP 404（"Page Not Found — LITUBO"）| ✅ |
+| 产品分类列表 | 产品不再出现 | ✅ |
+| Sitemap | 产品不出现 | ✅ |
+| 管理员 API | HTTP 200，status=draft（管理员仍可查）| ✅ |
+
+**ID=3 最终状态：`status=draft`、`seo_noindex=true`、TEST ONLY 标识保留（不对外可见）**
+
+**确认：** 验收全程未修改任何代码或 schema；验收期间未产生 commit；未 push、部署或调用 AI；未读取或输出任何凭证。
+
+---
+
 ### Phase 8B-1 完成内容
 
 | 类别 | 完成项 |
@@ -620,4 +666,4 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-04，由 Claude Code 在"M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化"任务中写入。*
+*最后更新：2026-09-04，由 Claude Code 在"9A-2C 本地发布/撤回验收"任务中写入。*
