@@ -11,20 +11,32 @@ const emit = defineEmits<{
   'status-change': [newStatus: ProductStatus]
 }>()
 
-// Phase 9A-1: only draft↔review transitions allowed
 const transitions: Record<ProductStatus, { label: string; target: ProductStatus; class: string }[]> = {
-  draft: [{ label: '提交审核', target: 'review', class: 'btn--review' }],
-  review: [{ label: '退回草稿', target: 'draft', class: 'btn--draft' }],
-  published: [],
-  archived: [],
+  draft:     [{ label: '提交审核', target: 'review',     class: 'btn--review'   }],
+  review:    [
+    { label: '退回草稿', target: 'draft',     class: 'btn--draft'   },
+    { label: '发布',     target: 'published', class: 'btn--publish'  },
+  ],
+  published: [{ label: '撤回草稿', target: 'draft',     class: 'btn--draft'   }],
+  archived:  [],
 }
 
 const currentTransitions = computed(() => transitions[props.status] ?? [])
 
 const lockNote = computed(() => {
-  if (props.status === 'draft' || props.status === 'review') return null
-  return 'Published / Archived 状态将在 Phase 9A-2 验收后开放'
+  if (props.status === 'archived') return '已归档状态，如需恢复请联系管理员'
+  return null
 })
+
+function requestTransition(target: ProductStatus) {
+  if (target === 'published') {
+    if (!window.confirm('确认发布此产品？发布后将对外公开可见。')) return
+  }
+  else if (target === 'draft' && props.status === 'published') {
+    if (!window.confirm('确认撤回至草稿？产品将立即从前台下线。')) return
+  }
+  emit('status-change', target)
+}
 </script>
 
 <template>
@@ -45,18 +57,13 @@ const lockNote = computed(() => {
         class="btn"
         :class="t.class"
         :disabled="loading"
-        @click="emit('status-change', t.target)"
+        @click="requestTransition(t.target)"
       >
         {{ t.label }}
       </button>
     </div>
 
     <p v-if="lockNote" class="lock-note">{{ lockNote }}</p>
-
-    <div class="disabled-row">
-      <button class="btn btn--locked" disabled title="Phase 9A-2 后开放">发布</button>
-      <button class="btn btn--locked" disabled title="Phase 9A-2 后开放">归档</button>
-    </div>
   </div>
 </template>
 
@@ -89,7 +96,7 @@ const lockNote = computed(() => {
   color: var(--color-ink-muted);
 }
 
-.action-row, .disabled-row {
+.action-row {
   display: flex;
   gap: var(--space-2);
 }
@@ -104,17 +111,12 @@ const lockNote = computed(() => {
   transition: background var(--transition-fast);
 }
 
-.btn--review { background: var(--color-primary); color: white; border-color: var(--color-primary); }
-.btn--review:hover:not(:disabled) { background: var(--color-primary-deep); }
-.btn--draft  { background: white; color: var(--color-ink); border-color: var(--color-line); }
-.btn--draft:hover:not(:disabled) { background: #F4F6F5; }
-
-.btn--locked {
-  background: #F0F0F0;
-  color: #B0B0B0;
-  cursor: not-allowed;
-  border-color: #E0E0E0;
-}
+.btn--review  { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+.btn--review:hover:not(:disabled)  { background: var(--color-primary-deep); }
+.btn--publish { background: #1a6b3c; color: white; border-color: #1a6b3c; }
+.btn--publish:hover:not(:disabled) { background: #155230; }
+.btn--draft   { background: white; color: var(--color-ink); border-color: var(--color-line); }
+.btn--draft:hover:not(:disabled)   { background: #F4F6F5; }
 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 

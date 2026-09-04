@@ -8,10 +8,11 @@ const ALLOWED = [
   'category_id', 'page_preset_id', 'review_notes',
 ]
 
-// Phase 9A-1: only draft↔review transitions allowed
+// Phase 9A-2D: full publish/revert state machine
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ['review'],
-  review: ['draft'],
+  review: ['draft', 'published'],
+  published: ['draft'],
 }
 
 export default defineEventHandler(async (event) => {
@@ -30,20 +31,27 @@ export default defineEventHandler(async (event) => {
   }
 
   if (body.status !== undefined) {
-    const current = await adminFetch<{ data: { status: string } }>(
+    const current = await adminFetch<{ data: { status: string; published_at: string | null } }>(
       event,
-      `/items/products/${id}?fields=status`,
+      `/items/products/${id}?fields=status,published_at`,
     )
-    const currentStatus = (current as { data: { status: string } }).data.status
+    const { status: currentStatus, published_at: currentPublishedAt } = (
+      current as { data: { status: string; published_at: string | null } }
+    ).data
     const allowed = ALLOWED_TRANSITIONS[currentStatus] ?? []
 
     if (!allowed.includes(String(body.status))) {
       throw createError({
         statusCode: 403,
-        message: `Status transition ${currentStatus} → ${body.status} is not permitted in Phase 9A-1. Published and Archived become available after Phase 9A-2 acceptance.`,
+        message: `Status transition ${currentStatus} → ${body.status} is not permitted. Allowed from ${currentStatus}: ${allowed.join(', ') || 'none'}.`,
       })
     }
     payload.status = body.status
+
+    // Set published_at only on first publish; preserve history on revert to draft
+    if (body.status === 'published' && !currentPublishedAt) {
+      payload.published_at = new Date().toISOString()
+    }
   }
 
   if (Object.keys(payload).length === 0) {
