@@ -116,11 +116,12 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 - 前端单飞锁 + visibilitychange 补刷 + 错误分支分离 ✅
 - **9C-2 保留给 Media Library 批量选择/归类**（勿覆盖此编号）
 
-#### M4-Next-2：9C-2 Media Library 批量选择/归类（预留编号，待授权）
+#### M4-Next-2：9C-2 Media Library 批量选择/归类（规划已确认，代码待授权）
 
 - 批量选择文件、批量归类到文件夹
-- 文件搜索增强
+- 文件搜索增强、全局引用查询、软归档
 - 治理规范：见 `docs/project/MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md`（B0-0 写入）
+- 规划文档：`docs/project/PHASE-9C-2-MEDIA-LIBRARY-FOUNDATION-SPEC.md`（2026-09-04 确认，决策 #10/#11/#12 已明确）
 
 #### M4-Next-3：Settings 最小版 ✅（完成，本地验收通过）
 

@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — 9A-2C 本地发布/撤回验收通过，等待 9C-2 或产品录入授权
+## 4. 当前状态 — Phase 9C-2 规划已确认，等待代码开发授权
 
-**状态：M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化均已完成。9A-2C 本地发布/撤回可逆验收通过（2026-09-04）。B0-1 代码已 push 至 GitHub（commit `ae29d14`）。已写入媒体治理规范文档 `docs/project/MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md`。未 push 该文档（待用户审核后授权），未部署。等待用户按序授权后续模块。**
+**状态：Phase 9C-2（M4-Next-2）Media Library 基础版规划已正式确认（2026-09-04）。规划文档 `docs/project/PHASE-9C-2-MEDIA-LIBRARY-FOUNDATION-SPEC.md` 已定稿并写入 commit。决策 #10/#11/#12 已明确（见规划文档第八节）。9C-2 代码开发尚未开始，须用户单独授权后方可实施。未 push、未部署。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -171,7 +171,8 @@
 | `0209ffa`  | M4-Next-3 + 9C-1P-R：Settings 最小版 + 多标签会话并发安全强化 + Vitest |
 | `ae29d14`  | docs：M4-Next-3 业务验收结果写入 CURRENT-STATE.md（已 push） |
 | `c555d9c`  | docs：B0-0 媒体治理规范 v0.1 + 决策 #1/#2/#3 已确认 + 状态机术语统一 |
-| （本次）     | docs：9A-2C 本地发布/撤回验收结果写入 CURRENT-STATE.md |
+| `82b4329`  | docs：9A-2C 本地发布/撤回验收结果写入 CURRENT-STATE.md |
+| （本次）     | docs(9c-2)：9C-2 规划定稿 — PHASE-9C-2 规划文档 + CURRENT-STATE 更新 |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
@@ -520,6 +521,34 @@
 
 ---
 
+### Phase 9C-2 规划已确认（2026-09-04，待代码开发授权）
+
+**规划文档：** `docs/project/PHASE-9C-2-MEDIA-LIBRARY-FOUNDATION-SPEC.md`（本次 commit 写入）
+
+**规划内容涵盖：**
+- 双资料区边界（Media Library 公开媒体库 / 私有原始资料区）
+- 文件元数据字段分层与引用关系
+- 全局引用查询 API 规格（`GET /api/admin/media/:uuid/references`）
+- 软归档五阶段文件生命周期
+- 各阶段功能范围（9C-1 已完成 / 9C-2 待授权 / 二期待授权）
+- 权限、审计与存储策略（含 Directus Collection 配额规划）
+- Phase 9B 接口与安全边界（9C-2 视角定义，Phase 9B 须单独授权）
+- 已确认开放决策（见下表）
+
+**已确认决策（2026-09-04）：**
+
+| # | 决策内容 |
+|---|---------|
+| #10 | 软归档状态使用独立 Directus Collection 或独立 Postgres 数据表关联 file_id；**不修改 directus_files 表结构** |
+| #11 | 管理员引用 API 返回引用数量 + 实体名称/ID/file_role；**公开 API 不暴露任何引用信息** |
+| #12 | SHA-256 仅提示重复（UI 显示已有相同内容文件的 UUID）；管理员可确认后继续上传；**不自动合并、不强制阻止** |
+
+**仍待确认（不阻塞 9C-2 开发）：** 决策 #4/#5/#6/#7/#8/#9/#13（详见规划文档第八节第二组）
+
+**下一步：** 9C-2 代码开发尚未开始。开始开发前须用户单独授权。
+
+---
+
 ### Phase 8B-1 完成内容
 
 | 类别 | 完成项 |
@@ -666,4 +695,4 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-04，由 Claude Code 在"9A-2C 本地发布/撤回验收"任务中写入。*
+*最后更新：2026-09-04，由 Claude Code 在"9C-2 Media Library 基础版规划确认"任务中写入。*
