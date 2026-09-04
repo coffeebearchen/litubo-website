@@ -177,7 +177,10 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
             <tbody>
               <tr v-for="row in group.items" :key="row.label.en">
                 <th>{{ loc(row.label) }}</th>
-                <td>{{ loc(row.value) }}<span v-if="row.unit" class="spec-unit"> {{ row.unit }}</span></td>
+                <td>
+                  {{ loc(row.value) }}<span v-if="row.unit" class="spec-unit"> {{ row.unit }}</span>
+                  <span v-if="row.note" class="spec-note">{{ row.note }}</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -395,6 +398,13 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
 }
 .spec-table td { color: var(--color-ink-muted); }
 .spec-unit { color: var(--color-ink-muted); }
+.spec-note {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  font-style: italic;
+}
 
 @media (max-width: 640px) {
   .spec-table, .spec-table thead, .spec-table tbody,

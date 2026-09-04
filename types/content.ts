@@ -126,6 +126,7 @@ export interface ProductSpecRow {
   label: LocalizedString
   value: LocalizedString
   unit?: string
+  note?: string
 }
 
 /** Structured spec group from product_spec_groups + product_spec_items. */

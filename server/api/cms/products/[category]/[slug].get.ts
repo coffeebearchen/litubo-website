@@ -255,7 +255,7 @@ export default defineEventHandler(async (event) => {
         items: (itemsByGroup.get(g.id) ?? []).map(i => ({
           label: ls(i.label_en, i.label_es, i.label_pt),
           value: ls(i.value_en, i.value_es, i.value_pt),
-          ...(i.note_en ? { unit: i.note_en } : {}),
+          ...(i.note_en ? { note: i.note_en } : {}),
         })),
       }))
     }

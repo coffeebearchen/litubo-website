@@ -42,20 +42,20 @@ defineProps<{
 }
 
 .breadcrumb__link {
-  color: var(--color-ink-muted);
+  color: var(--bc-link, var(--color-ink-muted));
   transition: color var(--transition-fast);
 }
 
 .breadcrumb__link:hover {
-  color: var(--color-primary);
+  color: var(--bc-link-hover, var(--color-primary));
 }
 
 .breadcrumb__current {
-  color: var(--color-ink-muted);
+  color: var(--bc-current, var(--color-ink-muted));
   font-weight: 500;
 }
 
 .breadcrumb__sep {
-  color: var(--color-line);
+  color: var(--bc-sep, var(--color-line));
 }
 </style>
