@@ -209,6 +209,7 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 - 腾讯云服务器 Docker Compose 部署就绪
 - Cloudflare 配置确认
 - 旧 Wix 网站迁移计划确认
+- **认证并发安全完整验收**：在独立测试环境（非本地开发）验证多标签 / 多实例场景；若部署多 Nuxt 实例，须先将 `refreshCoordinator` 的 pending / graceCache / rotated 改为共享协调机制（Redis SETNX+TTL）
 
 ### 禁止（未授权前绝对禁止）
 

@@ -8,26 +8,30 @@ const menuOpen = ref(false)
 // Refresh interval: 10 min (Directus access token expires at ~15 min)
 const REFRESH_MS = 10 * 60 * 1000
 let refreshTimer: ReturnType<typeof setInterval> | null = null
+// Per-instance noise reducer — prevents this tab from queuing duplicate refresh calls.
+// Cross-tab coordination is handled server-side in refresh.post.ts.
 let isRefreshing = false
 
 // Returns true on success or transient failure (keep going), false on 401 (must re-login).
-async function refreshSession(): Promise<boolean> {
+// intent 'ensure'         — onMounted / visibilitychange: server skips RT rotation if AT is valid.
+// intent 'scheduled-renew' — 10-min timer: server proactively rotates RT even if AT is still live.
+async function refreshSession(intent: 'ensure' | 'scheduled-renew' = 'ensure'): Promise<boolean> {
   if (isRefreshing) return true
   isRefreshing = true
   try {
-    await $fetch('/api/admin/auth/refresh', { method: 'POST' })
+    await $fetch('/api/admin/auth/refresh', { method: 'POST', body: { intent } })
     return true
   } catch (err: unknown) {
     const e = err as { statusCode?: number; response?: { status?: number } }
     const status = e?.statusCode ?? e?.response?.status ?? 0
     if (status === 401) {
-      // Refresh token invalid/expired — force re-login
+      // Both AT and RT confirmed invalid — force re-login
       user.value = null
       if (refreshTimer !== null) { clearInterval(refreshTimer); refreshTimer = null }
       router.push('/admin/login')
       return false
     }
-    // 503 / network error — keep session alive, retry at next interval
+    // 503 / network error — keep session alive, retry at next opportunity
     return true
   } finally {
     isRefreshing = false
@@ -35,11 +39,11 @@ async function refreshSession(): Promise<boolean> {
 }
 
 function onVisibilityChange() {
-  if (document.visibilityState === 'visible') refreshSession()
+  if (document.visibilityState === 'visible') refreshSession('ensure')
 }
 
 onMounted(async () => {
-  const ok = await refreshSession()
+  const ok = await refreshSession('ensure')
   if (!ok) return
   try {
     user.value = await $fetch<AdminUser>('/api/admin/auth/me')
@@ -47,7 +51,7 @@ onMounted(async () => {
     router.push('/admin/login')
     return
   }
-  refreshTimer = setInterval(refreshSession, REFRESH_MS)
+  refreshTimer = setInterval(() => refreshSession('scheduled-renew'), REFRESH_MS)
   document.addEventListener('visibilitychange', onVisibilityChange)
 })
 

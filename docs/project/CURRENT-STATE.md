@@ -143,7 +143,7 @@
 
 ## 4. 当前状态 — M4-Next-3 Settings 最小版本地完成
 
-**状态：M4-Next-3 Settings 最小版全部本地完成，所有验收通过，本地 commit 待创建。未 push，未部署。等待用户按序授权后续模块。**
+**状态：M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化均已完成，所有验收通过，本地 commit 待创建。未 push，未部署。等待用户按序授权后续模块。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -168,12 +168,12 @@
 | `7e9d41c` | Phase 9C-1：Media Library 基础版 + Products 媒体复用 |
 | `f2b9ef1` | Phase 9C-1P（git 标签误为 9C-2）：管理员会话续期基础实现 |
 | （上次收口）| Phase 9C-1P 收口：refresh 安全分支 + 前端单飞锁 + visibilitychange 补刷 |
-| （本次）   | M4-Next-3：Settings 最小版（site_settings + site_social_links + Admin UI + Footer CMS） |
+| （本次）   | M4-Next-3 + 9C-1P-R：Settings 最小版 + 多标签会话并发安全强化 + Vitest |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
 1. ~~**Media Library 基础版**~~：✅ 已在 Phase 9C-1 完成
-2. ~~**管理员会话续期**~~：✅ 已在 Phase 9C-1P 完成（含安全强化收口）
+2. ~~**管理员会话续期**~~：✅ 已在 Phase 9C-1P 完成（含安全强化收口）+ Phase 9C-1P-R 多标签并发安全强化（见下方专节）
 3. ~~**Settings 最小版**~~：✅ 已在 M4-Next-3 完成
 4. **9C-2：Media Library 批量选择/归类**（预留编号，待授权）
 5. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
@@ -397,6 +397,27 @@
 
 ---
 
+### Phase 9C-1P-R — 多标签会话并发安全强化（本地完成）
+
+**⚠️ 单实例范围声明：当前协调器驻于单个 Nuxt 进程内存，适用于本地及单实例生产部署。水平扩展（多 Nuxt 实例）前必须将 pending / graceCache / rotated 三个 Map 改为共享协调机制（如 Redis SETNX+TTL）。正式上线前须在独立测试环境完成完整认证并发安全验收；当前 14 个 Vitest 用例 + 即时双路并发验证作为本地基线，不作为生产认证依据。人工登录安全验收统一延期到上线前独立测试环境执行。**
+
+| 类别 | 完成项 |
+|------|--------|
+| **新建协调器** | `server/utils/refreshCoordinator.ts`：纯 TypeScript 工厂 `createCoordinator()`，管理三个状态集合：`pending`（并发去重）、`graceCache`（5s 重复结果复用）、`rotated`（60s 旧 RT 标记，仅存 SHA-256 摘要，零 Token 值） |
+| **修改端点** | `server/api/admin/auth/refresh.post.ts`：使用单例协调器；`ensure` vs `scheduled-renew` intent 语义分离；invalid intent → 400；`scheduled-renew` 缺失 RT 时先验证 AT 再决定 503 或 401 |
+| **intent 语义** | `ensure`（onMounted / visibilitychange）：AT 有效直接返回，不消耗 RT；`scheduled-renew`（10 min 定时器）：主动轮换 RT，AT 有效时亦执行 |
+| **迟到请求保护** | 旧 RT 被本进程轮换后，携带同 RT 的迟到请求命中 `rotated` 记录 → 返回 503，不清 Cookie，不触发 401 |
+| **自动化测试** | `tests/refreshCoordinator.test.ts`（14 个 Vitest 用例）、`vitest.config.ts`；devDep `vitest ^2.1.9` |
+| **前端 intent** | `layouts/admin.vue`：`refreshSession('ensure')` 用于 onMounted / visibilitychange；`refreshSession('scheduled-renew')` 用于 setInterval |
+
+**验收结果：**
+- `npm test` 14 tests：14 passed ✅
+- typecheck：0 errors ✅；lint：0 errors ✅；`npx nuxt build`：BUILD COMPLETE ✅
+- `git diff --check`：0 whitespace errors ✅
+- 即时双路并发 `POST /refresh { intent: "scheduled-renew" }`：[200, 200] ✅
+- tab-1 `/api/admin/auth/me`：200，路径 `/admin/products` ✅
+- tab-2 `/api/admin/auth/me`：200，路径 `/admin/settings` ✅
+
 ---
 
 ### M4-Next-3 — Settings 最小版（完成）
@@ -581,4 +602,4 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-04，由 Claude Code 在"M4-Next-3 Settings 最小版"任务中写入。*
+*最后更新：2026-09-04，由 Claude Code 在"M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化"任务中写入。*
