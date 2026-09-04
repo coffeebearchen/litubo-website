@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — M4-Next-3 Settings 最小版本地完成
+## 4. 当前状态 — M4-Next-3 Settings 最小版业务验收完成
 
-**状态：M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化均已完成，所有验收通过，本地 commit 待创建。未 push，未部署。等待用户按序授权后续模块。**
+**状态：M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化均已完成，所有代码和文档本地 commit 完毕。未 push，未部署。等待用户按序授权后续模块。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -168,7 +168,8 @@
 | `7e9d41c` | Phase 9C-1：Media Library 基础版 + Products 媒体复用 |
 | `f2b9ef1` | Phase 9C-1P（git 标签误为 9C-2）：管理员会话续期基础实现 |
 | （上次收口）| Phase 9C-1P 收口：refresh 安全分支 + 前端单飞锁 + visibilitychange 补刷 |
-| （本次）   | M4-Next-3 + 9C-1P-R：Settings 最小版 + 多标签会话并发安全强化 + Vitest |
+| `0209ffa`  | M4-Next-3 + 9C-1P-R：Settings 最小版 + 多标签会话并发安全强化 + Vitest |
+| （本次）   | docs：M4-Next-3 业务验收结果写入 CURRENT-STATE.md |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
@@ -445,14 +446,30 @@
 | 公开 API 安全 | 只输出白名单字段，不含 date_updated；social_links 只含 platform/url/sort（不含 id/enabled） |
 | Footer FALLBACK | 硬编码常量确保 CMS 不可用时 Footer 仍显示正确联系信息 |
 
-**验收结果（全部通过）：**
+**静态验收结果（全部通过）：**
 - vue-tsc --noEmit：0 errors ✅
 - npm run lint：0 errors ✅
 - npx nuxt build：Build complete ✅
-- Admin Settings 三区块：Company 表单保存、Social Links CRUD、Security 只读 ✅
-- `GET /api/cms/site-settings`：返回真实 CMS 数据（非 FALLBACK）✅
-- Footer：显示 CMS 电话、邮件、社交图标（LinkedIn + YouTube）、legal name、copyright ✅
-- 375px 移动端：无水平溢出（scrollWidth = clientWidth）✅
+
+**M4-Next-3 业务验收（2026-09-04，真实 Directus 数据，本地运行时）：**
+
+| 验收项 | 操作 | 结果 |
+|--------|------|------|
+| `/api/admin/auth/me` 状态 | GET → 200 | ✅ 会话有效 |
+| Company 信息保存 | PATCH copyright_text 改为 TEST ONLY 标识 → 公开 API 返回测试文本 | ✅ |
+| Company 信息还原 | PATCH 恢复 "© {year} LITUBO. All rights reserved." → 公开 API 确认还原 | ✅ |
+| Social Link 禁用 | PATCH LinkedIn `enabled:false` → 公开 API 仅返回 YouTube | ✅ |
+| Social Link 恢复 | PATCH LinkedIn `enabled:true` → 公开 API 返回 LinkedIn + YouTube | ✅ |
+| 服务端 email 校验 | 无效 email → 422 | ✅ |
+| 服务端 URL 校验 | 非 HTTPS URL → 422 | ✅ |
+| 服务端重复平台校验 | 重复 platform → 409 | ✅ |
+| 响应式 Settings 375px | scrollWidth = innerWidth = 375，无横向溢出 | ✅ |
+| 响应式 Settings 1440px | scrollWidth = innerWidth = 1440，无横向溢出 | ✅ |
+| 响应式 Footer 375px | scrollWidth = innerWidth = 375，无横向溢出 | ✅ |
+| 响应式 Footer 1440px | scrollWidth = innerWidth = 1440，无横向溢出 | ✅ |
+| 最终公开 API 数据状态 | copyright_text、brand_name、所有联系字段 + LinkedIn/YouTube 均完整正确 | ✅ |
+
+**验收期间所有测试数据已还原：copyright_text 已恢复原值，social links 均为 enabled=true。未接入 AI、未连接真实社媒平台、未读取或输出任何凭证或 Cookie、未 push、未部署。**
 
 ---
 
