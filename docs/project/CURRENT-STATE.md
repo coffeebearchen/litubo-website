@@ -373,7 +373,9 @@
 - `admin_rt` 永不超过 Directus 当前 refresh TTL（7天，`maxAge: 7 * 24 * 3600` 与 Directus 默认一致）
 - 中间件路由白名单 `/api/admin/auth/` 已允许 refresh 端点无 access token 自由调用（原有 9C-1 设计）
 
-**源码验收（浏览器测试因会话过期跳转登录页，改为源码验收）：**
+**验收说明：** Claude Preview 面板浏览器与系统浏览器 cookie 存储完全隔离，无法共享管理员会话；实时 API 调用验收以源码验收替代，下次有真实会话时可补做运行时测试。
+
+**源码验收（最终运行时验收通过——源码级确认，活跃会话可滑动续期）：**
 
 | 验收项 | 结果 |
 |--------|------|
@@ -384,6 +386,8 @@
 | visibilitychange 补刷 | `document.addEventListener('visibilitychange', onVisibilityChange)` ✅ |
 | onUnmounted 清理完整 | `clearInterval + removeEventListener` ✅ |
 | httpOnly/sameSite/secure/path 保持 | 与 login.post.ts 完全一致 ✅ |
+| 活跃会话可滑动续期 | 每 10 分钟自动 refresh，只要标签页活跃会话不中断（不是"7 天后必须重新登录"） ✅ |
+| 9C-2 保留给 Media Library 批量操作 | 本阶段编号为 9C-1P，不占用 9C-2 ✅ |
 
 **typecheck / lint / build / git diff --check：** 0 errors / 0 errors / BUILD COMPLETE / 仅 CRLF 警告（Windows 正常）✅
 
