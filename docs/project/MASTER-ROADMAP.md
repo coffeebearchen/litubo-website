@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：M4 / Phase 9A-2 已完成（Products 完整闭环本地验收通过）— 等待 Media Library → Settings（含 Social Links）→ 9B AI 导入 → Content Center → 正式上线授权**
+**当前位置：M4 / Phase 9C-1P 已完成（Media Library 基础版 + 管理员会话续期安全强化本地验收通过）— 等待 9C-2 Media Library 批量 → Settings（含 Social Links）→ 9B AI 导入 → Content Center → 正式上线授权**
 
 ---
 
@@ -105,12 +105,23 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 以下按严格顺序执行，每步须独立授权：
 
-#### M4-Next-1：Media Library 基础版
+#### M4-Next-1：Media Library 基础版 ✅（Phase 9C-1，commit 7e9d41c）
 
-- 上传、替换、管理媒体文件
-- 整合至产品媒体编辑流程
+- 上传、替换、管理媒体文件 ✅
+- 整合至产品媒体编辑流程 ✅
 
-#### M4-Next-2：Settings 最小版
+#### M4-Next-1P：管理员会话续期安全强化 ✅（Phase 9C-1P，commits f2b9ef1 + 收口 commit）
+
+- auto-refresh 端点：Directus 401/403 清 cookie；网络错误/5xx 不清 cookie ✅
+- 前端单飞锁 + visibilitychange 补刷 + 错误分支分离 ✅
+- **9C-2 保留给 Media Library 批量选择/归类**（勿覆盖此编号）
+
+#### M4-Next-2：9C-2 Media Library 批量选择/归类（预留编号，待授权）
+
+- 批量选择文件、批量归类到文件夹
+- 文件搜索增强
+
+#### M4-Next-3：Settings 最小版
 
 **必须包含：**
 - **Site Settings → Social Links**：
@@ -120,15 +131,15 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
   - Facebook URL + 显示/隐藏开关
   - 保存后**全站 Footer 自动读取并更新**社交图标与链接
 
-#### M4-Next-3（= M5）：Phase 9B AI 产品导入与审核
+#### M4-Next-4（= M5）：Phase 9B AI 产品导入与审核
 
 见 M5 节；AI 仅生成 Draft，人工审核后发布，永不自动发布
 
-#### M4-Next-4：Content Center
+#### M4-Next-5：Content Center
 
 内容运营中心（博文、资源、页面等综合管理）
 
-#### M4-Next-5：真实产品资料录入与正式上线
+#### M4-Next-6：真实产品资料录入与正式上线
 
 **push 授权、DNS 切换、生产部署须用户单独授权**
 
@@ -241,4 +252,4 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 ---
 
-*最后更新：2026-09-03，Phase 9A-1 施工开始时写入。*
+*最后更新：2026-09-04，Phase 9C-1P 收口（管理员会话续期安全强化）写入。*

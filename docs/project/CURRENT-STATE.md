@@ -141,9 +141,11 @@
 
 ---
 
-## 4. 当前状态 — Phase 9C-1 Media Library 基础版 + Products 媒体复用本地完成
+## 4. 当前状态 — Phase 9C-1P 管理员会话续期安全强化本地完成
 
-**状态：Phase 9C-1（Media Library 基础版 + Products 媒体复用）全部本地完成，所有验收通过，本地 commit 已创建。未 push，未部署。等待用户按序授权后续模块。**
+**状态：Phase 9C-1（Media Library）+ Phase 9C-1P（管理员会话续期安全强化）全部本地完成，所有验收通过，本地 commit 已创建。未 push，未部署。等待用户按序授权后续模块。**
+
+> **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
 ### 当前本机配置
 
@@ -151,10 +153,10 @@
 |------|--------|
 | `CMS_MODE_PRODUCTS` | `directus`（本机测试，`.env` 中，不进 Git） |
 | Directus 测试产品 ID=3 | `status=draft`、`seo_noindex=true`、TEST ONLY 标识保留 |
-| 推送状态 | 本地 commit `cdcdfd5`，**未 push，未部署** |
+| 推送状态 | 本地 commit 见下表，**未 push，未部署** |
 | 生产是否启用 Products Directus | **否**（生产仍用 fixtures，Products 开关独立） |
 
-### 关键提交清单（Phase 9A-2 阶段）
+### 关键提交清单（Phase 9C 阶段）
 
 | commit | 内容 |
 |--------|------|
@@ -163,16 +165,21 @@
 | `041d867` | Phase 9A-2F：Directus 权限修复 + 查询上限 |
 | `89d40cd` | Phase 9A-2F-2：规格 note 独立显示 + Hero 面包屑对比度 |
 | `cdcdfd5` | Phase 9A-2I：全局面包屑 currentColor+opacity 真正修复 |
+| `7e9d41c` | Phase 9C-1：Media Library 基础版 + Products 媒体复用 |
+| `f2b9ef1` | Phase 9C-1P（git 标签误为 9C-2）：管理员会话续期基础实现 |
+| （本次）  | Phase 9C-1P 收口：refresh 安全分支 + 前端单飞锁 + visibilitychange 补刷 |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
 1. ~~**Media Library 基础版**~~：✅ 已在 Phase 9C-1 完成
-2. **Settings 最小版**（包含但不限于）：
+2. ~~**管理员会话续期**~~：✅ 已在 Phase 9C-1P 完成（含安全强化收口）
+3. **9C-2：Media Library 批量选择/归类**（预留编号，待授权）
+4. **Settings 最小版**（含但不限于）：
    - Site Settings → Social Links：LinkedIn、YouTube、Instagram、Facebook 各 URL 字段 + 独立显示/隐藏开关
    - 保存后全站 Footer 自动读取并实时更新社交图标与链接
-3. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
-4. **Content Center**：内容运营中心（博文、资源、页面等综合管理）
-5. **真实产品资料录入与正式上线**
+5. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
+6. **Content Center**：内容运营中心（博文、资源、页面等综合管理）
+7. **真实产品资料录入与正式上线**
 
 **Push 授权、DNS 切换、生产部署须用户单独授权，不在以上范围内。**
 
@@ -339,6 +346,49 @@
 
 ---
 
+### Phase 9C-1P — 管理员会话续期安全强化（完成）
+
+> **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话临时命名；正式文档编号为 **Phase 9C-1P**。9C-2 保留给 Media Library 批量选择/归类。
+
+**commits：** `f2b9ef1`（基础实现）+ 本次收口 commit（安全强化）
+
+| 类别 | 完成项 |
+|------|--------|
+| **新建端点** | `server/api/admin/auth/refresh.post.ts`：读 `admin_rt` httpOnly cookie，调用 Directus `POST /auth/refresh`，重置 `admin_at`（Directus 实际 expires）和 `admin_rt`（7天）；响应体仅 `{ ok: true }`，不含任何 token 值 |
+| **安全分支** | Directus 401/403 → `deleteCookie(admin_at + admin_rt)` + throw 401（强制重新登录）；网络错误/5xx → throw 503，**不清 cookie**（下次重试） |
+| **前端单飞锁** | `layouts/admin.vue`：`isRefreshing` 布尔标志防止 mount、定时器、visibilitychange 同时触发多次刷新 |
+| **visibilitychange** | 标签页切回可见时通过单飞逻辑补一次刷新 |
+| **错误分支** | refreshSession 返回 `false` 仅在 401 时才跳转登录页；503/网络错误保持状态继续定时重试 |
+| **定时清理** | `onUnmounted` 同时清除 `setInterval` 计时器和 `visibilitychange` 监听器 |
+| **Cookie 安全** | httpOnly / sameSite:strict / secure:isProd / path:'/' 全部保留；access token 维持 Directus 短 TTL，不人为延长 |
+
+**会话语义（滑动续期）：**
+- 每次成功 `POST /refresh` 后 Directus 返回新的 access token（~15min TTL）和新的 refresh token
+- Admin layout 每 10 分钟自动触发一次，等效于"每次登录后只要标签页仍活跃，会话无限续期"
+- 关闭浏览器后 refresh token（7天）到期前重开标签页仍可自动续期
+- **建议单一 Admin 标签页使用**：多标签页各自独立触发刷新，refresh token 会被最后写入者覆盖，早期标签页的 refresh token 可能失效
+
+**注意事项：**
+- 无 `/admin/login` 循环：refresh 调用在 admin layout（已鉴权页）触发，登录页使用独立页面布局，不受影响
+- `admin_rt` 永不超过 Directus 当前 refresh TTL（7天，`maxAge: 7 * 24 * 3600` 与 Directus 默认一致）
+- 中间件路由白名单 `/api/admin/auth/` 已允许 refresh 端点无 access token 自由调用（原有 9C-1 设计）
+
+**源码验收（浏览器测试因会话过期跳转登录页，改为源码验收）：**
+
+| 验收项 | 结果 |
+|--------|------|
+| 响应体无 access_token / refresh_token | `return { ok: true }` 为 refresh.post.ts 唯一返回值 ✅ |
+| Directus 401/403 → 清 cookie + 返回 401 | `deleteCookie(admin_at) + deleteCookie(admin_rt) + createError(401)` ✅ |
+| 网络错误 → 不清 cookie + 返回 503 | `createError(503)` 无 deleteCookie 调用 ✅ |
+| 单飞锁防并发 | `if (isRefreshing) return true` 优先路径 ✅ |
+| visibilitychange 补刷 | `document.addEventListener('visibilitychange', onVisibilityChange)` ✅ |
+| onUnmounted 清理完整 | `clearInterval + removeEventListener` ✅ |
+| httpOnly/sameSite/secure/path 保持 | 与 login.post.ts 完全一致 ✅ |
+
+**typecheck / lint / build / git diff --check：** 0 errors / 0 errors / BUILD COMPLETE / 仅 CRLF 警告（Windows 正常）✅
+
+---
+
 ### Phase 8B-1 完成内容
 
 | 类别 | 完成项 |
@@ -485,4 +535,4 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-04，由 Claude Code 在"9C-1 Media Library 基础版 + Products 媒体复用"任务中写入。*
+*最后更新：2026-09-04，由 Claude Code 在"Phase 9C-1P 管理员会话续期安全强化收口"任务中写入。*

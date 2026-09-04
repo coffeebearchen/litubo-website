@@ -5,34 +5,55 @@ const user = ref<AdminUser | null>(null)
 const router = useRouter()
 const menuOpen = ref(false)
 
-// Refresh interval: 10 min (Directus access token expires at 15 min)
+// Refresh interval: 10 min (Directus access token expires at ~15 min)
 const REFRESH_MS = 10 * 60 * 1000
 let refreshTimer: ReturnType<typeof setInterval> | null = null
+let isRefreshing = false
 
-async function refreshSession() {
+// Returns true on success or transient failure (keep going), false on 401 (must re-login).
+async function refreshSession(): Promise<boolean> {
+  if (isRefreshing) return true
+  isRefreshing = true
   try {
     await $fetch('/api/admin/auth/refresh', { method: 'POST' })
-  } catch {
-    user.value = null
-    clearInterval(refreshTimer!)
-    router.push('/admin/login')
+    return true
+  } catch (err: unknown) {
+    const e = err as { statusCode?: number; response?: { status?: number } }
+    const status = e?.statusCode ?? e?.response?.status ?? 0
+    if (status === 401) {
+      // Refresh token invalid/expired — force re-login
+      user.value = null
+      if (refreshTimer !== null) { clearInterval(refreshTimer); refreshTimer = null }
+      router.push('/admin/login')
+      return false
+    }
+    // 503 / network error — keep session alive, retry at next interval
+    return true
+  } finally {
+    isRefreshing = false
   }
 }
 
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') refreshSession()
+}
+
 onMounted(async () => {
+  const ok = await refreshSession()
+  if (!ok) return
   try {
-    // Immediately refresh to extend session, then verify identity
-    await refreshSession()
     user.value = await $fetch<AdminUser>('/api/admin/auth/me')
   } catch {
     router.push('/admin/login')
     return
   }
   refreshTimer = setInterval(refreshSession, REFRESH_MS)
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 onUnmounted(() => {
-  if (refreshTimer !== null) clearInterval(refreshTimer)
+  if (refreshTimer !== null) { clearInterval(refreshTimer); refreshTimer = null }
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 
 async function logout() {
