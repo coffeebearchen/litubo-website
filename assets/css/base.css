@@ -86,10 +86,3 @@ button {
   }
 }
 
-/* Breadcrumb contrast on deep-green hero sections */
-.page-hero {
-  --bc-link:       rgba(255, 255, 255, 0.70);
-  --bc-link-hover: rgba(255, 255, 255, 1);
-  --bc-current:    rgba(255, 255, 255, 0.90);
-  --bc-sep:        rgba(255, 255, 255, 0.40);
-}

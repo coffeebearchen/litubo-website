@@ -42,20 +42,23 @@ defineProps<{
 }
 
 .breadcrumb__link {
-  color: var(--bc-link, var(--color-ink-muted));
-  transition: color var(--transition-fast);
+  color: currentColor;
+  opacity: 0.72;
+  transition: opacity var(--transition-fast);
 }
 
 .breadcrumb__link:hover {
-  color: var(--bc-link-hover, var(--color-primary));
+  opacity: 1;
 }
 
 .breadcrumb__current {
-  color: var(--bc-current, var(--color-ink-muted));
+  color: currentColor;
+  opacity: 0.92;
   font-weight: 500;
 }
 
 .breadcrumb__sep {
-  color: var(--bc-sep, var(--color-line));
+  color: currentColor;
+  opacity: 0.45;
 }
 </style>
