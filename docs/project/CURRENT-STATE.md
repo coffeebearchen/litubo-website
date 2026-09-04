@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — M4-Next-3 Settings 最小版业务验收完成
+## 4. 当前状态 — B0-0 媒体治理规划完成，等待 9C-2 或产品录入授权
 
-**状态：M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化均已完成，所有代码和文档本地 commit 完毕。未 push，未部署。等待用户按序授权后续模块。**
+**状态：M4-Next-3 Settings 最小版 + Phase 9C-1P-R 多标签会话并发安全强化均已完成。B0-1 代码已 push 至 GitHub（commit `ae29d14`）。已写入媒体治理规范文档 `docs/project/MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md`。未 push 该文档（待用户审核后授权），未部署。等待用户按序授权后续模块。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -169,7 +169,8 @@
 | `f2b9ef1` | Phase 9C-1P（git 标签误为 9C-2）：管理员会话续期基础实现 |
 | （上次收口）| Phase 9C-1P 收口：refresh 安全分支 + 前端单飞锁 + visibilitychange 补刷 |
 | `0209ffa`  | M4-Next-3 + 9C-1P-R：Settings 最小版 + 多标签会话并发安全强化 + Vitest |
-| （本次）   | docs：M4-Next-3 业务验收结果写入 CURRENT-STATE.md |
+| `ae29d14`  | docs：M4-Next-3 业务验收结果写入 CURRENT-STATE.md（已 push） |
+| （本次）     | docs：B0-0 媒体治理规范 v0.1 + 决策 #1/#2/#3 已确认 + 状态机术语统一 |
 
 ### 后续顺序（严格按序，每步须独立授权）
 

@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：M4 / M4-Next-3 Settings 最小版已完成（本地验收通过）— 等待 9C-2 Media Library 批量 → 9B AI 导入 → Content Center → 正式上线授权**
+**当前位置：M4 / M4-Next-3 Settings 最小版已完成 + B0-1 代码已 push 至 GitHub + B0-0 媒体治理规范写入 — 等待 9C-2 Media Library 批量 → 真实 Draft 产品试点 → 9B AI 导入 → Content Center → 正式上线授权**
 
 ---
 
@@ -120,6 +120,7 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 - 批量选择文件、批量归类到文件夹
 - 文件搜索增强
+- 治理规范：见 `docs/project/MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md`（B0-0 写入）
 
 #### M4-Next-3：Settings 最小版 ✅（完成，本地验收通过）
 
