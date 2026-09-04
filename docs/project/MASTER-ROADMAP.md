@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：M4 / Phase 9A-1（Product CMS Admin 基础信息，正在施工）**
+**当前位置：M4 / Phase 9A-2 已完成（Products 完整闭环本地验收通过）— 等待 Media Library → Settings（含 Social Links）→ 9B AI 导入 → Content Center → 正式上线授权**
 
 ---
 
@@ -77,59 +77,60 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 ## M4 — Product CMS Admin + 新版产品详情页（Phase 9A）
 
-**状态：🔨 当前施工目标**
+**状态：✅ Phase 9A-1 + 9A-2 核心闭环已完成（本地验收通过，未 push）— 后续子项待授权**
 
-### 进入条件（已满足）
+### 已完成子里程碑
 
-- M1–M3 完成且 build 正常
-- Directus 11 本地运行、现有 collections 完好
-- `phase9a1-before.yaml` schema 快照已导出
-- PostgreSQL 备份已完成
-- 用户单独授权本次施工
+#### 9A-1 ✅（完成）
 
-### M4 分两个子里程碑
+管理员登录 + Product Center 基础信息 + Draft/Review 流程 + JWT 安全层 + 全量 typecheck/lint/build 通过
 
-#### 9A-1（当前施工）
+#### 9A-2 ✅（完成）
 
-**目标：** 管理员登录 + Product Center 基础信息 + Draft/Review 流程
+内容模块 + 参数组 + 媒体 + FAQ + SEO + 管理员预览 + 公开 Directus 接入 + 完整 Published→Draft 验收闭环
 
-**范围：**
-- Directus：`product_page_presets`（新建）、`products` 新增 4 字段（`model_or_series`、`page_preset_id`、`published_at`、`review_notes`）、`status` 增加 `review` 选项
-- LITUBO Admin：`/admin/login`、`/admin/products`（列表）、`/admin/products/new`、`/admin/products/[id]`
-- 安全：JWT httpOnly Cookie、登录失败 5 次锁定 15 分钟、CSRF Origin 检查、管理员角色验证
-- 发布限制：9A-1 只允许 `draft ↔ review`；Published/Archived 按钮在 9A-1 禁用
+**已完成项（9A-2 核心）：**
+- Directus：`product_sections`、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`、`product_source_records`（6 collections）
+- Admin 子页面：Content / Specs / Media / FAQ / SEO / Preview
+- 公开前台：`CMS_MODE_PRODUCTS=directus` 开关、完整产品详情页渲染
+- 状态机：Draft → Review → Published → Draft（管理员完整控制）
+- 验收：Published 时前台可见 + noindex + sitemap 排除；Draft 撤回后列表消失 + 404
+- `nuxt-server` 权限：`product_categories`（18字段）、`products`（25字段），均含 sort
+- 面包屑 `currentColor+opacity`：26 条路由全量验证通过（375px + 1440px）
+- 规格 note 独立行显示（斜体 `display:block`）
 
-**禁止（9A-1）：**
-- 任何 AI UI 或按钮
-- 创建任何产品测试数据或假产品
-- 修改公开前台页面
-- 将任何产品状态设为 `published` 或 `archived`
-- push、部署、改服务器
+**当前 Directus 测试产品：** ID=3，status=draft，seo_noindex=true，TEST ONLY 标识保留
 
-**9A-1 验收条件：**
-- typecheck 0 errors、lint 0 errors、build SUCCESS
-- `/admin/login` 登录正常，错误密码拒绝，5 次失败后 429
-- 未登录访问 `/admin/products` 重定向到 `/admin/login`
-- 普通角色用户 Cookie 访问 `/api/admin/*` 返回 403
-- 产品列表、新建、基础字段编辑正常
-- Draft → Review → Draft 状态流转正常
-- 禁止出现 Published 产品
-- 侧边栏无任何 AI 入口
-- 公开前台 `/products/...` 无任何变化
-- 本地 Git commit 完成
+### M4 待授权后续子项
 
-#### 9A-2（9A-1 验收通过后授权）
+以下按严格顺序执行，每步须独立授权：
 
-**目标：** 内容模块 + 参数 + 媒体 + FAQ + SEO + 新版公开产品详情页 + LT-180C 真实样板
+#### M4-Next-1：Media Library 基础版
 
-**范围：**
-- Directus：`product_sections`（含 `body_en/es/pt`、`media_id`、`external_url`）、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`、`product_source_records`（`source_file_id → directus_files`）
-- `products_files` 扩展（11 种 `file_role`、alt_text、enabled、language、version、published_date）
-- LITUBO Admin：Content/Specs/Media/FAQ/SEO 编辑器页面
-- 公开前台：`ProductPageViewModel`、新版 `[slug].vue`、全套 section 组件
-- LT-180C 真实 Draft 录入与验收
+- 上传、替换、管理媒体文件
+- 整合至产品媒体编辑流程
 
-**9A-2 发布限制解除条件：** 用户确认新版详情页渲染正确后，Published 按钮开放
+#### M4-Next-2：Settings 最小版
+
+**必须包含：**
+- **Site Settings → Social Links**：
+  - LinkedIn URL + 显示/隐藏开关
+  - YouTube URL + 显示/隐藏开关
+  - Instagram URL + 显示/隐藏开关
+  - Facebook URL + 显示/隐藏开关
+  - 保存后**全站 Footer 自动读取并更新**社交图标与链接
+
+#### M4-Next-3（= M5）：Phase 9B AI 产品导入与审核
+
+见 M5 节；AI 仅生成 Draft，人工审核后发布，永不自动发布
+
+#### M4-Next-4：Content Center
+
+内容运营中心（博文、资源、页面等综合管理）
+
+#### M4-Next-5：真实产品资料录入与正式上线
+
+**push 授权、DNS 切换、生产部署须用户单独授权**
 
 ---
 

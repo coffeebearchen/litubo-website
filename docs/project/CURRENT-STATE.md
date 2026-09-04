@@ -141,9 +141,42 @@
 
 ---
 
-## 4. 当前状态 — Phase 9A-2A Fix 收口完成，等待 push 授权
+## 4. 当前状态 — Phase 9A-2 Products 完整闭环本地完成，等待后续模块授权
 
-**状态：Phase 9A-2A Fix（补做验收收口）本地完全收口，所有验收通过，本地 commit 已创建。Phase 9A-2B（多语言字段扩展）尚未开始。Phase 9B（公开前台产品页联通）尚未开始。**
+**状态：Phase 9A-2（Products 公开前台联通 + 视觉验收 + 管理员完整状态机）全部本地完成，所有验收通过，本地 commit 已创建。未 push，未部署。等待用户按序授权后续模块。**
+
+### 当前本机配置
+
+| 项目 | 当前值 |
+|------|--------|
+| `CMS_MODE_PRODUCTS` | `directus`（本机测试，`.env` 中，不进 Git） |
+| Directus 测试产品 ID=3 | `status=draft`、`seo_noindex=true`、TEST ONLY 标识保留 |
+| 推送状态 | 本地 commit `cdcdfd5`，**未 push，未部署** |
+| 生产是否启用 Products Directus | **否**（生产仍用 fixtures，Products 开关独立） |
+
+### 关键提交清单（Phase 9A-2 阶段）
+
+| commit | 内容 |
+|--------|------|
+| `da73094` | Phase 9A-2D：管理员发布/撤回完整状态机 |
+| `945d5b6` | Phase 9A-2E：公开 Product Center 接入 Directus CMS |
+| `041d867` | Phase 9A-2F：Directus 权限修复 + 查询上限 |
+| `89d40cd` | Phase 9A-2F-2：规格 note 独立显示 + Hero 面包屑对比度 |
+| `cdcdfd5` | Phase 9A-2I：全局面包屑 currentColor+opacity 真正修复 |
+
+### 后续顺序（严格按序，每步须独立授权）
+
+1. **Media Library 基础版**：上传、替换、管理；整合至产品媒体编辑流程
+2. **Settings 最小版**（包含但不限于）：
+   - Site Settings → Social Links：LinkedIn、YouTube、Instagram、Facebook 各 URL 字段 + 独立显示/隐藏开关
+   - 保存后全站 Footer 自动读取并实时更新社交图标与链接
+3. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
+4. **Content Center**：内容运营中心（博文、资源、页面等综合管理）
+5. **真实产品资料录入与正式上线**
+
+**Push 授权、DNS 切换、生产部署须用户单独授权，不在以上范围内。**
+
+---
 
 ### Phase 9A-2A Fix — 补做验收收口（完成）
 
@@ -193,6 +226,70 @@
 
 **Schema 快照：** before=`directus/schema/phase9a2a-before.yaml`（163,906 B）、after=`directus/schema/phase9a2a-after.yaml`（250,374 B）
 **数据库备份：** `backups/phase9a2a-before-20260903-165135.sql`（402,579 B）
+
+### Phase 9A-2D — 管理员发布／撤回完整状态机（完成）
+
+**commit：** `da73094`
+
+| 类别 | 完成项 |
+|------|--------|
+| 服务端状态限制解除 | `server/api/admin/products/[id].patch.ts`：开放 `published` 写入（9A-1 只允许 draft↔review） |
+| 管理员预览端点 | `server/api/admin/products/[id]/preview-data.get.ts`：以管理员身份聚合产品完整数据 |
+| 管理员预览页面 | `pages/admin/products/[id]/preview.vue`：在新标签页渲染与公开前台一致的产品外观 |
+| Admin UI | 侧边栏增加"预览"快速链接；PublishPanel 支持五态转移（draft / review / published / archived / draft 撤回） |
+| 9A-1 解除项 | "9A-1 发布限制"正式解除，Published 按钮对已授权管理员开放 |
+
+**验收结果：** typecheck 0 / lint 0 / build SUCCESS ✅
+
+---
+
+### Phase 9A-2E — 公开 Product Center 接入 Directus CMS（完成）
+
+**commit：** `945d5b6`
+
+| 类别 | 完成项 |
+|------|--------|
+| 运行时开关 | `CMS_MODE_PRODUCTS`（`runtimeConfig`）：`fixtures`（默认）或 `directus` |
+| Nuxt API 端点 | `categories.get.ts`（status=published 分类列表）、`[category].get.ts`（分类+产品列表 limit=200）、`[category]/[slug].get.ts`（产品完整详情：规格组、FAQ、页面模块、媒体、下载） |
+| Directus 工具 | `directusFetch()`：仅在服务端运行，使用 `nuxt-server` 只读静态 Token |
+| 适配器隔离 | fixtures 路径与 directus 路径完全隔离，切换不改任何前台组件 |
+
+**验收结果：** typecheck 0 / lint 0 / build SUCCESS ✅
+
+---
+
+### Phase 9A-2F / 9A-2F-2 / 9A-2I — Directus 权限修复与视觉验收（完成）
+
+**commits：** `041d867`、`89d40cd`、`cdcdfd5`
+
+| 类别 | 完成项 |
+|------|--------|
+| Directus 权限修复 | `nuxt-server` READ 权限：`product_categories`（18 字段，含 sort）、`products`（25 字段，含 sort、seo_image、seo_noindex、related_product_slugs）；修正前均返回 403 |
+| 查询上限 | `limit=-1` → 分类 `limit=100`、产品 `limit=200` |
+| 规格 note 字段 | `types/content.ts`：`ProductSpecRow` 新增 `note` 字段（独立行、斜体、`display:block`，不与 value 拼接） |
+| 面包屑全局修复 | `components/ui/Breadcrumb.vue`：改为 `color: currentColor` + `opacity`（link 0.72 / hover 1.0 / current 0.92 / sep 0.45）；无需枚举 hero 类名，任何深色容器设 `color: white` 后自动生效 |
+| 去除冗余规则 | `assets/css/base.css`：删除仅覆盖 `.page-hero` 的 `--bc-*` 变量块 |
+
+**全量 26 条面包屑路由验证（375px + 1440px）：**
+- 可渲染路由 25/25 全部通过（bcColor `rgb(255,255,255)` × opacity 0.72，无横向溢出）
+- `/products/[category]/[slug]`：当前 Directus 无已发布产品（ID=3 为 draft），404 页面不渲染面包屑，属数据可用性限制，非 CSS 问题，模板 Hero 类及机制与已验证路由完全一致
+
+**Products 完整验收闭环（ID=3，TEST ONLY 测试产品）：**
+
+| 场景 | 验收项 | 结论 |
+|------|--------|------|
+| Published | 分类列表出现产品卡、详情页 HTTP 200 | ✅ |
+| Published | `<meta name="robots" content="noindex,follow">` | ✅ |
+| Published | robots.txt 不含产品 URL；sitemap.xml 不含 noindex 产品 | ✅ |
+| 1440px + 375px | 无横向溢出；规格 note 独立行显示；Hero 面包屑白色清晰可读 | ✅ |
+| Draft 撤回 | 分类列表消失、详情 404、sitemap 排除 | ✅ |
+| 非登录管理 API | GET /api/admin/* → 401 或 403 | ✅ |
+
+**ID=3 最终状态：`status=draft`、`seo_noindex=true`、TEST ONLY 标识保留（不对外可见）**
+
+**验收结果：** typecheck 0 / lint 0 / build SUCCESS ✅
+
+---
 
 ### Phase 8B-1 完成内容
 
@@ -340,4 +437,4 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-02，由 Claude Code 在"项目档案固化"任务中写入。*
+*最后更新：2026-09-04，由 Claude Code 在"9A-2H 项目档案更新"任务中写入。*
