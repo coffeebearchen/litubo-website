@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — Phase 9A-2 Products 完整闭环本地完成，等待后续模块授权
+## 4. 当前状态 — Phase 9C-1 Media Library 基础版 + Products 媒体复用本地完成
 
-**状态：Phase 9A-2（Products 公开前台联通 + 视觉验收 + 管理员完整状态机）全部本地完成，所有验收通过，本地 commit 已创建。未 push，未部署。等待用户按序授权后续模块。**
+**状态：Phase 9C-1（Media Library 基础版 + Products 媒体复用）全部本地完成，所有验收通过，本地 commit 已创建。未 push，未部署。等待用户按序授权后续模块。**
 
 ### 当前本机配置
 
@@ -166,7 +166,7 @@
 
 ### 后续顺序（严格按序，每步须独立授权）
 
-1. **Media Library 基础版**：上传、替换、管理；整合至产品媒体编辑流程
+1. ~~**Media Library 基础版**~~：✅ 已在 Phase 9C-1 完成
 2. **Settings 最小版**（包含但不限于）：
    - Site Settings → Social Links：LinkedIn、YouTube、Instagram、Facebook 各 URL 字段 + 独立显示/隐藏开关
    - 保存后全站 Footer 自动读取并实时更新社交图标与链接
@@ -288,6 +288,54 @@
 **ID=3 最终状态：`status=draft`、`seo_noindex=true`、TEST ONLY 标识保留（不对外可见）**
 
 **验收结果：** typecheck 0 / lint 0 / build SUCCESS ✅
+
+---
+
+### Phase 9C-1 — Media Library 基础版 + Products 媒体复用（完成）
+
+**commit：** 见第 4 节（本次 commit）
+
+| 类别 | 完成项 |
+|------|--------|
+| **新建页面** | `pages/admin/media/index.vue`：媒体库主页面（文件夹侧边栏 + 文件网格 + 文件详情面板 + 上传） |
+| **新建 API × 4** | `server/api/admin/media/files.get.ts`（文件列表，支持 folder/type/search/limit/offset）；`folders.get.ts`（文件夹树，服务端构建）；`upload.post.ts`（批量上传，ALLOWED_TYPES：jpg/png/webp/pdf，MAX 50MB）；`[id]/meta.patch.ts`（元数据更新，白名单：title/description/folder，拒绝 is_public 等非授权字段） |
+| **修改布局** | `layouts/admin.vue`：Media Library 导航从 disabled `<span>` 改为可点击 `<NuxtLink to="/admin/media">` |
+| **修改产品媒体页** | `pages/admin/products/[id]/media.vue`：新增「从媒体库选择」按钮 + `<Teleport to="body">` 模态选择器；`existingFileIds` computed 防重复关联；`pickFromLibrary()` POST `/api/admin/products/${id}/media` |
+
+**关键设计决策：**
+
+| 决策点 | 结论 |
+|--------|------|
+| 初始加载时机 | `onMounted(() => loadFiles(true))` — 延迟至客户端挂载后，避免 SSR/CSR 水合不匹配（`await loadFiles()` 在 setup 中会导致 SSR 渲染有数据但 CSR 起始为空，产生 hydration mismatch 和横向溢出） |
+| 上传格式限制 | ALLOWED_TYPES + ALLOWED_EXTS 双重校验；GIF/BMP 等直接拒绝 |
+| 元数据字段白名单 | `['title', 'description', 'folder']`；`is_public` 零出现（全库 grep 确认） |
+| 文件夹缩进 | `'—'.repeat(f.depth)` 替代全角空格（lint 规则禁止 U+3000） |
+| 重复防护 | `existingFileIds.value.has(file.id)` → `error.value = '已经关联...'` + `return`，无额外 POST |
+
+**Session 诊断（只读，不修复）：**
+
+- Directus access token 默认 15 分钟过期；`admin_at` cookie `maxAge = Math.floor(expires/1000)` ≈ 900s
+- `admin_rt`（7 天 refresh token）已设置但**无刷新端点和前端调用逻辑**
+- 中间件每次 API 请求均向 Directus 验证 token，token 到期后所有受保护 API 返回 401
+- 此为正常 Directus 行为；Nitro dev server 重启不影响 cookie；属独立后续任务（实现 auto-refresh），不在 9C-1 范围内
+
+**浏览器验收结果（全部通过）：**
+
+| 断点 | 项目 | 结果 |
+|------|------|------|
+| 375px 刷新后 | 12 张卡片在 `.file-grid`，无 `.empty-state`，scrollW=innerW=375 | ✅ |
+| 1440px 刷新后 | 12 张卡片在 `.file-grid`，无 `.empty-state`，scrollW=innerW=1440 | ✅ |
+| 文件夹筛选 | click products 文件夹→0，全部文件→12 | ✅ |
+| 搜索 | 搜索"180C3"→3，清空→12 | ✅ |
+| DataTransfer 上传 | 真实 file input change 事件，POST 200，文件数 12→13 | ✅ |
+| 元数据编辑 | PATCH 200，「元数据已保存」横幅，标题更新可见 | ✅ |
+| ID=3 媒体选择器 | 「从媒体库选择」→模态→选文件→POST 200，绑定数 6→7 | ✅ |
+| 重复防护 | 再次选同一文件→无 POST，显示「已经关联到此产品」错误 | ✅ |
+| 原始 7 个文件 | API 查询确认全部存在（7 条非 TEST ONLY 记录） | ✅ |
+| ID=3 状态 | `status=draft`，`seo_noindex=true` | ✅ |
+| TEST ONLY 文件 | 仅关联 ID=3（Draft），系统无 Published 产品（共 1 个产品） | ✅ |
+
+**typecheck / lint / build / git diff --check：** 见本次 commit 验收
 
 ---
 
@@ -437,4 +485,4 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-04，由 Claude Code 在"9A-2H 项目档案更新"任务中写入。*
+*最后更新：2026-09-04，由 Claude Code 在"9C-1 Media Library 基础版 + Products 媒体复用"任务中写入。*

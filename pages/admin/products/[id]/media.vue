@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import type { AdminProduct, ProductMedia, FileRole } from '~/types/product-cms'
 
+interface LibraryFile {
+  id: string
+  filename_download: string | null
+  title: string | null
+  type: string | null
+  filesize: number | null
+  width: number | null
+  height: number | null
+  folder: string | null
+}
+interface LibraryFolder { id: string; name: string; parent: string | null; children: LibraryFolder[] }
+
 definePageMeta({ layout: 'admin' })
 
 const route = useRoute()
@@ -137,6 +149,87 @@ async function toggleEnabled(item: ProductMedia) {
   }
 }
 
+// ── Media Library picker ──────────────────────────────────────────────────────
+const libOpen = ref(false)
+const libFiles = ref<LibraryFile[]>([])
+const libFolders = ref<LibraryFolder[]>([])
+const libSelectedFolder = ref<string | null>(null)
+const libSearch = ref('')
+const libTypeFilter = ref<'' | 'image' | 'pdf'>('')
+const libLoading = ref(false)
+const libTotal = ref(0)
+const LIB_PAGE = 100
+const libOffset = ref(0)
+
+function flattenFolders(nodes: LibraryFolder[], depth = 0): Array<{ id: string; name: string; depth: number }> {
+  const r: Array<{ id: string; name: string; depth: number }> = []
+  for (const n of nodes) { r.push({ id: n.id, name: n.name, depth }); r.push(...flattenFolders(n.children, depth + 1)) }
+  return r
+}
+const libFlatFolders = computed(() => flattenFolders(libFolders.value))
+
+async function openLibrary() {
+  libOpen.value = true
+  if (libFolders.value.length === 0) {
+    const res = await $fetch<LibraryFolder[]>('/api/admin/media/folders').catch(() => [])
+    libFolders.value = res
+  }
+  await loadLibFiles(true)
+}
+
+function closeLibrary() { libOpen.value = false }
+
+async function loadLibFiles(reset = false) {
+  if (reset) { libOffset.value = 0; libFiles.value = [] }
+  libLoading.value = true
+  try {
+    const params: Record<string, string> = { limit: String(LIB_PAGE), offset: String(libOffset.value) }
+    if (libSelectedFolder.value) params.folder = libSelectedFolder.value
+    if (libTypeFilter.value) params.type = libTypeFilter.value
+    if (libSearch.value.trim()) params.search = libSearch.value.trim()
+    const res = await $fetch<{ data: LibraryFile[]; meta?: { filter_count: number } }>('/api/admin/media/files', { query: params })
+    if (reset) { libFiles.value = res.data ?? [] } else { libFiles.value = [...libFiles.value, ...(res.data ?? [])] }
+    libTotal.value = res.meta?.filter_count ?? res.data?.length ?? 0
+    libOffset.value += res.data?.length ?? 0
+  } finally { libLoading.value = false }
+}
+
+watch([libSelectedFolder, libTypeFilter], () => loadLibFiles(true))
+let libSearchTimer: ReturnType<typeof setTimeout>
+watch(libSearch, () => { clearTimeout(libSearchTimer); libSearchTimer = setTimeout(() => loadLibFiles(true), 350) })
+
+// Existing file UUIDs already associated with this product
+const existingFileIds = computed(() => new Set(mediaList.value.map((m: ProductMedia) => m.directus_files_id).filter(Boolean)))
+
+async function pickFromLibrary(file: LibraryFile) {
+  if (existingFileIds.value.has(file.id)) {
+    error.value = `文件「${file.title ?? file.filename_download ?? file.id}」已经关联到此产品`
+    return
+  }
+  error.value = ''
+  try {
+    await $fetch(`/api/admin/products/${id}/media`, {
+      method: 'POST',
+      body: { directus_files_id: file.id, file_role: null },
+    })
+    success.value = `已关联「${file.title ?? file.filename_download ?? file.id}」`
+    setTimeout(() => (success.value = ''), 3000)
+    await refreshMedia()
+    closeLibrary()
+  } catch (e: unknown) {
+    const fe = e as { data?: { message?: string } }
+    error.value = fe.data?.message ?? '关联失败，请重试'
+  }
+}
+
+function libIsImage(type: string | null | undefined) { return (type ?? '').startsWith('image/') }
+function libThumb(id: string) { return `/api/admin/media/${id}?width=160&height=120&fit=cover` }
+function libFmtSize(bytes: number | null | undefined) {
+  if (!bytes) return '—'
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / 1048576).toFixed(1)} MB`
+}
+
 async function removeMedia(mid: number) {
   if (!confirm('确认移除此媒体记录？只删除关联，不删除原始文件。')) return
   error.value = ''
@@ -167,12 +260,13 @@ async function removeMedia(mid: number) {
     <div class="content-card">
       <div class="card-header">
         <h2 class="card-title">图片与资料</h2>
-        <span class="card-note">已绑定 {{ mediaList.length }} 个文件 · 批量管理建议桌面端操作</span>
+        <span class="card-note">已绑定 {{ mediaList.length }} 个文件</span>
+        <button class="btn-from-lib" @click="openLibrary">从媒体库选择</button>
       </div>
 
       <div v-if="mediaList.length === 0" class="empty-state">
         <p class="empty-title">此产品暂无媒体文件</p>
-        <p class="empty-hint">在 Directus 媒体库（:8055）上传文件后，通过 API 绑定到此产品。</p>
+        <p class="empty-hint">上传文件后通过"从媒体库选择"关联到产品，或直接上传新文件。</p>
       </div>
 
       <div v-else class="media-grid">
@@ -297,9 +391,80 @@ async function removeMedia(mid: number) {
       </div>
     </div>
 
-    <div class="desktop-hint">
-      <p>💡 上传新文件、批量排序请在 Directus 后台（:8055）完成后刷新此页绑定。大量文件建议桌面端管理。</p>
-    </div>
+    <!-- Media Library picker modal -->
+    <Teleport to="body">
+      <div v-if="libOpen" class="lib-overlay" @click.self="closeLibrary">
+        <div class="lib-modal" role="dialog" aria-modal="true" aria-label="从媒体库选择文件">
+          <div class="lib-modal-header">
+            <h3 class="lib-modal-title">从媒体库选择</h3>
+            <button class="lib-modal-close" aria-label="关闭" @click="closeLibrary">✕</button>
+          </div>
+
+          <div class="lib-modal-body">
+            <!-- Folder filter pills -->
+            <div class="lib-folders">
+              <button
+                class="lib-folder-pill"
+                :class="{ 'lib-folder-pill--active': libSelectedFolder === null }"
+                @click="libSelectedFolder = null"
+              >全部</button>
+              <button
+                v-for="f in libFlatFolders"
+                :key="f.id"
+                class="lib-folder-pill"
+                :class="{ 'lib-folder-pill--active': libSelectedFolder === f.id }"
+                @click="libSelectedFolder = f.id"
+              >{{ f.name }}</button>
+            </div>
+
+            <!-- Search + type -->
+            <div class="lib-filter">
+              <input v-model="libSearch" type="search" class="lib-search" placeholder="搜索文件名 / 标题…">
+              <select v-model="libTypeFilter" class="lib-type">
+                <option value="">全部格式</option>
+                <option value="image">图片</option>
+                <option value="pdf">PDF</option>
+              </select>
+              <span class="lib-count">{{ libTotal }} 个文件</span>
+            </div>
+
+            <!-- Loading -->
+            <div v-if="libLoading && libFiles.length === 0" class="lib-loading">加载中…</div>
+            <div v-else-if="!libLoading && libFiles.length === 0" class="lib-empty">暂无文件，请先在 Media Library 上传</div>
+
+            <!-- Grid -->
+            <div v-else class="lib-grid">
+              <button
+                v-for="f in libFiles"
+                :key="f.id"
+                class="lib-card"
+                :class="{ 'lib-card--already': existingFileIds.has(f.id) }"
+                :title="existingFileIds.has(f.id) ? '此文件已关联到产品' : (f.title ?? f.filename_download ?? f.id)"
+                @click="pickFromLibrary(f)"
+              >
+                <div class="lib-card__thumb">
+                  <img
+                    v-if="libIsImage(f.type)"
+                    :src="libThumb(f.id)"
+                    :alt="f.title ?? ''"
+                    class="lib-card__img"
+                    loading="lazy"
+                  >
+                  <div v-else class="lib-card__icon">{{ f.type === 'application/pdf' ? 'PDF' : '📄' }}</div>
+                  <span v-if="existingFileIds.has(f.id)" class="lib-card__badge">已关联</span>
+                </div>
+                <p class="lib-card__name">{{ f.title ?? f.filename_download ?? f.id.slice(0, 8) }}</p>
+                <p class="lib-card__size">{{ libFmtSize(f.filesize) }}</p>
+              </button>
+            </div>
+
+            <div v-if="libFiles.length < libTotal && !libLoading" class="lib-more">
+              <button class="lib-more-btn" @click="loadLibFiles(false)">加载更多</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -551,11 +716,171 @@ async function removeMedia(mid: number) {
 
 .error-banner { background: #fdf0ee; border: 1px solid #f5c6c2; border-radius: var(--radius-sm); color: #c0392b; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
 .success-banner { background: #d1f0e8; border: 1px solid #a3dbc8; border-radius: var(--radius-sm); color: #0f5c4b; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
-.desktop-hint { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); background: #fffbf0; border: 1px solid #f0e0b0; border-radius: var(--radius-sm); font-size: var(--text-xs); color: #7a6030; }
+
+/* "从媒体库选择" 按钮 */
+.btn-from-lib {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-primary);
+  background: white;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  min-height: 36px;
+}
+.btn-from-lib:hover { background: var(--color-primary); color: white; }
+
+/* ── Library modal ── */
+.lib-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .lib-overlay { align-items: center; }
+}
+
+.lib-modal {
+  background: white;
+  border-radius: var(--radius-md);
+  width: 100%;
+  max-width: 900px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.lib-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+  flex-shrink: 0;
+}
+.lib-modal-title { font-size: var(--text-lg); font-weight: 700; color: var(--color-ink); margin: 0; }
+.lib-modal-close {
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer; color: var(--color-ink-muted);
+  border-radius: var(--radius-sm); font-size: var(--text-base);
+}
+.lib-modal-close:hover { background: var(--color-line); }
+
+.lib-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Folder pills */
+.lib-folders {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.lib-folder-pill {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 99px;
+  border: 1px solid var(--color-line);
+  background: white;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.lib-folder-pill:hover { background: rgba(18,60,50,0.06); color: var(--color-ink); }
+.lib-folder-pill--active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+
+/* Filter */
+.lib-filter {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lib-search {
+  flex: 1; min-width: 140px; height: 36px;
+  padding: 0 var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink); background: white;
+}
+.lib-search:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.lib-type {
+  height: 36px; padding: 0 var(--space-3);
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink); background: white;
+}
+.lib-count { font-size: var(--text-xs); color: var(--color-ink-muted); margin-left: auto; }
+
+/* States */
+.lib-loading, .lib-empty {
+  text-align: center; padding: var(--space-8);
+  font-size: var(--text-sm); color: var(--color-ink-muted);
+}
+
+/* Grid */
+.lib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+
+.lib-card {
+  display: flex; flex-direction: column;
+  border: 2px solid var(--color-line); border-radius: var(--radius-md);
+  overflow: hidden; cursor: pointer; text-align: left; padding: 0; background: white;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.lib-card:hover:not(.lib-card--already) { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(18,60,50,0.12); }
+.lib-card--already { opacity: 0.55; cursor: not-allowed; }
+
+.lib-card__thumb {
+  position: relative; height: 100px;
+  background: #e8edf0; display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.lib-card__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-card__icon { font-size: var(--text-sm); font-weight: 700; color: var(--color-ink-muted); }
+.lib-card__badge {
+  position: absolute; top: 4px; right: 4px;
+  background: var(--color-primary); color: white;
+  font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 99px;
+}
+.lib-card__name {
+  font-size: 10px; font-weight: 600; color: var(--color-ink);
+  margin: 0; padding: var(--space-2) var(--space-2) 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lib-card__size { font-size: 10px; color: var(--color-ink-muted); margin: 0; padding: 0 var(--space-2) var(--space-2); }
+
+/* Load more */
+.lib-more { text-align: center; }
+.lib-more-btn {
+  height: 36px; padding: 0 var(--space-5);
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink); background: white; cursor: pointer;
+}
+.lib-more-btn:hover { background: var(--color-line); }
 
 @media (max-width: 767px) {
   .page { padding: var(--space-4); }
   .media-grid { grid-template-columns: 1fr; }
   .focal-wrap { flex-direction: column; }
+  .lib-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .lib-modal { max-height: 92vh; }
+  .lib-modal-body { padding: var(--space-3); }
 }
 </style>
