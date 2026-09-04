@@ -6,7 +6,7 @@ const localePath = useLocalePath()
 const route = useRoute()
 const categorySlug = route.params.category as string
 
-const { data, error } = await useAsyncData<{ category: ProductCategory; products: Product[] }>(
+const { data, error } = await useAsyncData<{ category: ProductCategory; products: Product[]; cmsError?: boolean }>(
   `product-category-${categorySlug}`,
   () => $fetch(`/api/cms/products/${categorySlug}`)
 )
@@ -17,6 +17,7 @@ if (error.value || !data.value) {
 
 const category = computed(() => data.value!.category)
 const products = computed(() => data.value!.products)
+const cmsError = computed(() => data.value?.cmsError === true)
 
 const catLocale = computed(() => locale.value as 'en' | 'es' | 'pt')
 const catSeoTitle = computed(() =>
@@ -60,6 +61,9 @@ useSeoHead({
             :image-src="p.heroMedia.url"
             :image-alt="p.heroMedia.alt.en"
           />
+        </div>
+        <div v-else-if="cmsError" class="unavailable-state">
+          <p>Product information is temporarily unavailable. Please try again later or <NuxtLink :to="localePath('/contact')">contact us</NuxtLink>.</p>
         </div>
         <div v-else class="empty-state">
           <p>Product information is being prepared. <NuxtLink :to="localePath('/contact')">Contact us</NuxtLink> for details.</p>
@@ -105,13 +109,15 @@ useSeoHead({
   gap: var(--space-6);
 }
 
-.empty-state {
+.empty-state,
+.unavailable-state {
   padding: var(--space-12) 0;
   font-size: var(--text-base);
   color: var(--color-ink-muted);
 }
 
-.empty-state a {
+.empty-state a,
+.unavailable-state a {
   color: var(--color-primary);
   text-decoration: underline;
 }

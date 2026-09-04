@@ -128,16 +128,66 @@ export interface ProductSpecRow {
   unit?: string
 }
 
+/** Structured spec group from product_spec_groups + product_spec_items. */
+export interface PublicSpecGroup {
+  title: LocalizedString
+  description: LocalizedString
+  items: ProductSpecRow[]
+}
+
+/** FAQ entry from product_faqs. Body fields are plain text (input-multiline). */
+export interface PublicFaq {
+  question: LocalizedString
+  answer: LocalizedString
+}
+
+/** Section item from product_section_items. All text fields are plain text. */
+export interface PublicSectionItem {
+  label: LocalizedString
+  title: LocalizedString
+  body: LocalizedString
+  iconKey?: string
+}
+
+/** Content section from product_sections. All body/eyebrow fields are plain text. */
+export interface PublicSection {
+  type: string
+  title: LocalizedString
+  eyebrow: LocalizedString
+  body: LocalizedString
+  layoutVariant?: string
+  media?: MediaAsset
+  items: PublicSectionItem[]
+}
+
+/** Downloadable file from products_files (brochure/datasheet/drawing/manual/certificate roles). */
+export interface PublicDownload {
+  uuid: string
+  url: string
+  role: string
+  versionLabel?: string
+  fileDate?: string
+}
+
 export interface Product {
   id: string
   categoryId: string
   slug: string
   name: LocalizedString
   summary: LocalizedString
+  modelSeries?: string
   heroMedia: MediaAsset
   gallery: MediaAsset[]
   highlights: ProductHighlight[]
   specifications: ProductSpecRow[]
+  /** Structured spec groups — populated in Directus mode; empty in fixtures mode. */
+  specGroups?: PublicSpecGroup[]
+  /** Product FAQ entries — populated in Directus mode; absent in fixtures mode. */
+  faqs?: PublicFaq[]
+  /** Page content sections — populated in Directus mode; absent in fixtures mode. */
+  sections?: PublicSection[]
+  /** Downloadable documents — populated in Directus mode; absent in fixtures mode. */
+  downloads?: PublicDownload[]
   options: LocalizedString[]
   downloadIds: string[]
   relatedProductIds: string[]

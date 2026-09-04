@@ -1,4 +1,4 @@
-import { defineEventHandler } from 'h3'
+import { defineEventHandler, createError } from 'h3'
 import { useRuntimeConfig } from '#imports'
 import { directusFetch } from '~/server/utils/directus'
 import { DEMO_PRODUCT_CATEGORIES } from '~/content/fixtures/products'
@@ -48,12 +48,18 @@ function toProductCategory(c: DirectusCategory): ProductCategory {
 export default defineEventHandler(async () => {
   const config = useRuntimeConfig()
 
-  if (config.cmsMode !== 'directus') {
+  if (config.productsCmsMode !== 'directus') {
     return DEMO_PRODUCT_CATEGORIES
   }
 
-  const data = await directusFetch<{ data: DirectusCategory[] }>(
-    '/items/product_categories?filter[status][_eq]=published&sort=sort,name_en&limit=-1'
-  )
-  return data.data.map(toProductCategory) as ProductCategory[]
+  try {
+    const data = await directusFetch<{ data: DirectusCategory[] }>(
+      '/items/product_categories?filter[status][_eq]=published&sort=sort,name_en&limit=-1'
+    )
+    return data.data.map(toProductCategory) as ProductCategory[]
+  }
+  catch (err) {
+    console.error('[cms/products/categories] Directus fetch failed:', err instanceof Error ? err.message : err)
+    throw createError({ statusCode: 503, message: 'Product catalogue temporarily unavailable' })
+  }
 })

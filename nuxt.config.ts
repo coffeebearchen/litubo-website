@@ -75,6 +75,9 @@ export default defineNuxtConfig({
     directusUrl: process.env.DIRECTUS_URL ?? '',
     directusToken: process.env.DIRECTUS_TOKEN ?? '',
     cmsMode: process.env.CMS_MODE ?? 'fixtures',
+    // Products-only CMS switch — independent of cmsMode so Home/Posts stay on fixtures.
+    // Set CMS_MODE_PRODUCTS=directus (plus DIRECTUS_URL and DIRECTUS_TOKEN) to enable.
+    productsCmsMode: process.env.CMS_MODE_PRODUCTS ?? 'fixtures',
     // HubSpot Contact sync (Phase 7A framework — Phase 7B configures token)
     hubspotAccessToken: process.env.HUBSPOT_ACCESS_TOKEN ?? '',
     // Override API base for local mock testing only; always https://api.hubapi.com in production

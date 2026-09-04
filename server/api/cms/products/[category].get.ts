@@ -105,23 +105,39 @@ export default defineEventHandler(async (event) => {
 
   const config = useRuntimeConfig()
 
-  if (config.cmsMode !== 'directus') {
+  if (config.productsCmsMode !== 'directus') {
     const category = DEMO_PRODUCT_CATEGORIES.find(c => c.slug === categorySlug)
     if (!category) throw createError({ statusCode: 404 })
     const products = DEMO_PRODUCTS.filter(p => p.categoryId === category.id && p.status === 'published')
-    return { category, products }
+    return { category, products, cmsError: false as const }
   }
 
-  const catRes = await directusFetch<{ data: DirectusCategory[] }>(
-    `/items/product_categories?filter[slug][_eq]=${encodeURIComponent(categorySlug)}&filter[status][_eq]=published&limit=1`
-  )
+  // Resolve category — failure here is a hard 503 (not a 404 that would de-index the page).
+  let catRes: { data: DirectusCategory[] }
+  try {
+    catRes = await directusFetch<{ data: DirectusCategory[] }>(
+      `/items/product_categories?filter[slug][_eq]=${encodeURIComponent(categorySlug)}&filter[status][_eq]=published&limit=1`
+    )
+  }
+  catch (err) {
+    console.error('[cms/products/category] Directus category fetch failed:', err instanceof Error ? err.message : err)
+    throw createError({ statusCode: 503, message: 'Product catalogue temporarily unavailable' })
+  }
+
   if (!catRes.data.length) throw createError({ statusCode: 404 })
   const category = mapCategory(catRes.data[0])
 
-  const prodRes = await directusFetch<{ data: DirectusProduct[] }>(
-    `/items/products?filter[category_id][_eq]=${catRes.data[0].id}&filter[status][_eq]=published&sort=sort,name_en&limit=-1`
-  )
-  const products = prodRes.data.map(p => mapProduct(p, categorySlug))
-
-  return { category, products }
+  // Product list failure is non-fatal: return cmsError flag so the page can show the
+  // appropriate "unavailable" message rather than silently appearing as an empty category.
+  try {
+    const prodRes = await directusFetch<{ data: DirectusProduct[] }>(
+      `/items/products?filter[category_id][_eq]=${catRes.data[0].id}&filter[status][_eq]=published&sort=sort,name_en&limit=-1`
+    )
+    const products = prodRes.data.map(p => mapProduct(p, categorySlug))
+    return { category, products, cmsError: false as const }
+  }
+  catch (err) {
+    console.error('[cms/products/category] Directus product fetch failed:', err instanceof Error ? err.message : err)
+    return { category, products: [] as ReturnType<typeof mapProduct>[], cmsError: true as const }
+  }
 })
