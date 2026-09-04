@@ -122,13 +122,13 @@ function closeMenu() {
           </svg>
           Media Library
         </NuxtLink>
-        <span class="nav-item nav-item--disabled" title="Phase 9A-2 后开放">
+        <NuxtLink to="/admin/settings" class="nav-item" active-class="nav-item--active" @click="closeMenu">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M20 12h2M2 12h2M12 20v2M12 2v2" />
           </svg>
           Settings
-        </span>
+        </NuxtLink>
       </nav>
 
       <div class="sidebar-footer">

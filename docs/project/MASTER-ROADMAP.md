@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：M4 / Phase 9C-1P 已完成（Media Library 基础版 + 管理员会话续期安全强化本地验收通过）— 等待 9C-2 Media Library 批量 → Settings（含 Social Links）→ 9B AI 导入 → Content Center → 正式上线授权**
+**当前位置：M4 / M4-Next-3 Settings 最小版已完成（本地验收通过）— 等待 9C-2 Media Library 批量 → 9B AI 导入 → Content Center → 正式上线授权**
 
 ---
 
@@ -121,15 +121,15 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 - 批量选择文件、批量归类到文件夹
 - 文件搜索增强
 
-#### M4-Next-3：Settings 最小版
+#### M4-Next-3：Settings 最小版 ✅（完成，本地验收通过）
 
-**必须包含：**
-- **Site Settings → Social Links**：
-  - LinkedIn URL + 显示/隐藏开关
-  - YouTube URL + 显示/隐藏开关
-  - Instagram URL + 显示/隐藏开关
-  - Facebook URL + 显示/隐藏开关
-  - 保存后**全站 Footer 自动读取并更新**社交图标与链接
+**已完成：**
+- `site_settings`（singleton）+ `site_social_links`（O2M）Directus collections
+- Admin `/admin/settings` 页面：公司联系信息 / Social Links CRUD / Security 只读面板
+- 公开 API `GET /api/cms/site-settings` 输出白名单字段 + enabled 社交链接
+- Footer 从 CMS 读取，hardcoded fallback 保底
+- LinkedIn / YouTube / Instagram / Facebook 四平台动态社交图标
+- Schema 快照：`directus/schema/phase-settings-after.yaml`
 
 #### M4-Next-4（= M5）：Phase 9B AI 产品导入与审核
 
@@ -252,4 +252,4 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 ---
 
-*最后更新：2026-09-04，Phase 9C-1P 收口（管理员会话续期安全强化）写入。*
+*最后更新：2026-09-04，M4-Next-3 Settings 最小版完成写入。*

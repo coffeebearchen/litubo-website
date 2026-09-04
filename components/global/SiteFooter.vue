@@ -1,8 +1,43 @@
 <script setup lang="ts">
+import type { PublicSiteSettings } from '~/types/settings'
+
 const { t } = useI18n()
 const localePath = useLocalePath()
 const year = new Date().getFullYear()
-const contact = useContactInfo()
+
+const FALLBACK: PublicSiteSettings = {
+  brand_name: 'LITUBO',
+  legal_company_name: 'Shanghai NingPin Industrial Dev. Co., Ltd.',
+  public_email: 'sales@litubo.com',
+  public_phone: '+86 21 5270 7913',
+  public_whatsapp_url: 'https://wa.me/8619370713936',
+  public_address: 'No. 23, Huangtu Rd., Huaqiao Town, Kunshan, Jiangsu Province, China',
+  copyright_text: '© {year} LITUBO. All rights reserved.',
+  social_links: [
+    { platform: 'linkedin', url: 'https://www.linkedin.com/company/litubo', sort: 1 },
+    { platform: 'youtube', url: 'https://www.youtube.com/@litubo', sort: 2 },
+  ],
+}
+
+const SOCIAL_ICONS: Record<string, string> = {
+  linkedin: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-5a2 2 0 110 4 2 2 0 010-4z',
+  youtube: 'M22.54 6.42a2.78 2.78 0 00-1.95-1.97C18.88 4 12 4 12 4s-6.88 0-8.59.45A2.78 2.78 0 001.46 6.42 29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.4a2.78 2.78 0 001.95-1.98A29 29 0 0023 12a29 29 0 00-.46-5.58zM9.75 15.02v-6.04L15.5 12l-5.75 3.02z',
+  instagram: 'M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z',
+  facebook: 'M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z',
+}
+
+const { data: siteSettings } = useFetch<PublicSiteSettings>('/api/cms/site-settings', {
+  default: () => FALLBACK,
+})
+
+const phone = computed(() => siteSettings.value?.public_phone ?? FALLBACK.public_phone)
+const phoneHref = computed(() => 'tel:' + phone.value.replace(/[\s\-().]/g, ''))
+const email = computed(() => siteSettings.value?.public_email ?? FALLBACK.public_email)
+const socialLinks = computed(() => siteSettings.value?.social_links ?? FALLBACK.social_links)
+const legalName = computed(() => siteSettings.value?.legal_company_name || t('footer.legalName'))
+const copyrightText = computed(() =>
+  (siteSettings.value?.copyright_text || t('footer.copyright')).replace('{year}', String(year))
+)
 </script>
 
 <template>
@@ -17,22 +52,24 @@ const contact = useContactInfo()
           <p class="site-footer__description">{{ t('footer.description') }}</p>
           <address class="site-footer__contact">
             <p>
-              <a :href="contact.phoneHref">{{ contact.phone }}</a>
+              <a :href="phoneHref">{{ phone }}</a>
             </p>
             <p>
-              <a :href="`mailto:${contact.email}`">{{ contact.email }}</a>
+              <a :href="`mailto:${email}`">{{ email }}</a>
             </p>
           </address>
-          <!-- Social icons -->
+          <!-- Social icons from CMS -->
           <div class="site-footer__social" aria-label="Social media">
-            <a href="https://www.linkedin.com/company/litubo" target="_blank" rel="noopener noreferrer" aria-label="LITUBO on LinkedIn">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-5a2 2 0 110 4 2 2 0 010-4z" />
-              </svg>
-            </a>
-            <a href="https://www.youtube.com/@litubo" target="_blank" rel="noopener noreferrer" aria-label="LITUBO on YouTube">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M22.54 6.42a2.78 2.78 0 00-1.95-1.97C18.88 4 12 4 12 4s-6.88 0-8.59.45A2.78 2.78 0 001.46 6.42 29 29 0 001 12a29 29 0 00.46 5.58A2.78 2.78 0 003.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.4a2.78 2.78 0 001.95-1.98A29 29 0 0023 12a29 29 0 00-.46-5.58zM9.75 15.02v-6.04L15.5 12l-5.75 3.02z" />
+            <a
+              v-for="link in socialLinks"
+              :key="link.platform"
+              :href="link.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              :aria-label="`LITUBO on ${link.platform}`"
+            >
+              <svg v-if="SOCIAL_ICONS[link.platform]" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path :d="SOCIAL_ICONS[link.platform]" />
               </svg>
             </a>
           </div>
@@ -103,10 +140,8 @@ const contact = useContactInfo()
     <!-- Bottom bar -->
     <div class="site-footer__bottom">
       <div class="container site-footer__bottom-inner">
-        <p class="site-footer__legal-name">{{ t('footer.legalName') }}</p>
-        <p class="site-footer__copyright">
-          {{ t('footer.copyright').replace('{year}', String(year)) }}
-        </p>
+        <p class="site-footer__legal-name">{{ legalName }}</p>
+        <p class="site-footer__copyright">{{ copyrightText }}</p>
         <nav class="site-footer__legal-links" aria-label="Legal">
           <NuxtLink :to="localePath('/privacy-policy')">{{ t('footer.privacy') }}</NuxtLink>
           <NuxtLink :to="localePath('/terms-of-use')">{{ t('footer.terms') }}</NuxtLink>

@@ -136,14 +136,14 @@
 | Directus Admin 地址 | 仅内网访问（127.0.0.1:8055），不对公网开放 |
 | 前台访问 CMS 的方式 | 仅通过 Nuxt server API 层（`server/api/`、`server/utils/`），Directus REST API 不暴露给浏览器 |
 | Directus Token | `.env` 中管理，不进 Git，不写入任何文档 |
-| Directus Collection 数量 | 上限 25（Directus 社区版限制）；当前已用：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries`、`product_page_presets`、`product_sections`、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`、`product_source_records` = **13 个**（含 M2M junction 1 个） |
+| Directus Collection 数量 | 上限 25（Directus 社区版限制）；当前已用：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries`、`product_page_presets`、`product_sections`、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`、`product_source_records`、`site_settings`、`site_social_links` = **15 个**（含 M2M junction 1 个） |
 | 不进 Git 的内容 | `.env`、PostgreSQL 数据文件、`directus/uploads/`、数据库备份 |
 
 ---
 
-## 4. 当前状态 — Phase 9C-1P 管理员会话续期安全强化本地完成
+## 4. 当前状态 — M4-Next-3 Settings 最小版本地完成
 
-**状态：Phase 9C-1（Media Library）+ Phase 9C-1P（管理员会话续期安全强化）全部本地完成，所有验收通过，本地 commit 已创建。未 push，未部署。等待用户按序授权后续模块。**
+**状态：M4-Next-3 Settings 最小版全部本地完成，所有验收通过，本地 commit 待创建。未 push，未部署。等待用户按序授权后续模块。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -156,7 +156,7 @@
 | 推送状态 | 本地 commit 见下表，**未 push，未部署** |
 | 生产是否启用 Products Directus | **否**（生产仍用 fixtures，Products 开关独立） |
 
-### 关键提交清单（Phase 9C 阶段）
+### 关键提交清单（Phase 9C / M4-Next 阶段）
 
 | commit | 内容 |
 |--------|------|
@@ -167,16 +167,15 @@
 | `cdcdfd5` | Phase 9A-2I：全局面包屑 currentColor+opacity 真正修复 |
 | `7e9d41c` | Phase 9C-1：Media Library 基础版 + Products 媒体复用 |
 | `f2b9ef1` | Phase 9C-1P（git 标签误为 9C-2）：管理员会话续期基础实现 |
-| （本次）  | Phase 9C-1P 收口：refresh 安全分支 + 前端单飞锁 + visibilitychange 补刷 |
+| （上次收口）| Phase 9C-1P 收口：refresh 安全分支 + 前端单飞锁 + visibilitychange 补刷 |
+| （本次）   | M4-Next-3：Settings 最小版（site_settings + site_social_links + Admin UI + Footer CMS） |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
 1. ~~**Media Library 基础版**~~：✅ 已在 Phase 9C-1 完成
 2. ~~**管理员会话续期**~~：✅ 已在 Phase 9C-1P 完成（含安全强化收口）
-3. **9C-2：Media Library 批量选择/归类**（预留编号，待授权）
-4. **Settings 最小版**（含但不限于）：
-   - Site Settings → Social Links：LinkedIn、YouTube、Instagram、Facebook 各 URL 字段 + 独立显示/隐藏开关
-   - 保存后全站 Footer 自动读取并实时更新社交图标与链接
+3. ~~**Settings 最小版**~~：✅ 已在 M4-Next-3 完成
+4. **9C-2：Media Library 批量选择/归类**（预留编号，待授权）
 5. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
 6. **Content Center**：内容运营中心（博文、资源、页面等综合管理）
 7. **真实产品资料录入与正式上线**
@@ -398,6 +397,44 @@
 
 ---
 
+---
+
+### M4-Next-3 — Settings 最小版（完成）
+
+**新建 Directus collections：** `site_settings`（singleton）、`site_social_links`（O2M）
+**Schema 快照：** `directus/schema/phase-settings-after.yaml`（275,089 B）
+
+| 类别 | 完成项 |
+|------|--------|
+| **Directus Schema** | `site_settings`（singleton，8 字段：brand_name / legal_company_name / public_email / public_phone / public_whatsapp_url / public_address / copyright_text + date_updated）；`site_social_links`（6 字段：platform / url / sort / enabled / settings_id M2O）；M2O 关系（CASCADE SET NULL）；`nuxt-server` site-readonly-policy READ 权限 |
+| **Admin Setup API** | `POST /api/admin/settings/setup`：幂等创建 Schema + 种子数据（PATCH singleton + social links）；首次运行自动建表、授权并填入 LITUBO 默认值 |
+| **Admin Settings API** | `GET /api/admin/settings`：返回 settings + socialLinks（singleton 空时返回 needsSetup:true）；`PATCH /api/admin/settings`：白名单校验 + 长度限制 + email/URL 格式校验；`POST /api/admin/settings/social`：新建社交链接（枚举校验 + https 校验 + 防重复）；`PATCH /api/admin/settings/social/[id]`：更新 url/sort/enabled；`DELETE /api/admin/settings/social/[id]`：删除记录 |
+| **公开 CMS API** | `GET /api/cms/site-settings`：以 nuxt-server 静态 Token 读取，白名单输出（7个 company 字段 + enabled 社交链接），任何错误返回 hardcoded FALLBACK |
+| **Admin UI** | `pages/admin/settings.vue`：三区块（Company & Public Contact 表单 / Social Links CRUD 内联编辑 / Security & AI Connections 只读面板）；`layouts/admin.vue` Settings 导航从 disabled 改为可点击 NuxtLink |
+| **Footer CMS 接入** | `components/global/SiteFooter.vue`：`useFetch('/api/cms/site-settings')` 替代硬编码；`phoneHref` computed 去除格式符；`copyrightText` 支持 `{year}` 占位替换；社交图标改为 `v-for` 动态渲染（SVG 内联，4 个平台）；无 CMS 数据时 fallback 至 i18n 硬编码值 |
+| **TypeScript** | `types/settings.ts`：`SiteSettings`、`SiteSocialLink`、`SocialPlatform`、`SOCIAL_PLATFORMS`、`PublicSiteSettings` |
+
+**关键设计决策：**
+
+| 决策点 | 结论 |
+|--------|------|
+| Directus singleton PATCH 语义 | `POST /items/site_settings` 对 singleton 无效（返回 `{id: null}`）；正确方式是 `PATCH /items/site_settings`（无 ID）创建/更新 |
+| needsSetup 判断 | `settings.id === null`（非 `!settings`）：Directus singleton 空时返回对象而非 null |
+| ESLint no-dynamic-delete | `delete linkEdits.value[id]` 违规；改为 `Object.entries(...) as [string, LinkEdit][]` 重建对象 |
+| 公开 API 安全 | 只输出白名单字段，不含 date_updated；social_links 只含 platform/url/sort（不含 id/enabled） |
+| Footer FALLBACK | 硬编码常量确保 CMS 不可用时 Footer 仍显示正确联系信息 |
+
+**验收结果（全部通过）：**
+- vue-tsc --noEmit：0 errors ✅
+- npm run lint：0 errors ✅
+- npx nuxt build：Build complete ✅
+- Admin Settings 三区块：Company 表单保存、Social Links CRUD、Security 只读 ✅
+- `GET /api/cms/site-settings`：返回真实 CMS 数据（非 FALLBACK）✅
+- Footer：显示 CMS 电话、邮件、社交图标（LinkedIn + YouTube）、legal name、copyright ✅
+- 375px 移动端：无水平溢出（scrollWidth = clientWidth）✅
+
+---
+
 ### Phase 8B-1 完成内容
 
 | 类别 | 完成项 |
@@ -544,4 +581,4 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-04，由 Claude Code 在"Phase 9C-1P 管理员会话续期安全强化收口"任务中写入。*
+*最后更新：2026-09-04，由 Claude Code 在"M4-Next-3 Settings 最小版"任务中写入。*
