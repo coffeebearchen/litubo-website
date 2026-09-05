@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — Phase 9C-2R 媒体目录治理收口（Directus live 验收 + 角色审计待确认）
+## 4. 当前状态 — Phase 9C-2R 媒体目录治理收口（全部验收完成，2026-09-06）
 
-**状态：Phase 9C-2R（9C-2 目录治理强化补丁）全部代码、测试、UI 已完成收口（2026-09-05），等待 Directus live 目录树核实 + 普通运营角色绕过审计。未 push、未部署。**
+**状态：Phase 9C-2R 全部完成。代码 + 测试（67/67）+ UI + Directus live 目录树核实 + 角色审计 + 浏览器双断点验收均已通过。未 push、未部署。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -549,7 +549,7 @@
 
 ### Phase 9C-2R — 媒体目录治理 Folder Registry（收口已完成，2026-09-05）
 
-**状态：全部代码、测试（67/67）、UI 英文化已完成（本地 commit `063dea7` + 收口 commit），未 push，未部署。Directus live 目录树及普通运营角色绕过审计待 live session 核实。**
+**状态：全部验收完成（2026-09-06）。代码 + 测试 + UI + Directus live 目录树 + 角色审计 + 浏览器双断点均通过。未 push、未部署。**
 
 **commit `063dea7` 完成项：**
 
@@ -603,9 +603,42 @@
 
 **未暂存/未提交（永久排除）：** `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/`、`docs/design-reference/inbox/`、`docs/product-cms/CMS-AI-CONSTRUCTION-PACK-V1/`、`docs/project/LITUBO_9C-2R_正式施工单.md`
 
-**Directus live 状态：** unverified — 需用户已登录本机 Directus 会话方可核实目录树。
+**Directus live 目录树核实（2026-09-06，PostgreSQL 直查 + 浏览器 upload dropdown 验证）：**
 
-**Launch Gate：** A. Directus 技术超管可绕过 Nuxt API 直接 PATCH `directus_files.folder`（受控技术例外，不等于"全路径已保护"）。B. 普通运营角色是否拥有原生 `directus_files.folder` UPDATE 权限 — 待 live session 核实，无法自行结论。上线前须完成 B 项审计。
+16 个目录全部存在，parent 链与 `FOLDER_POLICY` 完全一致；无幽灵目录；8 个文件 `folder=NULL`（待分类）。  
+Active-canonical upload dropdown UUIDs（浏览器 accessibility tree 确认）：
+
+| 文件夹名 | UUID |
+|---------|------|
+| applications | `9b8ae1f0-5056-4b64-920d-30f13b4baa4a` |
+| company | `3372cf0e-7b26-4a8a-b3f5-51647df1a626` |
+| home | `03d8f41d-a0ee-4782-a2ef-2742ccb3ea81` |
+| products/checkweigher | `1edce96c-ccd4-41fe-a83b-5c5ca7050e97` |
+| products/combination | `1b250d0d-98ea-4ae1-a688-b20e818f5026` |
+| products/conveyor | `4ec63a59-a92c-4617-9398-3516dea74f1d` |
+| products/metal-detection | `139e0338-2c7a-43c1-be25-92423d7bacc1` |
+| products/xray | `de7281ef-e3b6-4175-b22f-58ecc78aa5b5` |
+
+**浏览器验收结果（2026-09-06，Nuxt dev localhost:3000）：**
+
+| 断点 | 项目 | 结果 |
+|------|------|------|
+| 1440px | 侧边栏"Active destinations"标签显示 | ✅ |
+| 1440px | Active 目录 10 个（active-canonical + container-only）正确渲染 | ✅ |
+| 1440px | 侧边栏"Legacy — read only"标签 + 5 个 legacy 目录 | ✅ |
+| 1440px | 侧边栏"Conflict — read only"标签 + certifications 按钮 | ✅ |
+| 1440px | 上传下拉框仅含 8 个 active-canonical 文件夹；certifications/legacy 不在其中 | ✅ |
+| 375px | 无横向溢出（pill 布局、"Legacy (read only) ▼"折叠按钮正常） | ✅ |
+| 375px | certifications 以红色文字显示在 Conflict tier | ✅ |
+
+**Launch Gate 审计（2026-09-06，完成）：**
+
+| 项目 | 结论 |
+|------|------|
+| A. 技术超管绕过 | Administrator 角色（admin_access=true）可直接 PATCH Directus 原生 API，绕过 Nuxt folder policy。属受控技术例外，已记录。 |
+| B. 普通运营角色绕过 | **Pass**。Directus 中仅存在 2 个角色：Administrator（admin_access=true）+ nuxt-server（只读服务账户）。无普通运营角色。外部运营人员目前只能经过 Nuxt Admin UI，无法绕过 folder policy。|
+
+**B 项结论：上线前无需额外角色权限变更；如日后新增普通运营角色，须在 Directus 权限层严格限制 `directus_files.folder` UPDATE 字段。**
 
 ---
 
