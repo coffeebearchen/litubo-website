@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：M4 / 9C-2R Media Folder Registry 已完成收口（本地 commit）— 等待 Directus live 目录树验收 + 普通运营角色绕过审计确认 → 真实 Draft 产品试点 → 9B AI 导入 → Content Center → 正式上线授权**
+**当前位置：M4 / Admin SSR 认证边界修复（commit f04f1e4）已完成 — `/admin/*` 未登录服务端 302 → `/admin/login`；`/api/admin/*` 未登录仍为 401。下一步：真实 Draft 产品试点 → 9B AI 导入 → Content Center → 正式上线授权**
 
 ---
 
@@ -122,6 +122,34 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 - 文件搜索增强、全局引用查询、软归档
 - 治理规范：见 `docs/project/MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md`（B0-0 写入）
 - 规划文档：`docs/project/PHASE-9C-2-MEDIA-LIBRARY-FOUNDATION-SPEC.md`（2026-09-04 确认，决策 #10/#11/#12 已明确）
+
+#### M4-Next-2R：9C-2R Media Folder Registry ✅（完成，commits 063dea7 / 3c227ee / a177e09）
+
+- 服务端 `FOLDER_POLICY` 冻结表 + `buildFolderRegistry` 纯函数（含 §2.7 ambiguity 检测）
+- `validateUploadFolder` / `validateMoveFolder`（FOLDER_AMBIGUOUS 错误码）
+- batch-move API、文件夹 policy_state 服务端注入、upload dropdown 仅含 active-canonical
+- 侧边栏英文标签（Active destinations / Legacy — read only / Conflict — read only）
+- 44 单元测试，全部通过（合计 67/67）
+- Directus live 目录树 16 个全确认；B 项审计 Pass（无普通运营角色）
+
+#### M4-Next-2S：Admin SSR 认证边界修复 ✅（完成，commit f04f1e4）
+
+**背景：** 原实现仅在 `server/middleware/admin-auth.ts` 中保护 `/api/admin/*` API 路由；`/admin/*` 页面路由无 cookie 时服务端返回 HTTP 200（admin shell），仅靠 `layouts/admin.vue` onMounted 客户端跳转——不构成充分保护。
+
+**修复：** 同一中间件扩展覆盖 `/admin/*` 页面路由：
+- 无 `admin_at` cookie → `sendRedirect 302 /admin/login`
+- Directus 验证失败（失效/伪造 token）→ `sendRedirect 302 /admin/login`
+- `/admin/login` 本身 + `/api/admin/auth/*` → 排除，不受影响
+- `/api/admin/*` → 维持 401/403，不改为 HTML 重定向
+
+**验证（curl，无 cookie）：**
+- `/admin/media` / `/admin/products` / `/admin/settings` → 302 Location: /admin/login ✅
+- `/admin/login` → 200，无循环 ✅
+- 伪造 token → 302 ✅；有效 session → 200 ✅
+- `/api/admin/*` → 401（不重定向）✅
+- 67/67 tests、typecheck 0、lint 0、build OK、375px/1440px 无溢出 ✅
+
+**本次未触碰：** Directus、媒体、AI、权限、部署、凭证。
 
 #### M4-Next-3：Settings 最小版 ✅（完成，本地验收通过）
 
@@ -255,4 +283,4 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 ---
 
-*最后更新：2026-09-04，M4-Next-3 Settings 最小版完成写入。*
+*最后更新：2026-09-06，M4-Next-2S Admin SSR 认证边界修复（commit f04f1e4）完成写入。*
