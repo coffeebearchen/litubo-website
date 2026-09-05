@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — Phase 9C-2R 媒体目录治理收口（全部验收完成，2026-09-06）
+## 4. 当前状态 — Admin SSR 认证边界修复（9C-2R 后续安全补丁，2026-09-06）
 
-**状态：Phase 9C-2R 全部完成。代码 + 测试（67/67）+ UI + Directus live 目录树核实 + 角色审计 + 浏览器双断点验收均已通过。未 push、未部署。**
+**状态：admin SSR 重定向已补齐。`/admin/*` 页面路由现在服务端强制 302 → `/admin/login`（无 cookie 或失效/伪造 token）；9C-2R 全部验收完成。未 push、未部署。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -171,6 +171,8 @@
 | `0209ffa`  | M4-Next-3 + 9C-1P-R：Settings 最小版 + 多标签会话并发安全强化 + Vitest |
 | `ae29d14`  | docs：M4-Next-3 业务验收结果写入 CURRENT-STATE.md（已 push） |
 | `c555d9c`  | docs：B0-0 媒体治理规范 v0.1 + 决策 #1/#2/#3 已确认 + 状态机术语统一 |
+| `a177e09`  | docs(9c-2r)：9C-2R live 验收结果写入 CURRENT-STATE.md |
+| （本次）   | fix(admin-auth)：/admin/* SSR 认证边界 — 无 token 服务端 302 → /admin/login |
 | `82b4329`  | docs：9A-2C 本地发布/撤回验收结果写入 CURRENT-STATE.md |
 | `abfd69a`  | docs(9c-2)：9C-2 规划定稿 — PHASE-9C-2 规划文档 + CURRENT-STATE 更新 |
 | `2f0bac4`  | feat(9c-2)：Media Library 生命周期管理 — 软归档、引用保护、恢复、批量归类 |
@@ -639,6 +641,40 @@ Active-canonical upload dropdown UUIDs（浏览器 accessibility tree 确认）�
 | B. 普通运营角色绕过 | **Pass**。Directus 中仅存在 2 个角色：Administrator（admin_access=true）+ nuxt-server（只读服务账户）。无普通运营角色。外部运营人员目前只能经过 Nuxt Admin UI，无法绕过 folder policy。|
 
 **B 项结论：上线前无需额外角色权限变更；如日后新增普通运营角色，须在 Directus 权限层严格限制 `directus_files.folder` UPDATE 字段。**
+
+---
+
+### Admin SSR 认证边界修复（2026-09-06，完成）
+
+**问题：** 诊断发现 `/admin/*` 页面路由无服务端 cookie 验证——无 cookie 时服务端返回 HTTP 200（admin shell HTML），仅靠 `layouts/admin.vue` `onMounted` 客户端跳转重定向，不构成充分保护。
+
+**修复：** 修改 `server/middleware/admin-auth.ts`，在现有 `/api/admin/*` API 保护之外，对 `/admin/*` 页面路由增加服务端认证检查：
+- 无 `admin_at` cookie → `sendRedirect(event, '/admin/login', 302)`
+- `admin_at` 存在但 Directus 验证失败（失效/伪造）→ `sendRedirect(event, '/admin/login', 302)`
+- `/admin/login` 本身、`/api/admin/auth/*` 端点：排除，不受影响
+- API 路由 `/api/admin/*`：保持原有 401/403 行为，不改为 HTML 重定向
+
+**验证结果（2026-09-06）：**
+
+| 场景 | 方法 | 结果 |
+|------|------|------|
+| 无 cookie GET /admin/media | curl --max-redirs 0 | **302** Location: /admin/login ✅ |
+| 无 cookie GET /admin/products | curl --max-redirs 0 | **302** Location: /admin/login ✅ |
+| 无 cookie GET /admin/settings | curl --max-redirs 0 | **302** Location: /admin/login ✅ |
+| GET /admin/login（无 cookie）| curl --max-redirs 0 | **200**（无循环）✅ |
+| 伪造 token GET /admin/media | curl -H "Cookie: admin_at=fake" | **302** Location: /admin/login ✅ |
+| 无 cookie GET /api/admin/auth/me | fetch credentials:omit | **401**（不重定向）✅ |
+| 无 cookie GET /api/admin/media/files | fetch credentials:omit | **401**（不重定向）✅ |
+| 有效 session GET /admin/media | fetch credentials:include | **200** ✅ |
+| 重定向响应体 | curl body | 纯 meta-refresh HTML（无 admin shell 数据）✅ |
+| 375px 无溢出 | JS scrollWidth/innerWidth | 375 = 375 ✅ |
+| 1440px 无溢出 | JS scrollWidth/innerWidth | 1440 = 1440 ✅ |
+| 67 Vitest 测试 | npm test | 67/67 passed ✅ |
+| typecheck | vue-tsc --noEmit | 0 errors ✅ |
+| lint | eslint . | 0 errors ✅ |
+| build | nuxt build | BUILD COMPLETE ✅ |
+
+**变更文件：** `server/middleware/admin-auth.ts`（唯一代码改动）
 
 ---
 
