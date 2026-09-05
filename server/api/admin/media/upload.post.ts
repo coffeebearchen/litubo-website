@@ -1,5 +1,6 @@
 import { readMultipartFormData, createError } from 'h3'
 import { getAdminToken } from '~/server/utils/adminDirectusClient'
+import { assertFolderAllowsUpload } from '~/server/utils/folderRegistry'
 
 const ALLOWED_TYPES = new Set([
   'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf',
@@ -23,6 +24,10 @@ export default defineEventHandler(async (event) => {
   if (folder && !UUID_RE.test(folder)) {
     throw createError({ statusCode: 400, message: 'folder 必须是有效的 UUID' })
   }
+
+  // Server-side registry validation — null folder is allowed (Needs Classification).
+  // Client-side isFolderCanonical checks are not trusted.
+  await assertFolderAllowsUpload(folder, event, true)
 
   const fileParts = parts.filter(p => !!p.filename)
   if (fileParts.length === 0) {

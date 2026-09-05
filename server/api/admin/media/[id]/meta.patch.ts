@@ -1,5 +1,6 @@
 import { getRouterParam, readBody, createError } from 'h3'
 import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { resolveFolderRegistry, validateMoveFolder } from '~/server/utils/folderRegistry'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ALLOWED_FIELDS = new Set(['title', 'description', 'folder'])
@@ -34,7 +35,17 @@ export default defineEventHandler(async (event) => {
     if (f !== null && f !== '' && !UUID_RE.test(String(f))) {
       throw createError({ statusCode: 400, message: 'folder 必须是有效的 UUID 或 null' })
     }
-    payload.folder = f === '' ? null : (f ?? null)
+    const folderUuid = f === '' ? null : (f as string | null) ?? null
+
+    // Server-side registry validation — single-file patch/move cannot set folder to null
+    // (existing files cannot be returned to Needs Classification this way).
+    const registry = await resolveFolderRegistry(event)
+    const check = validateMoveFolder(registry, folderUuid)
+    if (!check.ok) {
+      throw createError({ statusCode: 422, message: `${check.code}: ${check.message}` })
+    }
+
+    payload.folder = folderUuid
   }
 
   if (Object.keys(payload).length === 0) {

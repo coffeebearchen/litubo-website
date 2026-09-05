@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — Phase 9C-2 代码已完成，等待用户验收
+## 4. 当前状态 — Phase 9C-2R 媒体目录治理代码已完成，等待用户验收
 
-**状态：Phase 9C-2（M4-Next-2）Media Library 基础版代码开发已完成（2026-09-04），本地 commit 已建立，等待用户业务验收。未 push、未部署。**
+**状态：Phase 9C-2R（9C-2 目录治理强化补丁）Media Folder Registry 服务端 policy 层代码开发已完成（2026-09-05），本地 commit 已建立，等待用户业务验收。未 push、未部署。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -173,15 +173,17 @@
 | `c555d9c`  | docs：B0-0 媒体治理规范 v0.1 + 决策 #1/#2/#3 已确认 + 状态机术语统一 |
 | `82b4329`  | docs：9A-2C 本地发布/撤回验收结果写入 CURRENT-STATE.md |
 | `abfd69a`  | docs(9c-2)：9C-2 规划定稿 — PHASE-9C-2 规划文档 + CURRENT-STATE 更新 |
-| （本次）     | feat(9c-2)：Media Library 生命周期管理 — 软归档、引用保护、恢复、批量归类 |
+| `2f0bac4`  | feat(9c-2)：Media Library 生命周期管理 — 软归档、引用保护、恢复、批量归类 |
+| （本次）    | feat(9c-2r)：媒体目录治理 — Folder Registry 服务端 policy + batch-move + 前端收口 |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
 1. ~~**Media Library 基础版**~~：✅ 已在 Phase 9C-1 完成
 2. ~~**管理员会话续期**~~：✅ 已在 Phase 9C-1P 完成（含安全强化收口）+ Phase 9C-1P-R 多标签并发安全强化（见下方专节）
 3. ~~**Settings 最小版**~~：✅ 已在 M4-Next-3 完成
-4. ~~**9C-2：Media Library 批量选择/归类**~~：✅ 本次完成（代码已 commit，等待业务验收）
-5. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
+4. ~~**9C-2：Media Library 批量选择/归类**~~：✅ commit `2f0bac4`（软归档/引用/恢复/批量归类）完成
+5. ~~**9C-2R：媒体目录治理 Folder Registry**~~：✅ 本次完成（代码已 commit，等待业务验收）
+6. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
 6. **Content Center**：内容运营中心（博文、资源、页面等综合管理）
 7. **真实产品资料录入与正式上线**
 
@@ -541,6 +543,53 @@
 **Directus Collection：** `media_file_lifecycle`（16/25，2026-09-04 通过 API 创建）
 
 **验证结果：** typecheck 0 errors、lint 0 errors、build exit 0、vitest 23/23 通过、375px 无水平溢出
+
+---
+
+### Phase 9C-2R — 媒体目录治理 Folder Registry（代码已完成，2026-09-05）
+
+**状态：代码已完成，等待业务验收（本地 commit，未 push，未部署）**
+
+| 类别 | 完成项 |
+|------|--------|
+| **新建工具层** | `server/utils/folderRegistry.ts`：`PolicyState` 类型、`FolderEntry` 接口、冻结策略表 `FOLDER_POLICY`（16条全路径→状态）、纯函数 `buildFolderRegistry(flat)`、Live resolver `resolveFolderRegistry(event)`、`validateUploadFolder()`、`validateMoveFolder()`、`assertFolderAllowsUpload()`、`assertFolderAllowsMove()` |
+| **修改 upload.post.ts** | 新增 `assertFolderAllowsUpload(folder, event, true)`：上传前服务端 policy 校验；null folder（Needs Classification）被允许 |
+| **修改 meta.patch.ts** | 单文件移动增加 `resolveFolderRegistry + validateMoveFolder`：不允许移至 null/legacy/conflict/unknown |
+| **新建 batch-move.post.ts** | `POST /api/admin/media/batch-move`：批量移动最多 200 个文件；**批量预验证**（先验证目标 folder → registry check，全批失败再报错，无写入）；逐文件 Directus PATCH，结果 `{ moved, failed, errors? }` |
+| **修改 folders.get.ts** | 扩展 `FolderNode` 接口（新增 `full_path`, `policy_state`, `allow_upload`, `allow_move_target`）；服务端用 `buildFolderRegistry` 注入 policy 字段，前端零计算 |
+| **修改 index.vue（前端收口）** | ① 移除 `import { isFolderCanonical, isFolderLegacy }` 客户端 policy 依赖；② `flattenFolders` 新增 policy 字段透传；③ `filterCanonicalTree` 改为 `allow_upload \|\| container-only`（全路径）；④ `uploadableFlatFolders` 新 computed（仅 active-canonical）用于三处写操作 dropdown；⑤ `legacyFlatFolders` 改为 `policy_state === 'legacy-read-only'`；⑥ `batchMoveToFolder` 改调 `POST /api/admin/media/batch-move`；⑦ `saveMetadata` 和 `onFilesSelected` 移除客户端 canon check；⑧ `selectedFileFolderIsLegacy` 改为查 `flatFolders` 中的 `policy_state`；⑨ 修复 `v-show="showLegacyMobile \|\| true"` bug；⑩ `.mobile-legacy-hidden` 限定 `@media (max-width: 767px)` |
+| **policy bug 修复** | `FOLDER_POLICY['company']` 从 `container-only` 改为 `active-canonical`（施工单表格权威依据） |
+| **已排除（明确不处理）** | Directus 原生绕过（管理员可直接 PATCH directus_files）— 已文档化为 Launch Gate |
+
+**Policy 状态表（本次 commit 冻结）：**
+
+| full_path | policy_state | allow_upload | allow_move |
+|-----------|--------------|:---:|:---:|
+| home | active-canonical | ✅ | ✅ |
+| applications | active-canonical | ✅ | ✅ |
+| company | active-canonical | ✅ | ✅ |
+| company/global-service | legacy-read-only | ✗ | ✗ |
+| products | container-only | ✗ | ✗ |
+| products/xray | active-canonical | ✅ | ✅ |
+| products/metal-detection | active-canonical | ✅ | ✅ |
+| products/combination | active-canonical | ✅ | ✅ |
+| products/checkweigher | active-canonical | ✅ | ✅ |
+| products/conveyor | active-canonical | ✅ | ✅ |
+| products/technical-docs | legacy-read-only | ✗ | ✗ |
+| resources | container-only | ✗ | ✗ |
+| resources/case-studies | legacy-read-only | ✗ | ✗ |
+| resources/downloads | legacy-read-only | ✗ | ✗ |
+| resources/insights | legacy-read-only | ✗ | ✗ |
+| certifications | conflict-frozen | ✗ | ✗ |
+
+**验收结果：**
+- vue-tsc --noEmit：0 errors ✅
+- npm run lint：0 errors ✅
+- npx nuxt build：BUILD COMPLETE ✅
+
+**未暂存/未提交：** 以下文件不含本次 commit —— `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/`、`docs/design-reference/inbox/`、`docs/product-cms/CMS-AI-CONSTRUCTION-PACK-V1/`、`docs/project/LITUBO_9C-2R_正式施工单.md`
+
+**Launch Gate（已记录，不在本次范围）：** Directus 原生管理员可绕过 Nuxt API 直接 PATCH `directus_files.folder`，无需经过 registry check。上线前须评估此 Gap。
 
 ---
 

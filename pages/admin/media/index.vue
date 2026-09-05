@@ -25,7 +25,7 @@ interface ApiFilesResult {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-const selectedFolder = ref<string | null>(null) // null = all, 'root' = uncategorised
+const selectedFolder = ref<string | null>(null)   // null = all files
 const searchQuery = ref('')
 const typeFilter = ref<'' | 'image' | 'pdf'>('')
 const offset = ref(0)
@@ -56,6 +56,9 @@ const batchTargetFolder = ref('')
 const showArchivedView = ref(false)
 const archivedFileIds = ref<Set<string>>(new Set())
 
+// Mobile: show legacy section
+const showLegacyMobile = ref(false)
+
 // Detail panel: references + lifecycle
 interface RefsResult {
   product_count: number
@@ -75,7 +78,7 @@ const lifecycleWorking = ref(false)
 const { data: foldersData } = await useFetch<FolderNode[]>('/api/admin/media/folders')
 const folderTree = computed(() => foldersData.value ?? [])
 
-// Flat folder map id→name for display
+// Flat folder map id→name
 const folderMap = computed(() => {
   const m: Record<string, string> = {}
   function walk(nodes: FolderNode[]) {
@@ -85,6 +88,57 @@ const folderMap = computed(() => {
   return m
 })
 
+// Parent map id→parentId (null = root)
+const parentMap = computed(() => {
+  const m: Record<string, string | null> = {}
+  function walk(nodes: FolderNode[], pid: string | null = null) {
+    for (const n of nodes) { m[n.id] = pid; walk(n.children, n.id) }
+  }
+  walk(folderTree.value)
+  return m
+})
+
+// Full display path: "products / xray"
+function folderPath(folderId: string | null): string {
+  if (!folderId) return '待分类'
+  const parts: string[] = []
+  let id: string | null = folderId
+  while (id) {
+    const name = folderMap.value[id]
+    if (name) parts.unshift(name)
+    id = parentMap.value[id] ?? null
+  }
+  return parts.join(' / ') || '—'
+}
+
+// Flatten all folders (for folderMap, parentMap building)
+type FlatFolder = { id: string; name: string; depth: number; policy_state: FolderNode['policy_state']; allow_upload: boolean; allow_move_target: boolean }
+function flattenFolders(nodes: FolderNode[], depth = 0): FlatFolder[] {
+  const result: FlatFolder[] = []
+  for (const n of nodes) {
+    result.push({ id: n.id, name: n.name, depth, policy_state: n.policy_state, allow_upload: n.allow_upload, allow_move_target: n.allow_move_target })
+    result.push(...flattenFolders(n.children, depth + 1))
+  }
+  return result
+}
+const flatFolders = computed(() => flattenFolders(folderTree.value))
+
+// Filter folder tree: show active-canonical and container-only in sidebar "正式目录"
+function filterCanonicalTree(nodes: FolderNode[]): FolderNode[] {
+  return nodes
+    .filter(n => n.policy_state === 'active-canonical' || n.policy_state === 'container-only')
+    .map(n => ({ ...n, children: filterCanonicalTree(n.children) }))
+}
+const canonicalTree = computed(() => filterCanonicalTree(folderTree.value))
+const canonicalFlatFolders = computed(() => flattenFolders(canonicalTree.value))
+// Write-target dropdown: only active-canonical (allow_upload) folders
+const uploadableFlatFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => f.allow_upload))
+
+// Legacy folders (flat, for sidebar Legacy tier)
+const legacyFlatFolders = computed(() =>
+  flatFolders.value.filter((f: FlatFolder) => f.policy_state === 'legacy-read-only')
+)
+
 // ── File loading ──────────────────────────────────────────────────────────────
 async function loadFiles(reset = false) {
   if (reset) { offset.value = 0; files.value = [] }
@@ -92,20 +146,16 @@ async function loadFiles(reset = false) {
   errorMsg.value = ''
   try {
     if (showArchivedView.value) {
-      // Load archived files by cross-referencing lifecycle + files API
       const lcRes = await $fetch<{ data: Array<{ file_id: string }> }>('/api/admin/media/lifecycle')
       archivedFileIds.value = new Set(lcRes.data.map(r => r.file_id))
       const uuids = lcRes.data.map(r => r.file_id)
       if (uuids.length === 0) {
-        files.value = []
-        totalCount.value = 0
-        return
+        files.value = []; totalCount.value = 0; return
       }
-      // Fetch files in those UUIDs (use search by id list)
       const allFiles: MediaFile[] = []
       for (const uuid of uuids) {
         try {
-          const res = await $fetch<ApiFilesResult>(`/api/admin/media/files`, {
+          const res = await $fetch<ApiFilesResult>('/api/admin/media/files', {
             query: { search: uuid, limit: '1' },
           })
           if (res.data?.length) allFiles.push(res.data[0])
@@ -139,7 +189,6 @@ async function loadFiles(reset = false) {
   }
 }
 
-// Load archived file IDs once on mount for grid badges
 async function loadArchivedIds() {
   try {
     const res = await $fetch<{ data: Array<{ file_id: string }> }>('/api/admin/media/lifecycle')
@@ -149,13 +198,11 @@ async function loadArchivedIds() {
   }
 }
 
-// Initial load deferred to onMounted to avoid SSR/CSR hydration mismatch on admin pages
 onMounted(() => {
   loadFiles(true)
   loadArchivedIds()
 })
 
-// Reload when filters change
 watch([selectedFolder, typeFilter, showArchivedView], () => loadFiles(true))
 
 let searchTimer: ReturnType<typeof setTimeout>
@@ -164,7 +211,7 @@ watch(searchQuery, () => {
   searchTimer = setTimeout(() => loadFiles(true), 350)
 })
 
-// ── Folder selection ──────────────────────────────────────────────────────────
+// ── Folder navigation ─────────────────────────────────────────────────────────
 function selectFolder(id: string | null) {
   showArchivedView.value = false
   selectedFolder.value = id
@@ -174,6 +221,14 @@ function toggleArchivedView() {
   showArchivedView.value = !showArchivedView.value
   if (showArchivedView.value) selectedFolder.value = null
 }
+
+// Label for the current view (breadcrumb-style topbar heading)
+const currentViewLabel = computed(() => {
+  if (showArchivedView.value) return '已归档'
+  if (selectedFolder.value === null) return '全部文件'
+  if (selectedFolder.value === 'root') return '待分类'
+  return folderPath(selectedFolder.value)
+})
 
 // ── Multi-select ──────────────────────────────────────────────────────────────
 function toggleSelect(id: string, evt: Event) {
@@ -186,31 +241,31 @@ function toggleSelect(id: string, evt: Event) {
 
 function clearSelection() {
   selectedIds.value = new Set()
+  batchTargetFolder.value = ''
 }
 
 async function batchMoveToFolder() {
   if (!batchTargetFolder.value || selectedIds.value.size === 0) return
   batchMovingFolder.value = true
   errorMsg.value = ''
-  let failed = 0
-  for (const id of selectedIds.value) {
-    try {
-      await $fetch(`/api/admin/media/${id}/meta`, {
-        method: 'PATCH',
-        body: { folder: batchTargetFolder.value || null },
-      })
-    } catch {
-      failed++
+  try {
+    const res = await $fetch<{ moved: number; failed: number; errors?: unknown[] }>(
+      '/api/admin/media/batch-move',
+      { method: 'POST', body: { file_ids: [...selectedIds.value], folder: batchTargetFolder.value } },
+    )
+    if (res.failed === 0) {
+      successMsg.value = `已将 ${res.moved} 个文件移至 ${folderPath(batchTargetFolder.value)}`
+      setTimeout(() => (successMsg.value = ''), 3000)
+      clearSelection()
+      await loadFiles(true)
+    } else {
+      errorMsg.value = `${res.failed} 个文件移动失败（共 ${res.moved + res.failed} 个），请重试`
     }
-  }
-  batchMovingFolder.value = false
-  if (failed === 0) {
-    successMsg.value = `已将 ${selectedIds.value.size} 个文件移动到所选文件夹`
-    setTimeout(() => (successMsg.value = ''), 3000)
-    clearSelection()
-    await loadFiles(true)
-  } else {
-    errorMsg.value = `${failed} 个文件移动失败，请重试`
+  } catch (e: unknown) {
+    const fe = e as { data?: { message?: string } }
+    errorMsg.value = fe.data?.message ?? '批量移动失败'
+  } finally {
+    batchMovingFolder.value = false
   }
 }
 
@@ -220,6 +275,8 @@ async function openFile(f: MediaFile) {
   editForm.value = {
     title: f.title ?? '',
     description: f.description ?? '',
+    // Keep actual folder UUID — dropdown will show blank if it's a legacy folder,
+    // which is intentional (user must pick canonical or leave unchanged).
     folder: f.folder ?? '',
   }
   editSaving.value = false
@@ -303,7 +360,9 @@ async function saveMetadata() {
     if (editForm.value.description !== (selectedFile.value.description ?? '')) {
       payload.description = editForm.value.description
     }
-    if (editForm.value.folder !== (selectedFile.value.folder ?? '')) {
+    // Only send folder if it actually changed; server enforces policy
+    const currentFolder = selectedFile.value.folder ?? ''
+    if (editForm.value.folder !== currentFolder) {
       payload.folder = editForm.value.folder || null
     }
     if (Object.keys(payload).length === 0) {
@@ -316,13 +375,11 @@ async function saveMetadata() {
     })
     successMsg.value = '元数据已保存'
     setTimeout(() => (successMsg.value = ''), 3000)
-    // Update local state
     Object.assign(selectedFile.value, {
       title: editForm.value.title || null,
       description: editForm.value.description || null,
       folder: editForm.value.folder || null,
     })
-    // Refresh list to reflect changes
     await loadFiles(true)
     closeDetail()
   } catch (e: unknown) {
@@ -350,13 +407,13 @@ async function onFilesSelected(evt: Event) {
   const uploadPromises: Promise<void>[] = []
   const allErrors: Array<{ filename: string; message: string }> = []
 
-  // Upload files in parallel, one FormData per file
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i]
     uploadPromises.push(
       (async () => {
         const fd = new FormData()
         fd.append('file', file, file.name)
+        // Server enforces folder policy; pass folder UUID if selected
         if (uploadFolder.value) fd.append('folder', uploadFolder.value)
         try {
           const res = await $fetch<{ uploaded: unknown[]; errors: Array<{ filename: string; message: string }> }>(
@@ -373,13 +430,11 @@ async function onFilesSelected(evt: Event) {
   }
 
   await Promise.all(uploadPromises)
-
   uploading.value = false
   uploadErrors.value = allErrors
   input.value = ''
 
   if (allErrors.length < fileList.length) {
-    // At least some succeeded
     const okCount = fileList.length - allErrors.length
     successMsg.value = `成功上传 ${okCount} 个文件`
     setTimeout(() => (successMsg.value = ''), 4000)
@@ -409,33 +464,35 @@ function formatType(type: string | null | undefined) {
   return type.split('/')[1]?.toUpperCase() ?? type
 }
 
-// Recursive folder tree component helper
-function flattenFolders(nodes: FolderNode[], depth = 0): Array<{ id: string; name: string; depth: number }> {
-  const result: Array<{ id: string; name: string; depth: number }> = []
-  for (const n of nodes) {
-    result.push({ id: n.id, name: n.name, depth })
-    result.push(...flattenFolders(n.children, depth + 1))
-  }
-  return result
-}
-
-const flatFolders = computed(() => flattenFolders(folderTree.value))
-
 const hasMore = computed(() => files.value.length < totalCount.value)
+
+// Whether the currently selected file's folder is legacy (highlight "move" call to action)
+const selectedFileFolderIsLegacy = computed(() => {
+  if (!selectedFile.value?.folder) return false
+  const entry = flatFolders.value.find((f: FlatFolder) => f.id === selectedFile.value!.folder)
+  return entry?.policy_state === 'legacy-read-only'
+})
 </script>
 
 <template>
   <div class="ml-shell">
     <!-- Top bar -->
     <div class="ml-topbar">
-      <h1 class="ml-title">Media Library</h1>
+      <div class="ml-breadcrumb">
+        <span class="breadcrumb-root">Media Library</span>
+        <template v-if="currentViewLabel !== '全部文件'">
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-current">{{ currentViewLabel }}</span>
+        </template>
+      </div>
+
       <div class="ml-topbar-actions">
-        <!-- Batch actions (visible when files are selected) -->
+        <!-- Batch actions -->
         <template v-if="selectedIds.size > 0">
           <span class="selection-count">{{ selectedIds.size }} 已选</span>
-          <select v-model="batchTargetFolder" class="folder-select" title="移动到文件夹">
-            <option value="">— 移动到文件夹 —</option>
-            <option v-for="f in flatFolders" :key="f.id" :value="f.id">
+          <select v-model="batchTargetFolder" class="folder-select" title="移至正式目录">
+            <option value="">— 移至正式目录 —</option>
+            <option v-for="f in uploadableFlatFolders" :key="f.id" :value="f.id">
               {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
             </option>
           </select>
@@ -445,11 +502,11 @@ const hasMore = computed(() => files.value.length < totalCount.value)
           <button class="btn-cancel-sel" @click="clearSelection">取消选择</button>
         </template>
 
-        <!-- Normal upload actions -->
+        <!-- Upload actions -->
         <template v-else>
-          <select v-model="uploadFolder" class="folder-select" title="上传目标文件夹">
-            <option value="">— 不选文件夹 —</option>
-            <option v-for="f in flatFolders" :key="f.id" :value="f.id">
+          <select v-model="uploadFolder" class="folder-select" title="上传目标正式目录">
+            <option value="">— Needs Classification —</option>
+            <option v-for="f in uploadableFlatFolders" :key="f.id" :value="f.id">
               {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
             </option>
           </select>
@@ -468,6 +525,22 @@ const hasMore = computed(() => files.value.length < totalCount.value)
       </div>
     </div>
 
+    <!-- Search + filter bar -->
+    <div class="ml-filterbar">
+      <input
+        v-model="searchQuery"
+        type="search"
+        class="search-input"
+        placeholder="搜索文件名 / 标题…"
+      >
+      <select v-model="typeFilter" class="type-select">
+        <option value="">所有格式</option>
+        <option value="image">图片</option>
+        <option value="pdf">PDF</option>
+      </select>
+      <span class="file-count">{{ totalCount }} 个文件</span>
+    </div>
+
     <!-- Banners -->
     <div v-if="errorMsg" class="banner banner--error">{{ errorMsg }}</div>
     <div v-if="successMsg" class="banner banner--success">{{ successMsg }}</div>
@@ -481,61 +554,64 @@ const hasMore = computed(() => files.value.length < totalCount.value)
     </div>
 
     <div class="ml-body">
-      <!-- Left: folder tree -->
+      <!-- ── Left sidebar ─────────────────────────────────────────────────── -->
       <aside class="ml-sidebar">
-        <p class="sidebar-label">文件夹</p>
+        <!-- Tier 1: System Views -->
+        <p class="sidebar-section-label">系统视图</p>
         <button
           class="folder-item"
           :class="{ 'folder-item--active': selectedFolder === null && !showArchivedView }"
           @click="selectFolder(null)"
-        >
-          全部文件
-        </button>
+        >全部文件</button>
         <button
           class="folder-item"
           :class="{ 'folder-item--active': selectedFolder === 'root' && !showArchivedView }"
           @click="selectFolder('root')"
-        >
-          未分类
-        </button>
+        >待分类</button>
         <button
           class="folder-item folder-item--archived"
           :class="{ 'folder-item--active': showArchivedView }"
           @click="toggleArchivedView"
-        >
-          已归档
-        </button>
-        <div class="folder-divider" />
-        <button
-          v-for="f in flatFolders"
-          :key="f.id"
-          class="folder-item"
-          :class="{ 'folder-item--active': selectedFolder === f.id && !showArchivedView }"
-          :style="{ paddingLeft: `calc(var(--space-3) + ${f.depth * 12}px)` }"
-          @click="selectFolder(f.id)"
-        >
-          {{ f.name }}
-        </button>
+        >已归档</button>
+
+        <!-- Tier 2: Asset Library (canonical tree) -->
+        <div class="sidebar-divider" />
+        <p class="sidebar-section-label">正式目录</p>
+        <template v-for="f in canonicalFlatFolders" :key="f.id">
+          <button
+            class="folder-item"
+            :class="{ 'folder-item--active': selectedFolder === f.id && !showArchivedView }"
+            :style="{ paddingLeft: `calc(var(--space-3) + ${f.depth * 10}px)` }"
+            @click="selectFolder(f.id)"
+          >{{ f.name }}</button>
+        </template>
+        <p v-if="canonicalFlatFolders.length === 0" class="sidebar-empty">暂无正式目录</p>
+
+        <!-- Tier 3: Legacy — Read Only -->
+        <template v-if="legacyFlatFolders.length > 0">
+          <div class="sidebar-divider" />
+          <!-- Mobile: toggle -->
+          <button class="sidebar-legacy-toggle mobile-only" @click="showLegacyMobile = !showLegacyMobile">
+            旧版 (只读) {{ showLegacyMobile ? '▲' : '▼' }}
+          </button>
+          <p class="sidebar-section-label desktop-only">旧版 — 只读</p>
+          <template v-for="f in legacyFlatFolders" :key="f.id">
+            <button
+              v-show="showLegacyMobile"
+              class="folder-item folder-item--legacy"
+              :class="{
+                'folder-item--active': selectedFolder === f.id && !showArchivedView,
+                'mobile-legacy-hidden': !showLegacyMobile,
+              }"
+              :style="{ paddingLeft: `calc(var(--space-3) + ${f.depth * 10}px)` }"
+              @click="selectFolder(f.id)"
+            >{{ f.name }}</button>
+          </template>
+        </template>
       </aside>
 
-      <!-- Right: main content -->
+      <!-- ── Main content ──────────────────────────────────────────────────── -->
       <div class="ml-main">
-        <!-- Search + filter bar -->
-        <div class="filter-bar">
-          <input
-            v-model="searchQuery"
-            type="search"
-            class="search-input"
-            placeholder="搜索文件名 / 标题…"
-          >
-          <select v-model="typeFilter" class="type-select">
-            <option value="">所有格式</option>
-            <option value="image">图片</option>
-            <option value="pdf">PDF</option>
-          </select>
-          <span class="file-count">{{ totalCount }} 个文件</span>
-        </div>
-
         <!-- Loading -->
         <div v-if="loading && files.length === 0" class="loading-state">
           <span class="loading-dot" />加载中…
@@ -544,7 +620,11 @@ const hasMore = computed(() => files.value.length < totalCount.value)
         <!-- Empty -->
         <div v-else-if="!loading && files.length === 0" class="empty-state">
           <p class="empty-title">暂无文件</p>
-          <p class="empty-hint">点击"上传文件"添加媒体资产</p>
+          <p class="empty-hint">
+            <template v-if="showArchivedView">当前无已归档文件</template>
+            <template v-else-if="selectedFolder === 'root'">所有文件均已归入正式目录</template>
+            <template v-else>点击"上传文件"添加媒体资产</template>
+          </p>
         </div>
 
         <!-- File grid -->
@@ -563,7 +643,6 @@ const hasMore = computed(() => files.value.length < totalCount.value)
             @click="openFile(f)"
             @keydown.enter="openFile(f)"
           >
-            <!-- Multi-select checkbox -->
             <label class="file-card__check" @click.stop>
               <input
                 type="checkbox"
@@ -572,7 +651,6 @@ const hasMore = computed(() => files.value.length < totalCount.value)
                 @change="toggleSelect(f.id, $event)"
               >
             </label>
-            <!-- Archived badge -->
             <span v-if="archivedFileIds.has(f.id)" class="archived-badge">归档</span>
             <div class="file-card__thumb">
               <img
@@ -584,7 +662,7 @@ const hasMore = computed(() => files.value.length < totalCount.value)
               >
               <div v-else class="file-card__icon">
                 <span v-if="f.type === 'application/pdf'" class="icon-pdf">PDF</span>
-                <span v-else class="icon-file">📄</span>
+                <span v-else class="icon-file">FILE</span>
               </div>
             </div>
             <div class="file-card__info">
@@ -593,21 +671,24 @@ const hasMore = computed(() => files.value.length < totalCount.value)
                 <span class="meta-type">{{ formatType(f.type) }}</span>
                 <span class="meta-size">{{ formatSize(f.filesize) }}</span>
               </p>
-              <p v-if="f.folder && folderMap[f.folder]" class="file-card__folder">
-                📁 {{ folderMap[f.folder] }}
+              <!-- Folder path — single source of truth from server data -->
+              <p class="file-card__folder">
+                <span v-if="f.folder && folderMap[f.folder]">{{ folderPath(f.folder) }}</span>
+                <span v-else class="folder-unset">待分类</span>
               </p>
             </div>
           </div>
         </div>
 
-        <!-- Load more -->
         <div v-if="hasMore && !loading" class="load-more">
-          <button class="btn-load-more" @click="loadFiles(false)">加载更多（还有 {{ totalCount - files.length }} 个）</button>
+          <button class="btn-load-more" @click="loadFiles(false)">
+            加载更多（还有 {{ totalCount - files.length }} 个）
+          </button>
         </div>
         <div v-if="loading && files.length > 0" class="loading-inline">加载中…</div>
       </div>
 
-      <!-- Detail panel -->
+      <!-- ── Detail panel ──────────────────────────────────────────────────── -->
       <aside v-if="selectedFile" class="ml-detail">
         <div class="detail-header">
           <h3 class="detail-title">文件详情</h3>
@@ -622,12 +703,10 @@ const hasMore = computed(() => files.value.length < totalCount.value)
             :alt="selectedFile.title ?? ''"
             class="detail-preview__img"
           >
-          <div v-else class="detail-preview__icon">
-            {{ formatType(selectedFile.type) }}
-          </div>
+          <div v-else class="detail-preview__icon">{{ formatType(selectedFile.type) }}</div>
         </div>
 
-        <!-- File info (read-only) -->
+        <!-- File facts (read-only) — single source of truth from selectedFile -->
         <dl class="detail-info">
           <dt>文件名</dt>
           <dd>{{ selectedFile.filename_download ?? selectedFile.filename_disk ?? '—' }}</dd>
@@ -641,27 +720,38 @@ const hasMore = computed(() => files.value.length < totalCount.value)
           <dd>{{ formatSize(selectedFile.filesize) }}</dd>
           <dt>上传时间</dt>
           <dd>{{ selectedFile.uploaded_on ? selectedFile.uploaded_on.slice(0, 10) : '—' }}</dd>
+          <!-- Current folder path — always from server data, never from editForm -->
+          <dt>当前路径</dt>
+          <dd :class="{ 'path-legacy': selectedFileFolderIsLegacy, 'path-unset': !selectedFile.folder }">
+            {{ folderPath(selectedFile.folder) }}
+            <span v-if="selectedFileFolderIsLegacy" class="legacy-tag">旧版</span>
+          </dd>
         </dl>
 
-        <!-- References & lifecycle section -->
+        <!-- Used in / References + lifecycle -->
         <div class="detail-lifecycle">
           <div class="lifecycle-header">
-            <span class="lifecycle-label">引用 / 归档</span>
+            <span class="lifecycle-label">引用状态</span>
             <span v-if="detailArchived" class="lifecycle-archived-tag">已归档</span>
           </div>
 
           <div v-if="detailRefsLoading" class="lifecycle-loading">查询引用中…</div>
           <div v-else-if="detailRefs" class="lifecycle-refs">
-            <p v-if="detailRefs.total === 0" class="refs-none">无引用，可以归档</p>
-            <p v-else class="refs-count">
-              被引用 {{ detailRefs.total }} 次（{{ detailRefs.product_count }} 个产品，{{ detailRefs.section_count }} 个章节）
-            </p>
-            <ul v-if="detailRefs.references.length" class="refs-list">
-              <li v-for="ref in detailRefs.references" :key="`${ref.product_id}-${ref.file_role}`">
-                {{ ref.product_name }} · {{ ref.file_role }}
-              </li>
-            </ul>
+            <p v-if="detailRefs.total === 0" class="refs-none">无产品引用，可归档</p>
+            <template v-else>
+              <p class="refs-count">
+                被引用 {{ detailRefs.total }} 次
+                （{{ detailRefs.product_count }} 个产品）
+              </p>
+              <p class="refs-note">ALT / caption / file_role 在产品或内容引用中设置，此处不可编辑</p>
+              <ul v-if="detailRefs.references.length" class="refs-list">
+                <li v-for="ref in detailRefs.references" :key="`${ref.product_id}-${ref.file_role}`">
+                  {{ ref.product_name }} · <code>{{ ref.file_role }}</code>
+                </li>
+              </ul>
+            </template>
           </div>
+          <div v-else class="lifecycle-loading">引用信息暂不可用</div>
 
           <!-- Archive action -->
           <div v-if="!detailArchived" class="lifecycle-action">
@@ -669,11 +759,9 @@ const hasMore = computed(() => files.value.length < totalCount.value)
               <button
                 class="btn-lifecycle btn-archive"
                 :disabled="lifecycleWorking || !detailRefs || !detailRefs.can_archive"
-                :title="detailRefs && !detailRefs.can_archive ? '有引用，无法归档' : ''"
+                :title="detailRefs && !detailRefs.can_archive ? '有产品引用，无法归档' : (detailRefs ? '' : '引用信息不可用')"
                 @click="archiveConfirm = true"
-              >
-                归档文件
-              </button>
+              >归档文件</button>
             </template>
             <template v-else>
               <p class="confirm-msg">确认归档此文件？归档后可随时恢复。</p>
@@ -705,24 +793,36 @@ const hasMore = computed(() => files.value.length < totalCount.value)
           </div>
         </div>
 
-        <!-- Editable fields -->
+        <!-- Editable metadata -->
         <div class="detail-edit">
+          <!-- Legacy folder warning -->
+          <div v-if="selectedFileFolderIsLegacy" class="legacy-notice">
+            此文件位于旧版目录（只读），建议移至正式目录。
+          </div>
+
           <div class="field-row">
             <label class="field-label">标题</label>
             <input v-model="editForm.title" type="text" class="field-input" placeholder="文件显示标题" maxlength="255">
           </div>
           <div class="field-row">
-            <label class="field-label">描述 / ALT（备用）</label>
-            <textarea v-model="editForm.description" class="field-textarea" placeholder="图片描述，未来可用于 alt 文字" rows="3" maxlength="1000" />
+            <label class="field-label">内部描述</label>
+            <textarea
+              v-model="editForm.description"
+              class="field-textarea"
+              placeholder="内部备注（不对外展示）"
+              rows="3"
+              maxlength="1000"
+            />
           </div>
           <div class="field-row">
-            <label class="field-label">文件夹</label>
+            <label class="field-label">移至正式目录</label>
             <select v-model="editForm.folder" class="field-input">
-              <option value="">— 不分组 —</option>
-              <option v-for="f in flatFolders" :key="f.id" :value="f.id">
+              <option value="">— 待分类 —</option>
+              <option v-for="f in uploadableFlatFolders" :key="f.id" :value="f.id">
                 {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
               </option>
             </select>
+            <p class="field-hint">旧版目录不在列表中；选择此处会覆盖当前路径。</p>
           </div>
           <div class="detail-actions">
             <button class="btn-save" :disabled="editSaving" @click="saveMetadata">
@@ -751,20 +851,38 @@ const hasMore = computed(() => files.value.length < totalCount.value)
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-3) var(--space-6);
   background: white;
   border-bottom: 1px solid var(--color-line);
   flex-shrink: 0;
   flex-wrap: wrap;
+  min-height: 56px;
 }
 
-.ml-title {
-  font-size: var(--text-xl);
+/* Breadcrumb */
+.ml-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.breadcrumb-root {
+  font-size: var(--text-base);
   font-weight: 700;
   color: var(--color-ink);
-  margin: 0;
-  flex: 1;
-  white-space: nowrap;
+}
+.breadcrumb-sep {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+.breadcrumb-current {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary-deep);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ml-topbar-actions {
@@ -775,19 +893,19 @@ const hasMore = computed(() => files.value.length < totalCount.value)
 }
 
 .folder-select {
-  height: 38px;
+  height: 36px;
   padding: 0 var(--space-3);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   color: var(--color-ink);
   background: white;
-  min-width: 160px;
-  max-width: 240px;
+  min-width: 180px;
+  max-width: 260px;
 }
 
 .btn-upload {
-  height: 38px;
+  height: 36px;
   padding: 0 var(--space-5);
   background: var(--color-primary);
   color: white;
@@ -804,9 +922,52 @@ const hasMore = computed(() => files.value.length < totalCount.value)
 
 .hidden-input { display: none; }
 
+/* ── Filter bar ── */
+.ml-filterbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-6);
+  background: white;
+  border-bottom: 1px solid var(--color-line);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 160px;
+  max-width: 400px;
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  background: white;
+}
+.search-input:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
+.type-select {
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  background: white;
+}
+
+.file-count {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
 /* ── Banners ── */
 .banner {
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-2) var(--space-5);
   font-size: var(--text-sm);
   flex-shrink: 0;
 }
@@ -826,7 +987,7 @@ const hasMore = computed(() => files.value.length < totalCount.value)
 
 /* ── Left sidebar ── */
 .ml-sidebar {
-  width: 180px;
+  width: 190px;
   flex-shrink: 0;
   background: white;
   border-right: 1px solid var(--color-line);
@@ -834,17 +995,25 @@ const hasMore = computed(() => files.value.length < totalCount.value)
   padding: var(--space-3) var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
-.sidebar-label {
+.sidebar-section-label {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-ink-muted);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-1);
   margin: 0;
+}
+
+.sidebar-empty {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  padding: var(--space-1) var(--space-3);
+  margin: 0;
+  font-style: italic;
 }
 
 .folder-item {
@@ -866,7 +1035,33 @@ const hasMore = computed(() => files.value.length < totalCount.value)
 .folder-item:hover { background: rgba(18, 60, 50, 0.05); color: var(--color-ink); }
 .folder-item--active { background: rgba(18, 60, 50, 0.1); color: var(--color-primary-deep); font-weight: 600; }
 
-.folder-divider { height: 1px; background: var(--color-line); margin: var(--space-2) var(--space-3); }
+/* Legacy folder items — italic + muted */
+.folder-item--legacy {
+  color: var(--color-ink-muted);
+  font-style: italic;
+  font-size: calc(var(--text-sm) - 1px);
+}
+.folder-item--legacy:hover { color: var(--color-ink); background: rgba(18,60,50,0.04); }
+.folder-item--legacy.folder-item--active { background: rgba(18,60,50,0.08); color: var(--color-ink); font-weight: 600; }
+
+/* Archived special item */
+.folder-item--archived { color: #8a5a00; }
+.folder-item--archived.folder-item--active { background: rgba(180,120,0,0.12); color: #7a4e00; font-weight: 600; }
+
+.sidebar-divider { height: 1px; background: var(--color-line); margin: var(--space-2) var(--space-3); }
+
+.sidebar-legacy-toggle {
+  display: none; /* shown only on mobile via .mobile-only */
+  width: 100%;
+  text-align: left;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
 
 /* ── Main ── */
 .ml-main {
@@ -877,45 +1072,6 @@ const hasMore = computed(() => files.value.length < totalCount.value)
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-/* ── Filter bar ── */
-.filter-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.search-input {
-  flex: 1;
-  min-width: 180px;
-  max-width: 400px;
-  height: 38px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  color: var(--color-ink);
-  background: white;
-}
-.search-input:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-
-.type-select {
-  height: 38px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  color: var(--color-ink);
-  background: white;
-}
-
-.file-count {
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
-  white-space: nowrap;
-  margin-left: auto;
 }
 
 /* ── States ── */
@@ -949,6 +1105,7 @@ const hasMore = computed(() => files.value.length < totalCount.value)
 }
 
 .file-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: white;
@@ -958,10 +1115,24 @@ const hasMore = computed(() => files.value.length < totalCount.value)
   cursor: pointer;
   text-align: left;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  padding: 0;
 }
 .file-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(18,60,50,0.1); }
 .file-card--selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(18,60,50,0.15); }
+.file-card--checked { border-color: var(--color-primary); background: rgba(18,60,50,0.03); }
+.file-card--archived { opacity: 0.65; }
+
+.file-card__check {
+  position: absolute; top: 6px; left: 6px; z-index: 2;
+  display: flex; cursor: pointer;
+}
+.check-input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--color-primary); }
+
+.archived-badge {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  background: rgba(0,0,0,0.55); color: white;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+  padding: 2px 6px; border-radius: 99px;
+}
 
 .file-card__thumb {
   height: 120px;
@@ -973,47 +1144,45 @@ const hasMore = computed(() => files.value.length < totalCount.value)
   flex-shrink: 0;
 }
 .file-card__img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.file-card__icon { display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+.file-card__icon { display: flex; align-items: center; justify-content: center; }
 .icon-pdf {
   font-size: var(--text-sm); font-weight: 700;
   background: #e74c3c; color: white;
   padding: 6px 10px; border-radius: var(--radius-sm);
 }
-.icon-file { font-size: 2rem; }
+.icon-file {
+  font-size: var(--text-xs); font-weight: 700;
+  background: #7f8c8d; color: white;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+}
 
 .file-card__info { padding: var(--space-2) var(--space-3); flex: 1; min-width: 0; }
 .file-card__title {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-ink);
+  font-size: var(--text-xs); font-weight: 600; color: var(--color-ink);
   margin: 0 0 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .file-card__meta {
-  display: flex;
-  gap: var(--space-2);
-  margin: 0;
+  display: flex; gap: var(--space-2); margin: 0;
 }
 .meta-type {
   font-size: 10px; font-weight: 600; color: var(--color-primary);
   background: #e8f4f1; padding: 1px 5px; border-radius: 99px;
 }
 .meta-size { font-size: 10px; color: var(--color-ink-muted); }
-.file-card__folder { font-size: 10px; color: var(--color-ink-muted); margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-card__folder {
+  font-size: 10px; color: var(--color-ink-muted);
+  margin: 2px 0 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-unset { font-style: italic; }
 
 /* ── Load more ── */
 .load-more { text-align: center; padding: var(--space-4); }
 .btn-load-more {
-  height: 38px;
-  padding: 0 var(--space-5);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  color: var(--color-ink);
-  background: white;
-  cursor: pointer;
+  height: 36px; padding: 0 var(--space-5);
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink); background: white; cursor: pointer;
 }
 .btn-load-more:hover { background: var(--color-line); }
 
@@ -1032,7 +1201,7 @@ const hasMore = computed(() => files.value.length < totalCount.value)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-4) var(--space-4) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-line);
   flex-shrink: 0;
 }
@@ -1046,22 +1215,19 @@ const hasMore = computed(() => files.value.length < totalCount.value)
 .detail-close:hover { background: var(--color-line); }
 
 .detail-preview {
-  width: 100%;
-  height: 180px;
+  width: 100%; height: 180px;
   background: #e8edf0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0;
 }
 .detail-preview__img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .detail-preview__icon {
   font-size: var(--text-2xl); font-weight: 700;
-  background: #e74c3c; color: white;
+  background: #7f8c8d; color: white;
   padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm);
 }
 
+/* File facts */
 .detail-info {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1076,12 +1242,88 @@ const hasMore = computed(() => files.value.length < totalCount.value)
   color: var(--color-ink); margin: 0; padding: 2px 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.path-legacy { color: #8a5a00; }
+.path-unset { color: var(--color-ink-muted); font-style: italic; }
+.legacy-tag {
+  display: inline-block;
+  font-size: 9px; font-weight: 700;
+  background: rgba(180,120,0,0.15); color: #8a5a00;
+  padding: 0 4px; border-radius: 3px;
+  margin-left: 4px; vertical-align: middle;
+}
 
+/* Lifecycle / references */
+.detail-lifecycle {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+.lifecycle-header { display: flex; align-items: center; gap: var(--space-2); }
+.lifecycle-label {
+  font-size: 10px; font-weight: 700; color: var(--color-ink-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.lifecycle-archived-tag {
+  font-size: 10px; font-weight: 700;
+  background: rgba(180,120,0,0.15); color: #7a4e00;
+  padding: 1px 8px; border-radius: 99px;
+}
+.lifecycle-loading { font-size: var(--text-xs); color: var(--color-ink-muted); }
+.lifecycle-refs { display: flex; flex-direction: column; gap: var(--space-1); }
+.refs-none { font-size: var(--text-xs); color: #0f5c4b; margin: 0; }
+.refs-count { font-size: var(--text-xs); color: var(--color-ink); margin: 0; }
+.refs-note {
+  font-size: 10px; color: var(--color-ink-muted);
+  background: #f8f8f8; border-radius: var(--radius-sm);
+  padding: 4px 8px; margin: 2px 0 0; line-height: 1.5;
+}
+.refs-list {
+  margin: var(--space-1) 0 0 var(--space-3); padding: 0;
+  font-size: var(--text-xs); color: var(--color-ink-muted);
+  list-style: disc; max-height: 80px; overflow-y: auto;
+}
+.refs-list li { margin: 1px 0; }
+.refs-list code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; }
+
+.lifecycle-action { display: flex; flex-direction: column; gap: var(--space-2); }
+.confirm-msg { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; }
+.confirm-btns { display: flex; gap: var(--space-2); }
+
+.btn-lifecycle {
+  height: 32px; padding: 0 var(--space-3);
+  border: none; border-radius: var(--radius-sm);
+  font-size: var(--text-xs); font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+.btn-lifecycle:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-archive { background: #fef3e2; color: #8a5a00; border: 1px solid #f0d090; }
+.btn-archive:hover:not(:disabled) { background: #fde8c0; }
+.btn-archive-confirm { background: #e74c3c; color: white; }
+.btn-archive-confirm:hover:not(:disabled) { background: #c0392b; }
+.btn-restore { background: #e8f4f1; color: var(--color-primary-deep); border: 1px solid #a3dbc8; }
+.btn-restore:hover:not(:disabled) { background: #d1f0e8; }
+.btn-restore-confirm { background: var(--color-primary); color: white; }
+.btn-restore-confirm:hover:not(:disabled) { background: var(--color-primary-deep); }
+.btn-lifecycle-cancel { background: white; color: var(--color-ink-muted); border: 1px solid var(--color-line); }
+.btn-lifecycle-cancel:hover { background: var(--color-line); }
+
+/* Editable metadata */
 .detail-edit { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); flex: 1; }
+
+.legacy-notice {
+  font-size: var(--text-xs);
+  background: rgba(180,120,0,0.08);
+  color: #8a5a00;
+  border: 1px solid rgba(180,120,0,0.2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.5;
+}
 
 .field-row { display: flex; flex-direction: column; gap: var(--space-1); }
 .field-label {
-  font-size: 10px; font-weight: 600;
+  font-size: 10px; font-weight: 700;
   color: var(--color-ink-muted);
   text-transform: uppercase; letter-spacing: 0.06em;
 }
@@ -1108,11 +1350,14 @@ const hasMore = computed(() => files.value.length < totalCount.value)
   line-height: var(--leading-normal);
 }
 .field-textarea:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.field-hint {
+  font-size: 10px; color: var(--color-ink-muted);
+  margin: 0; line-height: 1.4;
+}
 
 .detail-actions { display: flex; gap: var(--space-2); margin-top: auto; padding-top: var(--space-2); }
 .btn-save {
-  flex: 1;
-  height: 38px;
+  flex: 1; height: 36px;
   background: var(--color-primary); color: white; border: none;
   border-radius: var(--radius-sm); font-size: var(--text-sm); font-weight: 600;
   cursor: pointer; transition: background var(--transition-fast);
@@ -1120,149 +1365,53 @@ const hasMore = computed(() => files.value.length < totalCount.value)
 .btn-save:hover:not(:disabled) { background: var(--color-primary-deep); }
 .btn-save:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-cancel {
-  height: 38px;
-  padding: 0 var(--space-4);
+  height: 36px; padding: 0 var(--space-4);
   background: white; color: var(--color-ink-muted);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-sm); font-size: var(--text-sm); cursor: pointer;
 }
 .btn-cancel:hover { background: var(--color-line); }
 
-/* ── Batch actions ── */
+/* ── Batch bar ── */
 .selection-count {
   font-size: var(--text-sm); font-weight: 600;
-  color: var(--color-primary-deep);
-  white-space: nowrap;
+  color: var(--color-primary-deep); white-space: nowrap;
 }
-
 .btn-batch-move {
-  height: 38px; padding: 0 var(--space-4);
+  height: 36px; padding: 0 var(--space-4);
   background: var(--color-primary-deep); color: white;
   border: none; border-radius: var(--radius-sm);
-  font-size: var(--text-sm); font-weight: 600; cursor: pointer;
-  white-space: nowrap;
+  font-size: var(--text-sm); font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .btn-batch-move:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-batch-move:hover:not(:disabled) { background: var(--color-primary); }
-
 .btn-cancel-sel {
-  height: 38px; padding: 0 var(--space-3);
+  height: 36px; padding: 0 var(--space-3);
   border: 1px solid var(--color-line); border-radius: var(--radius-sm);
   font-size: var(--text-sm); color: var(--color-ink-muted);
   background: white; cursor: pointer;
 }
 .btn-cancel-sel:hover { background: var(--color-line); }
 
-/* ── File card additions ── */
-.file-card {
-  position: relative;
-}
+/* ── Responsive helpers ── */
+.desktop-only { }
+.mobile-only { display: none; }
 
-.file-card__check {
-  position: absolute; top: 6px; left: 6px; z-index: 2;
-  display: flex; cursor: pointer;
-}
-.check-input {
-  width: 16px; height: 16px; cursor: pointer; accent-color: var(--color-primary);
-}
-
-.archived-badge {
-  position: absolute; top: 6px; right: 6px; z-index: 2;
-  background: rgba(0,0,0,0.55); color: white;
-  font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
-  padding: 2px 6px; border-radius: 99px;
-}
-
-.file-card--checked { border-color: var(--color-primary); background: rgba(18,60,50,0.03); }
-.file-card--archived { opacity: 0.65; }
-
-/* ── Archived folder item ── */
-.folder-item--archived { color: #8a5a00; }
-.folder-item--archived.folder-item--active { background: rgba(180,120,0,0.12); color: #7a4e00; }
-
-/* ── Lifecycle panel ── */
-.detail-lifecycle {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-line);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.lifecycle-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.lifecycle-label {
-  font-size: 10px; font-weight: 600;
-  color: var(--color-ink-muted);
-  text-transform: uppercase; letter-spacing: 0.06em;
-}
-
-.lifecycle-archived-tag {
-  font-size: 10px; font-weight: 700;
-  background: rgba(180,120,0,0.15); color: #7a4e00;
-  padding: 1px 8px; border-radius: 99px;
-}
-
-.lifecycle-loading { font-size: var(--text-xs); color: var(--color-ink-muted); }
-
-.refs-none { font-size: var(--text-xs); color: #0f5c4b; margin: 0; }
-.refs-count { font-size: var(--text-xs); color: var(--color-ink); margin: 0; }
-
-.refs-list {
-  margin: var(--space-1) 0 0 var(--space-3);
-  padding: 0;
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
-  list-style: disc;
-  max-height: 80px;
-  overflow-y: auto;
-}
-.refs-list li { margin: 1px 0; }
-
-.lifecycle-action { display: flex; flex-direction: column; gap: var(--space-2); }
-
-.confirm-msg { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; }
-
-.confirm-btns { display: flex; gap: var(--space-2); }
-
-.btn-lifecycle {
-  height: 34px; padding: 0 var(--space-3);
-  border: none; border-radius: var(--radius-sm);
-  font-size: var(--text-xs); font-weight: 600; cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--transition-fast);
-}
-.btn-lifecycle:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.btn-archive { background: #fef3e2; color: #8a5a00; border: 1px solid #f0d090; }
-.btn-archive:hover:not(:disabled) { background: #fde8c0; }
-.btn-archive[title]:not([title=""]) { cursor: not-allowed; opacity: 0.5; }
-
-.btn-archive-confirm { background: #e74c3c; color: white; }
-.btn-archive-confirm:hover:not(:disabled) { background: #c0392b; }
-
-.btn-restore { background: #e8f4f1; color: var(--color-primary-deep); border: 1px solid #a3dbc8; }
-.btn-restore:hover:not(:disabled) { background: #d1f0e8; }
-
-.btn-restore-confirm { background: var(--color-primary); color: white; }
-.btn-restore-confirm:hover:not(:disabled) { background: var(--color-primary-deep); }
-
-.btn-lifecycle-cancel { background: white; color: var(--color-ink-muted); border: 1px solid var(--color-line); }
-.btn-lifecycle-cancel:hover { background: var(--color-line); }
-
-/* ── Responsive ── */
+/* ── Responsive 1024px ── */
 @media (max-width: 1023px) {
   .ml-detail { width: 260px; }
 }
 
+/* ── Responsive 767px (375px) ── */
 @media (max-width: 767px) {
   .ml-shell { height: auto; overflow: visible; }
-  .ml-topbar { padding: var(--space-3) var(--space-4); }
+  .ml-topbar { padding: var(--space-3) var(--space-4); min-height: auto; }
+  .ml-filterbar { padding: var(--space-2) var(--space-4); }
+  .file-count { display: none; }
+
   .ml-body { flex-direction: column; overflow: visible; }
+
+  /* Sidebar: horizontal chips */
   .ml-sidebar {
     width: 100%;
     border-right: none;
@@ -1273,23 +1422,56 @@ const hasMore = computed(() => files.value.length < totalCount.value)
     padding: var(--space-2);
     gap: var(--space-1);
   }
-  .sidebar-label { display: none; }
-  .folder-divider { display: none; }
+
+  .sidebar-section-label { display: none; }
+  .sidebar-divider { display: none; }
+  .sidebar-empty { display: none; }
+
   .folder-item {
     width: auto;
     flex-shrink: 0;
     padding: var(--space-1) var(--space-3);
     border: 1px solid var(--color-line);
+    border-radius: 99px;
     font-size: var(--text-xs);
+    font-style: normal;
   }
-  .folder-item--active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+  .folder-item--active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+    font-weight: 600;
+  }
+  .folder-item--legacy { font-style: normal; }
+
+  /* Mobile: legacy items hidden until toggle */
+  @media (max-width: 767px) {
+    .mobile-legacy-hidden { display: none; }
+  }
+  .sidebar-legacy-toggle {
+    display: block;
+    width: auto;
+    flex-shrink: 0;
+    padding: var(--space-1) var(--space-3);
+    border: 1px dashed var(--color-line);
+    border-radius: 99px;
+    font-size: var(--text-xs);
+    color: var(--color-ink-muted);
+    cursor: pointer;
+    background: none;
+  }
+  .desktop-only { display: none; }
+
   .ml-main { padding: var(--space-3); overflow: visible; }
   .file-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-2); }
+
+  /* Detail: full-width below grid */
   .ml-detail {
     width: 100%;
     border-left: none;
     border-top: 2px solid var(--color-primary);
   }
-  .file-count { display: none; }
+
+  .folder-select { min-width: 140px; max-width: 200px; }
 }
 </style>
