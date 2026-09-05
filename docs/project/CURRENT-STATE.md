@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — P1 产品身份与来源记录基础（2026-09-06）
+## 4. 当前状态 — P1 收口验收（2026-09-06）
 
-**状态：product_code 字段、product_source_records archive 能力、最小 source records Admin API 均已完成。未 push、未部署。**
+**状态：P1 收口完成。product_code 不变量、zero-source 防线、Directus 角色绕过审计均已通过。未 push、未部署。**
 
 > **前序：** admin SSR 重定向已在 commit f04f1e4 补齐；9C-2R Folder Registry 在 commit 063dea7 完成。
 
@@ -174,7 +174,8 @@
 | `a177e09`  | docs(9c-2r)：9C-2R live 验收结果写入 CURRENT-STATE.md |
 | `f04f1e4`  | fix(admin-auth)：/admin/* SSR 认证边界 — 无 token 服务端 302 → /admin/login |
 | `08c1a08`  | docs(admin-auth)：MASTER-ROADMAP 写入 SSR 认证边界修复 |
-| （本次）   | feat(p1)：product_code 字段 + source records archive 能力 + Admin API |
+| `d97ffbe`  | feat(p1)：product_code 字段 + source records archive 能力 + Admin API |
+| （本次）   | fix(p1-closure)：zero-source 防线 + source_locator 语义锁定 + 收口测试 |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
@@ -228,7 +229,7 @@
 | `POST /api/admin/products/[id]/sources` | 创建 source record（白名单字段） |
 | `POST /api/admin/products/[id]/sources/[sourceId]/archive` | 逻辑归档（不物理删除） |
 
-#### 验收结果
+#### 验收结果（P1 原始 commit `d97ffbe`）
 
 | 检查项 | 结果 |
 |--------|------|
@@ -239,11 +240,72 @@
 | products.product_code DB 字段存在，UNIQUE | ✅ |
 | product_source_records.archived / archived_at DB 字段存在 | ✅ |
 
+#### P1 收口验收（本次，2026-09-06）
+
+##### source_locator 业务语义结论
+
+| 项目 | 结论 |
+|------|------|
+| `source_file_id` schema | `interface: file`，FK → directus_files；为主来源指针 |
+| `source_locator` schema | `interface: input`，varchar(255)；命名含义为"文件内定位信息"（页码/章节/单元格等） |
+| ADMIN-CMS-SPEC.md | 无反例定义，无独立来源语义说明 |
+| 最终结论 | `source_locator` 是文件内位置描述符，**不是独立可溯源标识**；locator-only 不允许 |
+| 执行规则 | `source_file_id` 必须提供有效 UUID；否则返回 422 `SOURCE_REFERENCE_REQUIRED` |
+
+##### zero-source 防线（新增）
+
+| 场景 | 预期 | 结果 |
+|------|------|------|
+| source_file_id=null，locator 缺失 | 422 SOURCE_REFERENCE_REQUIRED | ✅ |
+| source_file_id=''，locator 空字符串 | 422 SOURCE_REFERENCE_REQUIRED | ✅ |
+| source_file_id=''，locator 纯空格 | 422 SOURCE_REFERENCE_REQUIRED | ✅ |
+| locator-only（无 source_file_id）| 422 SOURCE_REFERENCE_REQUIRED | ✅ |
+| source_file_id=''，locator 有值 | 422 SOURCE_REFERENCE_REQUIRED | ✅ |
+| 有效 UUID，无 locator | 允许 | ✅ |
+| 有效 UUID，有 locator | 允许 | ✅ |
+| 有效 UUID，locator 纯空格 | 允许；locator 规范化为 null | ✅ |
+
+##### Directus 角色绕过审计（product_code）
+
+| 角色 | 类型 | products:update 能力 | 结论 |
+|------|------|---------------------|------|
+| Administrator | admin_access=true | 技术全权（含 product_code 修改） | **技术例外，已记录** |
+| nuxt-server | site-readonly-policy，READ only | 无 UPDATE 能力 | **不能绕过** |
+| 普通运营角色 | 不存在 | N/A | **无风险** |
+
+> 依据：9C-2R Launch Gate 审计（同一 Directus 实例，P1 无角色变更）。Administrator 绕过属受控技术例外，仅限本地开发/系统管理员使用。
+
+**Launch Gate 结论：Pass**（无普通运营角色可绕过 Nuxt API 的 product_code 不变规则）
+
+##### ProductBasicForm UI 收口
+
+| 项目 | 验证方式 | 结论 |
+|------|---------|------|
+| `product_code` 字段标签 `产品代码 (Product Code)` | 组件代码检视 | ✅ |
+| 未设置时说明"设定后不可修改" | 组件代码检视（`form-hint` v-else） | ✅ |
+| 已设置时 disabled + `已锁定：XXX（不可更改）` | 组件代码检视（`:disabled="!!modelValue.product_code"`） | ✅ |
+| disabled 样式：灰底、`cursor: not-allowed` | 组件 CSS | ✅ |
+| 375px 无横向溢出 | 浏览器 JS：scrollW=375=innerW | ✅ |
+| 1440px 无横向溢出 | 浏览器 JS：scrollW=1440=innerW | ✅ |
+| 移动端 44px 最小高度 | 组件 CSS `@media (max-width: 720px)` | ✅ |
+
+> 注：直接渲染 ProductBasicForm 需要管理员登录会话，本次因凭证安全规则无法在自动化流程中完成。UI 行为通过组件代码检视 + 自动化测试（productCode.test.ts）证实，服务端规则为最终保护。
+
+##### 收口验收数字
+
+| 检查项 | 结果 |
+|--------|------|
+| Vitest：116/116（含收口新增 9 个测试）| ✅ |
+| vue-tsc --noEmit：0 errors | ✅ |
+| npm run lint：0 errors | ✅ |
+| npx nuxt build：Build complete | ✅ |
+| git diff --check：仅 LF/CRLF 警告（Windows 正常） | ✅ |
+
 #### 明确未触碰
 
 - TEST ONLY ID=3 产品：未修改
 - 任何真实媒体文件：未移动/上传/删除
-- Directus 权限、角色：未修改
+- Directus 权限、角色、schema：未修改
 - 无 AI、无 source snapshot、无真实 LT-180C 录入
 - 未 push、未部署、未读取或输出凭证
 

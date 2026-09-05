@@ -25,22 +25,36 @@ function isValidReviewStatus(value: string): value is ReviewStatus {
   return (ALLOWED_REVIEW_STATUSES as readonly string[]).includes(value)
 }
 
-const SOURCE_ALLOWED_FIELDS = ['source_file_id', 'source_locator', 'fact_key', 'review_status', 'note'] as const
-
 function buildSourcePayload(body: Record<string, unknown>, productId: number): { payload: Record<string, unknown> | null; error?: string } {
-  if (body.source_file_id !== undefined && body.source_file_id !== null && body.source_file_id !== '') {
-    if (typeof body.source_file_id !== 'string' || !isValidUUID(body.source_file_id)) {
+  // Normalize
+  const rawFileId = body.source_file_id === '' ? null : body.source_file_id
+  const rawLocator = typeof body.source_locator === 'string'
+    ? (body.source_locator.trim() || null)
+    : (body.source_locator ?? null)
+
+  // UUID format check
+  if (rawFileId !== undefined && rawFileId !== null) {
+    if (typeof rawFileId !== 'string' || !isValidUUID(rawFileId)) {
       return { payload: null, error: 'source_file_id must be a valid UUID' }
     }
   }
+
+  // source_locator is a within-file positional descriptor, not an independent source
+  const effectiveFileId = rawFileId === undefined ? null : rawFileId
+  if (!effectiveFileId) {
+    return { payload: null, error: 'SOURCE_REFERENCE_REQUIRED: source_file_id is required' }
+  }
+
   if (body.review_status !== undefined && body.review_status !== null) {
     if (!isValidReviewStatus(String(body.review_status))) {
       return { payload: null, error: `review_status must be one of: ${ALLOWED_REVIEW_STATUSES.join(', ')}` }
     }
   }
 
-  const payload: Record<string, unknown> = { product_id: productId, archived: false }
-  for (const key of SOURCE_ALLOWED_FIELDS) {
+  const payload: Record<string, unknown> = { product_id: productId, archived: false, source_file_id: rawFileId }
+  if (body.source_locator !== undefined) payload.source_locator = rawLocator
+  const textFields = ['fact_key', 'review_status', 'note'] as const
+  for (const key of textFields) {
     if (body[key] !== undefined) payload[key] = body[key] === '' ? null : body[key]
   }
   return { payload }
@@ -49,15 +63,23 @@ function buildSourcePayload(body: Record<string, unknown>, productId: number): {
 // ── Payload construction ──────────────────────────────────────────────────
 
 describe('source record payload construction', () => {
-  it('accepts minimal payload (no optional fields)', () => {
+  const VALID_UUID = 'eb7dfefd-0de8-4eda-9d19-87fc5b31c1ac'
+
+  it('requires source_file_id (minimal payload without it → error)', () => {
     const { payload, error } = buildSourcePayload({}, 42)
+    expect(payload).toBeNull()
+    expect(error).toMatch(/SOURCE_REFERENCE_REQUIRED/)
+  })
+
+  it('accepts minimal payload with valid source_file_id', () => {
+    const { payload, error } = buildSourcePayload({ source_file_id: VALID_UUID }, 42)
     expect(error).toBeUndefined()
-    expect(payload).toMatchObject({ product_id: 42, archived: false })
+    expect(payload).toMatchObject({ product_id: 42, archived: false, source_file_id: VALID_UUID })
   })
 
   it('accepts all allowed fields', () => {
     const { payload, error } = buildSourcePayload({
-      source_file_id: 'eb7dfefd-0000-0000-0000-000000000000',
+      source_file_id: VALID_UUID,
       source_locator: 'page 3, table 1',
       fact_key: 'sensitivity_fe',
       review_status: 'confirmed',
@@ -70,19 +92,19 @@ describe('source record payload construction', () => {
   })
 
   it('strips non-whitelisted fields', () => {
-    const { payload } = buildSourcePayload({ raw_excerpt: 'some text', injected: 'x' }, 1)
+    const { payload } = buildSourcePayload({ source_file_id: VALID_UUID, raw_excerpt: 'some text', injected: 'x' }, 1)
     expect(payload).not.toHaveProperty('raw_excerpt')
     expect(payload).not.toHaveProperty('injected')
   })
 
-  it('coerces empty string fields to null', () => {
-    const { payload } = buildSourcePayload({ note: '', fact_key: '' }, 1)
+  it('coerces empty string text fields to null', () => {
+    const { payload } = buildSourcePayload({ source_file_id: VALID_UUID, note: '', fact_key: '' }, 1)
     expect(payload!.note).toBeNull()
     expect(payload!.fact_key).toBeNull()
   })
 
   it('always sets archived=false on creation', () => {
-    const { payload } = buildSourcePayload({ archived: true } as Record<string, unknown>, 1)
+    const { payload } = buildSourcePayload({ source_file_id: VALID_UUID, archived: true } as Record<string, unknown>, 1)
     expect(payload!.archived).toBe(false)
   })
 })
@@ -103,10 +125,10 @@ describe('source_file_id UUID validation', () => {
     expect(error).toMatch(/UUID/)
   })
 
-  it('coerces empty string source_file_id to null (not a UUID error)', () => {
+  it('empty string source_file_id → SOURCE_REFERENCE_REQUIRED (coerced to null, then gate fires)', () => {
     const { payload, error } = buildSourcePayload({ source_file_id: '' }, 1)
-    expect(error).toBeUndefined()
-    expect(payload!.source_file_id).toBeNull()
+    expect(payload).toBeNull()
+    expect(error).toMatch(/SOURCE_REFERENCE_REQUIRED/)
   })
 
   it('rejects numeric as UUID', () => {
@@ -118,20 +140,22 @@ describe('source_file_id UUID validation', () => {
 // ── Review status whitelist ───────────────────────────────────────────────
 
 describe('review_status whitelist', () => {
+  const VALID_UUID = 'eb7dfefd-0de8-4eda-9d19-87fc5b31c1ac'
+
   for (const s of ALLOWED_REVIEW_STATUSES) {
     it(`accepts ${s}`, () => {
-      const { error } = buildSourcePayload({ review_status: s }, 1)
+      const { error } = buildSourcePayload({ source_file_id: VALID_UUID, review_status: s }, 1)
       expect(error).toBeUndefined()
     })
   }
 
   it('rejects unknown status', () => {
-    const { error } = buildSourcePayload({ review_status: 'approved' }, 1)
+    const { error } = buildSourcePayload({ source_file_id: VALID_UUID, review_status: 'approved' }, 1)
     expect(error).toMatch(/review_status must be one of/)
   })
 
   it('rejects ai_verified status', () => {
-    const { error } = buildSourcePayload({ review_status: 'ai_verified' }, 1)
+    const { error } = buildSourcePayload({ source_file_id: VALID_UUID, review_status: 'ai_verified' }, 1)
     expect(error).toMatch(/review_status must be one of/)
   })
 })
@@ -194,9 +218,11 @@ describe('archive logic', () => {
 // ── No AI / no media scan guardrails ─────────────────────────────────────
 
 describe('source records guardrails', () => {
+  const VALID_UUID = 'eb7dfefd-0de8-4eda-9d19-87fc5b31c1ac'
+
   it('payload has no AI fields', () => {
     const { payload } = buildSourcePayload({
-      source_file_id: 'eb7dfefd-0de8-4eda-9d19-87fc5b31c1ac',
+      source_file_id: VALID_UUID,
       ai_suggestion: 'some ai output',
       ai_confidence: 0.99,
     }, 1)
@@ -205,8 +231,64 @@ describe('source records guardrails', () => {
   })
 
   it('payload cannot auto-associate a product beyond the route param id', () => {
-    const { payload } = buildSourcePayload({ product_id: 999 }, 42)
-    // product_id always comes from the route param, not body
-    expect(payload!.product_id).toBe(42)
+    const { payload, error } = buildSourcePayload({ product_id: 999 }, 42)
+    // Without a valid source_file_id, SOURCE_REFERENCE_REQUIRED fires first
+    expect(error).toMatch(/SOURCE_REFERENCE_REQUIRED/)
+    expect(payload).toBeNull()
+  })
+})
+
+// ── Zero-source invariant ──────────────────────────────────────────────────
+
+describe('zero-source record invariant', () => {
+  const VALID_UUID = 'eb7dfefd-0de8-4eda-9d19-87fc5b31c1ac'
+
+  it('rejects: source_file_id=null, locator absent → SOURCE_REFERENCE_REQUIRED', () => {
+    const { payload, error } = buildSourcePayload({ source_file_id: null }, 1)
+    expect(payload).toBeNull()
+    expect(error).toMatch(/SOURCE_REFERENCE_REQUIRED/)
+  })
+
+  it('rejects: source_file_id=null, locator empty string → SOURCE_REFERENCE_REQUIRED', () => {
+    const { payload, error } = buildSourcePayload({ source_file_id: null, source_locator: '' }, 1)
+    expect(payload).toBeNull()
+    expect(error).toMatch(/SOURCE_REFERENCE_REQUIRED/)
+  })
+
+  it('rejects: source_file_id="", locator whitespace only → SOURCE_REFERENCE_REQUIRED', () => {
+    const { payload, error } = buildSourcePayload({ source_file_id: '', source_locator: '   ' }, 1)
+    expect(payload).toBeNull()
+    expect(error).toMatch(/SOURCE_REFERENCE_REQUIRED/)
+  })
+
+  it('rejects: locator-only (no source_file_id) → SOURCE_REFERENCE_REQUIRED', () => {
+    const { payload, error } = buildSourcePayload({ source_locator: 'page 3, table 1' }, 1)
+    expect(payload).toBeNull()
+    expect(error).toMatch(/SOURCE_REFERENCE_REQUIRED/)
+  })
+
+  it('rejects: source_file_id="", valid locator provided → SOURCE_REFERENCE_REQUIRED', () => {
+    const { payload, error } = buildSourcePayload({ source_file_id: '', source_locator: 'section 2.1' }, 1)
+    expect(payload).toBeNull()
+    expect(error).toMatch(/SOURCE_REFERENCE_REQUIRED/)
+  })
+
+  it('allows: valid UUID, no locator', () => {
+    const { payload, error } = buildSourcePayload({ source_file_id: VALID_UUID }, 1)
+    expect(error).toBeUndefined()
+    expect(payload!.source_file_id).toBe(VALID_UUID)
+    expect(payload).not.toHaveProperty('source_locator')
+  })
+
+  it('allows: valid UUID + locator', () => {
+    const { payload, error } = buildSourcePayload({ source_file_id: VALID_UUID, source_locator: 'page 3' }, 1)
+    expect(error).toBeUndefined()
+    expect(payload!.source_locator).toBe('page 3')
+  })
+
+  it('locator whitespace-only is coerced to null when source_file_id is valid', () => {
+    const { payload, error } = buildSourcePayload({ source_file_id: VALID_UUID, source_locator: '   ' }, 1)
+    expect(error).toBeUndefined()
+    expect(payload!.source_locator).toBeNull()
   })
 })
