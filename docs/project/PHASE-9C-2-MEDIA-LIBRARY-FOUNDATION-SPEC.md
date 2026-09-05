@@ -300,11 +300,30 @@ WHERE pf.directus_files_id = :uuid
 | 产品重复引用防护 | `existingFileIds.value.has(file.id)` | ✅ |
 | Admin 导航（Media Library 链接）| `layouts/admin.vue` | ✅ |
 
-### 4.2 Media Library 基础版（9C-2，待授权）
+### 4.2 Media Library 基础版（9C-2 已完成 + 9C-2R 已收口）
 
 **核心目标：** 让媒体库可管理、可组织，不触及产品参数、AI 或 Content Center。
 
-**一期必须做（最小完整集）：**
+**实施状态（9C-2 commit `2f0bac4` + 9C-2R Folder Registry 收口 commit）：**
+
+| 功能 | 实现文件 | 状态 |
+|------|---------|------|
+| 批量文件多选（checkbox）| `pages/admin/media/index.vue` | ✅ 已完成（9C-2）|
+| 批量移动文件夹 | `server/api/admin/media/batch-move.post.ts` | ✅ 已完成（9C-2R，服务端策略预验证）|
+| 软归档 / 恢复 | `server/utils/mediaLifecycle.ts` + 归档 API | ✅ 已完成（9C-2）|
+| 全局引用查询 | `server/api/admin/media/[uuid]/references.get.ts` | ✅ 已完成（9C-2）|
+| 文件夹目录策略（Folder Registry）| `server/utils/folderRegistry.ts` | ✅ 已完成（9C-2R）|
+| Upload / meta.patch / batch-move 路由 folder guard | 3 个 API handler | ✅ 已完成（9C-2R）|
+| 侧边栏 Conflict — read only tier | `pages/admin/media/index.vue` | ✅ 已完成（9C-2R 收口）|
+| 44 个 Folder Registry 单元测试 + route-level mock | `tests/folderRegistry.test.ts` | ✅ 已完成（9C-2R 收口）|
+
+**一期明确不做（避免扩展至其他模块）：**
+
+| 不做的功能 | 原因 |
+|-----------|------|
+| 文件夹创建 / 重命名 | 须遵守命名规范（§2.1），须 Directus 会话，延至独立授权 |
+
+**旧计划（已替换）：**
 
 | 功能 | 实现方向 | 依赖决策 |
 |------|---------|---------|

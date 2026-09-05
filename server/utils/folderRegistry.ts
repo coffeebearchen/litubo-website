@@ -9,6 +9,7 @@ export type PolicyState =
   | 'container-only'     // parent container; files should go in sub-folders
   | 'legacy-read-only'   // browsable; no new writes
   | 'conflict-frozen'    // naming conflict; frozen, no new writes
+  | 'ambiguous'          // two distinct UUIDs resolve to same full_path; fail-closed
   | 'unknown'            // folder exists in Directus but not in policy map
 
 export interface FolderEntry {
@@ -72,7 +73,7 @@ export function buildFolderRegistry(
     return chain
   }
 
-  return flat.map((f) => {
+  const entries: FolderEntry[] = flat.map((f) => {
     const parent_chain = parentChain(f.id)
     const full_path = parent_chain.join('/')
     const policy_state: PolicyState = FOLDER_POLICY[full_path] ?? 'unknown'
@@ -86,6 +87,22 @@ export function buildFolderRegistry(
       allow_move_target: policy_state === 'active-canonical',
     }
   })
+
+  // §2.7 Ambiguity check: two distinct UUIDs resolving to the same full_path → fail-closed.
+  const pathCount = new Map<string, number>()
+  for (const e of entries) {
+    pathCount.set(e.full_path, (pathCount.get(e.full_path) ?? 0) + 1)
+  }
+  const ambiguousPaths = new Set(
+    [...pathCount.entries()].filter(([, n]) => n > 1).map(([p]) => p),
+  )
+  if (ambiguousPaths.size === 0) return entries
+
+  return entries.map(e =>
+    ambiguousPaths.has(e.full_path)
+      ? { ...e, policy_state: 'ambiguous' as PolicyState, allow_upload: false, allow_move_target: false }
+      : e,
+  )
 }
 
 // ── Live resolver (fetches from Directus) ─────────────────────────────────────
@@ -128,6 +145,14 @@ export function validateUploadFolder(
     }
   }
 
+  if (entry.policy_state === 'ambiguous') {
+    return {
+      ok: false,
+      code: 'FOLDER_AMBIGUOUS',
+      message: `Folder UUID ${folderUuid} resolves to path "${entry.full_path}" which is shared by multiple folder IDs.`,
+    }
+  }
+
   if (!entry.allow_upload) {
     return {
       ok: false,
@@ -157,6 +182,14 @@ export function validateMoveFolder(
       ok: false,
       code: 'FOLDER_UNKNOWN',
       message: 'Folder UUID not found in the Directus folder tree.',
+    }
+  }
+
+  if (entry.policy_state === 'ambiguous') {
+    return {
+      ok: false,
+      code: 'FOLDER_AMBIGUOUS',
+      message: `Folder UUID ${folderUuid} resolves to path "${entry.full_path}" which is shared by multiple folder IDs.`,
     }
   }
 

@@ -141,9 +141,9 @@
 
 ---
 
-## 4. 当前状态 — Phase 9C-2R 媒体目录治理代码已完成，等待用户验收
+## 4. 当前状态 — Phase 9C-2R 媒体目录治理收口（Directus live 验收 + 角色审计待确认）
 
-**状态：Phase 9C-2R（9C-2 目录治理强化补丁）Media Folder Registry 服务端 policy 层代码开发已完成（2026-09-05），本地 commit 已建立，等待用户业务验收。未 push、未部署。**
+**状态：Phase 9C-2R（9C-2 目录治理强化补丁）全部代码、测试、UI 已完成收口（2026-09-05），等待 Directus live 目录树核实 + 普通运营角色绕过审计。未 push、未部署。**
 
 > **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
 
@@ -174,7 +174,8 @@
 | `82b4329`  | docs：9A-2C 本地发布/撤回验收结果写入 CURRENT-STATE.md |
 | `abfd69a`  | docs(9c-2)：9C-2 规划定稿 — PHASE-9C-2 规划文档 + CURRENT-STATE 更新 |
 | `2f0bac4`  | feat(9c-2)：Media Library 生命周期管理 — 软归档、引用保护、恢复、批量归类 |
-| （本次）    | feat(9c-2r)：媒体目录治理 — Folder Registry 服务端 policy + batch-move + 前端收口 |
+| `063dea7`  | feat(9c-2r)：媒体目录治理 — Folder Registry 服务端 policy + batch-move + 前端收口 |
+| （本次收口）| chore(9c-2r)：收口 — FOLDER_AMBIGUOUS 检测 + 44 单元测试 + 英文 UI + Conflict tier + 文档更新 |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
@@ -546,20 +547,32 @@
 
 ---
 
-### Phase 9C-2R — 媒体目录治理 Folder Registry（代码已完成，2026-09-05）
+### Phase 9C-2R — 媒体目录治理 Folder Registry（收口已完成，2026-09-05）
 
-**状态：代码已完成，等待业务验收（本地 commit，未 push，未部署）**
+**状态：全部代码、测试（67/67）、UI 英文化已完成（本地 commit `063dea7` + 收口 commit），未 push，未部署。Directus live 目录树及普通运营角色绕过审计待 live session 核实。**
+
+**commit `063dea7` 完成项：**
 
 | 类别 | 完成项 |
 |------|--------|
-| **新建工具层** | `server/utils/folderRegistry.ts`：`PolicyState` 类型、`FolderEntry` 接口、冻结策略表 `FOLDER_POLICY`（16条全路径→状态）、纯函数 `buildFolderRegistry(flat)`、Live resolver `resolveFolderRegistry(event)`、`validateUploadFolder()`、`validateMoveFolder()`、`assertFolderAllowsUpload()`、`assertFolderAllowsMove()` |
-| **修改 upload.post.ts** | 新增 `assertFolderAllowsUpload(folder, event, true)`：上传前服务端 policy 校验；null folder（Needs Classification）被允许 |
-| **修改 meta.patch.ts** | 单文件移动增加 `resolveFolderRegistry + validateMoveFolder`：不允许移至 null/legacy/conflict/unknown |
-| **新建 batch-move.post.ts** | `POST /api/admin/media/batch-move`：批量移动最多 200 个文件；**批量预验证**（先验证目标 folder → registry check，全批失败再报错，无写入）；逐文件 Directus PATCH，结果 `{ moved, failed, errors? }` |
-| **修改 folders.get.ts** | 扩展 `FolderNode` 接口（新增 `full_path`, `policy_state`, `allow_upload`, `allow_move_target`）；服务端用 `buildFolderRegistry` 注入 policy 字段，前端零计算 |
-| **修改 index.vue（前端收口）** | ① 移除 `import { isFolderCanonical, isFolderLegacy }` 客户端 policy 依赖；② `flattenFolders` 新增 policy 字段透传；③ `filterCanonicalTree` 改为 `allow_upload \|\| container-only`（全路径）；④ `uploadableFlatFolders` 新 computed（仅 active-canonical）用于三处写操作 dropdown；⑤ `legacyFlatFolders` 改为 `policy_state === 'legacy-read-only'`；⑥ `batchMoveToFolder` 改调 `POST /api/admin/media/batch-move`；⑦ `saveMetadata` 和 `onFilesSelected` 移除客户端 canon check；⑧ `selectedFileFolderIsLegacy` 改为查 `flatFolders` 中的 `policy_state`；⑨ 修复 `v-show="showLegacyMobile \|\| true"` bug；⑩ `.mobile-legacy-hidden` 限定 `@media (max-width: 767px)` |
-| **policy bug 修复** | `FOLDER_POLICY['company']` 从 `container-only` 改为 `active-canonical`（施工单表格权威依据） |
-| **已排除（明确不处理）** | Directus 原生绕过（管理员可直接 PATCH directus_files）— 已文档化为 Launch Gate |
+| **新建工具层** | `server/utils/folderRegistry.ts`：`PolicyState` 类型（含 `ambiguous`）、`FolderEntry` 接口、冻结策略表 `FOLDER_POLICY`（16条全路径→状态）、纯函数 `buildFolderRegistry(flat)`（含 §2.7 ambiguity 检测）、Live resolver `resolveFolderRegistry(event)`、`validateUploadFolder()`（含 FOLDER_AMBIGUOUS）、`validateMoveFolder()`（含 FOLDER_AMBIGUOUS）、`assertFolderAllowsUpload()`、`assertFolderAllowsMove()` |
+| **修改 upload.post.ts** | `assertFolderAllowsUpload(folder, event, true)`：上传前服务端 policy 校验；null folder（Needs Classification）被允许 |
+| **修改 meta.patch.ts** | 单文件移动增加 `resolveFolderRegistry + validateMoveFolder`：不允许移至 null/legacy/conflict/unknown/ambiguous |
+| **新建 batch-move.post.ts** | `POST /api/admin/media/batch-move`：批量移动最多 200 个文件；**批量预验证**（先验证目标 folder → registry check，全批失败再报错，无写入） |
+| **修改 folders.get.ts** | 扩展 `FolderNode`（新增 `full_path`, `policy_state`, `allow_upload`, `allow_move_target`）；服务端注入 policy，前端零计算 |
+| **修改 index.vue（前端收口）** | 移除客户端 policy 依赖；`uploadableFlatFolders` 仅 active-canonical；`batchMoveToFolder` 改调 batch-move API；修复 `v-show` 和 `mobile-legacy-hidden` bug |
+
+**本次收口 commit 新增项：**
+
+| 类别 | 完成项 |
+|------|--------|
+| **G1 单元测试** | `tests/folderRegistry.test.ts`：44 个测试全部通过；覆盖 §2 要求 1–9（正确 UUID/错误父链/未知 UUID/非可写状态/Planned 目录/null 规则/ambiguity/孤儿节点/路由级 mock） |
+| **G1 ambiguity 处理** | `buildFolderRegistry` 新增 §2.7 路径重复检测；ambiguous 条目设 `allow_upload=false, allow_move_target=false`；`validateUploadFolder`/`validateMoveFolder` 返回 `FOLDER_AMBIGUOUS` 错误码 |
+| **G2 英文 UI** | 侧边栏：`Active destinations` / `Legacy — read only` / `Conflict — read only`；批量移动：`Move to approved folder`；编辑表单：`Move to approved folder` / `Needs Classification` |
+| **G3 Conflict tier** | 新增 `conflictFlatFolders` computed；侧边栏第四层"Conflict — read only"显示 `certifications`；可浏览，不出现在任何 write dropdown |
+| **Cleanup** | 删除 `utils/mediaFolderPolicy.ts`（确认无真实 import 后删除） |
+| **文档更新** | CURRENT-STATE.md / MASTER-ROADMAP.md / MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md / PHASE-9C-2-MEDIA-LIBRARY-FOUNDATION-SPEC.md |
+| **policy bug 修复** | `FOLDER_POLICY['company']` 已从 `container-only` 改为 `active-canonical` |
 
 **Policy 状态表（本次 commit 冻结）：**
 
@@ -582,14 +595,17 @@
 | resources/insights | legacy-read-only | ✗ | ✗ |
 | certifications | conflict-frozen | ✗ | ✗ |
 
-**验收结果：**
+**验收结果（收口 commit）：**
+- npx vitest run：67 tests (3 files) 全部通过 ✅
 - vue-tsc --noEmit：0 errors ✅
 - npm run lint：0 errors ✅
-- npx nuxt build：BUILD COMPLETE ✅
+- npx nuxt build：BUILD COMPLETE ✅（commit `063dea7` 时已通过，收口仅增 tests/docs/UI，build 重新需本地验证）
 
-**未暂存/未提交：** 以下文件不含本次 commit —— `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/`、`docs/design-reference/inbox/`、`docs/product-cms/CMS-AI-CONSTRUCTION-PACK-V1/`、`docs/project/LITUBO_9C-2R_正式施工单.md`
+**未暂存/未提交（永久排除）：** `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/`、`docs/design-reference/inbox/`、`docs/product-cms/CMS-AI-CONSTRUCTION-PACK-V1/`、`docs/project/LITUBO_9C-2R_正式施工单.md`
 
-**Launch Gate（已记录，不在本次范围）：** Directus 原生管理员可绕过 Nuxt API 直接 PATCH `directus_files.folder`，无需经过 registry check。上线前须评估此 Gap。
+**Directus live 状态：** unverified — 需用户已登录本机 Directus 会话方可核实目录树。
+
+**Launch Gate：** A. Directus 技术超管可绕过 Nuxt API 直接 PATCH `directus_files.folder`（受控技术例外，不等于"全路径已保护"）。B. 普通运营角色是否拥有原生 `directus_files.folder` UPDATE 权限 — 待 live session 核实，无法自行结论。上线前须完成 B 项审计。
 
 ---
 

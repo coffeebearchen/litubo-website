@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：M4 / M4-Next-3 Settings 最小版已完成 + B0-1 代码已 push 至 GitHub + B0-0 媒体治理规范写入 — 等待 9C-2 Media Library 批量 → 真实 Draft 产品试点 → 9B AI 导入 → Content Center → 正式上线授权**
+**当前位置：M4 / 9C-2R Media Folder Registry 已完成收口（本地 commit）— 等待 Directus live 目录树验收 + 普通运营角色绕过审计确认 → 真实 Draft 产品试点 → 9B AI 导入 → Content Center → 正式上线授权**
 
 ---
 

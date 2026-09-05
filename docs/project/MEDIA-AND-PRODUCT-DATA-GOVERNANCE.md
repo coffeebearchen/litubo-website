@@ -65,7 +65,7 @@ Admin API `PATCH /api/admin/media/:id/meta` 白名单：
 |------|------|---------|
 | 文件级重复检测（hash/名称去重） | ❌ 未实现 | 9C-2 或手动管理 |
 | 标签（Tags）系统 | ❌ 未实现 | Product Dossier 阶段 |
-| 批量归类（多选→移动文件夹）| ❌ 未实现 | 9C-2 |
+| 批量归类（多选→移动文件夹）| ✅ 已实现（9C-2R `POST /api/admin/media/batch-move`；服务端策略预验证） | 9C-2R |
 | 批量删除 / 回收站 | ❌ 未实现 | 待定 |
 | 文件版本历史 / Diff | ❌ 未实现 | 待定 |
 | 全局多语言 ALT（文件级，非 junction 级）| ❌ 未实现 | Product Dossier |

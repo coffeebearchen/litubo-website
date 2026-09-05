@@ -139,6 +139,11 @@ const legacyFlatFolders = computed(() =>
   flatFolders.value.filter((f: FlatFolder) => f.policy_state === 'legacy-read-only')
 )
 
+// Conflict-frozen folders (flat, for sidebar Conflict tier — browsable, not writable)
+const conflictFlatFolders = computed(() =>
+  flatFolders.value.filter((f: FlatFolder) => f.policy_state === 'conflict-frozen')
+)
+
 // ── File loading ──────────────────────────────────────────────────────────────
 async function loadFiles(reset = false) {
   if (reset) { offset.value = 0; files.value = [] }
@@ -490,16 +495,16 @@ const selectedFileFolderIsLegacy = computed(() => {
         <!-- Batch actions -->
         <template v-if="selectedIds.size > 0">
           <span class="selection-count">{{ selectedIds.size }} 已选</span>
-          <select v-model="batchTargetFolder" class="folder-select" title="移至正式目录">
-            <option value="">— 移至正式目录 —</option>
+          <select v-model="batchTargetFolder" class="folder-select" title="Move to approved folder">
+            <option value="">— Move to approved folder —</option>
             <option v-for="f in uploadableFlatFolders" :key="f.id" :value="f.id">
               {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
             </option>
           </select>
           <button class="btn-batch-move" :disabled="batchMovingFolder || !batchTargetFolder" @click="batchMoveToFolder">
-            {{ batchMovingFolder ? '移动中…' : '批量移动' }}
+            {{ batchMovingFolder ? 'Moving…' : 'Move' }}
           </button>
-          <button class="btn-cancel-sel" @click="clearSelection">取消选择</button>
+          <button class="btn-cancel-sel" @click="clearSelection">Deselect all</button>
         </template>
 
         <!-- Upload actions -->
@@ -574,9 +579,9 @@ const selectedFileFolderIsLegacy = computed(() => {
           @click="toggleArchivedView"
         >已归档</button>
 
-        <!-- Tier 2: Asset Library (canonical tree) -->
+        <!-- Tier 2: Active destinations -->
         <div class="sidebar-divider" />
-        <p class="sidebar-section-label">正式目录</p>
+        <p class="sidebar-section-label">Active destinations</p>
         <template v-for="f in canonicalFlatFolders" :key="f.id">
           <button
             class="folder-item"
@@ -585,16 +590,16 @@ const selectedFileFolderIsLegacy = computed(() => {
             @click="selectFolder(f.id)"
           >{{ f.name }}</button>
         </template>
-        <p v-if="canonicalFlatFolders.length === 0" class="sidebar-empty">暂无正式目录</p>
+        <p v-if="canonicalFlatFolders.length === 0" class="sidebar-empty">No active folders</p>
 
-        <!-- Tier 3: Legacy — Read Only -->
+        <!-- Tier 3: Legacy — read only -->
         <template v-if="legacyFlatFolders.length > 0">
           <div class="sidebar-divider" />
           <!-- Mobile: toggle -->
           <button class="sidebar-legacy-toggle mobile-only" @click="showLegacyMobile = !showLegacyMobile">
-            旧版 (只读) {{ showLegacyMobile ? '▲' : '▼' }}
+            Legacy (read only) {{ showLegacyMobile ? '▲' : '▼' }}
           </button>
-          <p class="sidebar-section-label desktop-only">旧版 — 只读</p>
+          <p class="sidebar-section-label desktop-only">Legacy — read only</p>
           <template v-for="f in legacyFlatFolders" :key="f.id">
             <button
               v-show="showLegacyMobile"
@@ -603,6 +608,20 @@ const selectedFileFolderIsLegacy = computed(() => {
                 'folder-item--active': selectedFolder === f.id && !showArchivedView,
                 'mobile-legacy-hidden': !showLegacyMobile,
               }"
+              :style="{ paddingLeft: `calc(var(--space-3) + ${f.depth * 10}px)` }"
+              @click="selectFolder(f.id)"
+            >{{ f.name }}</button>
+          </template>
+        </template>
+
+        <!-- Tier 4: Conflict — read only -->
+        <template v-if="conflictFlatFolders.length > 0">
+          <div class="sidebar-divider" />
+          <p class="sidebar-section-label">Conflict — read only</p>
+          <template v-for="f in conflictFlatFolders" :key="f.id">
+            <button
+              class="folder-item folder-item--conflict"
+              :class="{ 'folder-item--active': selectedFolder === f.id && !showArchivedView }"
               :style="{ paddingLeft: `calc(var(--space-3) + ${f.depth * 10}px)` }"
               @click="selectFolder(f.id)"
             >{{ f.name }}</button>
@@ -815,14 +834,14 @@ const selectedFileFolderIsLegacy = computed(() => {
             />
           </div>
           <div class="field-row">
-            <label class="field-label">移至正式目录</label>
+            <label class="field-label">Move to approved folder</label>
             <select v-model="editForm.folder" class="field-input">
-              <option value="">— 待分类 —</option>
+              <option value="">— Needs Classification —</option>
               <option v-for="f in uploadableFlatFolders" :key="f.id" :value="f.id">
                 {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
               </option>
             </select>
-            <p class="field-hint">旧版目录不在列表中；选择此处会覆盖当前路径。</p>
+            <p class="field-hint">Legacy folders are not listed; selecting a folder here overwrites the current path.</p>
           </div>
           <div class="detail-actions">
             <button class="btn-save" :disabled="editSaving" @click="saveMetadata">
@@ -1043,6 +1062,14 @@ const selectedFileFolderIsLegacy = computed(() => {
 }
 .folder-item--legacy:hover { color: var(--color-ink); background: rgba(18,60,50,0.04); }
 .folder-item--legacy.folder-item--active { background: rgba(18,60,50,0.08); color: var(--color-ink); font-weight: 600; }
+
+.folder-item--conflict {
+  color: #7a3a3a;
+  font-style: italic;
+  font-size: calc(var(--text-sm) - 1px);
+}
+.folder-item--conflict:hover { color: var(--color-ink); background: rgba(122,58,58,0.06); }
+.folder-item--conflict.folder-item--active { background: rgba(122,58,58,0.1); color: var(--color-ink); font-weight: 600; }
 
 /* Archived special item */
 .folder-item--archived { color: #8a5a00; }
