@@ -1,4 +1,5 @@
 import { createError, getCookie, getHeader, getRequestURL, sendRedirect } from 'h3'
+import { attemptSsrRefresh } from '~/server/utils/adminRefresh'
 
 export default defineEventHandler(async (event) => {
   const url = getRequestURL(event).pathname
@@ -15,14 +16,21 @@ export default defineEventHandler(async (event) => {
   // Auth endpoints (login / logout / refresh / me) handle their own cookie logic
   if (isAdminApi && url.startsWith('/api/admin/auth/')) return
 
-  const token = getCookie(event, 'admin_at')
+  const config = useRuntimeConfig()
 
-  if (!token) {
+  function reject(): ReturnType<typeof sendRedirect> | never {
     if (isAdminPage) return sendRedirect(event, '/admin/login', 302)
     throw createError({ statusCode: 401, message: 'Not authenticated' })
   }
 
-  const config = useRuntimeConfig()
+  let token = getCookie(event, 'admin_at') ?? undefined
+
+  // Fast path: no AT at all — skip the /users/me round-trip, go straight to refresh
+  if (!token) {
+    const refreshed = await attemptSsrRefresh(event)
+    if (!refreshed) return reject()
+    token = refreshed
+  }
 
   try {
     const me = await $fetch<{ data: { id: string; role: { name: string } } }>(
@@ -38,10 +46,32 @@ export default defineEventHandler(async (event) => {
     event.context.adminToken = token
     event.context.adminUserId = me.data.id
   } catch (err: unknown) {
-    if (isAdminPage) return sendRedirect(event, '/admin/login', 302)
-    const httpErr = err as { statusCode?: number; message?: string }
+    const httpErr = err as { statusCode?: number }
+
+    // Role check explicitly denied — do not attempt refresh
     if (httpErr.statusCode === 403) throw err
-    throw createError({ statusCode: 401, message: 'Invalid or expired session' })
+
+    // AT was rejected (likely expired) — attempt server-side refresh with admin_rt
+    const refreshed = await attemptSsrRefresh(event)
+    if (!refreshed) return reject()
+
+    // Verify the refreshed token and confirm Administrator role
+    try {
+      const me2 = await $fetch<{ data: { id: string; role: { name: string } } }>(
+        `${config.directusUrl}/users/me?fields=id,role.name`,
+        { headers: { Authorization: `Bearer ${refreshed}` } }
+      )
+
+      if (me2.data?.role?.name !== 'Administrator') {
+        if (isAdminPage) return sendRedirect(event, '/admin/login', 302)
+        throw createError({ statusCode: 403, message: 'Insufficient privileges' })
+      }
+
+      event.context.adminToken = refreshed
+      event.context.adminUserId = me2.data.id
+    } catch {
+      return reject()
+    }
   }
 
   // CSRF check: only for write operations on API routes

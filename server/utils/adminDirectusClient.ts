@@ -2,6 +2,11 @@ import { createError, getCookie } from 'h3'
 import type { H3Event } from 'h3'
 
 export function getAdminToken(event: H3Event): string {
+  // Prefer the token already validated (and possibly refreshed) by admin-auth middleware.
+  // This ensures internal useFetch calls during SSR use the refreshed token, not the
+  // stale cookie that was forwarded from the original browser request.
+  const contextToken = event.context.adminToken as string | undefined
+  if (contextToken) return contextToken
   const token = getCookie(event, 'admin_at')
   if (!token) throw createError({ statusCode: 401, message: 'Not authenticated' })
   return token

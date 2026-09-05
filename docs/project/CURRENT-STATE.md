@@ -141,9 +141,61 @@
 
 ---
 
-## 4. 当前状态 — P1 收口验收（2026-09-06）
+## 4. 当前状态 — Admin Auth SSR 自动续期（2026-09-06）
 
-**状态：P1 收口完成。product_code 不变量、zero-source 防线、Directus 角色绕过审计均已通过。未 push、未部署。**
+**状态：SSR 自动续期完成。代码、测试、typecheck、lint、build 全部通过。等待用户浏览器验收与 commit 授权。未 push、未部署。**
+
+> **前序：** P1 product_code + zero-source 收口已在 commit 7cdb359 完成；Admin SSR 重定向已在 commit f04f1e4 补齐。
+
+### Admin Auth SSR Session Continuity（本次，2026-09-06）
+
+#### 问题
+
+原 `admin-auth.ts` middleware 当 `admin_at` 过期时直接 302 到 `/admin/login`，不尝试用 `admin_rt` 续期。同时，SSR 内部 `useFetch` 转发的是浏览器原始 Cookie（过期的 `admin_at`），即使 middleware 完成续期，`adminDirectusClient.ts` 读 Cookie 仍会得到旧令牌，导致 `/admin/products` 显示"暂无产品"。
+
+#### 修复
+
+| 文件 | 操作 |
+|------|------|
+| `server/utils/adminRefresh.ts`（**新建**）| SSR 刷新 helper：读 `admin_rt` cookie，调用现有 coordinator，续期成功写新 httpOnly Cookie，返回新 access token；失败返回 null |
+| `server/middleware/admin-auth.ts`（**修改**）| 无 AT → 直接调用 helper；有 AT 但 Directus 拒绝 → 也调用 helper；续期成功设 `event.context.adminToken`；续期失败才 302/401 |
+| `server/utils/adminDirectusClient.ts`（**修改**）| `getAdminToken` 优先读 `event.context.adminToken`（middleware 已验证的令牌），解决内部 useFetch 携带旧 Cookie 的根本问题 |
+| `tests/adminRefresh.test.ts`（**新建**）| 11 个 Vitest 用例，覆盖 6 个施工单场景 |
+
+#### 实现原则
+
+- SSR middleware 不通过 HTTP 调用自身的 `/api/admin/auth/refresh`，直接调用服务端 helper
+- `refresh.post.ts` 和新 helper 共用 `coordinator`（deduplication、grace window、rotated RT 保护均生效）
+- `/admin/login` 本身不受中间件影响，无循环重定向
+- `/api/admin/*` 认证失败仍 401，不改为 302
+- Cookie 的 httpOnly / sameSite / secure 属性保持不变
+- 管理员角色检查保持不变
+- `admin_at` TTL 仍为 Directus 内置默认（15m），未修改 Docker / `.env` / Directus 任何配置
+
+#### 验收结果
+
+| 检查项 | 结果 |
+|--------|------|
+| Vitest：127/127 | ✅ |
+| vue-tsc --noEmit：0 errors | ✅ |
+| npm run lint：0 errors | ✅ |
+| npx nuxt build：Build complete | ✅ |
+| git diff --check：仅 LF/CRLF 警告 | ✅ |
+
+#### 明确未触碰
+
+- Directus schema、权限、角色、Policy：未修改
+- admin_at TTL（15m）、docker-compose.yml、.env、.env.example：未修改
+- TEST ONLY ID=3 产品：未触碰
+- 真实媒体文件：未移动/上传/删除
+- P1 ProductBasicForm.vue 英文化改动：未暂存、未提交、完整保留
+- 无 AI、无 push、无部署、无凭证输出
+
+---
+
+## 4B. 原 P1 收口状态（2026-09-06，保持）
+
+**P1 已完成。product_code 不变量、zero-source 防线、Directus 角色绕过审计均已通过。**
 
 > **前序：** admin SSR 重定向已在 commit f04f1e4 补齐；9C-2R Folder Registry 在 commit 063dea7 完成。
 
