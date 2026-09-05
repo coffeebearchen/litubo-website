@@ -55,6 +55,22 @@ function update(field: keyof AdminProduct, value: unknown) {
     </div>
 
     <div class="form-row">
+      <label class="form-label">产品代码 (Product Code)</label>
+      <input
+        class="form-input form-input--mono"
+        type="text"
+        :value="modelValue.product_code ?? ''"
+        :disabled="!!modelValue.product_code"
+        placeholder="e.g. LT-180C"
+        @input="update('product_code', ($event.target as HTMLInputElement).value.trim().toUpperCase())"
+      >
+      <p v-if="modelValue.product_code" class="form-hint form-hint--locked">
+        已锁定：{{ modelValue.product_code }}（不可更改）
+      </p>
+      <p v-else class="form-hint">大写字母、数字、连字符。提交 Review 前必须填写。设定后不可修改。</p>
+    </div>
+
+    <div class="form-row">
       <label class="form-label">型号 / 系列</label>
       <input
         class="form-input"
@@ -138,6 +154,13 @@ function update(field: keyof AdminProduct, value: unknown) {
 .form-textarea { resize: vertical; }
 
 .form-hint { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; }
+.form-hint--locked { color: #8B4513; }
+
+.form-input:disabled {
+  background: #f5f5f0;
+  cursor: not-allowed;
+  color: var(--color-ink-muted);
+}
 
 .form-actions { display: flex; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--color-line); }
 

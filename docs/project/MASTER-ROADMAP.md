@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：M4 / Admin SSR 认证边界修复（commit f04f1e4）已完成 — `/admin/*` 未登录服务端 302 → `/admin/login`；`/api/admin/*` 未登录仍为 401。下一步：真实 Draft 产品试点 → 9B AI 导入 → Content Center → 正式上线授权**
+**当前位置：M4 / P1 产品身份与来源记录基础（本次）已完成 — `products.product_code` 字段（UNIQUE，不可覆盖，状态门控）+ `product_source_records` archive 能力 + 最小 Admin API（list/create/archive）。下一步：用户确认真实资料后进入 P2 真实 LT-180C Draft 录入 → 9B AI 导入 → Content Center → 正式上线授权**
 
 ---
 
@@ -131,6 +131,29 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 - 侧边栏英文标签（Active destinations / Legacy — read only / Conflict — read only）
 - 44 单元测试，全部通过（合计 67/67）
 - Directus live 目录树 16 个全确认；B 项审计 Pass（无普通运营角色）
+
+#### M4-Next-P0：S0 只读审计（完成，无代码变更）
+
+- 确认 Directus 内无正式 LT-180C 产品（ID=3 为 TEST ONLY draft）
+- 确认 product_source_records 表存在但 0 行，无 Admin API
+- 确认 products 表无 product_code 字段
+- 确认 13 个媒体文件中无可正式引用的 LT-180C 产品图（元数据/分类未完成）
+
+#### M4-Next-P1：产品身份与来源记录基础 ✅（完成，本次）
+
+**背景：** S0 审计确认 `product_code` 字段缺失（AI pipeline 身份主键），`product_source_records` 缺 archive 能力，无 Admin API 端点。
+
+**实现：**
+- Directus schema：`products.product_code`（varchar(100), UNIQUE, nullable）；`product_source_records.archived`（boolean, NOT NULL, default false）+ `archived_at`（timestamptz）
+- 业务规则：`product_code` 格式验证（大写/数字/连字符）；已设值后不可更改；`draft→review` 和 `review→published` 须先有合法 `product_code`
+- Admin API：`GET/POST /api/admin/products/[id]/sources`、`POST /api/admin/products/[id]/sources/[sourceId]/archive`
+- 表单：`ProductBasicForm.vue` 新增 `product_code` 输入（设定后锁定显示）
+- 测试：新增 `productCode.test.ts`（18 项）+ `sourceRecords.test.ts`（21 项）
+- Schema 快照：`phase-p1-before.yaml` / `phase-p1-after.yaml`
+
+**验证：** 107/107 tests、typecheck 0、lint 0、build OK
+
+**本次未触碰：** TEST ONLY ID=3 产品、真实媒体文件、Directus 权限、AI、部署、凭证
 
 #### M4-Next-2S：Admin SSR 认证边界修复 ✅（完成，commit f04f1e4）
 
@@ -283,4 +306,4 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 ---
 
-*最后更新：2026-09-06，M4-Next-2S Admin SSR 认证边界修复（commit f04f1e4）完成写入。*
+*最后更新：2026-09-06，M4-Next-P1 产品身份与来源记录基础完成写入。*

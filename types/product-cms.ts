@@ -46,6 +46,7 @@ export interface AdminProduct {
   name_en: string
   name_es: string | null
   name_pt: string | null
+  product_code: string | null
   model_or_series: string | null
   summary_en: string | null
   summary_es: string | null
@@ -197,6 +198,8 @@ export interface ProductSourceRecord {
   review_status: SourceReviewStatus | null
   note: string | null
   date_created: string | null
+  archived: boolean
+  archived_at: string | null
 }
 
 export interface ProductSeoFields {

@@ -141,18 +141,18 @@
 
 ---
 
-## 4. 当前状态 — Admin SSR 认证边界修复（9C-2R 后续安全补丁，2026-09-06）
+## 4. 当前状态 — P1 产品身份与来源记录基础（2026-09-06）
 
-**状态：admin SSR 重定向已补齐。`/admin/*` 页面路由现在服务端强制 302 → `/admin/login`（无 cookie 或失效/伪造 token）；9C-2R 全部验收完成。未 push、未部署。**
+**状态：product_code 字段、product_source_records archive 能力、最小 source records Admin API 均已完成。未 push、未部署。**
 
-> **编号说明：** git commit `f2b9ef1` 消息标签为"Phase 9C-2"，系会话中临时命名；正式文档编号为 **Phase 9C-1P**（9C-1 安全强化补丁），因为 **9C-2 保留给 Media Library 批量选择/归类**，不覆盖。
+> **前序：** admin SSR 重定向已在 commit f04f1e4 补齐；9C-2R Folder Registry 在 commit 063dea7 完成。
 
 ### 当前本机配置
 
 | 项目 | 当前值 |
 |------|--------|
 | `CMS_MODE_PRODUCTS` | `directus`（本机测试，`.env` 中，不进 Git） |
-| Directus 测试产品 ID=3 | `status=draft`、`seo_noindex=true`、TEST ONLY 标识保留 |
+| Directus 测试产品 ID=3 | `status=draft`、`seo_noindex=true`、`product_code=NULL`、TEST ONLY 标识保留 |
 | 推送状态 | 本地 commit 见下表，**未 push，未部署** |
 | 生产是否启用 Products Directus | **否**（生产仍用 fixtures，Products 开关独立） |
 
@@ -167,30 +167,85 @@
 | `cdcdfd5` | Phase 9A-2I：全局面包屑 currentColor+opacity 真正修复 |
 | `7e9d41c` | Phase 9C-1：Media Library 基础版 + Products 媒体复用 |
 | `f2b9ef1` | Phase 9C-1P（git 标签误为 9C-2）：管理员会话续期基础实现 |
-| （上次收口）| Phase 9C-1P 收口：refresh 安全分支 + 前端单飞锁 + visibilitychange 补刷 |
+| （收口）   | Phase 9C-1P 收口：refresh 安全分支 + 前端单飞锁 + visibilitychange 补刷 |
 | `0209ffa`  | M4-Next-3 + 9C-1P-R：Settings 最小版 + 多标签会话并发安全强化 + Vitest |
 | `ae29d14`  | docs：M4-Next-3 业务验收结果写入 CURRENT-STATE.md（已 push） |
-| `c555d9c`  | docs：B0-0 媒体治理规范 v0.1 + 决策 #1/#2/#3 已确认 + 状态机术语统一 |
+| `c555d9c`  | docs：B0-0 媒体治理规范 v0.1 + 决策 #1/#2/#3 已确认 |
 | `a177e09`  | docs(9c-2r)：9C-2R live 验收结果写入 CURRENT-STATE.md |
-| （本次）   | fix(admin-auth)：/admin/* SSR 认证边界 — 无 token 服务端 302 → /admin/login |
-| `82b4329`  | docs：9A-2C 本地发布/撤回验收结果写入 CURRENT-STATE.md |
-| `abfd69a`  | docs(9c-2)：9C-2 规划定稿 — PHASE-9C-2 规划文档 + CURRENT-STATE 更新 |
-| `2f0bac4`  | feat(9c-2)：Media Library 生命周期管理 — 软归档、引用保护、恢复、批量归类 |
-| `063dea7`  | feat(9c-2r)：媒体目录治理 — Folder Registry 服务端 policy + batch-move + 前端收口 |
-| （本次收口）| chore(9c-2r)：收口 — FOLDER_AMBIGUOUS 检测 + 44 单元测试 + 英文 UI + Conflict tier + 文档更新 |
+| `f04f1e4`  | fix(admin-auth)：/admin/* SSR 认证边界 — 无 token 服务端 302 → /admin/login |
+| `08c1a08`  | docs(admin-auth)：MASTER-ROADMAP 写入 SSR 认证边界修复 |
+| （本次）   | feat(p1)：product_code 字段 + source records archive 能力 + Admin API |
 
 ### 后续顺序（严格按序，每步须独立授权）
 
-1. ~~**Media Library 基础版**~~：✅ 已在 Phase 9C-1 完成
-2. ~~**管理员会话续期**~~：✅ 已在 Phase 9C-1P 完成（含安全强化收口）+ Phase 9C-1P-R 多标签并发安全强化（见下方专节）
-3. ~~**Settings 最小版**~~：✅ 已在 M4-Next-3 完成
-4. ~~**9C-2：Media Library 批量选择/归类**~~：✅ commit `2f0bac4`（软归档/引用/恢复/批量归类）完成
-5. ~~**9C-2R：媒体目录治理 Folder Registry**~~：✅ 本次完成（代码已 commit，等待业务验收）
-6. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
-6. **Content Center**：内容运营中心（博文、资源、页面等综合管理）
-7. **真实产品资料录入与正式上线**
+1. ~~**Media Library 基础版**~~：✅ Phase 9C-1
+2. ~~**管理员会话续期**~~：✅ Phase 9C-1P + 9C-1P-R
+3. ~~**Settings 最小版**~~：✅ M4-Next-3
+4. ~~**9C-2：Media Library 批量选择/归类**~~：✅ commit `2f0bac4`
+5. ~~**9C-2R：媒体目录治理 Folder Registry**~~：✅ commit `063dea7`
+6. ~~**Admin SSR 认证边界修复**~~：✅ commit `f04f1e4`
+7. ~~**P1：product_code + source records 基础**~~：✅ 本次
+8. **P2：真实 LT-180C Draft 录入**：用户确认真实资料、清理媒体元数据后执行
+9. **Phase 9B — AI 产品导入与审核**：批量导入产品资料草稿，人工审核后发布，永不自动发布
+10. **Content Center**：内容运营中心
+11. **真实产品资料录入与正式上线**
 
 **Push 授权、DNS 切换、生产部署须用户单独授权，不在以上范围内。**
+
+---
+
+### P1 — 产品身份与来源记录基础（本次，2026-09-06）
+
+#### Schema 变更
+
+| 集合 | 新字段 | 类型 | 约束 |
+|------|--------|------|------|
+| `products` | `product_code` | varchar(100) | UNIQUE, nullable；正式代码：大写字母/数字/连字符 |
+| `product_source_records` | `archived` | boolean | NOT NULL, default false |
+| `product_source_records` | `archived_at` | timestamptz | nullable |
+
+- Schema 快照：before = `directus/schema/phase-p1-before.yaml`；after = `directus/schema/phase-p1-after.yaml`
+- DB 备份：`backups/p1-before-2026-09-06.sql`（本地，不进 Git）
+
+#### 业务规则
+
+| 规则 | 实现位置 |
+|------|---------|
+| `product_code` 格式：`/^[A-Z0-9][A-Z0-9-]{0,98}[A-Z0-9]$\|^[A-Z0-9]$/` | `[id].patch.ts`、`index.post.ts` |
+| 已设置的 `product_code` 不可更改或清空 | `[id].patch.ts` |
+| `draft → review` 和 `review → published` 须先有合法 `product_code` | `[id].patch.ts` |
+| TEST ONLY ID=3 保持 `product_code=NULL + draft + noindex` | 不触碰 |
+| source records 仅管理员可访问（admin-auth 中间件） | 全局中间件 |
+| source records 无物理 DELETE；archive 保留审计记录 | `archive.post.ts` |
+| 重复归档返回 409 | `archive.post.ts` |
+| 默认 list 仅返回 active（archived=false）记录 | `index.get.ts`（`include_archived=true` 可选） |
+
+#### 新增 API 端点
+
+| 端点 | 作用 |
+|------|------|
+| `GET /api/admin/products/[id]/sources` | 列出该产品 active source records |
+| `POST /api/admin/products/[id]/sources` | 创建 source record（白名单字段） |
+| `POST /api/admin/products/[id]/sources/[sourceId]/archive` | 逻辑归档（不物理删除） |
+
+#### 验收结果
+
+| 检查项 | 结果 |
+|--------|------|
+| Vitest：107/107 | ✅ |
+| vue-tsc --noEmit：0 errors | ✅ |
+| npm run lint：0 errors | ✅ |
+| npx nuxt build：Build complete | ✅ |
+| products.product_code DB 字段存在，UNIQUE | ✅ |
+| product_source_records.archived / archived_at DB 字段存在 | ✅ |
+
+#### 明确未触碰
+
+- TEST ONLY ID=3 产品：未修改
+- 任何真实媒体文件：未移动/上传/删除
+- Directus 权限、角色：未修改
+- 无 AI、无 source snapshot、无真实 LT-180C 录入
+- 未 push、未部署、未读取或输出凭证
 
 ---
 

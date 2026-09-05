@@ -1,7 +1,7 @@
 import { getQuery } from 'h3'
 import { adminFetch } from '~/server/utils/adminDirectusClient'
 
-const FIELDS = 'id,status,slug,name_en,name_es,name_pt,model_or_series,category_id,page_preset_id,published_at,date_created,date_updated'
+const FIELDS = 'id,status,slug,name_en,name_es,name_pt,product_code,model_or_series,category_id,page_preset_id,published_at,date_created,date_updated'
 
 export default defineEventHandler(async (event) => {
   const { status, page = '1', limit = '20' } = getQuery(event)
