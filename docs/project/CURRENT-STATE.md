@@ -1617,3 +1617,89 @@ J-2.2.1 的安全代码实际由两个 commit 承载：
 - 七个保护 commit 均未被 amend、rebase 或覆盖
 
 *最后更新：2026-09-06，由 Claude Code 在"J-2.2.1b Git 历史核实、BFF 证据闭环与 Checkpoint 同步"任务中写入。*
+
+---
+
+## V-0.5 视觉与数据对齐登记册注册 + 只读事实审计（2026-09-06）
+
+**状态：V-0.5 文档治理任务完成，Register 已安装，V-0 只读审计已完成，本地 commit 待创建。无业务代码变更。**
+
+### Register 安装
+
+| 文件 | 路径 | 状态 |
+|------|------|------|
+| Visual & Data Conformance Register V1 | `docs/project/ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md` | ✅ 已安装（用户放置），由 Claude 完成 Section 4 路径确认、Section 8 V-0 状态填写、Section 12 证据台账 |
+
+Register 在权限层级上位于 Blueprint 之下、CURRENT-STATE.md 之上。Charter > Blueprint > Register。
+
+### 视觉母版路径确认（V-0 核实）
+
+| 范围 | 确认路径 |
+|------|---------|
+| ADM-02 ～ ADM-08（8张） | `docs/design-reference/inbox/admin-cms-ai-v1/reference-images/` |
+| Logic-01 / Logic-02（2张） | `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/logic-references/` |
+| 全部 10 张母版 | 文件已读取，路径 100% 确认 |
+
+### V-0 每模块审计结论
+
+| 模块 | 实现状态 | 证据状态 | 验收状态 | 关键发现 |
+|------|---------|---------|---------|---------|
+| ADM-02 | AUTOMATED_CHECKED | RUNTIME_PROVEN + SCREENSHOT_CONFIRMED | **SUSPENDED** | J-2 视觉验收由 Codex 宣告 FAILED/SUSPENDED（9 张截图） |
+| ADM-02a | AUTOMATED_CHECKED | REPOSITORY_CONFIRMED + SCREENSHOT_CONFIRMED | **SUSPENDED** | 同上 |
+| ADM-03 | LEGACY | SCREENSHOT_CONFIRMED + REPOSITORY_CONFIRMED | NOT_REVIEWED | 可见中文：标签、按钮、表头、空状态文案 |
+| ADM-04 | LEGACY | REPOSITORY_CONFIRMED | NOT_REVIEWED | 可见中文：FILE_ROLE_LABELS 常量、焦点标签、模态框 |
+| ADM-05 | LEGACY | SCREENSHOT_CONFIRMED + REPOSITORY_CONFIRMED | NOT_REVIEWED | 可见中文：SECTION_LABELS、按钮、空状态 |
+| ADM-06 | **NOT_STARTED** | REPOSITORY_CONFIRMED | NOT_REVIEWED | **严重缺口：无 `/admin/products/[id]/relations.vue` 路由，无 Relations BFF** |
+| ADM-07 | LEGACY | REPOSITORY_CONFIRMED | NOT_REVIEWED | `seo.vue` 存在但未出现在 ProductSubNav（仅 5 个标签，SEO tab 缺失） |
+| ADM-08 | **IN_DISCOVERY** | REPOSITORY_CONFIRMED | NOT_REVIEWED | BFF 存在（3 个 sources 端点），无 admin 页面 |
+| Logic-01 | NOT_STARTED | — | NOT_REVIEWED | — |
+| Logic-02 | NOT_STARTED | — | NOT_REVIEWED | — |
+
+### 可见中文清单（英文优先原则缺口）
+
+| 文件 | 可见中文位置 |
+|------|------------|
+| `pages/admin/products/[id]/specs.vue` | 返回链接"← 产品列表"、卡片标题"技术参数"、按钮"取消/＋ 添加参数组/确认添加/添加"、表头、空状态（3行）、分组标签 |
+| `pages/admin/products/[id]/media.vue` | FILE_ROLE_LABELS 常量（"Hero 主图""概览图"等）、焦点标签、模态框标签、返回链接 |
+| `pages/admin/products/[id]/content.vue` | SECTION_LABELS（"文本""功能列表""概览"等）、按钮、空状态 |
+| `pages/admin/products/[id]/seo.vue` | 提示文字"建议 50–70 个字符…"、节标题"搜索预览（示意）" |
+| `components/admin/product/ProductSubNav.vue` | 标签文字"基础信息/页面模块/技术参数/图片与资料/产品 FAQ"（5 个标签；SEO tab 缺失） |
+
+### 当前 Git 基线
+
+| 项目 | 值 |
+|------|-----|
+| 本地 HEAD | `5ea32f975795637f0ff469f568707e06aea8a2dc` |
+| `origin/master` | `2a3e67f952c3443166c73851467b7eaf77cec243` |
+| `origin/backup/admin-cms-j2` | `5ea32f9`（与 HEAD 匹配） |
+| 运行进程 | PID 33632，`node.exe ... nuxi.mjs dev`，RUNTIME_PROVEN |
+| Vitest | 222/222 ✅ |
+
+### J-2 验收状态
+
+**J-2 浏览器视觉验收：SUSPENDED**（由 Codex 于前序会话宣告，基于 9 张截图评估）。本次文档治理任务不改变此状态。J-2 push origin/master 须 Codex 发新的视觉验收指令并通过后方可授权。
+
+### V-0.5 治理文件更新清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| `CLAUDE.md` | 阅读顺序新增 Register（第 4 项）、权威关系表新增 Register 行、开工报告模板扩展 |
+| `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` | 新增 C.5a Register 交叉引用规则 |
+| `docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` | 新增 10.3a Register Gate（代码施工前置门禁） |
+| `docs/project/ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md` | Section 4 路径确认、Section 8 V-0 状态填写、Section 12 证据台账完整填写 |
+| `docs/project/CURRENT-STATE.md` | 本节 |
+| `docs/project/MASTER-ROADMAP.md` | V-0.5 里程碑记录 |
+
+### 禁止声明（已遵守）
+
+- 未修改任何业务代码、Vue 页面、API、tests、types、schema、Directus
+- 未使用 `git add .` / `git add -A` / `git reset --hard` 等禁止命令
+- 未触碰四个禁止资料包（均保持 `??` 未暂存）
+- 未 push origin/master、未改写历史、未修改 remote URL
+- J-3、AI Dossier、Import Queue、真实产品试点、前台 CMS 切换：均未开始，不得在无完整 Codex 施工单的情况下启动
+
+### 下一步
+
+V-0.5 完成后，等待 Codex 下一份**单一、完整模块施工单**。每个模块须对应 Register 中的一个完整条目，且 DoR 状态通过后方可开始代码施工。
+
+*最后更新：2026-09-06，由 Claude Code 在"V-0.5 视觉与数据对齐登记册注册 + 只读事实审计"任务中写入。*

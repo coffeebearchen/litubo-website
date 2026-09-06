@@ -252,6 +252,16 @@ Desktop and 375px visual check when appropriate
 - Visual and Construction Packs presently untracked: maintain a separate manifest/hash/backup location; never mix raw packs into a business-code commit.
 - Define health checks, service logs, capacity monitoring, dependency/security updates, and recovery procedures before production release.
 
+### 10.3a Visual & Data Conformance Register Gate (fixed, 2026-09-06)
+
+Before Claude changes any Admin/CMS source code for a given module:
+
+1. The corresponding Register row (ADM-xx or Logic-xx) must exist in `docs/project/ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md`.
+2. The row must confirm: target route, shared shell contract, data/API contract, English-first scope, applicable Charter DG and Blueprint BP-DG, and DoR status.
+3. If the row is absent, shows `IN_DISCOVERY`, or has unresolved DoR items, stop and report — do not start code changes.
+4. After implementation, the Register row must be updated with evidence before the task can report completion. Automated tests passing alone do not satisfy the Register gate; runtime and visual evidence are required.
+5. Register authority: Charter > Blueprint > Register. The Register cannot change module sequence, override gates, or invent data rules.
+
 ### 10.4 GitHub Checkpoint Protocol (fixed, 2026-09-06)
 
 A checkpoint is a remote backup only — it does not imply acceptance, release, or deployability.

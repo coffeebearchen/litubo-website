@@ -175,10 +175,11 @@ Before starting any Admin/CMS code or document task, read in this order:
 1. `CLAUDE.md` — this file; sole operative entry point
 2. `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` — highest authority; governs boundaries, safety, and framework-change rules
 3. `docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` — complete system construction map; bound by Charter
-4. `docs/project/CURRENT-STATE.md` — verified current progress, limitations, and active blockers
-5. `docs/project/MASTER-ROADMAP.md` — milestone order; does not independently override Blueprint sequence
-6. Relevant visual/logic master, Construction Pack, current code, types, APIs, and tests for the current module
-7. The complete, current Codex work order (施工单) for the authorized module only
+4. `docs/project/ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md` — master-to-route-to-evidence execution register; confirms target route, shared shell, data/API contract, English scope, DoR and current status for each ADM module
+5. `docs/project/CURRENT-STATE.md` — verified current progress, limitations, and active blockers
+6. `docs/project/MASTER-ROADMAP.md` — milestone order; does not independently override Blueprint sequence
+7. Relevant visual/logic master, Construction Pack, current code, types, APIs, and tests for the current module
+8. The complete, current Codex work order (施工单) for the authorized module only
 
 ### Document authority hierarchy
 
@@ -187,6 +188,7 @@ Before starting any Admin/CMS code or document task, read in this order:
 | Working tree, running services, Directus state, confirmed user decisions | Determines factual truth |
 | Governing Charter V1.1 | Highest governance; controls all boundaries, safety, and framework-change rules |
 | Implementation Blueprint V1 | Complete execution map; bound by Charter; defines modules, dependencies, AI/import gates, and construction sequence |
+| Visual & Data Conformance Register V1 | Master-to-route-to-evidence contract; bound by Charter and Blueprint; records target route, shell, API, English, DoR, DoD and status per ADM module |
 | CURRENT-STATE.md | Single source for verified progress and active blockers |
 | MASTER-ROADMAP.md | Milestone tracking; does not independently alter Blueprint sequence |
 | CLAUDE.md | Sole operative task entry; reading navigation only; not a second constitution |
@@ -212,12 +214,18 @@ Every Admin/CMS task opening report must declare all of the following before any
 ```text
 Framework version: Governing Charter V1.1 + Implementation Blueprint V1
 Current module: J-?
-Governing docs read: [list each file]
+Governing docs read: [list each file including Register]
+Register row confirmed: [ADM-xx / Logic-xx — Implementation / Evidence / Acceptance status; DoR met: yes / blocked]
 Applicable visual/logic master: [exact path + CONFIRMED/DRAFT/FD-001 status]
+Target route: [exact Nuxt route confirmed in Register]
+Shared shell: [Product Catalogue Shell or Product Workspace Shell — existing component or prerequisite work needed]
 Pre-requisite dependencies met: [yes / blocked — specify which prior module is incomplete]
 Applicable Charter DG-xx (if any): [DG-# + current status]
 Applicable Blueprint BP-DG-xx (if any): [BP-DG-# + current status]
-Data/API boundary: [relevant Blueprint Section 7 contract]
+Data/API boundary: [relevant Blueprint Section 7 contract; preserve-first items listed]
+English-first scope: [visible UI strings affected by this module]
 Acceptance criteria: [including empty / error / no-permission / 1440px + 375px breakpoints]
 Explicitly out of scope: [files and domains not touched this module]
 ```
+
+Claude must not start code changes for any Admin/CMS module unless the Register row for that module confirms Definition of Ready (DoR). If the relevant Register row is missing or shows `IN_DISCOVERY` / `NOT_REVIEWED`, stop and report before writing code.

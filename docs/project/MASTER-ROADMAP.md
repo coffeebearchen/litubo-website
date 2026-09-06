@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：J-2.2.1b 证据收口完成（Git 图谱核实、BFF 输入校验工具层、内联复制缺口关闭）。本地 commit 已创建，checkpoint backup/admin-cms-j2 已同步至 HEAD。J-2 集成链（7 个 commit）已备份至 GitHub。origin/master 未更新，浏览器视觉验收尚待进行。下一步：Codex 发集中浏览器验收施工单（/admin/products + /admin/products/categories/[id]，1440px + 375px）；验收通过 + 用户授权后 push origin/master；再启动 J-3 Product Workspace Shell。**
+**当前位置：V-0.5 视觉与数据对齐登记册注册 + 只读事实审计完成（2026-09-06）。Register 已安装，V-0 审计已完成，6 个治理文件已更新，本地 commit 已创建，checkpoint backup/admin-cms-j2 已同步。J-2 浏览器视觉验收状态：SUSPENDED（Codex 前序宣告）。origin/master 未更新。下一步：等待 Codex 下一份单一、完整模块施工单；每个模块须对应 Register 中完整条目且 DoR 通过后方可开始代码施工。**
 
 ---
 
@@ -398,4 +398,34 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 ---
 
-*最后更新：2026-09-06，Charter V1.1 框架补全（J-1.1）完成写入。*
+*最后更新：2026-09-06，V-0.5 视觉与数据对齐登记册注册 + 只读事实审计完成写入。*
+
+---
+
+#### M4-Next-V0.5：视觉与数据对齐登记册注册 + 只读 V-0 事实审计（2026-09-06）
+
+**状态：完成。Register 已安装，V-0 审计已完成，6 个治理文件已更新，本地 commit 已创建。**
+
+**Register 安装：**
+- `docs/project/ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md`（用户放置，由 Claude 完成 V-0 填写）
+- Section 4 母版路径 100% 确认（ADM-02～08：`inbox/admin-cms-ai-v1/reference-images/`；Logic-01/02：`CMS-AI-VISUAL-MASTER-V1/logic-references/`）
+- Section 8 V-0 状态逐模块填写完成
+- Section 12 证据台账完整（HEAD/origin SHA、进程证明、可见中文清单、路由/组件/API 映射表）
+
+**V-0 关键缺口发现：**
+- ADM-06：NOT_STARTED — 无 relations.vue，无 Relations BFF
+- ADM-07：LEGACY，但 SEO tab 未出现在 ProductSubNav（5 个标签，缺 SEO）
+- ADM-08：IN_DISCOVERY — BFF 存在，无 admin 页面
+- ADM-03/04/05/07：可见中文文案需英文化（英文优先原则）
+
+**J-2 验收状态：** SUSPENDED（Codex 前序宣告，本次不变）
+
+**6 个治理文件修改：**
+1. `CLAUDE.md`：Register 纳入阅读顺序（第 4 项）、权威关系表、开工报告模板
+2. `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md`：C.5a Register 交叉引用规则
+3. `docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md`：10.3a Register Gate
+4. `docs/project/ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md`：V-0 完整填写
+5. `docs/project/CURRENT-STATE.md`：V-0.5 节记录
+6. `docs/project/MASTER-ROADMAP.md`：本节记录
+
+**下一步：等待 Codex 下一份单一、完整模块施工单。**

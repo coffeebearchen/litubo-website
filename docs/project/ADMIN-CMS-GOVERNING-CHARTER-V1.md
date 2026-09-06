@@ -104,6 +104,17 @@ Codex/GPT 与 Claude 不得同时修改同一工作树。**Claude Code 是当前
 - 若发现 Blueprint 与仓库事实（代码、schema、运行服务、Directus 状态）冲突，**先报告事实冲突，不得猜测或静默施工**。
 - Claude 每次 Admin/CMS 开工报告须同时引用 Governing Charter V1.1 与 Implementation Blueprint V1，缺一不得开始代码修改。
 
+### C.5a Visual & Data Conformance Register 交叉引用规则
+
+`docs/project/ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md` 是受本 Charter 与 Blueprint 双重约束的执行登记册：
+
+- Register 在权限层级上位于 Blueprint 之下、CURRENT-STATE.md 之上。
+- Register 只记录事实映射与验收证据；它不能自行改变架构方向、施工顺序、模块权限或 Charter 定义的决策门控。
+- Charter 优先于 Blueprint，Blueprint 优先于 Register。若 Register 内容与 Charter 或 Blueprint 冲突，以 Charter / Blueprint 为准，并立即报告冲突。
+- 无对应 Register 条目（含目标路由、共享外壳、数据/API 合同、English-first 范围、DoR 状态）的模块，Claude 不得开始代码施工。
+- Register 中可保留的数据/API 必须优先保留；不得因视觉重构而静默破坏既有接口兼容性。
+- 当运行事实、仓库事实或用户新决定与 Register 内容冲突时，先报告事实冲突，不得猜测改代码。
+
 ### C.5 Decision Gate 命名空间规则
 
 - **Charter Decision Gates（`DG-xx`，无前缀）**：由本 Charter 在 Section M.2 中定义，具有治理级效力；DG-01～DG-16 保持原有编号和业务含义，不得重编。
