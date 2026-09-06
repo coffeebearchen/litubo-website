@@ -89,12 +89,13 @@ The approved visual reference images are stored outside this repository during p
    Scope is aligned / conflict found: [对齐 / 冲突说明]
    Files explicitly excluded: [禁止暂存的文件]
    ```
-3. 若对应视觉母版状态不是 `CONFIRMED`，**停止施工并报告**，不得自行设计或参照 DRAFT 图开始正式代码；
-4. 若发现代码、文档、视觉母版或施工单之间存在矛盾，**停止施工并报告冲突**；
-5. 不得把文案翻译误报为视觉母版落地；
-6. 不得把全局 Media Library（`/admin/media`）当作产品专属 Media & Resources（ADM-04）；
-7. 不得把尚未实现的 AI / Import 功能描述为已完成；
-8. 没有用户明确宣布"框架变更 / 替换框架 / 修订 Governing Charter"，不得改变架构方向。
+3. Claude 必须检查 Charter 是否存在 FD-001；若存在，ADM-02～08 与 Logic Master 01/02 可作为 `USER-CONFIRMED FOR IMPLEMENTATION` 施工依据，**不得要求用户再次确认同一批母版**；不得把此确认扩展成 AI、导入、真实数据或发布授权；
+4. 若对应视觉母版既非 `CONFIRMED` 状态，也无 Charter 框架决定（如 FD-001）覆盖，**停止施工并报告**，不得自行设计或参照 DRAFT 图开始正式代码；
+5. 若发现代码、文档、视觉母版或施工单之间存在矛盾，**停止施工并报告冲突**；
+6. 不得把文案翻译误报为视觉母版落地；
+7. 不得把全局 Media Library（`/admin/media`）当作产品专属 Media & Resources（ADM-04）；
+8. 不得把尚未实现的 AI / Import 功能描述为已完成；
+9. 没有用户明确宣布"框架变更 / 替换框架 / 修订 Governing Charter"，不得改变架构方向。
 
 ---
 

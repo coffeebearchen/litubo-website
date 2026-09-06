@@ -1160,9 +1160,9 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-## Governing Charter V1 建立（2026-09-06）
+## Governing Charter V1 + FD-001 确认（2026-09-06）
 
-**当前进入"母版对齐与结构施工"阶段。**
+**当前进入"母版对齐与结构施工"阶段。Framework Decision FD-001 已生效。**
 
 | 项目 | 状态 |
 |------|------|
@@ -1170,20 +1170,25 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 | Admin English UI — Phase A（products 界面英文化） | ✅ commit `008d708`，已 push |
 | Admin English UI — Phase B（media 界面英文化） | ✅ commit `4a88954`，已 push |
 | M5-A 审计（只读，零代码变更） | ✅ 已完成，报告已输出 |
-| Governing Charter V1 建立 | ✅ 当前任务（commit 待生成） |
+| Governing Charter V1 建立 | ✅ commit `b1cb789`，已 push |
+| **FD-001 — 视觉与逻辑母版施工授权确认** | **✅ 已生效（2026-09-06，用户明确确认）** |
+
+**FD-001 核心记录：**
+
+原始资料包中的 DRAFT 状态描述的是资料包自身的原始登记状态，保留不变、不得修改。用户已在 2026-09-06 明确确认下列母版为当前施工方向，Charter 内记录为 USER-CONFIRMED FOR IMPLEMENTATION：ADM-02 / ADM-02a（Product Center）、ADM-03～08（Product Workspace）、逻辑参考图 01 / 02（Dossier 与 Import 逻辑）。此确认不授权 AI、导入、真实数据或发布。
 
 **下一步施工顺序（严格按序，每步须用户独立授权）：**
 
-1. **视觉母版确认**：等待用户/Codex 将 ADM-02、ADM-02a、ADM-03～08 参考图确认为 CONFIRMED 状态并更新 README_VISUAL_INDEX.md
-2. **Product Center 重构（J-2）**：ADM-02 + ADM-02a CONFIRMED 后才可开始代码施工
-3. **Product Workspace Shell（J-3）**：ADM-03～08 CONFIRMED 后才可开始
-4. **真实 LT-180C Draft 录入（M5-B）**：满足 M5-A 报告中所有准入条件后，须用户单独授权
+1. **Product Center 重构（J-2）**：ADM-02 + ADM-02a 已由 FD-001 确认，等待 Codex 发完整施工单后可开始代码施工
+2. **Product Workspace Shell（J-3 ～ J-4）**：在 J-2 完成后，ADM-03～08 已由 FD-001 确认，可按序施工
+3. **真实 LT-180C Draft 录入（M5-B）**：满足 M5-A 报告中所有准入条件后，须用户单独授权
 
 **明确禁止（无框架变更声明的情况下）：**
+- 在 Product Center（J-2）完成前，不启动 Product Workspace、AI Dossier 或 Import Queue；
+- FD-001 不授权 AI、导入、真实数据写入或发布；
 - 零散 UI 文案任务不得绕过 Governing Charter 继续推进；
-- 不得以 DRAFT 状态的视觉母版作为正式代码施工依据；
 - 不得跳过 J-2 直接施工 J-3 及后续步骤。
 
 ---
 
-*最后更新：2026-09-06，由 Claude Code 在"建立后台 CMS 治理总纲 V1"任务中写入。*
+*最后更新：2026-09-06，由 Claude Code 在"FD-001 视觉母版确认"任务中写入。*

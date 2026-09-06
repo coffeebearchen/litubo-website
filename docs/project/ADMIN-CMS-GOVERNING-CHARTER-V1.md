@@ -116,6 +116,60 @@ Codex/GPT 与 Claude 不得同时修改同一工作树。**Claude Code 是当前
 | 逻辑参考图 02 | `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/logic-references/02_multi_model_import_ai_review_queue.png` | 多品号导入与逐项审核队列逻辑 | **DRAFT（流程参考）** | 同上 |
 | CURRENT-STATE evidence | `docs/project/CURRENT-STATE.md` | 已实施事实的唯一记录 | 持续更新 | 每次施工前必读 |
 
+### D.2 生效的框架决定（Framework Decisions）
+
+框架决定是由用户明确确认、写入本 Charter 的正式授权记录。框架决定中的 `USER-CONFIRMED FOR IMPLEMENTATION` 与视觉母版原始登记的 `CONFIRMED` 状态具有同等施工效力。
+
+#### FD-001 — User Confirmation of Admin Visual & Logic Masters（视觉与逻辑母版施工授权确认）
+
+| 项目 | 内容 |
+|------|------|
+| **决定编号** | FD-001 |
+| **决定名称** | User Confirmation of Admin Visual & Logic Masters |
+| **日期** | 2026-09-06 |
+| **状态** | **Effective / 生效** |
+| **授权者** | 用户 |
+
+**被确认的母版（范围）：**
+
+- `ADM-02`：Product Center — 全部产品列表
+- `ADM-02a`：Product Center — 分类视图
+- `ADM-03 ～ ADM-08`：Product Workspace 各子标签（规格 / 媒体 / 内容 / 关联 / SEO / 来源历史）
+- 逻辑参考图 01：`logic-references/01_single_product_dossier_workbench.png`
+- 逻辑参考图 02：`logic-references/02_multi_model_import_ai_review_queue.png`
+
+**重要区分（必须准确记录，不得修改原始资料包状态）：**
+
+```text
+原始资料包中保留的 DRAFT 状态，描述的是资料包自身的原始登记状态。
+不得被修改、覆盖或伪造为其他状态。
+
+用户已在 2026-09-06 明确确认，上述资料是当前 LITUBO Admin/CMS 的施工方向。
+因此，本 Charter 内上述母版的 Implementation Authority 状态为：
+USER-CONFIRMED FOR IMPLEMENTATION。
+
+该确认不代表 AI、导入、真实资料写入或发布已经获授权；
+它仅授权后续按已锁定顺序（Charter J 节）进行架构和界面施工。
+```
+
+**施工门槛（FD-001 生效后）：**
+
+```text
+可施工的母版必须满足以下任一条件：
+- 原始状态为 CONFIRMED；或
+- 在 Governing Charter 中有明确的 USER-CONFIRMED FOR IMPLEMENTATION 框架决定（如 FD-001）。
+
+其他 DRAFT、历史、未确认或冲突资料仍不可驱动代码施工。
+```
+
+**明确边界：**
+
+- `ADM-02 / ADM-02a` 是**下一阶段 Product Center 的视觉施工依据**（J-2）；
+- `ADM-03 ～ ADM-08` 是**后续 Product Workspace 的视觉施工依据**（J-4，在 J-2 完成后）；
+- 逻辑参考图 `01 / 02` 是后续 AI 工作流的逻辑依据；**不代表 AI 功能现在开始开发**；
+- 全局 Media Library（ADM-12）**不得等同于**产品专属 ADM-04；
+- 施工顺序仍严格按照 Charter J 节执行，不因本确认而跳步。
+
 ---
 
 ## E. 目标系统架构与前后端联动
@@ -415,7 +469,7 @@ AI 不可自动发布、删除或移动正式媒体；
 ```text
 J-0  母版对齐审计（只读，已由本 Charter 建立基线）
 J-1  本 Governing Charter 生效（当前步骤）
-J-2  Product Center 视觉确认（ADM-02 + ADM-02a → CONFIRMED）+ 施工
+J-2  Product Center 施工（ADM-02 + ADM-02a，视觉已由 FD-001 确认）
 J-3  Product Workspace Shell + Product Control 框架
 J-4  ADM-03～08 按依赖分模块实施（须各自 CONFIRMED）
 J-5  全局 Media Library 视觉对齐（ADM-12 → CONFIRMED 后）
@@ -440,7 +494,7 @@ J-10 上线前完整安全、视觉、数据验收
 3. docs/project/CURRENT-STATE.md
 4. docs/project/MASTER-ROADMAP.md
 5. 本任务相关 CMS-AI-CONSTRUCTION-PACK-V1 章节
-6. 本页面对应的 CONFIRMED 视觉母版（无 CONFIRMED 图则停止）
+6. 本页面对应的 CONFIRMED 视觉母版，或在 Charter 中有 USER-CONFIRMED FOR IMPLEMENTATION 框架决定（如 FD-001）的母版；两者均无则停止施工
 7. 当前相关代码与测试
 ```
 
@@ -507,14 +561,15 @@ push 前 git rev-list --left-right --count origin/master...HEAD 确认本地不�
 | 版本 | 日期 | 变更内容 | 授权者 |
 |------|------|---------|--------|
 | V1 | 2026-09-06 | 初始建立 | 用户 |
+| V1.1 (FD-001) | 2026-09-06 | 新增 Framework Decision FD-001 — 视觉与逻辑母版施工授权确认（User Confirmation of Admin Visual & Logic Masters） | 用户 |
 
 ### M.2 Open Decision Gates（用户待确认事项）
 
 | # | 事项 | 当前状态 | 影响 |
 |---|------|---------|------|
-| DG-01 | ADM-02 视觉母版 CONFIRMED 确认 | DRAFT，待用户确认 | Product Center 重构施工前置条件 |
-| DG-02 | ADM-02a 视觉母版 CONFIRMED 确认 | DRAFT，待用户确认 | 分类视图施工前置条件 |
-| DG-03 | ADM-03～08 视觉母版逐一 CONFIRMED 确认 | DRAFT，待用户确认 | Product Workspace Shell 施工前置条件 |
+| DG-01 | ADM-02 视觉母版施工确认 | **FD-001 已生效（USER-CONFIRMED FOR IMPLEMENTATION，2026-09-06）** | Product Center 重构（J-2）可开始施工 |
+| DG-02 | ADM-02a 视觉母版施工确认 | **FD-001 已生效（USER-CONFIRMED FOR IMPLEMENTATION，2026-09-06）** | 分类视图（J-2）可开始施工 |
+| DG-03 | ADM-03～08 视觉母版施工确认 | **FD-001 已生效（USER-CONFIRMED FOR IMPLEMENTATION，2026-09-06）** | Product Workspace Shell（J-4）在 J-2 完成后可开始施工 |
 | DG-04 | Metal Detection 产品分类是否已在 Directus 建立 | 未确认 | 真实 LT-180C Draft 录入前置条件 |
 | DG-05 | LT-180C 真实图片/文档资料上传 | 未上传 | M5-B 准入条件之一 |
 | DG-06 | `product_code = LT-180C` 业务确认 | 待确认 | product_code 设置后不可修改 |
