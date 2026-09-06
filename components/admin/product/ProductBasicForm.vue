@@ -21,7 +21,7 @@ function update(field: keyof AdminProduct, value: unknown) {
 <template>
   <div class="basic-form">
     <div class="form-row">
-      <label class="form-label required">产品名称 (EN)</label>
+      <label class="form-label required">Product Name (EN)</label>
       <input
         class="form-input"
         type="text"
@@ -32,12 +32,12 @@ function update(field: keyof AdminProduct, value: unknown) {
     </div>
 
     <div class="form-row">
-      <label class="form-label">产品名称 (ES)</label>
+      <label class="form-label">Product Name (ES)</label>
       <input class="form-input" type="text" :value="modelValue.name_es ?? ''" @input="update('name_es', ($event.target as HTMLInputElement).value)">
     </div>
 
     <div class="form-row">
-      <label class="form-label">产品名称 (PT)</label>
+      <label class="form-label">Product Name (PT)</label>
       <input class="form-input" type="text" :value="modelValue.name_pt ?? ''" @input="update('name_pt', ($event.target as HTMLInputElement).value)">
     </div>
 
@@ -51,11 +51,11 @@ function update(field: keyof AdminProduct, value: unknown) {
         pattern="[a-z0-9-]+"
         @input="update('slug', ($event.target as HTMLInputElement).value)"
       >
-      <p class="form-hint">小写字母、数字和连字符</p>
+      <p class="form-hint">Lowercase letters, numbers, and hyphens</p>
     </div>
 
     <div class="form-row">
-      <label class="form-label">产品代码 (Product Code)</label>
+      <label class="form-label">Product Code</label>
       <input
         class="form-input form-input--mono"
         type="text"
@@ -65,13 +65,13 @@ function update(field: keyof AdminProduct, value: unknown) {
         @input="update('product_code', ($event.target as HTMLInputElement).value.trim().toUpperCase())"
       >
       <p v-if="modelValue.product_code" class="form-hint form-hint--locked">
-        已锁定：{{ modelValue.product_code }}（不可更改）
+        Locked: {{ modelValue.product_code }} — cannot be changed
       </p>
-      <p v-else class="form-hint">大写字母、数字、连字符。提交 Review 前必须填写。设定后不可修改。</p>
+      <p v-else class="form-hint">Uppercase letters, digits, and hyphens. Required before submitting for Review. Cannot be changed once set.</p>
     </div>
 
     <div class="form-row">
-      <label class="form-label">型号 / 系列</label>
+      <label class="form-label">Model / Series</label>
       <input
         class="form-input"
         type="text"
@@ -82,34 +82,34 @@ function update(field: keyof AdminProduct, value: unknown) {
     </div>
 
     <div class="form-row">
-      <label class="form-label required">产品分类</label>
+      <label class="form-label required">Category</label>
       <select class="form-select" :value="modelValue.category_id ?? ''" @change="update('category_id', Number(($event.target as HTMLSelectElement).value) || null)">
-        <option value="">— 选择分类 —</option>
+        <option value="">— Select category —</option>
         <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name_en }}</option>
       </select>
     </div>
 
     <div class="form-row">
-      <label class="form-label">页面预设</label>
+      <label class="form-label">Page Preset</label>
       <select class="form-select" :value="modelValue.page_preset_id ?? ''" @change="update('page_preset_id', Number(($event.target as HTMLSelectElement).value) || null)">
-        <option value="">— 无预设 —</option>
+        <option value="">— No preset —</option>
         <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name_en }}</option>
       </select>
     </div>
 
     <div class="form-row">
-      <label class="form-label">摘要 (EN)</label>
+      <label class="form-label">Summary (EN)</label>
       <textarea class="form-textarea" :value="modelValue.summary_en ?? ''" rows="3" @input="update('summary_en', ($event.target as HTMLTextAreaElement).value)" />
     </div>
 
     <div class="form-row">
-      <label class="form-label">审核备注（内部）</label>
-      <textarea class="form-textarea" :value="modelValue.review_notes ?? ''" rows="2" placeholder="内部审核意见，不显示于前台" @input="update('review_notes', ($event.target as HTMLTextAreaElement).value)" />
+      <label class="form-label">Review Notes (internal)</label>
+      <textarea class="form-textarea" :value="modelValue.review_notes ?? ''" rows="2" placeholder="Internal notes, not shown on the website" @input="update('review_notes', ($event.target as HTMLTextAreaElement).value)" />
     </div>
 
     <div class="form-actions">
       <button class="btn btn--primary" :disabled="loading" @click="emit('save')">
-        {{ loading ? '保存中…' : '保存' }}
+        {{ loading ? 'Saving…' : 'Save' }}
       </button>
     </div>
   </div>

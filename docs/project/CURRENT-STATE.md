@@ -189,8 +189,29 @@
 - admin_at TTL（15m）、docker-compose.yml、.env、.env.example：未修改
 - TEST ONLY ID=3 产品：未触碰
 - 真实媒体文件：未移动/上传/删除
-- P1 ProductBasicForm.vue 英文化改动：未暂存、未提交、完整保留
+- P1 ProductBasicForm.vue 英文化改动：已暂存并 commit（见下节）
 - 无 AI、无 push、无部署、无凭证输出
+
+---
+
+### P1 ProductBasicForm English Copy Closure（2026-09-06，commit 完成）
+
+**源码核对：** `components/admin/product/ProductBasicForm.vue` 所有用户可见静态文案已完成英文化，无遗漏、无中英文混用。
+
+| 文案类别 | 改动内容 |
+|----------|---------|
+| 字段标签 | Product Name (EN/ES/PT)、URL Slug、Product Code、Model / Series、Category、Page Preset、Summary (EN)、Review Notes (internal) |
+| 下拉占位 | — Select category —、— No preset — |
+| 提示文字 | Lowercase letters…、Uppercase letters…、Locked: {code} — cannot be changed、Cannot be changed once set |
+| Placeholder | Internal notes, not shown on the website |
+| 按钮 | Save / Saving… |
+
+**自动化验证：** Vitest 127/127 ✅ · vue-tsc 0 errors ✅ · lint 0 errors ✅ · nuxt build ✅ · git diff --check 仅 CRLF 警告 ✅
+
+**1440px / 375px 浏览器视觉验收：未完成**
+Claude in Chrome 扩展在 Edge 中创建的标签组无法访问用户常规浏览会话的 Cookie，导致工具层面服务端 302 重定向与页面读取超时。这不是代码功能失败；该视觉验收转入下一次集中 Admin visual smoke test，不重复要求用户登录。
+
+**未改动：** API、schema、Directus 权限、产品数据、媒体文件、来源记录、字段逻辑、v-model、校验规则、提交行为、CSS 布局
 
 ---
 
