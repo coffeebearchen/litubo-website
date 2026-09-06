@@ -75,6 +75,7 @@ export interface CategorySummary {
   id: number
   slug: string
   name_en: string
+  intro_en: string | null
   total: number
   by_status: {
     draft: number

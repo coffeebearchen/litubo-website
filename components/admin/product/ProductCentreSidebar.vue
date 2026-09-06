@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CategorySummary, ProductsSummary } from '~/types/product-cms'
+import { categoryContextRoute } from '~/utils/productCentre'
 
 const props = defineProps<{
   summary: ProductsSummary
@@ -11,93 +12,131 @@ const emit = defineEmits<{ 'update:activeStatus': [string] }>()
 
 const route = useRoute()
 
+/** On /admin/products the views drive local filter state; elsewhere they navigate to it. */
+const onAllProductsRoute = computed(() => route.path === '/admin/products')
+
 const SYSTEM_VIEWS = [
-  { label: 'All Products',   value: '',           countKey: 'all'          as const },
+  { label: 'All Products', value: '', countKey: 'all' as const },
   { label: 'Draft & Review', value: 'draft,review', countKey: 'draft_review' as const },
-  { label: 'Published',      value: 'published',  countKey: 'published'    as const },
-  { label: 'Archived',       value: 'archived',   countKey: 'archived'     as const },
+  { label: 'Published', value: 'published', countKey: 'published' as const },
+  { label: 'Archived', value: 'archived', countKey: 'archived' as const },
 ]
 
-function isViewActive(val: string) {
-  return props.activeStatus === val && route.path === '/admin/products'
+function isViewActive(value: string) {
+  return onAllProductsRoute.value && props.activeStatus === value
 }
+
+function viewLink(value: string) {
+  return value ? { path: '/admin/products', query: { status: value } } : { path: '/admin/products' }
+}
+
+/** Collapsed by default on narrow viewports; always expanded from 1024px up. */
+const railOpen = ref(false)
 </script>
 
 <template>
-  <aside class="pc-sidebar" aria-label="Product catalogue navigation">
-    <div class="sidebar-section">
-      <p class="sidebar-heading">SYSTEM VIEWS</p>
-      <ul class="sidebar-list" role="list">
-        <li v-for="view in SYSTEM_VIEWS" :key="view.value">
-          <button
-            class="sidebar-item"
-            :class="{ 'sidebar-item--active': isViewActive(view.value) }"
-            @click="emit('update:activeStatus', view.value)"
-          >
-            <span class="sidebar-item-label">{{ view.label }}</span>
-            <span class="sidebar-item-count">{{ summary[view.countKey] }}</span>
-          </button>
-        </li>
-        <li>
-          <span
-            class="sidebar-item sidebar-item--disabled"
-            aria-disabled="true"
-            :title="`Category Health formula not confirmed — Charter DG-10`"
-          >
-            <span class="sidebar-item-label">Needs Attention</span>
-            <span class="sidebar-item-count sidebar-item-count--gate">—</span>
-          </span>
-          <span class="gate-note">Not assessed (DG-10)</span>
-        </li>
-      </ul>
+  <aside class="pc-rail" :class="{ 'pc-rail--open': railOpen }" aria-label="Product catalogue navigation">
+    <div class="rail-titlebar">
+      <span class="rail-title">Product Catalogue</span>
+      <button
+        type="button"
+        class="rail-toggle"
+        :aria-expanded="railOpen"
+        aria-controls="product-catalogue-rail"
+        @click="railOpen = !railOpen"
+      >
+        {{ railOpen ? 'Hide' : 'Browse' }}
+      </button>
     </div>
 
-    <div class="sidebar-section sidebar-section--taxonomy">
-      <p class="sidebar-heading">PRODUCT TAXONOMY</p>
-      <ul class="sidebar-list" role="list">
-        <li v-for="cat in categories" :key="cat.id">
-          <NuxtLink
-            :to="`/admin/products/categories/${cat.id}`"
-            class="sidebar-item sidebar-item--link"
-            :class="{ 'sidebar-item--active': route.path === `/admin/products/categories/${cat.id}` }"
-          >
-            <span class="sidebar-item-label">{{ cat.name_en }}</span>
-            <span class="sidebar-item-count">{{ cat.total }}</span>
-          </NuxtLink>
-        </li>
-        <li v-if="categories.length === 0" class="sidebar-empty">
-          No categories configured
-        </li>
-      </ul>
-    </div>
+    <div id="product-catalogue-rail" class="rail-content">
+      <div class="rail-section">
+        <p class="rail-heading">System views</p>
+        <ul class="rail-list" role="list">
+          <li v-for="view in SYSTEM_VIEWS" :key="view.value || 'all'">
+            <button
+              v-if="onAllProductsRoute"
+              type="button"
+              class="rail-item"
+              :class="{ 'rail-item--active': isViewActive(view.value) }"
+              :aria-pressed="isViewActive(view.value)"
+              @click="emit('update:activeStatus', view.value)"
+            >
+              <span class="rail-item-label">{{ view.label }}</span>
+              <span class="rail-item-count">{{ summary[view.countKey] }}</span>
+            </button>
+            <NuxtLink v-else :to="viewLink(view.value)" class="rail-item">
+              <span class="rail-item-label">{{ view.label }}</span>
+              <span class="rail-item-count">{{ summary[view.countKey] }}</span>
+            </NuxtLink>
+          </li>
+        </ul>
+      </div>
 
-    <div class="sidebar-footer-note-block">
-      <p class="sidebar-footer-note">Product taxonomy controls the public Products menu.</p>
-      <p class="sidebar-footer-note">Media Library stores reusable files, not product records.</p>
+      <div class="rail-section rail-section--taxonomy">
+        <p class="rail-heading">Product taxonomy</p>
+        <ul class="rail-list" role="list">
+          <li v-for="cat in categories" :key="cat.id">
+            <NuxtLink
+              :to="categoryContextRoute(cat.id)"
+              class="rail-item"
+              :class="{ 'rail-item--active': route.path === categoryContextRoute(cat.id) }"
+            >
+              <span class="rail-item-label">{{ cat.name_en }}</span>
+              <span class="rail-item-count">{{ cat.total }}</span>
+            </NuxtLink>
+          </li>
+          <li v-if="categories.length === 0" class="rail-empty">No categories configured</li>
+        </ul>
+      </div>
+
+      <div class="rail-footer">
+        <p class="rail-note">Product taxonomy controls the public Products menu.</p>
+        <p class="rail-note">Media Library stores reusable files, not product records.</p>
+      </div>
     </div>
   </aside>
 </template>
 
 <style scoped>
-.pc-sidebar {
-  width: 204px;
+.pc-rail {
+  width: 216px;
   flex-shrink: 0;
   border-right: 1px solid var(--color-line);
   background: var(--color-surface-alt);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
 }
 
-.sidebar-section {
-  padding: var(--space-4) var(--space-3) var(--space-2);
+.rail-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
 }
 
-.sidebar-section--taxonomy {
+.rail-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+/* Disclosure control exists only on narrow viewports. */
+.rail-toggle { display: none; }
+
+.rail-content {
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-height: 0;
 }
 
-.sidebar-heading {
+.rail-section { padding: var(--space-3) var(--space-2) var(--space-2); }
+.rail-section--taxonomy { flex: 1; }
+
+.rail-heading {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -107,7 +146,7 @@ function isViewActive(val: string) {
   margin: 0;
 }
 
-.sidebar-list {
+.rail-list {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -116,132 +155,123 @@ function isViewActive(val: string) {
   gap: 1px;
 }
 
-.sidebar-item {
+.rail-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
   width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  color: var(--color-ink);
-  background: none;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3) !important;
   border: none;
-  cursor: pointer;
-  text-decoration: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: var(--text-sm) !important;
+  color: var(--color-ink);
   text-align: left;
-  transition: background 0.1s, color 0.1s;
-  min-height: 36px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.sidebar-item:hover:not(.sidebar-item--disabled) {
-  background: rgba(0, 0, 0, 0.05);
-}
+.rail-item:hover { background: rgba(18, 60, 50, 0.07); }
 
-.sidebar-item--active {
-  background: rgba(15, 92, 75, 0.1);
+.rail-item--active {
+  background: rgba(15, 92, 75, 0.12);
   color: var(--color-primary);
   font-weight: 600;
 }
 
-.sidebar-item--disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
-.sidebar-item--link {
-  display: flex;
-}
-
-.sidebar-item-label {
+.rail-item-label {
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-right: var(--space-2);
 }
 
-.sidebar-item-count {
-  font-size: 0.6875rem;
+.rail-item-count {
+  font-size: var(--text-xs);
   color: var(--color-ink-muted);
   background: rgba(0, 0, 0, 0.06);
   border-radius: 999px;
-  padding: 1px 7px;
-  white-space: nowrap;
+  padding: 1px 8px;
   flex-shrink: 0;
 }
 
-.sidebar-item--active .sidebar-item-count {
-  background: rgba(15, 92, 75, 0.15);
+.rail-item--active .rail-item-count {
+  background: rgba(15, 92, 75, 0.16);
   color: var(--color-primary);
 }
 
-.sidebar-item-count--gate { opacity: 0.5; }
-
-.gate-note {
-  font-size: 0.6rem;
-  color: var(--color-ink-muted);
-  padding: 0 var(--space-3) var(--space-1);
-  display: block;
-  font-style: italic;
-}
-
-.sidebar-empty {
+.rail-empty {
   font-size: var(--text-xs);
+  font-style: italic;
   color: var(--color-ink-muted);
   padding: var(--space-2) var(--space-3);
-  font-style: italic;
 }
 
-.sidebar-footer-note-block {
+.rail-footer {
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-line);
   margin-top: auto;
 }
 
-.sidebar-footer-note {
-  font-size: 0.625rem;
+.rail-note {
+  font-size: 0.6875rem;
   color: var(--color-ink-muted);
-  margin: 0 0 var(--space-2);
   line-height: 1.5;
+  margin: 0 0 var(--space-2);
 }
 
-.sidebar-footer-note:last-child { margin-bottom: 0; }
+.rail-note:last-child { margin-bottom: 0; }
 
-@media (max-width: 767px) {
-  .pc-sidebar {
+/* Rail column narrows before it ever stacks, matching the Media Library rail. */
+@media (max-width: 1279px) {
+  .pc-rail { width: 190px; }
+}
+
+/* ── 768–1023px: full-width band, System views and taxonomy stay visible ── */
+@media (max-width: 1023px) {
+  .pc-rail {
     width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--color-line);
-    flex-direction: row;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
   }
 
-  .sidebar-section {
+  .rail-content {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    padding: 0 var(--space-2) var(--space-2);
+  }
+
+  .rail-section { flex: 1 1 240px; padding-top: var(--space-2); }
+  .rail-footer { display: none; }
+}
+
+/* ── ≤767px: collapsible accordion so the catalogue never squeezes the list ── */
+@media (max-width: 767px) {
+  .rail-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: var(--space-1) var(--space-3) !important;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs) !important;
+    color: var(--color-primary);
+    cursor: pointer;
     flex-shrink: 0;
-    padding: var(--space-3);
   }
 
-  .sidebar-section--taxonomy {
-    flex: 0 0 auto;
+  .rail-content {
+    display: none;
+    flex-direction: column;
+    gap: 0;
   }
 
-  .sidebar-list {
-    flex-direction: row;
-    gap: var(--space-1);
-    flex-wrap: nowrap;
-  }
-
-  .sidebar-item {
-    white-space: nowrap;
-    min-height: 32px;
-    padding: var(--space-1) var(--space-2);
-    font-size: var(--text-xs);
-  }
-
-  .gate-note { display: none; }
-  .sidebar-footer-note-block { display: none; }
+  .pc-rail--open .rail-content { display: flex; }
 }
 </style>

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 
 // ── Replication of the categories-summary join logic for unit testing ─────────
 
-interface RawCategory { id: number; slug: string; name_en: string }
+interface RawCategory { id: number; slug: string; name_en: string; intro_en: string | null }
 interface AggRow { category_id: number | null; status: string; count: { id: string } }
 
 function buildCategorySummary(categories: RawCategory[], aggRows: AggRow[]) {
@@ -18,14 +18,21 @@ function buildCategorySummary(categories: RawCategory[], aggRows: AggRow[]) {
         total += n
       }
     }
-    return { id: cat.id, slug: cat.slug, name_en: cat.name_en, total, by_status: byStatus }
+    return {
+      id: cat.id,
+      slug: cat.slug,
+      name_en: cat.name_en,
+      intro_en: cat.intro_en ?? null,
+      total,
+      by_status: byStatus,
+    }
   })
 }
 
 const CATS: RawCategory[] = [
-  { id: 1, slug: 'x-ray', name_en: 'X-Ray Inspection' },
-  { id: 2, slug: 'metal-detection', name_en: 'Metal Detection' },
-  { id: 3, slug: 'checkweighing', name_en: 'Checkweighing' },
+  { id: 1, slug: 'x-ray', name_en: 'X-Ray Inspection', intro_en: 'X-ray inspection systems.' },
+  { id: 2, slug: 'metal-detection', name_en: 'Metal Detection', intro_en: null },
+  { id: 3, slug: 'checkweighing', name_en: 'Checkweighing', intro_en: null },
 ]
 
 describe('categories-summary join', () => {
@@ -78,6 +85,12 @@ describe('categories-summary join', () => {
   it('preserves category order from input list', () => {
     const result = buildCategorySummary(CATS, [])
     expect(result.map(r => r.id)).toEqual([1, 2, 3])
+  })
+
+  it('passes through intro_en and normalises a missing intro to null', () => {
+    const result = buildCategorySummary(CATS, [])
+    expect(result.find(r => r.id === 1)!.intro_en).toBe('X-ray inspection systems.')
+    expect(result.find(r => r.id === 2)!.intro_en).toBeNull()
   })
 
   it('ignores unknown status values gracefully', () => {

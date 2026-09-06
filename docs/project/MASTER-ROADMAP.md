@@ -2,11 +2,11 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：V-0.5.2B FD-003、Checkpoint 统一与 J-2 Recovery DoR 精度收口完成（2026-09-06）。FD-002 视觉母版权威裁定（V-0.5.2）已确认在先，V-0.5.1 的五项冲突 CF-1～CF-5 全部裁定关闭。Master Authority Matrix 已建立（12 项资源，逐项标注权威等级与可影响维度）。工程模块 ID 命名空间已固定（PC-01 / PC-02 / PW-00～PW-06 / AI-01 / IMP-01，共 11 个），裸 ADM-xx 不得再指挥代码。English-first 台账已重建为逐条登记：硬编码用户可见中文 246 处，分布在 11 个文件（UI 207 + PLACEHOLDER 11 + OPTION 28），匹配源码行合计 278。11 个工程模块的完整事实表（每模块 18 字段）已建立（此前误写"十个"，本次更正）。FD-003 — Context-Efficient Execution（高效分层阅读规则）已登记生效，唯一 checkpoint 分支核实为 origin/backup/admin-cms-j2。**
+**当前位置：V-0.6 J-2 Recovery 结构性缺陷收口完成（2026-09-07）。组件别名错配（17 处 `Admin*` 标签）、分类路由父子嵌套缺陷（`categories.vue`→`categories/index.vue`）、3 条过期测试断言，三项均已修复并通过自动化验证（Vitest 280/280、typecheck 0、lint 0、build 成功）与登录态浏览器验收（1440px/375px 均无水平溢出，`/admin/products`、`/admin/products/categories`、`/admin/products/categories/:id` 三条路由均已用生成后的路由表与真实渲染核实）。**
 
-**J-2 移动端 375px 验收：仍为 FAILED。J-2 整体视觉验收：仍为 SUSPENDED。origin/master 提升：仍 BLOCKED。运行来源：RUNTIME_NOT_PROVEN。FD-002 未改变任何验收状态，只是让 FAILED 第一次有了明确修复目标——VM1-ADM02-M375 规定的堆叠卡片列表。**
+**J-2 技术性结构缺陷（组件解析、375px 桌面表格残留、分类详情路由不挂载）已解决。J-2 整体视觉验收（对照 VM1-ADM02-D1440/M375 的像素级 Codex/用户签收）仍待进行，不因本次修复自动通过。origin/master 提升：仍 BLOCKED。**
 
-**下一步：`J-2 Recovery DoR` 已达成（精确表述：仅代表 PC-01/PC-02 可开始受限范围的修复，不代表 J-2 已完成、视觉已通过或可推送 origin/master），等待 Codex 的 J-2 Product Center Recovery 单一完整施工单。PW-00 Workspace Shell（J-3）、AI-01、IMP-01 及后续模块均未开始，且 PW-00 自身 DoR 未达成。**
+**下一步：等待 Codex 安排 J-2 的像素级视觉签收，或发出下一份完整施工单。PW-00 Workspace Shell（J-3）、AI-01、IMP-01 及后续模块均未开始，且 PW-00 自身 DoR 未达成。**
 
 ---
 
@@ -531,3 +531,29 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 **明确未触碰：** 任何业务代码、Vue、TypeScript、CSS、server API、tests、types、Directus schema、角色、权限、数据、媒体、来源记录、Docker、`.env`；`ed952d2` 未被回滚/amend/rebase/squash/重写；四项保护资料全程 `??`。
 
 **下一步：等待 Codex 的 J-2 Product Center Recovery 单一完整施工单。**
+
+---
+
+#### M4-Next-V0.6：J-2 Recovery 结构性缺陷收口 ✅（完成，本次，2026-09-07）
+
+**背景：** J-2 Recovery 施工单落地后，浏览器验收发现三条彼此独立的技术性缺陷，经过三轮只读诊断（`ADM-COMP-AUD-01`、`J2-CATEGORY-ROUTE-DIAG-01`）逐一定位根因后，本次一次性修复并收口。
+
+**完成内容：**
+
+1. **组件别名修复**：`pages/admin/products/index.vue`、`pages/admin/products/categories/index.vue`、`pages/admin/products/categories/[id].vue`、`components/admin/product/ProductCardList.vue`、`components/admin/product/ProductControlPanel.vue` 共 17 处 `Admin*` 前缀标签改为 Nuxt 实际注册的裸组件名；未改 `nuxt.config.ts`。
+2. **分类路由拓扑修复**：`pages/admin/products/categories.vue` 非暂存移动为 `pages/admin/products/categories/index.vue`，解除与 `categories/[id].vue` 的父子嵌套关系，两条路由改为独立平级路由；已用生成的 `virtual:nuxt:.nuxt/routes.mjs` 路由表核实修复前后差异；未新增 `<NuxtPage/>`，未改动 Product Center 布局。
+3. **测试断言修正**：`tests/productCentreView.test.ts` 3 条断言更新为正确组件名与新文件路径。
+4. **临时配置清理**：`.claude/launch.json` 中本次诊断期间新增的临时 `"LITUBO dev j2"`（3100 端口）配置块已移除，文件与 HEAD 逐字一致。
+
+**验证结果（2026-09-07）：**
+
+- `npx vitest run`：280/280 通过
+- `npx vue-tsc --noEmit`：0 errors
+- `npm run lint`：0 errors
+- `npx nuxt build`：Build complete
+- `git diff --check`：0 错误
+- 登录态浏览器验收：`/admin/products`、`/admin/products/categories`、`/admin/products/categories/1`（无关联产品）、`/admin/products/categories/2`（1 个关联产品）在 1440px 与 375px 下均无水平溢出，组件渲染真实数据，路由拓扑已用生成路由表核实
+
+**明确边界：** 不构成 Codex/用户对 `VM1-ADM02-D1440`/`VM1-ADM02-M375` 的像素级视觉签收；`origin/master` 提升仍 BLOCKED；未触碰 Product Workspace、AI-01、IMP-01；四项保护资料与 PW child blueprint 全程未触碰。
+
+**下一步：等待 Codex 安排 J-2 像素级视觉签收，或发出下一份完整施工单。**

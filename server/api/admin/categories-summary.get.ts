@@ -1,14 +1,15 @@
 import { adminFetch } from '~/server/utils/adminDirectusClient'
 import type { H3Event } from 'h3'
 
-interface RawCategory { id: number; slug: string; name_en: string }
+interface RawCategory { id: number; slug: string; name_en: string; intro_en: string | null }
 interface AggRow { category_id: number | null; status: string; count: { id: string } }
 
 export default defineEventHandler(async (event: H3Event) => {
   const [categoriesResult, aggResult] = await Promise.all([
+    // Output allow-list; intro_en backs the "About this category" block in Product Control.
     adminFetch<{ data: RawCategory[] }>(
       event,
-      '/items/product_categories?fields=id,slug,name_en&sort=name_en&limit=-1',
+      '/items/product_categories?fields=id,slug,name_en,intro_en&sort=name_en&limit=-1',
     ),
     adminFetch<{ data: AggRow[] }>(
       event,
@@ -31,6 +32,13 @@ export default defineEventHandler(async (event: H3Event) => {
         total += n
       }
     }
-    return { id: cat.id, slug: cat.slug, name_en: cat.name_en, total, by_status: byStatus }
+    return {
+      id: cat.id,
+      slug: cat.slug,
+      name_en: cat.name_en,
+      intro_en: cat.intro_en ?? null,
+      total,
+      by_status: byStatus,
+    }
   })
 })

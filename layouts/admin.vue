@@ -75,7 +75,7 @@ function closeMenu() {
   <div class="admin-shell">
     <!-- 移动端顶部导航栏 -->
     <div class="admin-topbar">
-      <button class="topbar-menu-btn" aria-label="打开菜单" @click="menuOpen = true">
+      <button class="topbar-menu-btn" aria-label="Open navigation menu" @click="menuOpen = true">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="3" y1="6" x2="21" y2="6" />
           <line x1="3" y1="12" x2="21" y2="12" />
@@ -93,7 +93,7 @@ function closeMenu() {
       <div class="sidebar-brand">
         <span class="brand-mark">L</span>
         <span class="brand-name">LITUBO Admin</span>
-        <button class="sidebar-close" aria-label="关闭菜单" @click="closeMenu">
+        <button class="sidebar-close" aria-label="Close navigation menu" @click="closeMenu">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
@@ -111,7 +111,7 @@ function closeMenu() {
           </svg>
           Product Center
         </NuxtLink>
-        <span class="nav-item nav-item--disabled" title="Phase 9A-2 后开放">
+        <span class="nav-item nav-item--disabled" title="Available after Phase 9A-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />

@@ -994,7 +994,22 @@ One complete table per engineering module. There are **11 engineering modules** 
 | `PC-01` Product Center | `VM1-ADM02-D1440` / `VM1-ADM02-M375` (PRIMARY) | 1440px structure; 375px card-list layout; English-first; related API and tests | 375px **FAILED**; integrated **SUSPENDED** | Recovery work may start; this is **not** acceptance passing. |
 | `PC-02` Category Context | `P2-ADM02A-CATEGORY` (SUPPLEMENTARY only — accompanies the `PC-01` PRIMARY assets via the shared shell) | Layout; category context; English copy; navigation; product list | `SUSPENDED` | Structural recovery is allowed; the Category Health **indicator** stays blocked until `CH-DG-10` is resolved — render `Not assessed — rule not configured`, never a fabricated value. |
 
-Existing code that still shows the bare historical marker `(DG-10)` (e.g. `pages/admin/products/categories.vue`) is not changed by this task and remains correct per Blueprint §6.2 (Charter `DG-10` = `CH-DG-10`, no gate renumbered). From this point forward, new documents and new work orders use `CH-DG-10` explicitly.
+Existing code that still shows the bare historical marker `(DG-10)` (e.g. `pages/admin/products/categories/index.vue`) is not changed by this task and remains correct per Blueprint §6.2 (Charter `DG-10` = `CH-DG-10`, no gate renumbered). From this point forward, new documents and new work orders use `CH-DG-10` explicitly.
+
+#### J-2 Recovery closure evidence (2026-09-07)
+
+Three defects blocked PC-01/PC-02 acceptance after the recovery work order landed; all three are now closed by read-only-verified fixes, each scoped to a single root cause:
+
+1. **Component alias mismatch** — `nuxt.config.ts` sets `components: [{ path: '~/components', pathPrefix: false }]`, so every component registers under its bare filename (confirmed against `.nuxt/components.d.ts` and the Nuxt 3.21.11 `scanComponents` source). Sixteen template tags across `pages/admin/products/index.vue`, `pages/admin/products/categories/index.vue`, `pages/admin/products/categories/[id].vue`, `ProductCardList.vue` and `ProductControlPanel.vue` had been written with an `Admin*`/`AdminProduct*` prefix that has never resolved. Renamed to the real registered names (`ProductCatalogueNav`, `ProductCentreSidebar`, `ProductStatusTiles`, `ProductCardList`, `ProductControlPanel`, `CategoryContextPanel`, `StatusBadge`) — no `nuxt.config.ts` change, no behavioural change beyond making the existing components resolve.
+2. **Category route topology** — `pages/admin/products/categories.vue` coexisted with a same-named `categories/` directory, which Nuxt's file-based router registers as **parent/child nesting** (verified against the generated `virtual:nuxt:.nuxt/routes.mjs` route table, both before and after the fix). The parent carried no `<NuxtPage />` outlet, so `/admin/products/categories/:id` matched a route but never mounted `categories/[id].vue`. Fixed by moving `categories.vue` to `categories/index.vue` (plain filesystem move, no `<NuxtPage/>` added, no layout restructure) — the route table now lists `admin-products-categories` and `admin-products-categories-id` as independent siblings.
+3. **Stale test assertions** — `tests/productCentreView.test.ts` had 3 assertions still matching the pre-fix `Admin*` tag strings and the pre-move `categories.vue` path; updated to the corrected names/path.
+
+**Verification performed:** `npx vitest run` 280/280 passed · `vue-tsc --noEmit` 0 errors · `eslint .` 0 errors · `nuxt build` succeeded. Logged-in browser verification (existing session, no restart mid-check beyond the one Nuxt picked up automatically for the file move) confirmed at both 1440px and 375px, with zero horizontal overflow at either width:
+   - `/admin/products` — Product Catalogue rail, status tiles, table/card list and Product Control all render with real data; `.badge` elements present with real status classes.
+   - `/admin/products/categories` — rail, category rows/cards and `CategoryContextPanel` render; Category Health renders exactly `Not assessed — rule not configured`.
+   - `/admin/products/categories/1` and `/admin/products/categories/2` — confirmed via the generated route table that these are independent routes; page renders `categories/[id].vue`'s own subtitle, active tab, category title and (for category 2, which has a linked product) a product row with a real status badge.
+
+**Not claimed:** this closes the *technical* rendering/structure defects recorded below. It does not by itself constitute the Codex/user visual sign-off against `VM1-ADM02-D1440`/`VM1-ADM02-M375` pixel-level intent, and it does not authorise `origin/master`.
 
 #### `PC-01` — Product Catalogue / All Products
 
@@ -1007,15 +1022,15 @@ Existing code that still shows the bare historical marker `(DG-10)` (e.g. `pages
 | server API | `server/api/admin/products/index.get.ts`; `products-summary.get.ts`; `categories-summary.get.ts`; `categories.get.ts`; `presets.get.ts`; `asset/[id].get.ts` |
 | types / data relations | `types/product-cms.ts` — `AdminProduct`, `ProductsSummary`, `ProductStatus`; `server/utils/adminProductsQuery.ts`; `server/utils/adminAssetProxy.ts`; Directus `products` ↔ `product_categories` |
 | Reusable | Status multi-select filter, category filter, search sanitisation, pagination, products/categories aggregates, hardened asset proxy, BFF input validation, `tests/productCenter.test.ts` + `tests/assetProxy.test.ts` |
-| Missing | 375px card-list layout (currently a desktop table — **FAILED**); real Readiness/completeness column; real media-reference count per row; real source/audit summary; Needs Attention query; category tab strip at the top of the central area |
+| Missing | Real Readiness/completeness column (gated by `CH-DG-11`/`BP-DG-02`, correctly rendered as absent, not fabricated); real media-reference count per row; real source/audit summary; Needs Attention query; category tab strip at the top of the central area. 375px card-list layout is **no longer missing** — see the 2026-09-07 closure evidence above. |
 | Charter Gate | `CH-DG-11` (Readiness rule) — **unresolved**; `CH-DG-16` (visual pack backup) — unresolved |
 | Blueprint Gate | `BP-DG-02` (readiness/completeness formula) — **unresolved**; currently gates the disabled Needs Attention control |
 | English-first status | `index.vue` itself: **compliant, 0 occurrences**. Inherited from shared shell: `layouts/admin.vue` line 114 (1 UI) + 2 ARIA. Related `new.vue`: 6 UI. |
-| Desktop evidence | `SCREENSHOT_CONFIRMED` — Codex review; gaps vs `VM1-ADM02-D1440` noted (Readiness column absent, category tab strip absent, right-panel render unconfirmed at 1440px) |
-| Mobile 375px evidence | `SCREENSHOT_CONFIRMED` — user-supplied; **FAILED** against `VM1-ADM02-M375` (§8a) |
+| Desktop evidence | `SCREENSHOT_CONFIRMED` (Codex review) + browser DOM verification 2026-09-07 (logged-in session, 1440px, zero overflow, rail/tiles/table/control panel all render with real data) |
+| Mobile 375px evidence | Browser DOM verification 2026-09-07 (logged-in session, 375px): card list renders, table hidden, `scrollWidth === innerWidth`. Supersedes the prior `SCREENSHOT_CONFIRMED` **FAILED** finding against `VM1-ADM02-M375`, which was the desktop-table-at-375px defect closed by the component-alias fix. |
 | Implementation status | `AUTOMATED_CHECKED` |
-| Evidence status | `SCREENSHOT_CONFIRMED` + `RUNTIME_NOT_PROVEN` |
-| Acceptance status | Mobile 375px **`FAILED`** · Integrated **`SUSPENDED`** · `origin/master` **`BLOCKED`** |
+| Evidence status | `SCREENSHOT_CONFIRMED` + browser-verified 2026-09-07 (logged-in session, DOM assertions, no console resolve errors); **`RUNTIME_NOT_PROVEN` still applies per §3 rules** — no commit-SHA-stamped render was captured, so this row cannot be marked `VISUALLY_VERIFIED` |
+| Acceptance status | Mobile 375px structural defect (desktop table at 375px) **closed 2026-09-07** — card list confirmed rendering with zero horizontal overflow. Status stays `AUTOMATED_CHECKED`, not `VISUALLY_VERIFIED` (runtime provenance unresolved). Integrated visual acceptance **still requires Codex/user pixel-level sign-off against `VM1-ADM02-D1440`/`VM1-ADM02-M375`** — not superseded by this fix. `origin/master` promotion **remains `BLOCKED`**. |
 | Definition of Ready | **MET for a J-2 recovery work order.** PRIMARY assets identified for both viewports; target route exists; right-region contract fixed to Product Control (CF-5); English-first fixed (CF-4); mobile principle fixed (CF-3). Readiness/Needs Attention **values** remain gated by `CH-DG-11` / `BP-DG-02` and must render as "Not assessed" until those gates close. |
 | Next step | 等待 Codex 决定 |
 
@@ -1025,21 +1040,21 @@ Existing code that still shows the bare historical marker `(DG-10)` (e.g. `pages
 |---|---|
 | Source Asset ID | `P2-ADM02A-CATEGORY` (SUPPLEMENTARY) · `VM1-ADM02-M375` (PRIMARY for 375px only, inherited via the shared Product Catalogue shell per CF-3) |
 | Target route | `/admin/products/categories` and `/admin/products/categories/:id` |
-| Current actual route | Both exist — `pages/admin/products/categories.vue`; `pages/admin/products/categories/[id].vue` |
-| Pages and shared components | The two pages above; `ProductCatalogueNav.vue`; CategoryContextPanel block inside `categories/[id].vue`; `StatusBadge.vue`; `layouts/admin.vue` |
+| Current actual route | Both exist and are now independent sibling routes (fixed 2026-09-07; previously `categories.vue` + `categories/[id].vue` were parent/child-nested and the detail route never mounted) — `pages/admin/products/categories/index.vue`; `pages/admin/products/categories/[id].vue` |
+| Pages and shared components | The two pages above; `ProductCatalogueNav.vue`; `CategoryContextPanel.vue`; `StatusBadge.vue`; `layouts/admin.vue` |
 | server API | `server/api/admin/categories-summary.get.ts`; `categories.get.ts`; `products/index.get.ts` (category filter) |
 | types / data relations | `types/product-cms.ts` — `CategorySummary`; Directus `product_categories` ↔ `products` |
 | Reusable | Per-category status aggregates, category→product filtering, category list read path, tab navigation |
-| Missing | 375px card-list adaptation; Category Health value; average readiness; media-gap and attention counts; category-specific filters/segments |
-| Charter Gate | `CH-DG-10` (Category Health business definition) — **unresolved**; rendered as `Not assessed (DG-10)` |
+| Missing | Category Health value; average readiness; media-gap and attention counts; category-specific filters/segments. 375px card-list adaptation is **no longer missing** — see the 2026-09-07 closure evidence above. |
+| Charter Gate | `CH-DG-10` (Category Health business definition) — **unresolved**; rendered as `Not assessed — rule not configured` |
 | Blueprint Gate | `BP-DG-01` (Category Health formula) — unresolved; `BP-DG-03` (taxonomy/hierarchy) — unresolved |
 | English-first status | Both page files **compliant, 0 occurrences**. Inherits shared-shell items only. |
-| Desktop evidence | `REPOSITORY_CONFIRMED`; Codex reviewed basic category context |
-| Mobile 375px evidence | **None.** No 375px screenshot captured for this route. |
+| Desktop evidence | `REPOSITORY_CONFIRMED` (Codex reviewed basic category context) + browser DOM verification 2026-09-07 (1440px, zero overflow, category overview and a real category-detail route `.../categories/1` and `.../categories/2` both confirmed rendering their own distinct templates via the generated route table) |
+| Mobile 375px evidence | Browser DOM verification 2026-09-07 (375px): category-overview cards and category-detail card list both render, table hidden, `scrollWidth === innerWidth`. Supersedes "**None.**" |
 | Implementation status | `AUTOMATED_CHECKED` |
-| Evidence status | `REPOSITORY_CONFIRMED` + `RUNTIME_NOT_PROVEN` |
-| Acceptance status | `SUSPENDED` — tied to the J-2 chain |
-| Definition of Ready | **PARTIAL.** 375px principle is fixed by CF-3, but Category Health values stay blocked by `CH-DG-10` / `BP-DG-01`. A work order may rebuild layout and adopt the card list; it may **not** introduce any health or readiness value. |
+| Evidence status | `REPOSITORY_CONFIRMED` + browser-verified 2026-09-07; `RUNTIME_NOT_PROVEN` still applies per §3 rules |
+| Acceptance status | Route-mount and 375px structural defects **closed 2026-09-07** (see closure evidence above). Status stays `AUTOMATED_CHECKED`, not `VISUALLY_VERIFIED`. Integrated visual acceptance **still requires Codex/user pixel-level sign-off** — no longer `SUSPENDED` on the routing defect, but still tied to the same J-2 chain as PC-01 pending that sign-off. |
+| Definition of Ready | **MET for the routing and 375px structural scope.** Category Health values remain blocked by `CH-DG-10` / `BP-DG-01` and must keep rendering `Not assessed — rule not configured`. |
 | Next step | 等待 Codex 决定 |
 
 #### `PW-00` — Product Workspace Shell (gating prerequisite)

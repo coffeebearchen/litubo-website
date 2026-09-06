@@ -2057,3 +2057,44 @@ Register §12.1i、本文件第 6 节、`MASTER-ROADMAP.md` 中此前将工程�
 - `ed952d2` 未被回滚、amend、rebase、squash 或重写
 
 *最后更新：2026-09-06，由 Claude Code 在"V-0.5.2B FD-003、Checkpoint 统一与 J-2 Recovery DoR 精度收口"任务中写入。*
+
+---
+
+## V-0.6 — J-2 Recovery 结构性缺陷收口（2026-09-07）
+
+**状态：三项技术性缺陷已修复并通过自动化与登录态浏览器验收。这不构成 Codex/用户对 `VM1-ADM02-D1440`/`VM1-ADM02-M375` 的像素级视觉签收，也不解除 `origin/master` 锁定。**
+
+### 1. 修复的三项缺陷
+
+1. **组件别名错配**：`nuxt.config.ts` 的 `components: [{ path: '~/components', pathPrefix: false }]` 使组件按裸文件名注册（已用 `.nuxt/components.d.ts` 与 Nuxt 3.21.11 源码 `scanComponents` 逐行核实）。`pages/admin/products/index.vue`、`pages/admin/products/categories/index.vue`、`pages/admin/products/categories/[id].vue`、`ProductCardList.vue`、`ProductControlPanel.vue` 五个文件内 17 处 `Admin*`/`AdminProduct*` 前缀标签从未解析成功，已全部改为真实注册名（`ProductCatalogueNav`、`ProductCentreSidebar`、`ProductStatusTiles`、`ProductCardList`、`ProductControlPanel`、`CategoryContextPanel`、`StatusBadge`）。未改 `nuxt.config.ts`。
+2. **分类路由拓扑**：`pages/admin/products/categories.vue` 与同名目录 `categories/` 共存，被 Nuxt 文件路由自动注册为**父子嵌套路由**（已用生成的 `virtual:nuxt:.nuxt/routes.mjs` 路由表逐字核实修复前后差异）。父页面从未包含 `<NuxtPage/>` 出口，导致 `/admin/products/categories/:id` 路由匹配成功但详情页从未挂载。修复方式：将 `categories.vue` 非暂存移动为 `categories/index.vue`，使两个 URL 成为独立平级路由；**未**新增 `<NuxtPage/>`，**未**改动任何 Product Center 布局结构。
+3. **测试断言过期**：`tests/productCentreView.test.ts` 中 3 条断言仍匹配已被替换的 `Admin*` 标签字符串与移动前的 `categories.vue` 路径，已同步更新为正确名称与路径。
+
+### 2. 自动化验证结果
+
+```text
+npx vitest run        → 280/280 passed（9 个测试文件全部通过）
+npx vue-tsc --noEmit  → 0 errors
+npm run lint           → 0 errors
+npx nuxt build         → Build complete
+git diff --check       → 0 错误（仅 LF/CRLF 提示）
+```
+
+### 3. 登录态浏览器验收（沿用已有会话，未新增登录请求）
+
+| 路由 | 1440px | 375px |
+|---|---|---|
+| `/admin/products` | Product Catalogue 栏、状态卡、表格、Product Control 均渲染真实数据；无水平溢出 | 卡片列表渲染，表格隐藏；`scrollWidth = innerWidth` |
+| `/admin/products/categories` | 分类总览、栏与 Control 面板渲染；`Not assessed — rule not configured` 精确显示 | 分类卡片渲染，表格隐藏；`scrollWidth = innerWidth` |
+| `/admin/products/categories/1`（无关联产品）| 经生成路由表核实为独立路由；渲染详情页专属副标题、激活分类 Tab、分类标题、Control 面板 | — |
+| `/admin/products/categories/2`（关联 1 个产品）| 产品行 + 真实状态徽章渲染；无水平溢出 | 产品卡片渲染，表格隐藏；`scrollWidth = innerWidth` |
+
+### 4. 明确边界（未做的事）
+
+- **不构成** Codex/用户对视觉母版的像素级签收；Register 中 PC-01/PC-02 的 Integrated visual acceptance 仍待该项签收，未被本次修复自动带过
+- **未解除** `origin/master` 锁定
+- **未触碰** `nuxt.config.ts`、`layouts/admin.vue`、`ProductSubNav.vue`、`ProductBasicForm.vue`、`PublishPanel.vue`、`pages/admin/products/[id]/**`、任何前台/Media Library/Settings/Login 页面
+- **未开始** Product Workspace（`PW-00` 及之后）、AI-01、IMP-01
+- **全部 PW 文件与受保护资料包未触碰**
+
+*最后更新：2026-09-07，由 Claude Code 在"J2-CLOSE-03 分类路由拓扑修复、回归验收与本地收口"任务中写入。*

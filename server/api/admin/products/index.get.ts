@@ -9,7 +9,9 @@ import {
   buildProductsFilterParts,
 } from '~/server/utils/adminProductsQuery'
 
-const FIELDS = 'id,status,slug,name_en,name_es,name_pt,product_code,model_or_series,category_id,page_preset_id,published_at,date_created,date_updated'
+// Output allow-list. summary_en and hero_image back the Product Control panel and the
+// list thumbnails; internal fields (review_notes, source records) stay out of the list DTO.
+const FIELDS = 'id,status,slug,name_en,name_es,name_pt,product_code,model_or_series,summary_en,category_id,page_preset_id,hero_image,published_at,date_created,date_updated'
 
 export default defineEventHandler(async (event) => {
   const { status, category_id, search, page = '1', limit = '20' } = getQuery(event)
