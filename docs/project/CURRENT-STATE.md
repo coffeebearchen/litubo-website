@@ -1191,4 +1191,59 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-06，由 Claude Code 在"FD-001 视觉母版确认"任务中写入。*
+## Governing Charter V1.1 框架补全（J-1.1，2026-09-06）
+
+**状态：Charter V1.1 已完成、提交、推送至 GitHub。J-2 Product Center 施工门禁已解除。**
+
+| 项目 | 状态 |
+|------|------|
+| Charter 升级至 V1.1（11 项框架补充） | ✅ 本次 commit |
+| E.4 系统域所有权（四功能域边界） | ✅ 已写入 Charter |
+| E.5 前台与后台联动合同 | ✅ 已写入 Charter |
+| F.4 不可偷跑规则 | ✅ 已写入 Charter |
+| G.4 产品数据与 API 合同（全字段审计） | ✅ 已写入 Charter |
+| G.5 生命周期门禁、并发与错误合同 | ✅ 已写入 Charter |
+| H.4 AI/导入接入完整 Gate 链（J-7 前置条件） | ✅ 已写入 Charter |
+| I.2 渐进重构、兼容、迁移与恢复原则 | ✅ 已写入 Charter |
+| J 节施工顺序更新（含 J-1.1，对齐施工单） | ✅ 已写入 Charter |
+| K.2 开工声明扩展（新增 4 项必填字段） | ✅ 已写入 Charter |
+| M.2 新增 DG-10～DG-16（7 项新 Decision Gate） | ✅ 已写入 Charter |
+| Section N 非视觉质量合同 | ✅ 已写入 Charter |
+| Section O Definition of Ready / Done | ✅ 已写入 Charter |
+| CLAUDE.md 开工声明格式更新为 V1.1 | ✅ 本次更新 |
+| MASTER-ROADMAP.md J-1.1 里程碑记录 | ✅ 本次更新 |
+
+**Charter V1.1 新增 Decision Gates（DG-10 ～ DG-16，均为未确认，代码施工前须由用户确认）：**
+
+| Gate | 事项 | 影响模块 |
+|------|------|---------|
+| DG-10 | Category Health 的业务定义 | ADM-02a 分类视图（J-2） |
+| DG-11 | 产品完整度（Readiness）计算规则与阈值 | ADM-02 列表（J-2） |
+| DG-12 | 产品媒体角色（file_role）枚举与排序规则 | ADM-04（J-5） |
+| DG-13 | 页面内容模块审核粒度（整产品 vs 逐模块） | ADM-05（J-6） |
+| DG-14 | SEO 与多语言发布规则（ES/PT 激活条件） | ADM-07（J-6）及 J-10 |
+| DG-15 | 导入模板字段与错误修复规则 | Import Center（J-8） |
+| DG-16 | 原始视觉资料包的独立备份位置与方式 | 视觉资料安全保障 |
+
+**当前施工顺序（J-1.1 完成后）：**
+
+1. **J-2 — Product Center 结构性重构（ADM-02 + ADM-02a）**：FD-001 已确认视觉，DG-10/DG-11 需在施工单中明确或标注为"施工中确认"，等 Codex 完整施工单后立即可开始
+2. **J-3 — Product Workspace Shell + Product Control**：J-2 完成后
+3. **J-4 ～ J-6 — ADM-03 / ADM-04 / ADM-05～08**：J-3 完成后，按序逐步施工
+4. **J-7 / J-8 — AI Dossier / Import**：须 H.4 前置条件全部满足 + 用户单独授权
+5. **J-9 — 真实产品 Draft 录入**：用户确认真实资料后
+6. **J-10 — 前台联动与发布验收**
+
+**明确禁止（J-1.1 完成后，无框架变更声明的情况下）：**
+- J-1.1 完成前（本次施工）不得开始任何 J-2+ 业务代码施工（已满足：本次只改文档）；
+- FD-001 不授权 AI、导入、真实数据写入或发布；
+- 不得跳过 J-2 直接施工 J-3 及后续。
+
+**本次施工说明（J-1.1 完成）：**
+- **只修改了 4 个治理文档**：Charter、CLAUDE.md、CURRENT-STATE.md、MASTER-ROADMAP.md；
+- **未修改任何业务代码、页面、组件、API、schema、Directus、媒体或权限**；
+- **未触碰四个禁止暂存的资料包**。
+
+---
+
+*最后更新：2026-09-06，由 Claude Code 在"Charter V1.1 框架补全（J-1.1）"任务中写入。*

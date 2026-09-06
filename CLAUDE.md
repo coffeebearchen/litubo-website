@@ -79,15 +79,19 @@ The approved visual reference images are stored outside this repository during p
 
 **每次接到任何 Admin/CMS 相关代码任务（包括 `/admin/*` 页面、`server/api/admin/*` API、`components/admin/`、`types/product-cms.ts` 相关改动），Claude 必须：**
 
-1. 首先阅读 `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md`；
+1. 首先阅读 `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md`（当前为 V1.1）；
 2. 在开工报告中声明以下内容（缺少则不得开始修改代码）：
    ```text
-   Framework version: Governing Charter V1
-   Relevant Charter sections: [本次相关章节 A/B/C/...]
-   Relevant visual/logic master: [精确路径 + CONFIRMED/DRAFT 状态]
-   Current milestone: [当前处于 J-? 阶段]
+   Framework version: Governing Charter V1.1（docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md）
+   Relevant Charter sections: [本次相关章节 A/B/C/... 及 N/O]
+   Relevant visual/logic master: [精确路径 + CONFIRMED/DRAFT/FD-001 状态]
+   Current milestone: [当前处于 J-? 阶段；J-1.1 已完成，J-2 为下一步]
    Scope is aligned / conflict found: [对齐 / 冲突说明]
    Files explicitly excluded: [禁止暂存的文件]
+   Data/API contract reference: [引用 Charter G.4 节对应合同；未审计则停止施工]
+   Preserve / Refactor / New / Missing: [本模块在 Charter Section I 中的判定]
+   Open Decision Gates check: [无阻塞本模块的未确认 Gate / 若有则列出 DG 编号并停止]
+   Acceptance criteria: [含空态 / 错误态 / 无权限态 / 1440px + 375px 两个断点]
    ```
 3. Claude 必须检查 Charter 是否存在 FD-001；若存在，ADM-02～08 与 Logic Master 01/02 可作为 `USER-CONFIRMED FOR IMPLEMENTATION` 施工依据，**不得要求用户再次确认同一批母版**；不得把此确认扩展成 AI、导入、真实数据或发布授权；
 4. 若对应视觉母版既非 `CONFIRMED` 状态，也无 Charter 框架决定（如 FD-001）覆盖，**停止施工并报告**，不得自行设计或参照 DRAFT 图开始正式代码；

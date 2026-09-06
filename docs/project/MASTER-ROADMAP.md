@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：Governing Charter V1 已建立，进入"母版对齐与结构施工"阶段（J-0/J-1 完成）。下一步：等待 ADM-02/02a 视觉母版 CONFIRMED 确认后，按 Charter J 节顺序推进 Product Center 重构（J-2）→ Product Workspace Shell（J-3）→ ADM-03～08（J-4）→ Media Library 视觉优化（J-5）→ AI Dossier（J-6，须单独授权）→ Import（J-7，须单独授权）→ 真实产品录入（J-8）→ 上线授权。**
+**当前位置：Governing Charter V1.1 已完成（J-1.1 完成），FD-001 视觉确认门禁已解除。下一步：等 Codex 发 J-2 完整施工单，按 Charter J 节顺序推进 Product Center 重构（J-2）→ Product Workspace Shell（J-3）→ ADM-03 Specifications（J-4）→ ADM-04 Media & Resources（J-5）→ ADM-05～08（J-6）→ AI Dossier（J-7，须单独授权）→ Import（J-8，须单独授权）→ 真实产品录入（J-9）→ 前台联动与发布验收（J-10）。**
 
 ---
 
@@ -13,8 +13,8 @@
 | M1 | Nuxt 框架 + 全站 Shell | ✅ 已完成 | Phase 1 |
 | M2 | Directus CMS 基础 + 产品数据模型 | ✅ 已完成 | Phase 2–3 |
 | M3 | 内容管理 + 询盘 + HubSpot + SEO | ✅ 已完成 | Phase 4–8 |
-| **M4** | **Product CMS Admin + 产品详情页（Phase 9A）** | **🔨 Charter V1 生效，J-2 待视觉确认** | **Phase 9A-1 / 9A-2 / Charter J 节** |
-| M4.5 | Admin CMS 母版对齐与结构施工（Charter J-2～J-5） | ⏳ 待 ADM-02 CONFIRMED | Charter J-2 to J-5 |
+| **M4** | **Product CMS Admin + 产品详情页（Phase 9A）** | **🔨 Charter V1.1 生效（J-1.1 完成），J-2 待施工** | **Phase 9A-1 / 9A-2 / Charter J 节** |
+| M4.5 | Admin CMS 母版对齐与结构施工（Charter J-2～J-6） | ⏳ J-1.1 完成，J-2 FD-001 视觉已确认，等 Codex 施工单 | Charter J-2 to J-6 |
 | M5 | AI 产品资料导入助手（Charter J-6/J-7，Phase 9B） | ⏳ 待单独授权 | Phase 9B |
 | M6 | ES/PT 内容审校与发布 | ⏳ 待授权 | Phase 10 |
 | M7 | HubSpot 生产激活（Phase 7B） | ⏳ 待用户操作 | Phase 7B |
@@ -307,4 +307,14 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 ---
 
-*最后更新：2026-09-06，M4-Next-P1 产品身份与来源记录基础完成写入。*
+#### M4-Next-Charter-V1.1：Governing Charter V1.1 框架补全 ✅（完成，J-1.1，本次）
+
+**完成内容：**
+- 11 项框架补充（E.4/E.5 域所有权与前台联动合同、F.4 不可偷跑规则、G.4 数据/API 合同、G.5 生命周期/并发/错误合同、H.4 AI 完整 Gate 链、I.2 渐进重构兼容、J 节施工顺序更新、K.2 开工声明扩展、M.2 新增 DG-10～DG-16、Section N 非视觉质量合同、Section O DoR/DoD）
+- 唯一修改治理文档 4 个（Charter、CLAUDE.md、CURRENT-STATE.md、MASTER-ROADMAP.md）
+- 未修改任何业务代码、schema、Directus、媒体、权限
+- **J-1.1 完成后，J-2 Product Center 施工门禁解除（FD-001 视觉已确认），等 Codex 发完整施工单**
+
+---
+
+*最后更新：2026-09-06，Charter V1.1 框架补全（J-1.1）完成写入。*
