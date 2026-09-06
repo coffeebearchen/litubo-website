@@ -94,6 +94,16 @@ Codex/GPT 与 Claude 不得同时修改同一工作树。**Claude Code 是当前
 
 **严格禁止：** 把文案翻译误报为视觉母版落地；把全局 Media Library 当作产品专属 Media & Resources；把尚未实现的 AI / Import 功能说成已完成。
 
+### C.4 Implementation Blueprint 交叉引用规则
+
+`docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` 是受本 Charter 约束的完整执行总施工图：
+
+- **Blueprint 不能推翻 Charter；如两者冲突，以 Charter 为准。**
+- Blueprint 规定的模块顺序、前置依赖、前后端合同、AI/导入边界和验收要求，构成受 Charter 约束的执行层规则。
+- 任何代码施工必须同时满足 Charter 的架构边界 **和** Blueprint 的模块合同；不得只满足其中一方。
+- 若发现 Blueprint 与仓库事实（代码、schema、运行服务、Directus 状态）冲突，**先报告事实冲突，不得猜测或静默施工**。
+- Claude 每次 Admin/CMS 开工报告须同时引用 Governing Charter V1.1 与 Implementation Blueprint V1，缺一不得开始代码修改。
+
 ---
 
 ## D. 母版登记与追溯表

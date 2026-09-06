@@ -1299,3 +1299,47 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 3. DG-10（Category Health 公式）仍需用户在施工单中确认，J-2 已标注为 Not assessed
 
 *最后更新：2026-09-06，由 Claude Code 在"J-2 Product Center 结构性重构"任务中写入。*
+
+---
+
+## Blueprint 正式登记与唯一入口规则固化（J-2.5，2026-09-06）
+
+**状态：J-2.5 文档治理任务完成，本地 commit 已创建，等待 Codex 审核。**
+
+### 已安装的受控文件
+
+| 文件 | 路径 | 状态 |
+|------|------|------|
+| Implementation Blueprint V1 | `docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` | ✅ 已安装，正确路径，已登记 |
+| Governing Charter V1.1 | `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` | ✅ 已添加 C.4 Blueprint 交叉引用 |
+| CLAUDE.md | `CLAUDE.md` | ✅ 已添加唯一入口规则、七步阅读顺序、权威关系、禁止规则 |
+| 旧 09 文件 | `docs/project/09-claude-first-read-only-instruction.md` | ✅ 保留历史正文，顶部添加 LEGACY 重定向说明 |
+
+### 唯一 Claude 开工入口
+
+**CLAUDE.md 是唯一 Claude 施工入口。** `docs/project/09-claude-first-read-only-instruction.md` 已标记为历史说明文档，不再作为可执行指令或开工规则来源。
+
+### 当前 J-2 状态（截至本次记录时）
+
+- J-2 Product Center 代码施工已完成：commit `178b340`（本地，未 push）
+- 自动化验证已通过（134 tests、0 typecheck errors、0 lint errors、build OK）
+- **J-2 仍待：Codex 审核、集中浏览器视觉验收、用户单独授权后 GitHub push**
+- **J-2 不得标记为已完成或已上传**
+
+### J-3 及以后
+
+- J-3（Product Workspace Shell + Product Control）及所有后续模块**尚未开始**
+- 每个模块须在 J-2.5 通过 Codex 审核后，收到对应完整施工单方可启动
+- Blueprint 施工顺序：J-2 → J-2.5 → J-3 → J-3.5 → J-4 → J-5 → J-6a～e → J-7（单独授权）→ J-8（单独授权）→ J-9 → J-10 → J-11
+
+### 禁止声明（已遵守）
+
+- 未修改任何业务代码、Vue 页面、组件、API、tests、types
+- 未修改 Directus schema、角色、权限、数据
+- 未修改 .gitignore、Docker、.env、依赖
+- 未暂存四个禁止资料包
+- 未 push、未部署、无浏览器登录
+- 178b340 未被 amend、rebase 或覆盖
+- 缺失文档（`docs/DB重构与初始化说明.md`、`docs/数据库设计文档.md`）已记录为 MISSING，未尝试创建替代文件
+
+*最后更新：2026-09-06，由 Claude Code 在"J-2.5 Blueprint 正式登记与入口规则固化"任务中写入。*

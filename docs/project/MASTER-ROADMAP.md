@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：Governing Charter V1.1 已完成（J-1.1 完成），FD-001 视觉确认门禁已解除。下一步：等 Codex 发 J-2 完整施工单，按 Charter J 节顺序推进 Product Center 重构（J-2）→ Product Workspace Shell（J-3）→ ADM-03 Specifications（J-4）→ ADM-04 Media & Resources（J-5）→ ADM-05～08（J-6）→ AI Dossier（J-7，须单独授权）→ Import（J-8，须单独授权）→ 真实产品录入（J-9）→ 前台联动与发布验收（J-10）。**
+**当前位置：J-2 Product Center 代码施工完成（commit 178b340，本地，待验收）。J-2.5 Blueprint 正式登记完成（本地，待 Codex 审核）。下一步：Codex 集中验收 J-2 + J-2.5，授权 GitHub push，再按 Blueprint 顺序启动 J-3 Product Workspace Shell。**
 
 ---
 
@@ -304,6 +304,22 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 | AI 自动发布 | 禁止；AI 只生成 Draft |
 | Token 泄露 | `.env` 不进 Git；Token 不出现在代码、日志、文档中 |
 | `product_source_records` | 绝不向 `nuxt-server` 开放任何权限 |
+
+---
+
+#### M4-Next-Charter-Blueprint：Blueprint 正式登记与唯一入口规则固化 🔨（J-2.5，本地 commit，待 Codex 审核）
+
+**完成内容：**
+- `docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` 正式纳入版本控制（首次 staged + committed）
+- `CLAUDE.md` 新增：唯一入口声明、七步阅读顺序、权威关系表、禁止跳阶段规则、开工报告必填项
+- Charter V1.1 新增 C.4：Blueprint 交叉引用（Charter 优先、事实冲突先报告）
+- `docs/project/09-claude-first-read-only-instruction.md` 顶部添加 LEGACY 历史重定向说明（历史正文保留）
+- CURRENT-STATE.md 更新：J-2.5 状态记录、J-2 当前状态澄清、J-3 尚未开始声明
+- MASTER-ROADMAP.md 更新：当前位置说明 + 本条里程碑记录
+- **只修改治理文档；未修改任何业务代码、schema、Directus、数据、.gitignore**
+- **未 push；178b340 未被改写**
+
+**下一步：Codex 审核 J-2.5 + J-2，授权 GitHub push；然后发 J-3 完整施工单。**
 
 ---
 

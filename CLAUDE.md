@@ -149,3 +149,62 @@ Every module must complete all of the following before a local commit:
 - `docs/project/CURRENT-STATE.md` updated to reflect new state
 
 GitHub push requires separate user authorization after the above checklist passes.
+
+---
+
+## Canonical Admin/CMS Task Entry and Mandatory Build Order
+
+**CLAUDE.md is the single operative task entry point for every Claude session.** `docs/project/09-claude-first-read-only-instruction.md` is preserved as historical context only; it is no longer an active instruction source or executable rule.
+
+### Mandatory pre-work reading order (Admin/CMS tasks)
+
+Before starting any Admin/CMS code or document task, read in this order:
+
+1. `CLAUDE.md` — this file; sole operative entry point
+2. `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` — highest authority; governs boundaries, safety, and framework-change rules
+3. `docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` — complete system construction map; bound by Charter
+4. `docs/project/CURRENT-STATE.md` — verified current progress, limitations, and active blockers
+5. `docs/project/MASTER-ROADMAP.md` — milestone order; does not independently override Blueprint sequence
+6. Relevant visual/logic master, Construction Pack, current code, types, APIs, and tests for the current module
+7. The complete, current Codex work order (施工单) for the authorized module only
+
+### Document authority hierarchy
+
+| Document | Role |
+|----------|------|
+| Working tree, running services, Directus state, confirmed user decisions | Determines factual truth |
+| Governing Charter V1.1 | Highest governance; controls all boundaries, safety, and framework-change rules |
+| Implementation Blueprint V1 | Complete execution map; bound by Charter; defines modules, dependencies, AI/import gates, and construction sequence |
+| CURRENT-STATE.md | Single source for verified progress and active blockers |
+| MASTER-ROADMAP.md | Milestone tracking; does not independently alter Blueprint sequence |
+| CLAUDE.md | Sole operative task entry; reading navigation only; not a second constitution |
+
+- If Implementation Blueprint conflicts with Governing Charter → Charter governs.
+- If any document conflicts with working tree, running services, or Directus actual state → report the fact conflict; do not guess or silently patch.
+
+### Prohibited autonomous actions (Admin/CMS)
+
+Claude must never:
+
+- Select the next module independently; every module requires a complete, self-contained Codex work order (施工单)
+- Skip Blueprint pre-requisite dependencies because a page appears simple or nearby
+- Mistake English copy, basic forms, or the global Media Library for complete Product Workspace deliverables
+- Start AI Dossier (J-7), bulk Import (J-8), or public CMS cutover (J-10) before product-media-source-audit (J-3.5) and all J-4 through J-6e gates are complete
+- Fill any unconfirmed Decision Gate with fabricated data, fake scores, fake percentages, or engineering guesses
+- Start a new module without receiving a complete, self-contained Codex work order for that specific module
+
+### Mandatory opening report fields (Admin/CMS tasks)
+
+Every Admin/CMS task opening report must declare all of the following before any code or file is modified:
+
+```text
+Framework version: Governing Charter V1.1 + Implementation Blueprint V1
+Current module: J-?
+Governing docs read: [list each file]
+Applicable visual/logic master: [exact path + CONFIRMED/DRAFT/FD-001 status]
+Pre-requisite dependencies met: [yes / blocked — specify which prior module is incomplete]
+Applicable Open Decision Gates: [DG-# + current status]
+Data/API boundary: [relevant Blueprint Section 7 contract]
+Acceptance criteria: [including empty / error / no-permission / 1440px + 375px breakpoints]
+Explicitly out of scope: [files and domains not touched this module]
+```

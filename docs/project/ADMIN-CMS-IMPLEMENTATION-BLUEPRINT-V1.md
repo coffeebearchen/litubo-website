@@ -1,0 +1,346 @@
+# LITUBO Admin CMS — Implementation Blueprint V1
+
+> **Role:** This is the complete backend and Admin CMS master implementation blueprint. It sits below `ADMIN-CMS-GOVERNING-CHARTER-V1.md` and above all module-level construction contracts.
+>
+> **Status:** Framework baseline. Operational truth, current commits, and active blockers remain in `CURRENT-STATE.md`; sequence remains in `MASTER-ROADMAP.md`.
+
+## 1. Authority and non-negotiable rules
+
+| Actor | Responsibility |
+|---|---|
+| User | Final authority for business facts, real product files, visual approval, roles, publication, release, and framework change. |
+| Codex/GPT | System architect, programme planner, dependency/Gate owner, risk reviewer, acceptance reviewer. |
+| Claude | Sole code executor: reads governing files, inspects code, implements bounded work, tests, commits, reports. |
+
+No normal construction task may change this Blueprint, the Charter, business meaning, schema, roles, or source-of-truth rules. Such a change requires an explicit user decision recorded as a Framework Decision.
+
+## 2. Governing document stack
+
+1. Runtime/repository truth and confirmed user decisions.
+2. `docs/project/CURRENT-STATE.md`.
+3. `ADMIN-CMS-GOVERNING-CHARTER-V1.md` — constitution: authority, boundaries, safety, change control.
+4. **This file** — complete system construction map.
+5. `MASTER-ROADMAP.md` — stage order and current progress.
+6. Relevant Construction Pack, visual/logic master, current code, types, APIs, and tests.
+7. The bounded module contract and work order.
+
+Raw master status must remain truthful: visual files marked `DRAFT` are not edited. FD-001 records the user’s separate `USER-CONFIRMED FOR IMPLEMENTATION` authorization.
+
+## 3. Target architecture
+
+```text
+Admin UI
+  → Nuxt page/composable/component
+  → Nuxt Server BFF/Admin API
+  → validation, role checks, audit, DTOs, domain rules
+  → Directus / PostgreSQL / Media Storage
+
+Public Nuxt frontend
+  → Public BFF/API
+  → public projection only: published + approved + locale/SEO-eligible + non-TEST ONLY
+```
+
+Rules:
+
+- Admin pages do not bind themselves directly to unreviewed Directus raw data shapes.
+- Nuxt Server/BFF owns authentication, authorization, CSRF, validation, DTOs, audit, and compatibility.
+- Directus/PostgreSQL/store are substrate, not UI business logic.
+- Public APIs never disclose internal sources, audit notes, AI proposals, unreviewed facts, or TEST ONLY records.
+- Existing SSR session continuity, CSRF, admin role boundary, lifecycle, `product_code`, BFF APIs, media governance, source governance, and tests are preserved unless an explicit approved migration replaces them.
+
+## 4. Domain ownership and canonical relationships
+
+| Domain | Owns | Must not own |
+|---|---|---|
+| Identity & Access | Admin identity, role, session, audit actor | Product content or public delivery rules |
+| Product Center | Product master, category, `product_code`, lifecycle entry | Physical media files |
+| Product Workspace | One product’s work context, Product Control, review/readiness context | Global media storage |
+| Specifications | Groups, definitions, values, units, field evidence | Publication decisions alone |
+| Global Media Library | Media UUID, file, folder, archive, reference protection | Product-specific editorial role |
+| Product Media & Resources | Product-to-media/resource reference, role, order, alt/caption | Copy or ownership of a physical asset |
+| Sources & History | Evidence, `source_locator`, confidence, human confirmation, change history | Public presentation by default |
+| Page Content | Controlled product page modules, FAQ/resource links, module versions | Raw source files |
+| Relations | Product-to-product/application/resource meaning | Lifecycle changes |
+| SEO & Locales | Locale, SEO, canonical, noindex eligibility | Publication bypass |
+| Review & Publish | Review decisions, publication gate, audit | Fabricated readiness values |
+| Import Center | Workbook staging, mapping, validation, draft creation | Bulk publication |
+| AI Workbench / Dossier | Input snapshots, proposals, human decisions | Direct overwrite/publish/delete actions |
+| Public Delivery | Public read projection, cache/invalidation | Internal fields or Admin writes |
+| Settings & Operations | Rules, model config, retention, backups, health | Silent business-policy changes |
+
+Canonical relationship rules:
+
+```text
+Product ─ belongs to → Category
+Product ─ has → Specifications / Content Modules / Locale SEO / Audit events
+Product ─ links to → MediaAsset through ProductMediaLink
+Product ─ links to → SourceRecord through ProductSourceLink
+Product ─ relates to → Product/Resource/Application through ProductRelation
+Product ─ receives → AI Proposal; proposal is not formal product data before human acceptance
+ImportRow ─ may create → one Draft Product after validation and review
+```
+
+Any field or relation not proved by current code/schema is labelled **AUDIT REQUIRED BEFORE SCHEMA**. It is not silently invented.
+
+## 5. Global state, audit, security, and publication contracts
+
+### 5.1 Lifecycle
+
+```text
+draft → review → published → archived
+```
+
+- `readiness`, content completeness, and Category Health are calculated indicators, never lifecycle states.
+- Formulas are Decision Gates; absent formulas produce neutral statistics or `Not assessed`, never fake scores.
+- TEST ONLY products stay non-public and noindex.
+- Published edits, review outcomes, withdrawal, archive, restore, and material source changes must be auditable.
+
+### 5.2 Human control
+
+- No source evidence + no required human review + no publication gate = no public publication.
+- Admin role, SSR auth, CSRF/Origin checks, input validation, and audit controls cannot be bypassed by page code.
+- Concurrent edit, save failure, no-permission, empty, loading, and error behaviors must be defined per module.
+
+### 5.3 Security and privacy
+
+- Cookies/tokens/passwords/`.env` are never printed, committed, or included in screenshots/reports.
+- Public DTOs use a field whitelist.
+- Raw Word/Excel/PPT, source evidence, internal notes, and unreviewed data remain private.
+- Upload type/size/quarantine policy, rate limiting, least privilege, logs, backups, and recovery are mandatory operational concerns.
+
+## 6. Admin information architecture and visual traceability
+
+| Visual/logic master | Module | Target responsibility |
+|---|---|---|
+| ADM-02 | Product Center | All products, real filters, list, Product Control context |
+| ADM-02a | Categories | Category navigation and neutral/confirmed category statistics |
+| ADM-03 | Specifications | Evidence-backed technical parameter workspace |
+| ADM-04 | Product Media & Resources | Per-product references to global media/resources |
+| ADM-05 | Page Content | Controlled website modules and reviewable content |
+| ADM-06 | Relations | Product/application/resource relationships |
+| ADM-07 | SEO & Locales | Locale, SEO, canonical/noindex readiness |
+| ADM-08 | Sources & History | Evidence, audit, decision history |
+| Logic 01 | Single Product Dossier | One Draft’s controlled AI proposal/review pipeline |
+| Logic 02 | Multi-model Import Review Queue | Workbook mapping, draft-only import, isolated review queue |
+
+An Admin route is complete only when it has real data/API, role boundary, empty/loading/error/no-permission states, desktop/375px behavior, tests, and acceptance evidence. No menu-only or static mock modules are allowed.
+
+## 7. Module contracts
+
+### 7.1 Product Center and Categories — ADM-02 / ADM-02a
+
+- Rebuild existing Product Center gradually; preserve product APIs, `product_code`, edit/new flows, and ProductBasicForm.
+- Real search/filter/pagination/category statistics only.
+- Category Health remains neutral until its formula is approved.
+- Product Control is read-only context until Review/Publish contracts are implemented.
+- No fake media/source counts, AI actions, exports, bulk actions, or health percentages.
+
+### 7.2 Product Workspace Shell and Product Control
+
+- One protected product context route and shared navigation for all product tabs.
+- Overview reuses ProductBasicForm as the basic editor; it is not a full workspace substitute.
+- Each tab has its own data/API/permission/empty/error contract.
+- J-3 cannot invent content for later tabs.
+
+### 7.3 Specifications — ADM-03
+
+- Requires audited parameter model: groups, values, units, evidence, validation, and readiness input.
+- Category-specific versus universal fields and unit conversion are Decision Gates.
+
+### 7.4 Product Media & Resources — ADM-04
+
+- Reuses global Media UUIDs; never copies physical assets.
+- Requires approved product-media role, ordering, caption/alt, download and archive-reference rules.
+- Links to product resources are distinct from global library management.
+
+### 7.5 Page Content — ADM-05
+
+- Controlled page-module records only; every module has source, review, version, and public eligibility rules.
+- No direct uncontrolled rich-content publication.
+
+### 7.6 Relations — ADM-06
+
+- Defines allowed product/product, product/application, product/resource relation types and their direction/meaning.
+
+### 7.7 SEO & Locales — ADM-07
+
+- Governs English public release first; ES/PT structure is reserved.
+- Requires locale, canonical, noindex, structured-data, translation-review and publication rules.
+
+### 7.8 Sources & History — ADM-08
+
+- Evidence is traceable through `SourceRecord` and `source_locator`.
+- Audit records show actor, time, field/module, source basis, decision, and outcome.
+
+### 7.9 Review & Publish
+
+- Built only after readiness inputs exist.
+- Calculates a transparent gate; does not replace the existing lifecycle.
+- Publish/withdraw emits audit and invalidates appropriate public data/cache.
+
+## 8. AI and import production lines
+
+### 8.1 Single Product Dossier
+
+```text
+Current Draft
+→ select only its already-linked approved source/material set
+→ freeze InputSnapshot
+→ generate a versioned proposal with evidence links
+→ human accepts, edits, or returns each field/module
+→ audit/review/publish gate
+```
+
+AI must never cross product boundaries, overwrite confirmed fields, auto-publish, delete assets, or move formal media. Model/provider, key ownership, cost cap, retention, logging, retry, and human-review policy are user Decision Gates.
+
+### 8.2 Multi-model Import Review Queue
+
+```text
+XLSX/CSV upload
+→ detect sheet
+→ map fields
+→ validate preview
+→ stage errors and correction report
+→ create Drafts only
+→ isolate each product_code
+→ per-product AI/human review
+→ never bulk publish
+```
+
+Import needs idempotency, duplicate handling, partial failure, correction, rollback, audit, and real-template approval before live use.
+
+## 9. Public frontend delivery contract
+
+Only qualified public product projections are available to frontend routes:
+
+```text
+Published
++ required human review
++ valid public locale/SEO decision
++ non-TEST ONLY
++ no internal-only evidence/content
+```
+
+Define public fields, noindex/canonical, cache invalidation, public error fallback, structured data, and language behavior before frontend cutover. Existing fixtures remain until a contracted public CMS path is verified.
+
+## 10. Quality, migration, backups, and operations
+
+### 10.1 Incremental migration
+
+- Keep working behavior until its replacement is tested.
+- No schema change without an approved migration contract, backup, rollback, test-data rehearsal, and index/performance review.
+- Protect old routes/APIs, ID=3 TEST ONLY, existing media, and existing sources.
+- Separate fixtures from real product data.
+
+### 10.2 Required verification per code module
+
+```text
+Vitest
+Typecheck
+Lint
+Nuxt build
+git diff --check
+Relevant API/permission/state-machine tests
+Desktop and 375px visual check when appropriate
+```
+
+### 10.3 Backup and recovery
+
+- Passing module: exact commit → Codex review → concentrated acceptance → separate GitHub push → hash match.
+- Schema and database changes: snapshot + database backup + restoration verification before mutation.
+- Media: inventory/manifest and separate backup.
+- Visual and Construction Packs presently untracked: maintain a separate manifest/hash/backup location; never mix raw packs into a business-code commit.
+- Define health checks, service logs, capacity monitoring, dependency/security updates, and recovery procedures before production release.
+
+## 11. Mandatory programme sequence
+
+| Stage | Module | Dependency / unlock |
+|---|---|---|
+| J-1 | Charter + FD-001 | Completed |
+| J-1.1 | Charter v1.1 | Completed |
+| J-2 | ADM-02 Product Center + ADM-02a Categories | Current local code pending concentrated visual acceptance and backup |
+| J-2.5 | Master Blueprint | This document; required before J-3 |
+| J-3 | Workspace Shell + Product Control | J-2/J-2.5 accepted |
+| J-3.5 | Product-media-source-audit relationship foundation | J-3; approved contract before schema |
+| J-4 | ADM-03 Specifications | J-3 + parameter model gate |
+| J-5 | ADM-04 Product Media & Resources | J-3.5 + media-role gate |
+| J-6a | ADM-08 Sources & History | J-3.5 + evidence/audit contract |
+| J-6b | ADM-05 Page Content | Content-module gate |
+| J-6c | ADM-06 Relations | Relation-semantic gate |
+| J-6d | ADM-07 SEO & Locales | SEO/locale gate |
+| J-6e | Review & Publish + readiness | J-4 to J-6d inputs completed |
+| J-7 | Single Product Dossier | Source/media/audit/review gates completed |
+| J-8 | Multi-model Import Queue | Import contract; no bulk publication |
+| J-9 | Real product pilot | User-selected authority files; a new Draft, never repurpose ID=3 |
+| J-10 | Public frontend CMS cutover | Qualified published product projection |
+| J-11 | Production operations closure | Security, backup/restore, performance, deployment approval |
+
+## 12. Open Decision Gate register
+
+| Gate | Decision required | Blocks |
+|---|---|---|
+| DG-01 | Category Health formula | Calculated category health only |
+| DG-02 | Product readiness/completeness formula | Publish readiness and review dashboard |
+| DG-03 | Category taxonomy and hierarchy | Full category operations |
+| DG-04 | Parameter model, units, conversions | Specifications |
+| DG-05 | Media roles, ordering, resource taxonomy | Product Media & Resources writes |
+| DG-06 | Evidence confidence, `source_locator`, retention | Sources/History and AI provenance |
+| DG-07 | Content module types, review/version/rollback | Page Content |
+| DG-08 | Relation semantics | Relations |
+| DG-09 | Locale, canonical, noindex, SEO release | SEO/Locales and public cutover |
+| DG-10 | Role matrix and final publisher | Expanded review/publish actions |
+| DG-11 | AI provider/model, budget, key, logs, retention | AI Dossier |
+| DG-12 | Import template, duplicate/error correction | Import Queue |
+| DG-13 | Real pilot model and authority source package | Real product Draft |
+| DG-14 | Raw visual/construction pack backup/recovery | Long-term reference reliability |
+| DG-15 | Migration/recovery/deployment authority | Production mutation/release |
+
+Open Gates only block dependent stages. Codex consolidates user decisions at the relevant stage; Claude never guesses them.
+
+## 13. Module readiness and completion
+
+### Definition of Ready
+
+```text
+Relevant master confirmed through FD-001 or confirmed status
+Current code/data/API audited
+Required Decision Gates resolved or safely excluded
+Allowed files and prohibited areas named
+Test and acceptance criteria defined
+Migration/rollback need known
+```
+
+### Definition of Done
+
+```text
+Bounded code complete
+No fake data or hidden policy changes
+Tests, typecheck, lint, build, diff check pass
+Visual/functional acceptance evidence recorded
+CURRENT-STATE and ROADMAP updated
+Exact local commit reviewed
+Separate backup/push complete when authorized
+```
+
+## 14. Traceability and working cycle
+
+Every module must trace:
+
+```text
+Master → route/page → entity/DTO/API → tests → acceptance evidence → commit → GitHub backup
+```
+
+Fixed cycle:
+
+```text
+Codex identifies next dependency and consolidated Gate
+→ one complete work order
+→ Claude reads governing files and current code
+→ bounded implementation + tests + local commit
+→ Codex reviews
+→ user participates only for consolidated business confirmation or one necessary visual session
+→ separate backup/push order
+→ state and milestone updates
+```
+
+No module may jump this sequence.

@@ -1,4 +1,14 @@
-# First Claude Code instruction — copy exactly
+> **Status: LEGACY / NON-OPERATIVE HISTORICAL GUIDE**
+>
+> The only active Claude task-entry rule is **`CLAUDE.md`** (root of this repository).
+>
+> For Admin/CMS work, follow the reading order declared in `CLAUDE.md` → Governing Charter → Implementation Blueprint → CURRENT-STATE → MASTER-ROADMAP.
+>
+> If this historical document conflicts with `CLAUDE.md`, the Governing Charter V1.1, the Implementation Blueprint V1, repository truth, or a current approved Codex work order, **it must not be used as an implementation instruction.**
+
+---
+
+# First Claude Code instruction — copy exactly (historical)
 
 ```text
 Please perform only a LITUBO project-archive installation and consistency check. Do not write business-page code, deploy, initialize services, connect external accounts, or change DNS.
