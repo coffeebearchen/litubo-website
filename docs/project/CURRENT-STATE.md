@@ -1950,9 +1950,9 @@ V-0.5.1 只给了估算数字（"约 249 处 / 9 个文件"）且缺乏行级依
 
 **本任务只登记，未翻译、未修改任何文案。**
 
-### 6. 十个工程模块完整事实表（Register §12.1i）
+### 6. 11 个工程模块完整事实表（Register §12.1i）
 
-每个模块登记 18 个字段（Source Asset ID · 目标路由 · 当前实际路由 · 页面与共享组件 · server API · types/数据关系 · 可复用 · 缺失 · Charter Gate · Blueprint Gate · English-first · Desktop 证据 · Mobile 375px 证据 · Implementation · Evidence · Acceptance · DoR · 下一步）。
+共 **11 个工程模块**：`PC-01`、`PC-02`、`PW-00`、`PW-01`～`PW-06`、`AI-01`、`IMP-01`。`PW-00` 计入 11 之内，不是额外第 12 项——此前文档误写"十个工程模块"，本次更正。每个模块登记 18 个字段（Source Asset ID · 目标路由 · 当前实际路由 · 页面与共享组件 · server API · types/数据关系 · 可复用 · 缺失 · Charter Gate · Blueprint Gate · English-first · Desktop 证据 · Mobile 375px 证据 · Implementation · Evidence · Acceptance · DoR · 下一步）。
 
 | 模块 | Implementation | Acceptance | DoR |
 |------|---------------|-----------|-----|
@@ -1994,10 +1994,66 @@ V-0.5.1 只给了估算数字（"约 249 处 / 9 个文件"）且缺乏行级依
 
 ### 9. 下一步
 
-J-2 Product Center 的 **Definition of Ready 已达成**：PRIMARY 资源（桌面 + 375px）已确定、目标路由存在、右栏契约固定为 Product Control、English-first 固定、移动端原则固定。Readiness 与 Needs Attention 的**数值**仍被 `CH-DG-11` / `BP-DG-02` 阻塞，必须继续显示为 "Not assessed"。
+**`J-2 Recovery DoR` 已达成**（精确表述，非笼统"J-2 DoR"）：仅代表 `PC-01` / `PC-02` 可以开始受限范围的修复施工——PRIMARY 资源（桌面 + 375px）已确定、目标路由存在、右栏契约固定为 Product Control、English-first 固定、移动端原则固定。**不代表** J-2 已完成、视觉已通过验收、或可以推送 `origin/master`。Readiness 与 Needs Attention 的**数值**仍被 `CH-DG-11` / `BP-DG-02` 阻塞，必须继续显示为 "Not assessed"。
 
 J-2 移动端 375px 仍为 **FAILED**；整体视觉验收仍为 **SUSPENDED**；`origin/master` 仍 **BLOCKED**。`PW-00`（J-3）、`AI-01`、`IMP-01` 及后续模块**均未开始**。
 
 等待 Codex 的 **J-2 Product Center Recovery 单一完整施工单**。
 
 *最后更新：2026-09-06，由 Claude Code 在"V-0.5.2 FD-002 视觉母版权威裁定与证据闭环"任务中写入。*
+
+---
+
+## V-0.5.2B — FD-003、Checkpoint 统一与 J-2 Recovery DoR 精度收口（2026-09-06）
+
+**状态：治理文档精度收口完成。仅修改 6 个治理文档（`CLAUDE.md`、Charter、Blueprint、Register、本文件、`MASTER-ROADMAP.md`）；无任何业务代码、测试、schema、Directus、权限、数据、媒体或来源记录改动。**
+
+### 1. FD-003 已登记
+
+`FD-003 — Context-Efficient Execution`（高效分层阅读规则）已由用户确认，写入 `ADMIN-CMS-GOVERNING-CHARTER-V1.md` 框架决定章节，紧接 FD-002 之后。状态 Effective，独立于 FD-001 / FD-002，不修改、不撤销二者。
+
+**三层规则摘要：**
+
+- **Tier A**：新模块、框架/母版/数据合同/Gate 变化、新 Session 接手大模块、推送 `origin/master` 前最终验收 → 完整读取治理文件全套。
+- **Tier B**：同一模块的后续子任务 → 只读 `CLAUDE.md`、`CURRENT-STATE.md`、该模块 Blueprint/Register 章节、适用母版、当前施工单、相关代码/API/types/tests。
+- **Tier C**：纯机械验证 → 只读当前施工单、相关文件、diff、测试输出。
+
+层级只降低重复阅读成本，不降低任何 Gate、母版、数据/API 合同、English-first 或验收标准的适用范围；不构成框架变更。
+
+### 2. Checkpoint 唯一性核实
+
+只读基线核实全部通过：`HEAD = ed952d2`；`origin/master = 2a3e67f952c3443166c73851467b7eaf77cec243`（未变）；`origin/backup/admin-cms-j2 = ed952d2`（与 HEAD 相同）；`origin/backup/j2` 在远端**不存在（MISSING）**，非删除，只是从未推送过。**唯一有效 checkpoint 分支确认为 `origin/backup/admin-cms-j2`。**
+
+### 3. "十个工程模块" → "11 个工程模块" 精度修正
+
+Register §12.1i、本文件第 6 节、`MASTER-ROADMAP.md` 中此前将工程模块统计误写为"十个"/"十模块"。实际工程模块共 **11 个**：`PC-01`、`PC-02`、`PW-00`、`PW-01`～`PW-06`、`AI-01`、`IMP-01`；`PW-00` 计入 11 之内，因 FD-002 将其定为 `PW-01`～`PW-06` 的门禁前提，不是额外第 12 项。三处标题/说明已更正为"11 个工程模块"，模块清单与既有 18 字段事实表内容不变。
+
+### 4. J-2 Recovery DoR 精度收口
+
+将笼统的"J-2 DoR 已达成"改为精确表述：**`J-2 Recovery DoR` 仅代表 `PC-01` / `PC-02` 可以开始受限范围的修复，不代表 J-2 已完成、视觉已通过、或可以推送 `origin/master`。** 本文件第 9 节已改写为此精确表述。
+
+**PC-01 / PC-02 Recovery DoR 证据表（同步写入 Register §12.1i）：**
+
+| 模块 | 主/补充母版 | 本次可修复范围 | 当前验收 | 结论 |
+|---|---|---|---|---|
+| `PC-01` Product Center | `VM1-ADM02-D1440` / `VM1-ADM02-M375`（PRIMARY） | 1440px 结构、375px 卡片列表、English-first、相关 API 与测试 | 375px **FAILED**；整体 **SUSPENDED** | 允许开始修复，不代表验收通过 |
+| `PC-02` Category Context | `P2-ADM02A-CATEGORY`（SUPPLEMENTARY，依附 `PC-01` 共享外壳的 PRIMARY 资源） | 布局、分类上下文、英文文案、导航、产品列表 | `SUSPENDED` | 结构性修复允许；`CH-DG-10` 未确认前不得生成 Category Health 假数值，须显示 `Not assessed — rule not configured` |
+
+旧代码中仍存在的裸 `(DG-10)` 历史标记（如 `pages/admin/products/categories.vue`）本次不改代码，依 Blueprint §6.2 仍指 Charter `DG-10` = `CH-DG-10`，正确有效。从此以后新文档与新施工单一律使用 `CH-DG-10`。
+
+### 5. 明确状态（未变）
+
+- J-2 Product Center **仍未完成**；PC-01 的 375px 验收**仍为 FAILED**；J-2 整体视觉验收**仍为 SUSPENDED**；`origin/master` **继续锁定**。
+- `PW-00`（J-3 Workspace Shell）、`AI-01`、`IMP-01` 及后续模块**均未开始**。
+- J-2 Recovery 是下一步，等待 Codex 的 **J-2 Product Center Recovery 单一完整施工单**。
+
+### 6. 禁止声明（已遵守）
+
+- 未修改任何业务代码、Vue、TypeScript、CSS、server API、tests、types、Directus schema、角色、权限、Policy、Docker、`.env`、部署配置、真实产品、媒体、来源记录或数据库数据
+- 未使用 `git add .` / `git add -A` / `git reset --hard` / `git clean` / `git stash` / `git restore` / `git checkout --` / `git rebase` / `git commit --amend` / `git push --force` / `git push origin master`
+- 四项保护资料全程 `??`，未移动、改名、修改、暂存或提交：`docs/design-reference/CMS-AI-VISUAL-MASTER-V1/`、`docs/design-reference/inbox/`、`docs/product-cms/CMS-AI-CONSTRUCTION-PACK-V1/`、`docs/project/LITUBO_9C-2R_正式施工单.md`
+- 未运行 build / lint / typecheck / 业务测试（本任务不改业务代码，故不适用）
+- 无浏览器登录、无凭证输出、无 `origin/master` push、无部署
+- `ed952d2` 未被回滚、amend、rebase、squash 或重写
+
+*最后更新：2026-09-06，由 Claude Code 在"V-0.5.2B FD-003、Checkpoint 统一与 J-2 Recovery DoR 精度收口"任务中写入。*

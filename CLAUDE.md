@@ -207,12 +207,23 @@ Claude must never:
 - Fill any unconfirmed Decision Gate with fabricated data, fake scores, fake percentages, or engineering guesses
 - Start a new module without receiving a complete, self-contained Codex work order for that specific module
 
+### FD-003 reading tiers (Tier A / B / C)
+
+`FD-003 — Context-Efficient Execution` (registered in `ADMIN-CMS-GOVERNING-CHARTER-V1.md`, effective 2026-09-06) sets three reading tiers so repeated reading cost does not grow with every small task. A tier only lowers how much must be *re-read* — it never lowers what must be *satisfied*. The applicable module's Gate, visual master, data/API contract, English-first rule, acceptance criteria, and stated no-touch scope apply in full at every tier.
+
+- **Tier A** — a new module; a change to the framework, a master, a data/API contract, or a Gate; a new Claude session taking over a large module; or final acceptance before pushing `origin/master`. Read the full seven-step governing stack above.
+- **Tier B** — a follow-up sub-task inside the same module. Read only: `CLAUDE.md`, `CURRENT-STATE.md`, the Blueprint/Register sections for that module, the applicable master, the current Codex work order, and the relevant code/API/types/tests.
+- **Tier C** — a purely mechanical verification (re-running a check, confirming a diff). Read only the current work order, the affected files, the diff, and the test output.
+
+A Codex work order may raise the tier a task must read at; it may never lower what Tier A would otherwise require. Every opening report below must state which tier applies and why, before any other field.
+
 ### Mandatory opening report fields (Admin/CMS tasks)
 
 Every Admin/CMS task opening report must declare all of the following before any code or file is modified:
 
 ```text
-Framework version: Governing Charter V1.1 (FD-001 + FD-002) + Implementation Blueprint V1
+Reading tier (FD-003): [A / B / C — one-line reason]
+Framework version: Governing Charter V1.1 (FD-001 + FD-002 + FD-003) + Implementation Blueprint V1
 Engineering module ID: [PC-01 / PC-02 / PW-00 / PW-01…PW-06 / AI-01 / IMP-01 — never a bare ADM-xx]
 Blueprint stage: J-?
 Governing docs read: [list each file including Register]

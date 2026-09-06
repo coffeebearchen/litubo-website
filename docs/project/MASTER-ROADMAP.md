@@ -2,11 +2,11 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：V-0.5.2 FD-002 视觉母版权威裁定完成（2026-09-06）。用户已确认 FD-002，V-0.5.1 的五项冲突 CF-1～CF-5 全部裁定关闭。Master Authority Matrix 已建立（12 项资源，逐项标注权威等级与可影响维度）。工程模块 ID 命名空间已固定（PC-01 / PC-02 / PW-00～PW-06 / AI-01 / IMP-01），裸 ADM-xx 不得再指挥代码。English-first 台账已重建为逐条登记：硬编码用户可见中文 246 处，分布在 11 个文件（UI 207 + PLACEHOLDER 11 + OPTION 28），匹配源码行合计 278。十个工程模块的完整事实表（每模块 18 字段）已建立。**
+**当前位置：V-0.5.2B FD-003、Checkpoint 统一与 J-2 Recovery DoR 精度收口完成（2026-09-06）。FD-002 视觉母版权威裁定（V-0.5.2）已确认在先，V-0.5.1 的五项冲突 CF-1～CF-5 全部裁定关闭。Master Authority Matrix 已建立（12 项资源，逐项标注权威等级与可影响维度）。工程模块 ID 命名空间已固定（PC-01 / PC-02 / PW-00～PW-06 / AI-01 / IMP-01，共 11 个），裸 ADM-xx 不得再指挥代码。English-first 台账已重建为逐条登记：硬编码用户可见中文 246 处，分布在 11 个文件（UI 207 + PLACEHOLDER 11 + OPTION 28），匹配源码行合计 278。11 个工程模块的完整事实表（每模块 18 字段）已建立（此前误写"十个"，本次更正）。FD-003 — Context-Efficient Execution（高效分层阅读规则）已登记生效，唯一 checkpoint 分支核实为 origin/backup/admin-cms-j2。**
 
 **J-2 移动端 375px 验收：仍为 FAILED。J-2 整体视觉验收：仍为 SUSPENDED。origin/master 提升：仍 BLOCKED。运行来源：RUNTIME_NOT_PROVEN。FD-002 未改变任何验收状态，只是让 FAILED 第一次有了明确修复目标——VM1-ADM02-M375 规定的堆叠卡片列表。**
 
-**下一步：J-2 Product Center 的 Definition of Ready 已达成，等待 Codex 的 J-2 Product Center Recovery 单一完整施工单。PW-00 Workspace Shell（J-3）、AI-01、IMP-01 及后续模块均未开始，且 PW-00 自身 DoR 未达成。**
+**下一步：`J-2 Recovery DoR` 已达成（精确表述：仅代表 PC-01/PC-02 可开始受限范围的修复，不代表 J-2 已完成、视觉已通过或可推送 origin/master），等待 Codex 的 J-2 Product Center Recovery 单一完整施工单。PW-00 Workspace Shell（J-3）、AI-01、IMP-01 及后续模块均未开始，且 PW-00 自身 DoR 未达成。**
 
 ---
 
@@ -428,7 +428,7 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 **English-first 台账重建：** 逐行登记并六类分类。硬编码用户可见中文 **246 处 / 11 个文件**（UI 207 + PLACEHOLDER 11 + OPTION 28），另有 ARIA 6、COMMENT 26，`DATA` 类 0，匹配源码行合计 **278**。V-0.5.1 的"约 249 / 9 个文件"估算作废。零可见中文的合规文件 10 个。**本次只登记，未翻译。**
 
-**十模块完整事实表（每模块 18 字段）：**
+**11 个工程模块完整事实表（每模块 18 字段；此前误写"十模块"，本次更正）：**
 
 | 模块 | Implementation | DoR |
 |---|---|---|
@@ -510,3 +510,24 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 6. `docs/project/MASTER-ROADMAP.md`：本节记录
 
 **下一步：等待 Codex 下一份单一、完整模块施工单。**
+
+---
+
+#### M4-Next-V0.5.2B：FD-003、Checkpoint 统一与 J-2 Recovery DoR 精度收口 ✅（完成，本次）
+
+**状态：治理精度收口完成。仅修改 6 个治理文档；无业务代码、测试、schema、Directus、权限、数据、媒体改动。**
+
+**完成内容：**
+
+1. **FD-003 登记**：`ADMIN-CMS-GOVERNING-CHARTER-V1.md` 新增 Framework Decision FD-003 — Context-Efficient Execution，紧接 FD-002 后；设立 Tier A/B/C 三层阅读规则，只降低重复阅读成本，不降低任何 Gate/母版/数据合同/验收标准的适用范围。
+2. **CLAUDE.md**：新增 FD-003 阅读层级章节；开工报告模板新增 `Reading tier (FD-003)` 必填首行。
+3. **Blueprint**：§2 后新增一句交叉引用——FD-003 仅优化阅读效率，不得跳过模块依赖、母版、数据/API 合同、Gate 或验收，不改变模块顺序或 AI/Import 边界。
+4. **Checkpoint 唯一性核实**：`origin/backup/admin-cms-j2 = ed952d2`（与 HEAD 相同）；`origin/backup/j2` 在远端不存在（MISSING，非删除）。确认唯一有效 checkpoint 为 `origin/backup/admin-cms-j2`。
+5. **"十个工程模块" → "11 个工程模块" 修正**：Register §12.1i、CURRENT-STATE.md 第 6 节、本文件（当前位置段落 + 十模块表标题）三处更正，模块清单与既有事实内容不变。
+6. **J-2 Recovery DoR 精度收口**：Register 新增「J-2 Recovery DoR — precise scope」小节 + PC-01/PC-02 证据表；CURRENT-STATE.md 第 9 节与本文件"下一步"段落同步改写为精确表述——`J-2 Recovery DoR` 仅代表 PC-01/PC-02 可开始受限修复，不代表 J-2 完成/验收通过/可推送 master。裸 `(DG-10)` 历史代码标记本次不改，新文档一律用 `CH-DG-10`。
+
+**验证：** 本任务不涉及业务代码，故不运行 build/lint/typecheck/测试；仅 `git diff --check` 用于确认暂存内容无 whitespace 错误。
+
+**明确未触碰：** 任何业务代码、Vue、TypeScript、CSS、server API、tests、types、Directus schema、角色、权限、数据、媒体、来源记录、Docker、`.env`；`ed952d2` 未被回滚/amend/rebase/squash/重写；四项保护资料全程 `??`。
+
+**下一步：等待 Codex 的 J-2 Product Center Recovery 单一完整施工单。**

@@ -275,6 +275,36 @@ P2 inbox/admin-cms-ai-v1/README.md 的全部声明：保持不变，继续有效
 
 FD-002 不改写任何原始文件；它只在治理文档中记录用户如何使用这些文件。
 
+#### FD-003 — Context-Efficient Execution（高效分层阅读规则）
+
+| 项目 | 内容 |
+|------|------|
+| **决定编号** | FD-003 |
+| **决定名称** | Context-Efficient Execution |
+| **状态** | **Effective / 生效** |
+| **授权者** | 用户 |
+| **日期** | 2026-09-06 |
+| **关系** | 独立于 FD-001 / FD-002；不修改、不撤销二者 |
+
+**规则（三层，须准确表达）：**
+
+```text
+A. 新模块、框架/母版/数据合同/Gate 变化、新 Claude Session 接手大模块、
+   或推送 origin/master 前的最终验收：
+   必须完整读取当前治理文件（CLAUDE.md 七步阅读顺序全套）与该模块适用母版。
+
+B. 同一模块的后续子任务：
+   仅读取 CLAUDE.md、CURRENT-STATE.md、该模块 Blueprint/Register 章节、
+   适用母版、当前 Codex 施工单，以及相关代码/API/types/tests。
+
+C. 纯机械验证（重跑检查、核对 diff）：
+   仅读取当前施工单、相关文件、diff 与测试输出。
+```
+
+**不可跳过的底线：** 任何层级都不得跳过当前模块的 Gate、视觉母版、数据/API 合同、English-first 规则、验收条件或明确的不触碰范围——层级只降低"要重复读多少"，不降低"要满足什么"。Codex 当前施工单可以提高阅读要求（例如把 B 级任务临时提升为 A 级），但不得降低当前任务本应满足的读取要求。
+
+**作用范围（穷尽列举）：** FD-003 只优化重复阅读成本，不改变 Charter、Blueprint、Register 三者的权威关系，不降低任何代码或验收标准，不构成框架变更，不授权跳过 J 节施工顺序或任何 Decision Gate。
+
 ---
 
 ## E. 目标系统架构与前后端联动
@@ -931,6 +961,7 @@ Checkpoint 是远程备份，不等于已验收、已发布或可部署。
 | V1.1 (FD-001) | 2026-09-06 | 新增 Framework Decision FD-001 — 视觉与逻辑母版施工授权确认（User Confirmation of Admin Visual & Logic Masters） | 用户 |
 | V1.1（框架补全） | 2026-09-06 | 完整框架 11 项补充：E.4/E.5 域所有权与前台联动合同、F.4 不可偷跑规则、G.4 数据/API 合同、G.5 生命周期/并发/错误合同、H.4 AI 接入完整 Gate 链、I.2 渐进重构兼容原则、J 节施工顺序更新至 J-1.1 格式、K.2 开工声明扩展、M.2 新增 DG-10～DG-16、新增 Section N 非视觉质量合同、新增 Section O Definition of Ready/Done | 用户 |
 | V1.1 (FD-002) | 2026-09-06 | 新增 Framework Decision FD-002 — Master Authority & Responsive Adaptation（视觉母版权威与响应式适配裁定）。裁定 VM1 两张 ADM-02 母版为 J-2 主要实施依据；P2 inbox 图片降为视觉方向参考，不得单独决定路由/数据/API/交互/移动端；English-first 优先于母版中文；J-2 右侧采用 Product Control，AI 批量导入延后至 IMP-01；PC-01/PC-02 采用 375px 卡片列表原则，其余 Workspace 模块移动端阻塞；引入工程模块 ID 与 Source Asset ID 命名空间。解决 V-0.5.1 记录的 CF-1～CF-5 五项冲突。不授权 AI、导入、真实数据或发布 | 用户 |
+| V1.1 (FD-003) | 2026-09-06 | 新增 Framework Decision FD-003 — Context-Efficient Execution（高效分层阅读规则）。设立 A/B/C 三层阅读要求：新模块/框架变化/新 Session 接手/推送前最终验收须完整阅读；同模块后续子任务只读模块相关文件；纯机械验证只读当前施工单与 diff。层级只降低重复阅读成本，不降低任何 Gate、母版、数据/API 合同、English-first 或验收标准的适用范围，不构成框架变更 | 用户 |
 
 ### M.2 Open Decision Gates（用户待确认事项）
 

@@ -24,7 +24,7 @@ No normal construction task may change this Blueprint, the Charter, business mea
 6. Relevant Construction Pack, visual/logic master, current code, types, APIs, and tests.
 7. The bounded module contract and work order.
 
-Raw master status must remain truthful: visual files marked `DRAFT` are not edited. FD-001 records the user’s separate `USER-CONFIRMED FOR IMPLEMENTATION` authorization.
+Raw master status must remain truthful: visual files marked `DRAFT` are not edited. FD-001 records the user’s separate `USER-CONFIRMED FOR IMPLEMENTATION` authorization. FD-003 (Charter §D.2) sets reading-efficiency tiers for execution only; it may never be used to skip a module dependency, visual master, data/API contract, Gate, or acceptance step defined in this Blueprint, and it changes no module sequence, AI/import boundary, or existing data architecture.
 
 ## 3. Target architecture
 

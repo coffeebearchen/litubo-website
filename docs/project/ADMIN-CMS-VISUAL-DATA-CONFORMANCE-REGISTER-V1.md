@@ -983,7 +983,18 @@ No `DATA`-class occurrence exists: every Chinese string found is a hardcoded lit
 
 ### 12.1i Engineering module fact tables (V-0.5.2, complete — no summaries)
 
-One complete table per engineering module. `PW-00` is included because FD-002 makes it the gating prerequisite for `PW-01`…`PW-06`, though the work order's required ten are `PC-01`, `PC-02`, `PW-01`…`PW-06`, `AI-01`, `IMP-01`.
+One complete table per engineering module. There are **11 engineering modules** in total: `PC-01`, `PC-02`, `PW-00`, `PW-01`…`PW-06`, `AI-01`, `IMP-01`. `PW-00` is included in this count (not a twelfth, separate item) because FD-002 makes it the gating prerequisite for `PW-01`…`PW-06`; a table listing only ten and omitting `PW-00` understates the module set and must not be repeated.
+
+#### J-2 Recovery DoR — precise scope (PC-01 / PC-02 only)
+
+`J-2 Recovery DoR` means only that a bounded recovery work order may begin for `PC-01` and `PC-02`. It does **not** mean J-2 is complete, does **not** mean visual acceptance has passed, and does **not** authorise pushing `origin/master`. The two rows below are the complete recovery-DoR evidence for this stage; the full 11-module fact tables that follow remain the underlying record.
+
+| Module | Primary/supplementary assets | Fixable scope this recovery | Current acceptance | Conclusion |
+|---|---|---|---|---|
+| `PC-01` Product Center | `VM1-ADM02-D1440` / `VM1-ADM02-M375` (PRIMARY) | 1440px structure; 375px card-list layout; English-first; related API and tests | 375px **FAILED**; integrated **SUSPENDED** | Recovery work may start; this is **not** acceptance passing. |
+| `PC-02` Category Context | `P2-ADM02A-CATEGORY` (SUPPLEMENTARY only — accompanies the `PC-01` PRIMARY assets via the shared shell) | Layout; category context; English copy; navigation; product list | `SUSPENDED` | Structural recovery is allowed; the Category Health **indicator** stays blocked until `CH-DG-10` is resolved — render `Not assessed — rule not configured`, never a fabricated value. |
+
+Existing code that still shows the bare historical marker `(DG-10)` (e.g. `pages/admin/products/categories.vue`) is not changed by this task and remains correct per Blueprint §6.2 (Charter `DG-10` = `CH-DG-10`, no gate renumbered). From this point forward, new documents and new work orders use `CH-DG-10` explicitly.
 
 #### `PC-01` — Product Catalogue / All Products
 
