@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：M4 / P1 产品身份与来源记录基础（本次）已完成 — `products.product_code` 字段（UNIQUE，不可覆盖，状态门控）+ `product_source_records` archive 能力 + 最小 Admin API（list/create/archive）。下一步：用户确认真实资料后进入 P2 真实 LT-180C Draft 录入 → 9B AI 导入 → Content Center → 正式上线授权**
+**当前位置：Governing Charter V1 已建立，进入"母版对齐与结构施工"阶段（J-0/J-1 完成）。下一步：等待 ADM-02/02a 视觉母版 CONFIRMED 确认后，按 Charter J 节顺序推进 Product Center 重构（J-2）→ Product Workspace Shell（J-3）→ ADM-03～08（J-4）→ Media Library 视觉优化（J-5）→ AI Dossier（J-6，须单独授权）→ Import（J-7，须单独授权）→ 真实产品录入（J-8）→ 上线授权。**
 
 ---
 
@@ -13,8 +13,9 @@
 | M1 | Nuxt 框架 + 全站 Shell | ✅ 已完成 | Phase 1 |
 | M2 | Directus CMS 基础 + 产品数据模型 | ✅ 已完成 | Phase 2–3 |
 | M3 | 内容管理 + 询盘 + HubSpot + SEO | ✅ 已完成 | Phase 4–8 |
-| **M4** | **Product CMS Admin + 产品详情页（Phase 9A）** | **🔨 施工中** | **Phase 9A-1 / 9A-2** |
-| M5 | AI 产品资料导入助手（Phase 9B） | ⏳ 待授权 | Phase 9B |
+| **M4** | **Product CMS Admin + 产品详情页（Phase 9A）** | **🔨 Charter V1 生效，J-2 待视觉确认** | **Phase 9A-1 / 9A-2 / Charter J 节** |
+| M4.5 | Admin CMS 母版对齐与结构施工（Charter J-2～J-5） | ⏳ 待 ADM-02 CONFIRMED | Charter J-2 to J-5 |
+| M5 | AI 产品资料导入助手（Charter J-6/J-7，Phase 9B） | ⏳ 待单独授权 | Phase 9B |
 | M6 | ES/PT 内容审校与发布 | ⏳ 待授权 | Phase 10 |
 | M7 | HubSpot 生产激活（Phase 7B） | ⏳ 待用户操作 | Phase 7B |
 | M8 | 生产部署 + Cloudflare DNS 切换 | ⏳ 待授权 | Phase 11 |

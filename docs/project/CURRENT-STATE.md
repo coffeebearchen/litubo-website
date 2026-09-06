@@ -1158,4 +1158,32 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-04，由 Claude Code 在"9C-2 Media Library 基础版规划确认"任务中写入。*
+---
+
+## Governing Charter V1 建立（2026-09-06）
+
+**当前进入"母版对齐与结构施工"阶段。**
+
+| 项目 | 状态 |
+|------|------|
+| `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` | 已建立，生效中 |
+| Admin English UI — Phase A（products 界面英文化） | ✅ commit `008d708`，已 push |
+| Admin English UI — Phase B（media 界面英文化） | ✅ commit `4a88954`，已 push |
+| M5-A 审计（只读，零代码变更） | ✅ 已完成，报告已输出 |
+| Governing Charter V1 建立 | ✅ 当前任务（commit 待生成） |
+
+**下一步施工顺序（严格按序，每步须用户独立授权）：**
+
+1. **视觉母版确认**：等待用户/Codex 将 ADM-02、ADM-02a、ADM-03～08 参考图确认为 CONFIRMED 状态并更新 README_VISUAL_INDEX.md
+2. **Product Center 重构（J-2）**：ADM-02 + ADM-02a CONFIRMED 后才可开始代码施工
+3. **Product Workspace Shell（J-3）**：ADM-03～08 CONFIRMED 后才可开始
+4. **真实 LT-180C Draft 录入（M5-B）**：满足 M5-A 报告中所有准入条件后，须用户单独授权
+
+**明确禁止（无框架变更声明的情况下）：**
+- 零散 UI 文案任务不得绕过 Governing Charter 继续推进；
+- 不得以 DRAFT 状态的视觉母版作为正式代码施工依据；
+- 不得跳过 J-2 直接施工 J-3 及后续步骤。
+
+---
+
+*最后更新：2026-09-06，由 Claude Code 在"建立后台 CMS 治理总纲 V1"任务中写入。*

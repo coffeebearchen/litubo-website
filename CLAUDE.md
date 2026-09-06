@@ -75,6 +75,29 @@ The approved visual reference images are stored outside this repository during p
 
 ---
 
+## Mandatory Governing Charter Gate（Admin/CMS 任务强制前置）
+
+**每次接到任何 Admin/CMS 相关代码任务（包括 `/admin/*` 页面、`server/api/admin/*` API、`components/admin/`、`types/product-cms.ts` 相关改动），Claude 必须：**
+
+1. 首先阅读 `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md`；
+2. 在开工报告中声明以下内容（缺少则不得开始修改代码）：
+   ```text
+   Framework version: Governing Charter V1
+   Relevant Charter sections: [本次相关章节 A/B/C/...]
+   Relevant visual/logic master: [精确路径 + CONFIRMED/DRAFT 状态]
+   Current milestone: [当前处于 J-? 阶段]
+   Scope is aligned / conflict found: [对齐 / 冲突说明]
+   Files explicitly excluded: [禁止暂存的文件]
+   ```
+3. 若对应视觉母版状态不是 `CONFIRMED`，**停止施工并报告**，不得自行设计或参照 DRAFT 图开始正式代码；
+4. 若发现代码、文档、视觉母版或施工单之间存在矛盾，**停止施工并报告冲突**；
+5. 不得把文案翻译误报为视觉母版落地；
+6. 不得把全局 Media Library（`/admin/media`）当作产品专属 Media & Resources（ADM-04）；
+7. 不得把尚未实现的 AI / Import 功能描述为已完成；
+8. 没有用户明确宣布"框架变更 / 替换框架 / 修订 Governing Charter"，不得改变架构方向。
+
+---
+
 ## New session handoff protocol (mandatory for every new conversation)
 
 **Before touching any file, a new Claude session MUST:**
