@@ -143,7 +143,7 @@
 
 ## 4. 当前状态 — Admin Auth SSR 自动续期（2026-09-06）
 
-**状态：SSR 自动续期完成。代码、测试、typecheck、lint、build 全部通过。等待用户浏览器验收与 commit 授权。未 push、未部署。**
+**状态：SSR 自动续期完成。代码、测试、typecheck、lint、build 全部通过。浏览器核心验收通过（见下表）。未 push、未部署。**
 
 > **前序：** P1 product_code + zero-source 收口已在 commit 7cdb359 完成；Admin SSR 重定向已在 commit f04f1e4 补齐。
 
@@ -181,6 +181,7 @@
 | npm run lint：0 errors | ✅ |
 | npx nuxt build：Build complete | ✅ |
 | git diff --check：仅 LF/CRLF 警告 | ✅ |
+| 真实 Chrome 核心验收：删除 admin_at、保留 admin_rt 后，新标签直接访问 /admin/products 正常进入后台（URL 未跳转至 /admin/login，SSR 续期生效）| ✅ |
 
 #### 明确未触碰
 

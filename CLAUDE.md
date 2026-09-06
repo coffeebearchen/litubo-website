@@ -40,6 +40,25 @@ The approved visual reference images are stored outside this repository during p
 6. Make a local Git commit only when the module is accepted or the user explicitly requests it. Never push without authorization.
 7. Keep the governing principle visible in decisions: **framework before details; make the full flow work before optimizing; modular, upgradeable, flexible, and low rework.**
 
+## Codex–Claude 完整施工单与模块闭环规则（固定）
+
+1. Codex 每次发给 Claude 的任务，必须视为一份完整、自包含、可一次执行的 Markdown 施工单；
+2. Claude 不得要求用户把同一施工单拆成多段复制，也不得要求用户自行判断哪些文字属于指令；
+3. 固定模块流程：
+
+   ```text
+   一份施工单
+   → Claude 自动完成代码、测试、构建与本地 commit
+   → 只有确实需要时，用户登录一次
+   → Claude 集中完成浏览器验收
+   → Codex 给出一份完整的备份 / GitHub PUSH 指令
+   ```
+
+4. 除认证、权限或真实业务确认确有必要外，Claude 不得反复要求用户进行 F12、Cookie、逐页点击或重复登录；
+5. Claude 必须先完成自动化验证，再一次性请求必要的用户登录或业务确认；
+6. 模块完成后，Claude 必须输出完整报告并停止，等待 Codex 的下一份完整施工单；
+7. GitHub push、部署、真实数据操作仍须以 Codex 的完整施工单为准。
+
 ## UX and responsive rules
 
 - Desktop: `Products`, `Applications`, `Resources`, `Support`, and `Company` use the confirmed mega-menu patterns.
