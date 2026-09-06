@@ -2,11 +2,11 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：V-0.5.1 审计证据补正完成（2026-09-06）。Register 证据已达标：12 张母版逐张登记（V-0.5 遗漏 2 张 ADM-02 母版已补入）、发现两套资料包权威冲突、9 项 V-0.5 事实错误已更正、English-first 完整台账已建立（约 249 处可见中文分布在 9 个文件）。**
+**当前位置：V-0.5.2 FD-002 视觉母版权威裁定完成（2026-09-06）。用户已确认 FD-002，V-0.5.1 的五项冲突 CF-1～CF-5 全部裁定关闭。Master Authority Matrix 已建立（12 项资源，逐项标注权威等级与可影响维度）。工程模块 ID 命名空间已固定（PC-01 / PC-02 / PW-00～PW-06 / AI-01 / IMP-01），裸 ADM-xx 不得再指挥代码。English-first 台账已重建为逐条登记：硬编码用户可见中文 246 处，分布在 11 个文件（UI 207 + PLACEHOLDER 11 + OPTION 28），匹配源码行合计 278。十个工程模块的完整事实表（每模块 18 字段）已建立。**
 
-**J-2 移动端 375px 验收：FAILED（用户截图确认横向滚动条、标题被裁切、桌面表格右列不可见）。J-2 整体视觉验收：SUSPENDED。origin/master 提升：BLOCKED。运行来源：RUNTIME_NOT_PROVEN。**
+**J-2 移动端 375px 验收：仍为 FAILED。J-2 整体视觉验收：仍为 SUSPENDED。origin/master 提升：仍 BLOCKED。运行来源：RUNTIME_NOT_PROVEN。FD-002 未改变任何验收状态，只是让 FAILED 第一次有了明确修复目标——VM1-ADM02-M375 规定的堆叠卡片列表。**
 
-**下一步：CF-1～CF-5 五项事实冲突（ADM 编号命名空间、P2 包权威、ADM-02a–08 缺 375px 母版、母版中文 UI 与 English-first、ADM-02 右栏契约）须由 Codex 裁定；裁定后方可发下一份单一、完整模块施工单。J-3 Workspace Shell 及后续均未开始。**
+**下一步：J-2 Product Center 的 Definition of Ready 已达成，等待 Codex 的 J-2 Product Center Recovery 单一完整施工单。PW-00 Workspace Shell（J-3）、AI-01、IMP-01 及后续模块均未开始，且 PW-00 自身 DoR 未达成。**
 
 ---
 
@@ -402,7 +402,45 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 ---
 
-*最后更新：2026-09-06，V-0.5.1 审计证据补正完成写入。*
+*最后更新：2026-09-06，V-0.5.2 FD-002 视觉母版权威裁定完成写入。*
+
+---
+
+#### M4-Next-V0.5.2：FD-002 视觉母版权威裁定与证据闭环（2026-09-06）
+
+**状态：完成。这是 J-2 Product Center Recovery 的 Definition of Ready 前置条件。仅修改 6 个治理文档，无业务代码变更。**
+
+**⚠️ 本条不代表 J-2、J-3 或 AI 任何一项完成。** J-2 移动端 375px 仍为 FAILED，整体视觉验收仍为 SUSPENDED，`origin/master` 仍 BLOCKED。
+
+**FD-002 已生效**（`ADMIN-CMS-GOVERNING-CHARTER-V1.md`，紧接 FD-001）。授权者为用户，状态 Effective，细化 FD-001 而不撤销它。只解决五件事：视觉文件权威、English-first、右侧 Product Control、移动端适配、命名空间。**不授权 AI、批量导入、真实数据写入、发布或 master 推送。**
+
+**CF-1 ～ CF-5 全部关闭：**
+
+| # | 裁定 |
+|---|------|
+| CF-1 | 两套命名空间：工程模块 ID（`PC-01` `PC-02` `PW-00`～`PW-06` `AI-01` `IMP-01`）+ Source Asset ID（`VM1-*` / `P2-*`）。裸 `ADM-xx` 不得指挥代码。Gate 前缀固定为 `CH-DG-xx` / `BP-DG-xx`，无 Gate 被重新编号 |
+| CF-2 | P2 保留为用户确认的视觉方向参考；其 README 的「非独立代码规格」规则继续有效，不得单独决定路由/数据/API/权限/交互/移动端 |
+| CF-3 | `PC-01` + `PC-02` 采用 375px 卡片列表原则；`PW-01`～`PW-06` 移动端在各自适配合同获授权前一律阻塞 |
+| CF-4 | English-first 高于母版中文；母版中文仅作信息层级与布局参考 |
+| CF-5 | J-2 右侧采用 Product Control；AI 批处理入口延后至 `IMP-01`，现在不得实现、不得伪造可用状态、不得展示假数据 |
+
+**Master Authority Matrix（12 项）：** `VM1-ADM02-D1440` 与 `VM1-ADM02-M375` 为 `PC-01` 的 **PRIMARY**（后者同时覆盖 `PC-02` 的 375px）；八张 P2 图为对应 `PC-02` / `PW-01`～`PW-06` 的 **SUPPLEMENTARY**；`VM1-LOGIC01` / `VM1-LOGIC02` 为 `AI-01` / `IMP-01` 的 **FUTURE-REFERENCE**，不构成任何开工授权。截图仅为验收证据，仓库/Directus 仅证明存在性，均非设计来源。
+
+**English-first 台账重建：** 逐行登记并六类分类。硬编码用户可见中文 **246 处 / 11 个文件**（UI 207 + PLACEHOLDER 11 + OPTION 28），另有 ARIA 6、COMMENT 26，`DATA` 类 0，匹配源码行合计 **278**。V-0.5.1 的"约 249 / 9 个文件"估算作废。零可见中文的合规文件 10 个。**本次只登记，未翻译。**
+
+**十模块完整事实表（每模块 18 字段）：**
+
+| 模块 | Implementation | DoR |
+|---|---|---|
+| `PC-01` | `AUTOMATED_CHECKED` | **MET** — 可发 J-2 recovery 施工单 |
+| `PC-02` | `AUTOMATED_CHECKED` | PARTIAL — 布局可改，健康度值仍被 `CH-DG-10` 阻塞 |
+| `PW-00` | `NOT_STARTED` | **NOT MET** — 门禁前提，无 PRIMARY 资源定义 |
+| `PW-01` `PW-02` `PW-03` `PW-05` | `LEGACY` | NOT MET |
+| `PW-04` | `NOT_STARTED` | NOT MET |
+| `PW-06` | `IN_DISCOVERY` | NOT MET |
+| `AI-01` `IMP-01` | `NOT_STARTED` | NOT MET |
+
+**下一步：等待 Codex 的 J-2 Product Center Recovery 单一完整施工单。**
 
 ---
 

@@ -1860,3 +1860,144 @@ J-2 移动端 375px 仍为 **FAILED**；J-2 整体视觉验收仍为 **SUSPENDED
 CF-1～CF-5 五项事实冲突须由 Codex 裁定后，方可编写下一份模块施工单。等待 Codex 下一份单一、完整施工单。
 
 *最后更新：2026-09-06，由 Claude Code 在"V-0.5.1 视觉与数据对齐审计证据补正"任务中写入。*
+
+---
+
+## V-0.5.2 FD-002 视觉母版权威裁定与证据闭环（2026-09-06）
+
+**状态：FD-002 已生效。V-0.5.1 记录的五项冲突 CF-1～CF-5 全部裁定关闭。J-2 Product Center 的 Definition of Ready 已建立。仅修改 6 个治理文档，无任何业务代码、测试、CSS、schema、Directus、权限、数据改动。**
+
+### 1. FD-002 已生效
+
+用户已明确确认 **FD-002 — Master Authority & Responsive Adaptation**，写入位置：`docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` 框架决定章节，紧接 FD-001 之后。
+
+| 项目 | 内容 |
+|------|------|
+| 授权者 | 用户 |
+| 状态 | **Effective / 生效** |
+| 关系 | 细化 FD-001；不修改、不撤销 FD-001 |
+| 权限层级 | Charter 仍高于 Blueprint；Blueprint 仍高于 Register |
+
+**FD-002 只解决五件事：** 视觉文件权威 · English-first · 右侧 Product Control · 移动端适配 · 命名空间。
+
+**FD-002 明确不授权：** AI 功能、批量导入、真实产品数据写入、任何内容发布、跳过 Charter J 节顺序、`origin/master` 推送。
+
+**原始资料包状态保持不变：** VM1 索引中 ADM-02 行的 `DRAFT` 标记、P2 `README.md` 的全部声明均未被修改，四项保护资料全程 `??`。
+
+### 2. CF-1 ～ CF-5 逐项裁定结果
+
+| # | 裁定 | 状态 |
+|---|------|------|
+| **CF-1** | 引入两套命名空间解决 ADM 编号碰撞：工程模块 ID（`PC-01` `PC-02` `PW-00`～`PW-06` `AI-01` `IMP-01`）+ Source Asset ID（`VM1-*` / `P2-*`）。**裸 `ADM-xx` 不得指挥代码。** Gate 前缀明确为 `CH-DG-xx`（Charter）与 `BP-DG-xx`（Blueprint）；Charter `DG-10` = `CH-DG-10`，无任何 Gate 被重新编号 | **CLOSED** |
+| **CF-2** | P2 图片保留为用户确认的视觉方向参考（FD-001），同时其 README 的「非独立代码规格」规则继续完全有效——不得单独决定路由、数据/API、权限、交互或移动端结构 | **CLOSED** |
+| **CF-3** | `PC-01` 与 `PC-02` 采用 `VM1-ADM02-M375` 的卡片列表原则（375px 不得出现横向滚动桌面表格）；`PW-01`～`PW-06` **在各自移动端适配合同获 Codex 施工单授权前，375px 一律阻塞** | **CLOSED** |
+| **CF-4** | English-first 高于母版图中的中文。母版中的中文仅作信息层级、布局与视觉关系参考，不得照抄为可见文案 | **CLOSED** |
+| **CF-5** | J-2 右侧功能区采用 **Product Control**。`VM1-ADM02-D1440` 中可见的「AI 批处理入口」属未来 `IMP-01`，现在不得实现、不得展示为"即将可用"、不得显示任何假 AI 状态或假数据 | **CLOSED** |
+
+### 3. Master Authority Matrix（Register §4.4，12 项）
+
+每项资源登记：Source Asset ID · 实际路径 · 原始状态 · 可使用范围 · 不可使用范围 · 对应工程模块 · 允许影响维度 · 权威等级 · 证据状态。
+
+| Source Asset ID | 工程模块 | 权威等级 |
+|---|---|---|
+| `VM1-ADM02-D1440` | `PC-01` | **PRIMARY**（桌面 1440px） |
+| `VM1-ADM02-M375` | `PC-01`、`PC-02` | **PRIMARY**（375px 响应式） |
+| `P2-ADM02-ALL` | `PC-01` | SUPPLEMENTARY |
+| `P2-ADM02A-CATEGORY` | `PC-02` | SUPPLEMENTARY |
+| `P2-ADM03-SPECS` | `PW-01` | SUPPLEMENTARY |
+| `P2-ADM04-MEDIA` | `PW-02` | SUPPLEMENTARY |
+| `P2-ADM05-CONTENT` | `PW-03` | SUPPLEMENTARY |
+| `P2-ADM06-RELATIONS` | `PW-04` | SUPPLEMENTARY |
+| `P2-ADM07-SEO` | `PW-05` | SUPPLEMENTARY |
+| `P2-ADM08-SOURCES` | `PW-06` | SUPPLEMENTARY |
+| `VM1-LOGIC01` | `AI-01` | FUTURE-REFERENCE |
+| `VM1-LOGIC02` | `IMP-01` | FUTURE-REFERENCE |
+
+**非资源证据的权威上限：** 截图 = 仅验收证据，非设计来源；仓库/Directus/运行服务 = 仅证明"事实是否存在"，不决定设计方向；自动化测试 = 仅证明代码满足自身断言，不构成视觉验收。
+
+### 4. J-2 移动端仍为 FAILED
+
+FD-002 **未改变** J-2 的验收状态。用户 375px 截图确认的四项缺陷（横向滚动条、标题被裁切、桌面表格右列出界、必须横向拖动）依然成立：
+
+```text
+PC-01 Product Center
+Evidence:                     SCREENSHOT_CONFIRMED
+Mobile 375px acceptance:      FAILED
+Integrated visual acceptance: SUSPENDED
+origin/master promotion:      BLOCKED
+Runtime provenance:           RUNTIME_NOT_PROVEN
+```
+
+FD-002 的作用是**让这个 FAILED 第一次有了明确的修复目标**：`VM1-ADM02-M375` 规定的堆叠卡片列表。
+
+### 5. English-first 台账已重建为逐条登记
+
+V-0.5.1 只给了估算数字（"约 249 处 / 9 个文件"）且缺乏行级依据。V-0.5.2 已重建为逐行表格（Register §12.1b–12.1d），并按 UI / PLACEHOLDER / OPTION / ARIA / DATA / COMMENT 六类分类。
+
+| 分类 | 数量 | 是否属 English-first 范围 |
+|------|---:|---|
+| `UI` | **207** | 是 |
+| `PLACEHOLDER` | **11** | 是 |
+| `OPTION` | **28** | 是 |
+| `ARIA` | 6 | 独立无障碍处理 |
+| `DATA`（真实中文业务数据） | **0** | 不适用——未发现 |
+| `COMMENT` | 26 | 范围外，可保留 |
+| **匹配源码行合计** | **278** | — |
+
+> **硬编码用户可见中文 = UI + PLACEHOLDER + OPTION = 246 处，分布在 11 个文件。**
+
+此 246 由 Register §12.1e 的逐条表格求和得出，与本节数字完全一致。V-0.5.1 的"约 249 / 9 个文件"作废。零可见中文的合规文件共 10 个。
+
+**本任务只登记，未翻译、未修改任何文案。**
+
+### 6. 十个工程模块完整事实表（Register §12.1i）
+
+每个模块登记 18 个字段（Source Asset ID · 目标路由 · 当前实际路由 · 页面与共享组件 · server API · types/数据关系 · 可复用 · 缺失 · Charter Gate · Blueprint Gate · English-first · Desktop 证据 · Mobile 375px 证据 · Implementation · Evidence · Acceptance · DoR · 下一步）。
+
+| 模块 | Implementation | Acceptance | DoR |
+|------|---------------|-----------|-----|
+| `PC-01` | `AUTOMATED_CHECKED` | 375px **FAILED**，整体 **SUSPENDED** | **MET**（可发 J-2 recovery 施工单） |
+| `PC-02` | `AUTOMATED_CHECKED` | `SUSPENDED` | PARTIAL（布局可改；健康度值仍被 `CH-DG-10` 阻塞） |
+| `PW-00` | `NOT_STARTED`（Shell 不存在） | `NOT_REVIEWED` | **NOT MET** |
+| `PW-01` | `LEGACY` | `NOT_REVIEWED` | NOT MET（`BP-DG-04`） |
+| `PW-02` | `LEGACY` | `NOT_REVIEWED` | NOT MET（`CH-DG-12` / `BP-DG-05` + J-3.5） |
+| `PW-03` | `LEGACY` | `NOT_REVIEWED` | NOT MET（`CH-DG-13` / `BP-DG-07`） |
+| `PW-04` | **`NOT_STARTED`** | `NOT_REVIEWED` | NOT MET（`BP-DG-08`，schema 未定义） |
+| `PW-05` | `LEGACY` | `NOT_REVIEWED` | NOT MET（`CH-DG-14` / `BP-DG-09`） |
+| `PW-06` | **`IN_DISCOVERY`** | `NOT_REVIEWED` | NOT MET（`BP-DG-06` + J-3.5） |
+| `AI-01` | `NOT_STARTED` | `NOT_REVIEWED` | NOT MET |
+| `IMP-01` | `NOT_STARTED` | `NOT_REVIEWED` | NOT MET |
+
+**`PW-00` Product Workspace Shell 是 `PW-01`～`PW-06` 的门禁前提，本身 DoR 未达成**——没有任何单一 PRIMARY 资源定义它，完整度栏被 `CH-DG-11` / `BP-DG-02` 阻塞，375px 合同被 CF-3 阻塞。
+
+### 7. 本次修改的 6 个文件
+
+| 文件 | 最小修改 |
+|------|---------|
+| `CLAUDE.md` | 开工报告模板新增「工程模块 ID + Source Asset ID + Desktop/Mobile 验收依据 + CH-DG/BP-DG」必填项；新增 FD-002 命名空间规则段 |
+| `ADMIN-CMS-GOVERNING-CHARTER-V1.md` | 新增 FD-002 完整记录（七条裁定 + 作用范围 + 不授权清单 + 原始状态保持声明）；变更历史表新增一行 |
+| `ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` | 新增 §6.1 工程模块 ID 映射表（11 项）+ 4 条规则；新增 §6.2 Gate 前缀表；§12 命名空间规则改写为 `CH-DG-xx` |
+| `ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md` | §4.3 CF-1～CF-5 改为裁定表；新增 §4.4 Master Authority Matrix（12 项 + 非资源证据上限 + 6 条命名空间规则）；§12.1 重建为逐条台账（12.1a–12.1h）；新增 §12.1i 十模块完整事实表 |
+| `CURRENT-STATE.md` | 本节 |
+| `MASTER-ROADMAP.md` | 当前位置更新；新增 V-0.5.2 里程碑并标明为 J-2 Recovery 的 DoR 前置条件 |
+
+**未修改：** `docs/project/09-claude-first-read-only-instruction.md`，以及任何业务代码。
+
+### 8. 禁止声明（已遵守）
+
+- 未修改任何业务代码、Vue、TypeScript、CSS、server API、tests、types、Directus schema、角色、权限、Policy、Docker、`.env`、部署配置、真实产品、媒体、来源记录或数据库数据
+- 未使用 `git add .` / `git add -A` / `git reset --hard` / `git clean` / `git stash` / `git restore` / `git checkout --` / `git rebase` / `git commit --amend` / `git push --force` / `git push origin master`
+- 10 个受保护 commit（`178b340` `317bec0` `fdc83d2` `5821289` `4a74e42` `69c0e18` `948ad9b` `5ea32f9` `9a9d306` `46d0bc5`）经 `git merge-base --is-ancestor` 验证全部仍在 HEAD 祖先链中
+- 四项保护资料全程 `??`，未移动、改名、修改、暂存或提交
+- 未运行 build / lint / typecheck / 业务测试（本任务不改业务代码）
+- 无浏览器登录、无凭证输出、无 master push、无部署
+
+### 9. 下一步
+
+J-2 Product Center 的 **Definition of Ready 已达成**：PRIMARY 资源（桌面 + 375px）已确定、目标路由存在、右栏契约固定为 Product Control、English-first 固定、移动端原则固定。Readiness 与 Needs Attention 的**数值**仍被 `CH-DG-11` / `BP-DG-02` 阻塞，必须继续显示为 "Not assessed"。
+
+J-2 移动端 375px 仍为 **FAILED**；整体视觉验收仍为 **SUSPENDED**；`origin/master` 仍 **BLOCKED**。`PW-00`（J-3）、`AI-01`、`IMP-01` 及后续模块**均未开始**。
+
+等待 Codex 的 **J-2 Product Center Recovery 单一完整施工单**。
+
+*最后更新：2026-09-06，由 Claude Code 在"V-0.5.2 FD-002 视觉母版权威裁定与证据闭环"任务中写入。*

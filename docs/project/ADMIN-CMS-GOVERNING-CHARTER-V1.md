@@ -198,6 +198,83 @@ USER-CONFIRMED FOR IMPLEMENTATION。
 - 全局 Media Library（ADM-12）**不得等同于**产品专属 ADM-04；
 - 施工顺序仍严格按照 Charter J 节执行，不因本确认而跳步。
 
+#### FD-002 — Master Authority & Responsive Adaptation（视觉母版权威与响应式适配裁定）
+
+| 项目 | 内容 |
+|------|------|
+| **决定编号** | FD-002 |
+| **决定名称** | Master Authority & Responsive Adaptation |
+| **日期** | 2026-09-06 |
+| **状态** | **Effective / 生效** |
+| **授权者** | 用户 |
+| **关系** | 细化 FD-001；不修改、不撤销 FD-001 |
+
+**背景：** V-0.5.1 只读审计发现视觉资料分属两个独立且不一致的资料包，并记录了五项事实冲突（CF-1 ～ CF-5）。FD-002 是用户对这些冲突的正式裁定。
+
+**裁定内容（七条，须原样保留其含义）：**
+
+```text
+1. 下列两张 VM1 文件是 J-2 Product Center 的主要实施视觉依据：
+   docs/design-reference/CMS-AI-VISUAL-MASTER-V1/admin/desktop-1440/LITUBO_CMS_ADM-02_Product-Center__default__desktop-1440__v01.png
+   docs/design-reference/CMS-AI-VISUAL-MASTER-V1/admin/mobile-375/LITUBO_CMS_ADM-02_Product-Center__default__mobile-375__v01.png
+
+2. docs/design-reference/inbox/admin-cms-ai-v1/reference-images/ 中的图片保留为
+   用户确认的视觉方向参考；但其 README 明确说明它们不是独立代码规格，
+   因此不得单独决定路由、数据/API、交互或移动端结构。
+
+3. 后台所有可见 UI 以 English-first 为准。母版中的中文只作为信息层级、布局
+   和视觉关系参考，不得照抄为可见中文文案。
+
+4. J-2 当前右侧功能区采用 Product Control。AI 批量导入属于未来 IMP-01，
+   目前不得实现、不得伪造可用状态、不得展示假 AI 数据。
+
+5. PC-01 Product Center 与 PC-02 Category Context 的 375px 行为采用
+   VM1 ADM-02 mobile-375 的卡片列表原则：不得出现横向滚动桌面表格。
+
+6. 其余 Product Workspace 页面没有已批准的独立移动端适配合同；在每个模块的
+   移动端适配合同获得 Codex 施工单授权前，不得施工。
+
+7. 此决定细化 FD-001，但不修改、不删除、不伪造任何原始资料包中的
+   DRAFT、README 或历史状态。
+```
+
+**FD-002 的作用范围（穷尽列举）：**
+
+FD-002 **只**解决以下五件事，不涉及其他任何主题：
+
+| 范围 | 裁定 |
+|------|------|
+| 视觉文件权威 | VM1 与 P2 两套资料包的权威等级与可使用范围 |
+| English-first | 可见 UI 一律英文，优先于母版图中的中文 |
+| 右侧功能区 | J-2 采用 Product Control，非 AI 批处理入口 |
+| 移动端适配 | PC-01 / PC-02 采用卡片列表原则；其余模块阻塞 |
+| 命名空间 | 工程模块 ID 与 Source Asset ID 取代模糊的 `ADM-xx` 编号 |
+
+**FD-002 明确不授权：**
+
+```text
+不授权 AI 功能（AI-01 仍未开始）。
+不授权批量导入（IMP-01 仍未开始）。
+不授权真实产品数据写入。
+不授权任何内容发布。
+不授权跳过 Charter J 节施工顺序。
+不授权 origin/master 推送。
+```
+
+**权威关系不变：**
+
+Charter 仍高于 Blueprint；Blueprint 仍高于 Register。FD-002 作为 Charter 内的框架决定，与 FD-001 同级，均属于「用户明确决定」这一最高事实层级。
+
+**原始资料包状态保持不变：**
+
+```text
+VM1 README_VISUAL_INDEX.md 中 ADM-02 行的 DRAFT 标记：保持不变。
+P2 inbox/admin-cms-ai-v1/README.md 的全部声明：保持不变，继续有效。
+两套资料包全程保持 ?? 未跟踪，不被修改、改名、暂存或提交。
+```
+
+FD-002 不改写任何原始文件；它只在治理文档中记录用户如何使用这些文件。
+
 ---
 
 ## E. 目标系统架构与前后端联动
@@ -853,6 +930,7 @@ Checkpoint 是远程备份，不等于已验收、已发布或可部署。
 | V1 | 2026-09-06 | 初始建立 | 用户 |
 | V1.1 (FD-001) | 2026-09-06 | 新增 Framework Decision FD-001 — 视觉与逻辑母版施工授权确认（User Confirmation of Admin Visual & Logic Masters） | 用户 |
 | V1.1（框架补全） | 2026-09-06 | 完整框架 11 项补充：E.4/E.5 域所有权与前台联动合同、F.4 不可偷跑规则、G.4 数据/API 合同、G.5 生命周期/并发/错误合同、H.4 AI 接入完整 Gate 链、I.2 渐进重构兼容原则、J 节施工顺序更新至 J-1.1 格式、K.2 开工声明扩展、M.2 新增 DG-10～DG-16、新增 Section N 非视觉质量合同、新增 Section O Definition of Ready/Done | 用户 |
+| V1.1 (FD-002) | 2026-09-06 | 新增 Framework Decision FD-002 — Master Authority & Responsive Adaptation（视觉母版权威与响应式适配裁定）。裁定 VM1 两张 ADM-02 母版为 J-2 主要实施依据；P2 inbox 图片降为视觉方向参考，不得单独决定路由/数据/API/交互/移动端；English-first 优先于母版中文；J-2 右侧采用 Product Control，AI 批量导入延后至 IMP-01；PC-01/PC-02 采用 375px 卡片列表原则，其余 Workspace 模块移动端阻塞；引入工程模块 ID 与 Source Asset ID 命名空间。解决 V-0.5.1 记录的 CF-1～CF-5 五项冲突。不授权 AI、导入、真实数据或发布 | 用户 |
 
 ### M.2 Open Decision Gates（用户待确认事项）
 

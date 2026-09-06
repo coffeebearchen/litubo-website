@@ -212,20 +212,36 @@ Claude must never:
 Every Admin/CMS task opening report must declare all of the following before any code or file is modified:
 
 ```text
-Framework version: Governing Charter V1.1 + Implementation Blueprint V1
-Current module: J-?
+Framework version: Governing Charter V1.1 (FD-001 + FD-002) + Implementation Blueprint V1
+Engineering module ID: [PC-01 / PC-02 / PW-00 / PW-01…PW-06 / AI-01 / IMP-01 — never a bare ADM-xx]
+Blueprint stage: J-?
 Governing docs read: [list each file including Register]
-Register row confirmed: [ADM-xx / Logic-xx — Implementation / Evidence / Acceptance status; DoR met: yes / blocked]
-Applicable visual/logic master: [exact path + CONFIRMED/DRAFT/FD-001 status]
+Register row confirmed: [module ID — Implementation / Evidence / Acceptance status; DoR met: yes / blocked]
+Source Asset ID(s): [VM1-* / P2-* from Register §4.4, each with its authority level]
+  - PRIMARY asset(s): [exact path + viewport]
+  - SUPPLEMENTARY asset(s): [exact path — may refine hierarchy/spacing only]
 Target route: [exact Nuxt route confirmed in Register]
+Current actual route: [exists / absent]
 Shared shell: [Product Catalogue Shell or Product Workspace Shell — existing component or prerequisite work needed]
 Pre-requisite dependencies met: [yes / blocked — specify which prior module is incomplete]
-Applicable Charter DG-xx (if any): [DG-# + current status]
-Applicable Blueprint BP-DG-xx (if any): [BP-DG-# + current status]
+Applicable Charter Gate CH-DG-xx: [CH-DG-# + current status]
+Applicable Blueprint Gate BP-DG-xx: [BP-DG-# + current status]
 Data/API boundary: [relevant Blueprint Section 7 contract; preserve-first items listed]
-English-first scope: [visible UI strings affected by this module]
+English-first scope: [visible UI strings affected — cite Register §12.1 line numbers]
+Desktop acceptance basis: [which Source Asset defines 1440px, or "no approved desktop contract"]
+Mobile 375px acceptance basis: [which Source Asset defines 375px, or "BLOCKED — no approved
+  mobile adaptation contract"; PW-01…PW-06 are blocked until Codex authorises one]
 Acceptance criteria: [including empty / error / no-permission / 1440px + 375px breakpoints]
 Explicitly out of scope: [files and domains not touched this module]
 ```
 
 Claude must not start code changes for any Admin/CMS module unless the Register row for that module confirms Definition of Ready (DoR). If the relevant Register row is missing or shows `IN_DISCOVERY` / `NOT_REVIEWED`, stop and report before writing code.
+
+**Namespace rules (fixed by FD-002, 2026-09-06):**
+
+- A work order that cites only a bare `ADM-xx` is **not actionable** — the number means different modules in `README_VISUAL_INDEX.md` and in the Blueprint. Stop and report rather than infer which is meant.
+- Every code work order must name **both** the engineering module ID (Blueprint §6.1) **and** the Source Asset ID(s) (Register §4.4).
+- A `SUPPLEMENTARY` asset may never be the sole basis for a change; it must accompany a `PRIMARY` asset or an approved written contract.
+- A `FUTURE-REFERENCE` asset (`VM1-LOGIC01`, `VM1-LOGIC02`) never authorises implementation.
+- Screenshots are acceptance evidence only, never a design source. Repository and Directus state prove existence only, never design direction.
+- Charter gates are written `CH-DG-xx`; Blueprint gates `BP-DG-xx`. They are independent namespaces and neither may be inferred from the other.

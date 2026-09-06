@@ -125,6 +125,44 @@ draft → review → published → archived
 
 An Admin route is complete only when it has real data/API, role boundary, empty/loading/error/no-permission states, desktop/375px behavior, tests, and acceptance evidence. No menu-only or static mock modules are allowed.
 
+### 6.1 Engineering module IDs (fixed by FD-002, 2026-09-06)
+
+The unprefixed `ADM-xx` numbers above originate from visual reference filenames and are **ambiguous across packages**: `README_VISUAL_INDEX.md` assigns `ADM-04`–`ADM-08` to a single-product Dossier and `ADM-09`–`ADM-11` to an import queue, while the table in §6 assigns those same numbers to Media, Page Content, Relations, SEO and Sources. FD-002 resolves this by introducing engineering module IDs that are independent of any filename.
+
+| Engineering module ID | Module | §6 visual row | Blueprint stage |
+|---|---|---|---|
+| `PC-01` | Product Catalogue / All Products | ADM-02 | J-2 |
+| `PC-02` | Category Context | ADM-02a | J-2 |
+| `PW-00` | Product Workspace Shell | — (shared shell, no single visual row) | J-3 |
+| `PW-01` | Specifications | ADM-03 | J-4 |
+| `PW-02` | Media & Resources | ADM-04 | J-5 |
+| `PW-03` | Page Content | ADM-05 | J-6b |
+| `PW-04` | Relations | ADM-06 | J-6c |
+| `PW-05` | SEO & Locales | ADM-07 | J-6d |
+| `PW-06` | Sources & History | ADM-08 | J-6a |
+| `AI-01` | Single Product Dossier | Logic 01 | J-7 |
+| `IMP-01` | Import Review Queue | Logic 02 | J-8 |
+
+Rules:
+
+1. **An engineering module ID is not a visual filename.** `PW-02` is the Media & Resources module; it is not "the file named ADM-04". The two namespaces are related only through this table.
+2. **An unprefixed `ADM-xx` reference must never drive code.** Any work order, report or Register row that instructs implementation must name the engineering module ID (`PC-01`…`IMP-01`) and the Source Asset ID defined in the Register's Master Authority Matrix.
+3. This table changes **no** module sequence, dependency, data/API boundary or AI/import gate. §11 remains the binding stage order; `PW-00` (J-3) remains a prerequisite for every `PW-01`…`PW-06` module.
+4. `PW-00` has no single visual row because the Workspace shell contract is defined by §5.3 of the Register, assembled from the shared structure visible across the ADM-03…ADM-08 references. No individual reference file is authoritative for it.
+
+### 6.2 Gate namespace prefixes (fixed by FD-002)
+
+Two independent gate namespaces exist. FD-002 makes the Charter prefix explicit so neither can be inferred from the other:
+
+| Prefix | Owner document | Meaning |
+|---|---|---|
+| `CH-DG-xx` | `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` §M.2 | Charter Decision Gate — governance-level; business definitions the user must confirm |
+| `BP-DG-xx` | This document §12 | Blueprint Decision Gate — implementation-level |
+
+- `CH-DG-xx` is the explicit form of the Charter's existing `DG-xx` numbering. The numbers are unchanged: Charter `DG-10` **is** `CH-DG-10`. No Charter gate is renumbered by FD-002.
+- Existing business code that displays a bare `(DG-10)` string — `pages/admin/products/categories.vue` — refers to Charter `DG-10` / `CH-DG-10` and remains correct. FD-002 does not require a code change.
+- The same number in the two namespaces refers to entirely different decisions and must never be conflated. Any cross-mapping must be established by Codex and confirmed by the user; Claude must never assume one.
+
 ## 7. Module contracts
 
 ### 7.1 Product Center and Categories — ADM-02 / ADM-02a
@@ -302,7 +340,7 @@ A checkpoint is a remote backup only — it does not imply acceptance, release, 
 ### Gate namespace rule
 
 `BP-DG-xx` denotes **Blueprint Decision Gates** — implementation-level gates managed within this document.
-`DG-xx` (no prefix) denotes **Charter Decision Gates** in `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md`.
+`CH-DG-xx` denotes **Charter Decision Gates** in `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` §M.2. FD-002 fixed this explicit prefix; it is the same numbering the Charter writes as `DG-xx` (Charter `DG-10` = `CH-DG-10`), and no Charter gate was renumbered. Prefer `CH-DG-xx` in new work orders and reports; a bare `DG-xx` in existing documents and in `pages/admin/products/categories.vue` still means the Charter gate.
 
 These are two independent namespaces. The same number in each namespace (e.g. BP-DG-10 and DG-10) refers to an entirely different decision and must never be conflated. Neither namespace may be inferred from the other. Any explicit cross-mapping between a Charter DG and a Blueprint BP-DG must be established by Codex and confirmed by the user; Claude must never assume a mapping.
 

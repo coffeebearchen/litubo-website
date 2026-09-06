@@ -113,19 +113,69 @@ Both packages remain untracked (`??`) by design and are never staged.
 | LOGIC-01 | Single Product Dossier Workbench | `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/logic-references/01_single_product_dossier_workbench.png` | P1 | flow reference | `DRAFT`（流程参考） |
 | LOGIC-02 | Multi-model Import AI Review Queue | `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/logic-references/02_multi_model_import_ai_review_queue.png` | P1 | flow reference | `DRAFT`（流程参考） |
 
-### 4.3 Recorded fact conflicts — resolution required from Codex, not from Claude
+### 4.3 Fact conflicts CF-1 – CF-5 — **ADJUDICATED by FD-002 (2026-09-06)**
 
-These are reported, not resolved. Claude must not pick a winner.
+V-0.5.1 recorded five conflicts and referred them to Codex without resolving any. The user issued **FD-002 — Master Authority & Responsive Adaptation**, recorded in `ADMIN-CMS-GOVERNING-CHARTER-V1.md` §L (Framework Decisions), immediately after FD-001. All five are now closed. The original conflict statements are preserved verbatim so the reasoning remains auditable.
 
-| # | Conflict | Evidence | Consequence |
+| # | Conflict as recorded in V-0.5.1 | **FD-002 adjudication** | Status |
 |---|---|---|---|
-| CF-1 | **ADM numbering namespaces disagree.** `README_VISUAL_INDEX.md` assigns ADM-04–08 = “单型号 Product Dossier” and ADM-09–11 = “多型号导入与审核队列”. This Register and the Blueprint assign ADM-04 = Media & Resources, ADM-05 = Page Content, ADM-06 = Relations, ADM-07 = SEO, ADM-08 = Sources. | `README_VISUAL_INDEX.md` rows vs Blueprint §6 | The same ADM number denotes different modules in the two documents. Any work order citing “ADM-04”–“ADM-08” must state which namespace it means. |
-| CF-2 | **P2 package forbids the use V-0.5 recorded for it.** V-0.5 registered the eight P2 images as “DRAFT retained / FD-001 user-confirmed implementation overlay”. The package README says they “must not be treated as approved visual masters” and “No page may be implemented directly from these pictures.” | `inbox/admin-cms-ai-v1/README.md` lines 5, 18 | FD-001 (a user decision) outranks a package’s self-label under §1 governing order item 1, but the package’s own restriction must remain visible and must not be silently overwritten. |
-| CF-3 | **No 375px master exists for ADM-02a through ADM-08.** The index rule requires both a 1440px and a 375px `CONFIRMED` master before formal code construction. Only ADM-02 has a 375px file, and it is `DRAFT`. | `README_VISUAL_INDEX.md` line 3; P2 README line 24 | The 375px contract for ADM-02a–ADM-08 is undefined. Mobile acceptance criteria for those modules cannot be authored from existing evidence. |
-| CF-4 | **Both ADM-02 masters render a Chinese admin UI**, while §7 of this Register and the P2 README both declare English the confirmed admin baseline. | Direct image read of both ADM-02 P1 files | The English-first contract and the ADM-02 master imagery disagree. English-first governs visible UI; the master governs layout and information hierarchy only. |
-| CF-5 | **The two ADM-02 masters describe different right-hand panels.** P1 desktop-1440 shows a right **“AI 批处理入口”** rail; §5.2 of this Register specifies a persistent right **Product Control**. | P1 desktop-1440 image vs §5.2 | The ADM-02 right-panel contract is not settled. No right-panel work may proceed on assumption. |
+| **CF-1** | **ADM numbering namespaces disagree.** `README_VISUAL_INDEX.md` assigns ADM-04–08 = “单型号 Product Dossier” and ADM-09–11 = “多型号导入与审核队列”. This Register and the Blueprint assign ADM-04 = Media & Resources, ADM-05 = Page Content, ADM-06 = Relations, ADM-07 = SEO, ADM-08 = Sources. | **Resolved by two new namespaces.** Engineering work is addressed by module ID — `PC-01`, `PC-02`, `PW-00`…`PW-06`, `AI-01`, `IMP-01` (Blueprint §6.1). Visual evidence is addressed by Source Asset ID — `VM1-*` and `P2-*` (§4.4 below). **A bare `ADM-xx` may never drive code.** Every work order must name the engineering module ID and the Source Asset ID. Gate prefixes are likewise made explicit: `CH-DG-xx` (Charter) and `BP-DG-xx` (Blueprint); Charter `DG-10` = `CH-DG-10`, no gate renumbered. | **CLOSED** |
+| **CF-2** | **P2 package forbids the use V-0.5 recorded for it.** V-0.5 registered the eight P2 images as “DRAFT retained / FD-001 user-confirmed implementation overlay”. The package README says they “must not be treated as approved visual masters” and “No page may be implemented directly from these pictures.” | **Both statements stand; their scopes are separated.** P2 images remain a **user-confirmed visual direction reference** under FD-001. The P2 README rule remains fully in force: they are **not independent code specifications**, and therefore may not by themselves determine route, data/API, permissions, interaction or mobile structure. P2 may only supplement visual hierarchy, spacing, module relationships and information expression for a module whose Matrix row already lists it. The original README is not modified. | **CLOSED** |
+| **CF-3** | **No 375px master exists for ADM-02a through ADM-08.** The index rule requires both a 1440px and a 375px master before formal code construction. Only ADM-02 has a 375px file. | **Split decision.** `PC-01` **and** `PC-02` adopt the card-list principle from `VM1-ADM02-M375`: at 375px, no horizontally scrolling desktop table. `PC-02` inherits this because it shares the Product Catalogue shell with `PC-01`. For `PW-01`…`PW-06` there is **no approved mobile adaptation contract**; those modules are **BLOCKED at 375px** until each receives its own mobile adaptation contract in a Codex work order. | **CLOSED** |
+| **CF-4** | **Both ADM-02 masters render a Chinese admin UI**, while §7 of this Register and the P2 README both declare English the confirmed admin baseline. | **English-first outranks the imagery.** All visible Admin UI is English. Chinese appearing inside any master image is evidence of **information hierarchy, layout and visual relationship only** and must never be copied out as visible UI copy. This applies to `VM1-ADM02-D1440`, `VM1-ADM02-M375` and every P2 image. | **CLOSED** |
+| **CF-5** | **The two ADM-02 masters describe different right-hand panels.** P1 desktop-1440 shows a right **“AI 批处理入口”** rail; §5.2 of this Register specifies a persistent right **Product Control**. | **J-2 uses Product Control.** The right region of `PC-01` is the persistent **Product Control** panel. The AI batch-import rail visible in `VM1-ADM02-D1440` belongs to the future **`IMP-01` Import Review Queue** and must **not** be implemented now, must **not** be shown as an available/disabled-but-coming affordance, and must **not** display fabricated AI state or data. | **CLOSED** |
 
 **V-0.5.1 action taken:** exact paths confirmed for all 12 files; no master file was modified, renamed, copied or staged.
+**V-0.5.2 action taken:** CF-1 – CF-5 adjudicated per FD-002; Master Authority Matrix established in §4.4. No master file touched.
+
+---
+
+### 4.4 Master Authority Matrix and Namespace Rules (fixed by FD-002)
+
+This matrix is the **single authoritative statement** of which visual asset may influence which engineering module, and along which dimensions. No other document may grant a visual asset more authority than its row here.
+
+**Implementation authority levels:**
+
+| Level | Meaning |
+|---|---|
+| `PRIMARY` | This asset is the governing implementation reference for the named module and dimensions. |
+| `SUPPLEMENTARY` | May only refine visual hierarchy, spacing, module relationships and information expression **within a contract another authority has already set**. Never decides route, data/API, permissions, interaction or mobile structure. |
+| `FUTURE-REFERENCE` | Records intended future logic. Confers **no** authorization to build anything now. |
+| `NOT-A-DESIGN-SOURCE` | Usable only as acceptance evidence or existence proof. Never a design input. |
+
+#### Registered assets (12)
+
+| Source Asset ID | Actual file path | Original state | May be used for | May **not** be used for | Engineering module | Dimensions it may influence | Authority | Current evidence |
+|---|---|---|---|---|---|---|---|---|
+| `VM1-ADM02-D1440` | `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/admin/desktop-1440/LITUBO_CMS_ADM-02_Product-Center__default__desktop-1440__v01.png` | `DRAFT` (VM1 index row ADM-02); FD-001 + FD-002 user-confirmed | Desktop 1440px structure of `PC-01`: global nav, page header, status-tile strip, list table columns and density, pagination, right-region placement | Visible Chinese copy (CF-4); the right-region AI batch rail (CF-5 → `IMP-01`); data/API contract; permissions; any `PW-*` module | `PC-01` | Desktop layout · information hierarchy · component placement | **`PRIMARY`** | Image read 2026-09-06 (V-0.5.1) |
+| `VM1-ADM02-M375` | `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/admin/mobile-375/LITUBO_CMS_ADM-02_Product-Center__default__mobile-375__v01.png` | `DRAFT` (VM1 index row ADM-02); FD-001 + FD-002 user-confirmed | 375px responsive structure of `PC-01` **and** `PC-02`: stacked card list, sticky header, status-tile strip, search/filter/sort controls, fixed bottom action bar | Visible Chinese copy (CF-4); the AI batch panel (CF-5 → `IMP-01`); completeness/readiness **values** (gated by `CH-DG-11` / `BP-DG-02`); any `PW-*` module's mobile contract (CF-3) | `PC-01`, `PC-02` | 375px responsive structure · card composition · control placement | **`PRIMARY`** | Image read 2026-09-06 (V-0.5.1) |
+| `P2-ADM02-ALL` | `docs/design-reference/inbox/admin-cms-ai-v1/reference-images/ADM-02__product-center__all-products__desktop-reference__v01.png` | Draft input only — README forbids treating as approved master | Supplementary desktop visual hierarchy, spacing and module relationships for `PC-01` | Route · data/API · permissions · interaction · mobile structure (CF-2); any independent decision | `PC-01` | Visual hierarchy · spacing · information expression | `SUPPLEMENTARY` | Image read 2026-09-06 (V-0.5) |
+| `P2-ADM02A-CATEGORY` | `docs/design-reference/inbox/admin-cms-ai-v1/reference-images/ADM-02a__product-center__category-list__desktop-reference__v01.png` | Draft input only — README forbids treating as approved master | Supplementary desktop visual hierarchy for `PC-02` category context | Route · data/API · permissions · interaction · mobile structure (CF-2) | `PC-02` | Visual hierarchy · spacing · information expression | `SUPPLEMENTARY` | Image read 2026-09-06 (V-0.5) |
+| `P2-ADM03-SPECS` | `docs/design-reference/inbox/admin-cms-ai-v1/reference-images/ADM-03__product-workspace__specifications__desktop-reference__v01.png` | Draft input only — README forbids treating as approved master | Supplementary desktop visual hierarchy for `PW-01` **after** `PW-00` shell is accepted | Route · data/API · permissions · interaction · mobile structure; starting `PW-01` before `PW-00` | `PW-01` | Visual hierarchy · spacing · information expression | `SUPPLEMENTARY` | Image read 2026-09-06 (V-0.5) |
+| `P2-ADM04-MEDIA` | `docs/design-reference/inbox/admin-cms-ai-v1/reference-images/ADM-04__product-workspace__media-resources__desktop-reference__v01.png` | Draft input only — README forbids treating as approved master | Supplementary desktop visual hierarchy for `PW-02` **after** `PW-00` shell is accepted | Route · data/API · permissions · interaction · mobile structure; being cited as evidence for `/admin/media` (a different domain) | `PW-02` | Visual hierarchy · spacing · information expression | `SUPPLEMENTARY` | Image read 2026-09-06 (V-0.5) |
+| `P2-ADM05-CONTENT` | `docs/design-reference/inbox/admin-cms-ai-v1/reference-images/ADM-05__product-workspace__page-content__desktop-reference__v01.png` | Draft input only — README forbids treating as approved master | Supplementary desktop visual hierarchy for `PW-03` **after** `PW-00` shell is accepted | Route · data/API · permissions · interaction · mobile structure; defining module-type enum values | `PW-03` | Visual hierarchy · spacing · information expression | `SUPPLEMENTARY` | Image read 2026-09-06 (V-0.5) |
+| `P2-ADM06-RELATIONS` | `docs/design-reference/inbox/admin-cms-ai-v1/reference-images/ADM-06__product-workspace__relations__desktop-reference__v01.png` | Draft input only — README forbids treating as approved master | Supplementary desktop visual hierarchy for `PW-04` **after** `PW-00` shell is accepted | Route · data/API · permissions · interaction · mobile structure; **defining the relation schema** (`BP-DG-08`, AUDIT REQUIRED BEFORE SCHEMA) | `PW-04` | Visual hierarchy · spacing · information expression | `SUPPLEMENTARY` | Image read 2026-09-06 (V-0.5) |
+| `P2-ADM07-SEO` | `docs/design-reference/inbox/admin-cms-ai-v1/reference-images/ADM-07__product-workspace__seo-locales__desktop-reference__v01.png` | Draft input only — README forbids treating as approved master | Supplementary desktop visual hierarchy for `PW-05` **after** `PW-00` shell is accepted | Route · data/API · permissions · interaction · mobile structure; **deciding locale/publication rules** (`CH-DG-14` / `BP-DG-09`) | `PW-05` | Visual hierarchy · spacing · information expression | `SUPPLEMENTARY` | Image read 2026-09-06 (V-0.5) |
+| `P2-ADM08-SOURCES` | `docs/design-reference/inbox/admin-cms-ai-v1/reference-images/ADM-08__product-workspace__sources-history__desktop-reference__v01.png` | Draft input only — README forbids treating as approved master | Supplementary desktop visual hierarchy for `PW-06` **after** `PW-00` shell is accepted | Route · data/API · permissions · interaction · mobile structure; **defining confidence/retention model** (`BP-DG-06`) | `PW-06` | Visual hierarchy · spacing · information expression | `SUPPLEMENTARY` | Image read 2026-09-06 (V-0.5) |
+| `VM1-LOGIC01` | `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/logic-references/01_single_product_dossier_workbench.png` | `DRAFT`（流程参考）per VM1 index | Recording the intended future AI dossier flow for `AI-01` | **Any** implementation; any AI feature, adapter, snapshot or proposal record; any UI affordance suggesting AI exists | `AI-01` | Future logic only | `FUTURE-REFERENCE` | Image read 2026-09-06 (V-0.5) |
+| `VM1-LOGIC02` | `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/logic-references/02_multi_model_import_ai_review_queue.png` | `DRAFT`（流程参考）per VM1 index | Recording the intended future import/review-queue flow for `IMP-01` | **Any** implementation; any import job, mapping or queue; the AI batch rail seen in `VM1-ADM02-D1440` | `IMP-01` | Future logic only | `FUTURE-REFERENCE` | Image read 2026-09-06 (V-0.5) |
+
+#### Non-asset evidence sources — authority limits
+
+| Source | May decide | May **not** decide | Authority |
+|---|---|---|---|
+| Screenshots (user-supplied or captured) | Whether a rendered route meets or fails an already-stated contract — acceptance evidence only | Design direction, layout, structure or any contract | `NOT-A-DESIGN-SOURCE` |
+| Repository working tree · Directus state · the controlled running service | Whether a route, endpoint, field, component or value **exists** — factual existence only | Design direction; what a module *should* look like or contain | `NOT-A-DESIGN-SOURCE` |
+| Automated tests, typecheck, lint, build | Whether code satisfies its own assertions | Visual acceptance; contract conformance; readiness | `NOT-A-DESIGN-SOURCE` |
+
+#### Namespace rules — mandatory for every future work order
+
+1. Every Codex work order that authorises code **must name both**: the engineering module ID (`PC-01`, `PC-02`, `PW-00`…`PW-06`, `AI-01`, `IMP-01`) **and** the Source Asset ID(s) it draws on.
+2. A work order that cites only `ADM-xx` is **not actionable**. Claude must stop and report rather than infer which namespace is meant.
+3. A `SUPPLEMENTARY` asset may never be the sole basis for a change. It must accompany a `PRIMARY` asset or an approved written contract.
+4. A `FUTURE-REFERENCE` asset never authorises implementation, no matter which document cites it.
+5. Screenshots and repository facts never originate design.
+6. Where an asset's row and any other document disagree about that asset's authority, **this matrix governs**.
 
 ---
 
@@ -664,11 +714,246 @@ Every path below was enumerated by `Glob docs/design-reference/**` and, for the 
 | LOGIC-01 | `…/CMS-AI-VISUAL-MASTER-V1/logic-references/01_single_product_dossier_workbench.png` | Re-confirmed |
 | LOGIC-02 | `…/CMS-AI-VISUAL-MASTER-V1/logic-references/02_multi_model_import_ai_review_queue.png` | Re-confirmed |
 
-### 12.1 English-first visible-text ledger — complete scan
+### 12.1 English-first ledger — line-by-line (V-0.5.2 rebuild)
 
-Scan method: regex `[\u4e00-\u9fff]` over `layouts/admin.vue`, `pages/admin/`, `components/admin/`, with line numbers. **246 occurrences across 10 files in `pages/admin/`**, plus `layouts/admin.vue` and two components. No file was modified.
+**This ledger replaces the V-0.5.1 summary ledger**, which reported only per-file counts and an inconsistent estimate ("~249"). Every row below is one matching source line; the totals in \u00a712.1e are computed from these rows.
 
-Classification key — **UI** = rendered to an operator; **ARIA** = assistive-technology only; **COMMENT** = source/CSS comment, never rendered.
+**Scan method.** `Select-String` with a CJK Unified Ideographs character class over `layouts/admin.vue`, all of `pages/admin/`, and all of `components/admin/`. 23 files scanned; 13 contain matches; **278 matching source lines**. No file was modified and no copy was translated \u2014 this task registers only.
+
+**Classification.** `UI` = rendered visible text · `PLACEHOLDER` = input placeholder attribute · `OPTION` = `<option>` / label-map value rendered in a select · `ARIA` = assistive-technology only (`aria-label`, `alt`) · `DATA` = genuine Chinese business data · `COMMENT` = source/CSS comment, never rendered.
+
+**"Hardcoded user-visible Chinese" = UI + PLACEHOLDER + OPTION.** `ARIA` is assistive-only and tracked separately; `COMMENT` is out of scope and may remain under §7.
+
+#### 12.1a Compliant files — zero matches (10 files)
+
+`pages/admin/index.vue` · `pages/admin/products/index.vue` · `pages/admin/products/categories.vue` · `pages/admin/products/categories/[id].vue` · `pages/admin/products/[id]/preview.vue` · `components/admin/StatusBadge.vue` · `components/admin/product/ProductBasicForm.vue` · `components/admin/product/ProductCatalogueNav.vue` · `components/admin/product/ProductCentreSidebar.vue` · `components/admin/product/ProductControlPanel.vue`
+
+#### 12.1b Global shell and standalone routes
+
+**`layouts/admin.vue`** — route: all `/admin/*` · module: shared shell (`PC-01` / `PW-00`) — 13 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 114 | `title="Phase 9A-2 后开放"` — hover tooltip on the disabled Content Center item | **UI** | global shell English pass |
+| 78 | `aria-label="打开菜单"` | ARIA | accessibility English pass |
+| 96 | `aria-label="关闭菜单"` | ARIA | accessibility English pass |
+| 76, 88, 91 | Template comments | COMMENT (3) | may remain |
+| 160, 199, 261, 311, 349, 356, 364 | CSS section comments | COMMENT (7) | may remain |
+
+*Subtotal: UI 1 · ARIA 2 · COMMENT 10 = 13*
+
+**`pages/admin/login.vue`** — route: `/admin/login` · module: none (auth; no Source Asset) — 8 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 22 | `请输入邮箱和密码` | **UI** | login English pass |
+| 36 | `登录尝试过多，请稍后重试` | **UI** | login English pass |
+| 38 | `该账号无管理员权限` | **UI** | login English pass |
+| 40 | `邮箱或密码错误` | **UI** | login English pass |
+| 55 | `产品管理后台` | **UI** | login English pass |
+| 61 | `管理员邮箱` | **UI** | login English pass |
+| 73 | `密码` | **UI** | login English pass |
+| 86 | `登录中…` / `登录` | **UI** | login English pass |
+
+*Subtotal: UI 8 = 8. **Not registered in V-0.5 or V-0.5.1.***
+
+**`pages/admin/settings.vue`** — route: `/admin/settings` · module: none (Settings; no Source Asset) — 54 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 64, 76, 80, 103, 107, 122, 141, 147, 157, 176 | Toast / error strings: `加载设置失败，请刷新页面`; `初始化成功，CMS 集合已创建并预置数据`; `初始化失败，请稍后重试`; `设置已保存，前台 Footer 下次刷新即生效`; `保存失败，请重试`; `更新失败，请重试`; `保存失败`; `确认删除这条社媒链接？`; `删除失败，请重试`; `新增失败，请重试` | **UI** (10) | Settings English pass |
+| 192, 193, 199, 204, 205, 207 | `← 管理后台`; `网站设置`; `加载中…`; `首次初始化`; `尚未检测到 CMS 设置集合…`; `初始化中…` / `初始化 Settings CMS` | **UI** (6) | Settings English pass |
+| 214, 218, 222, 229, 231, 234, 240, 245, 250, 252, 257 | `公司与公开联系资料`; `品牌名称`; `法定公司名称`; `公开邮箱`; `Footer 展示邮箱…`; `联系电话`; `WhatsApp 链接`; `公司地址`; `版权声明`; `使用 {year} 占位符…`; `保存中…` / `保存设置` | **UI** (11) | Settings English pass |
+| 265, 271, 277, 313, 316, 323, 325 | `社媒链接`; `收起` / `+ 添加链接`; `暂无社媒链接…`; `点击禁用` / `点击启用`; `显示` / `隐藏`; `…` / `保存`; `删除` | **UI** (7) | Settings English pass |
+| 331, 335, 342, 348, 350 | `添加新社媒链接`; `平台`; `链接地址`; `添加中…` / `确认添加`; `取消` | **UI** (5) | Settings English pass |
+| 357, 360, 361, 364, 365, 368, 369, 373 | `安全与 AI 连接`; `AI 集成状态`; `未连接（Phase M5 规划中）`; `API 凭证`; `在服务器 .env 文件中配置，不在此界面显示`; `管理员权限`; `Administrator 角色（Directus 内置）`; `此区域为只读策略面板…` | **UI** (8) | Settings English pass |
+| 305 | `placeholder="顺序"` | PLACEHOLDER | Settings English pass |
+| 337 | `<option value="" disabled>选择平台</option>` | OPTION | Settings English pass |
+| 202, 212, 262, 329, 355 | Template section comments | COMMENT (5) | may remain |
+
+*Subtotal: UI 47 · PLACEHOLDER 1 · OPTION 1 · COMMENT 5 = 54*
+
+**`pages/admin/media/index.vue`** — route: `/admin/media` · module: Global Media Library (separate domain, never `PW-02`) — 1 line
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 126 | `// Filter folder tree: … sidebar "正式目录"` | COMMENT | may remain |
+
+*Subtotal: COMMENT 1 = 1. **Route is English-compliant** — zero visible Chinese.*
+
+#### 12.1c Product Center routes
+
+**`pages/admin/products/new.vue`** — route: `/admin/products/new` · module: `PC-01` — 6 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 21 | `产品名称（EN）为必填项` | **UI** | `PC-01` English pass |
+| 22 | `Slug 为必填项` | **UI** | `PC-01` English pass |
+| 23 | `产品分类为必填项` | **UI** | `PC-01` English pass |
+| 34 | `保存失败，请重试` | **UI** | `PC-01` English pass |
+| 44 | `← 产品列表` | **UI** | `PC-01` English pass |
+| 45 | `新建产品` | **UI** | `PC-01` English pass |
+
+*Subtotal: UI 6 = 6*
+
+#### 12.1d Product Workspace routes and shared components
+
+**`pages/admin/products/[id]/index.vue`** — route: `/admin/products/:id` · module: `PW-00` — 9 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 31 | `产品名称（EN）为必填项` | **UI** | `PW-00` shell rebuild |
+| 52 | `已保存` | **UI** | `PW-00` shell rebuild |
+| 56 | `保存失败，请重试` | **UI** | `PW-00` shell rebuild |
+| 73 | `状态更新失败` | **UI** | `PW-00` shell rebuild |
+| 83 | `← 产品列表` | **UI** | `PW-00` shell rebuild |
+| 84 | `产品详情` | **UI** | `PW-00` shell rebuild |
+| 95 | `基础信息` | **UI** | `PW-00` shell rebuild |
+| 118 | `创建时间` | **UI** | `PW-00` shell rebuild |
+| 120 | `最后更新` | **UI** | `PW-00` shell rebuild |
+
+*Subtotal: UI 9 = 9. **Not registered in V-0.5 or V-0.5.1.***
+
+**`pages/admin/products/[id]/specs.vue`** — route: `/admin/products/:id/specs` · module: `PW-01` — 28 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 33, 43, 47, 52, 59, 74, 78, 83, 90 | `参数组标题（EN）为必填项`; `参数组已添加`; `添加失败，请重试`; `确认删除此参数组（含其下所有参数条目）？`; `删除失败`; `参数已添加`; `添加失败`; `确认删除此参数条目？`; `删除失败` | **UI** (9) | `PW-01` English pass |
+| 98, 99, 109, 111, 117, 122 | `← 产品列表`; `产品编辑`; `技术参数`; `取消` / `＋ 添加参数组`; `参数组标题（EN）`; `添加中…` / `确认添加` | **UI** (6) | `PW-01` English pass |
+| 128, 129, 130, 137, 138, 143, 147, 172, 180 | `此产品暂无技术参数`; `点击「添加参数组」…`; `建议在桌面端操作…`; `（无标题）`; `N 条`; `暂无参数条目`; headers `标签（EN）` / `值（EN）` / `备注`; `添加`; `💡 多语言参数（ES / PT）…` | **UI** (9) | `PW-01` English pass |
+| 118, 166, 170 | `placeholder="如：General Specifications"`; `placeholder="标签（EN）"`; `placeholder="值（EN）"` | PLACEHOLDER (3) | `PW-01` English pass |
+| 162 | `<!-- 快速添加条目 -->` | COMMENT | may remain |
+
+*Subtotal: UI 24 · PLACEHOLDER 3 · COMMENT 1 = 28*
+
+**`pages/admin/products/[id]/content.vue`** — route: `/admin/products/:id/content` · module: `PW-03` — 38 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45 | `SECTION_LABELS` values rendered as `<option>` text: `文本`(33), `功能列表`(34), `概览`(35), `图文`(36), `优势亮点`(37), `应用场景`(38), `检测对象`(39), `工作原理`(40), `选型配置`(41), `产线集成`(42), `报价提醒`(43), `视频`(44), `案例`(45) | OPTION (13) | `PW-03` English pass — **`SectionType` enum keys unchanged; labels only** (`BP-DG-07`) |
+| 58, 63, 68, 72, 91, 95 | `操作失败，请重试`; `确认删除该模块？此操作不可撤销。`; `模块已删除`; `删除失败，请重试`; `模块已添加`; `添加失败，请重试` | **UI** (6) | `PW-03` English pass |
+| 105, 106, 116, 118, 126, 134, 141, 144 | `← 产品列表`; `产品编辑`; `页面模块`; `取消` / `＋ 添加模块`; `模块类型`; `标题（EN）`; `立即启用`; `添加中…` / `确认添加` | **UI** (8) | `PW-03` English pass |
+| 151, 152, 153, 166, 170, 175, 184 | `此产品暂无页面模块`; `点击「添加模块」…`; `建议先创建 overview（概览）模块。`; `（无标题）`; `title` `点击隐藏` / `点击启用`; `title="删除"`; `💡 模块内容…` | **UI** (7) | `PW-03` English pass |
+| 135 | `placeholder="可留空"` | PLACEHOLDER | `PW-03` English pass |
+| 122, 149, 156 | Template section comments | COMMENT (3) | may remain |
+
+*Subtotal: UI 21 · PLACEHOLDER 1 · OPTION 13 · COMMENT 3 = 38*
+
+**`pages/admin/products/[id]/media.vue`** — route: `/admin/products/:id/media` · module: `PW-02` — 62 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66 | `FILE_ROLE_LABELS` values rendered as role `<option>` text: `Hero 主图`(56), `概览图`(57), `应用场景`(58), `细节图`(59), `图库`(60), `视频封面`(61), `产品手册`(62), `规格书`(63), `工程图纸`(64), `操作手册`(65), `认证证书`(66) | OPTION (11) | `PW-02` English pass — **`FileRole` enum keys unchanged; labels only** (`CH-DG-12` / `BP-DG-05`) |
+| 333, 424, 425 | `— 未设置 —`; `全部格式`; `图片` | OPTION (3) | `PW-02` English pass |
+| 94, 95, 96 | Focal-point grid labels: `左上` / `上` / `右上`(94); `左` / `中` / `右`(95); `左下` / `下` / `右下`(96) | **UI** (3) | `PW-02` English pass |
+| 129, 135, 148, 206, 215, 221, 234, 239, 243 | `已保存`; `保存失败，请重试`; `操作失败`; `文件「…」已经关联到此产品`; `已关联「…」`; `关联失败，请重试`; `确认移除此媒体记录？只删除关联，不删除原始文件。`; `媒体记录已移除`; `删除失败` | **UI** (9) | `PW-02` English pass |
+| 251, 252, 262, 263, 264, 268, 269 | `← 产品列表`; `产品编辑`; `图片与资料`; `已绑定 N 个文件`; `从媒体库选择`; `此产品暂无媒体文件`; `上传文件后通过"从媒体库选择"…` | **UI** (7) | `PW-02` English pass |
+| 308, 319, 321, 322, 323, 328, 331, 339, 344, 349, 355, 379, 386, 387 | `未设置角色`; `已启用 — 点击禁用` / `已禁用 — 点击启用`; `启用` / `禁用`; `编辑`; `移除`; `编辑媒体记录`; `文件角色`; `Alt 文字 (EN)`; `说明文字 (EN)`; `排序`; `图片焦点`; `焦点：`; `保存`; `取消` | **UI** (14) | `PW-02` English pass |
+| 399, 410, 428, 432, 433, 442, 454, 462 | `从媒体库选择`; `全部`; `N 个文件`; `加载中…`; `暂无文件，请先在 Media Library 上传`; `此文件已关联到产品`; `已关联`; `加载更多` | **UI** (8) | `PW-02` English pass |
+| 340, 345, 422 | `placeholder="图片替代文字"`; `placeholder="图片说明"`; `placeholder="搜索文件名 / 标题…"` | PLACEHOLDER (3) | `PW-02` English pass |
+| 374, 397, 400 | `alt="焦点预览"`; `aria-label="从媒体库选择文件"`; `aria-label="关闭"` | ARIA (3) | accessibility English pass |
+| 720 | CSS comment | COMMENT | may remain |
+
+*Subtotal: UI 41 · PLACEHOLDER 3 · OPTION 14 · ARIA 3 · COMMENT 1 = 62*
+
+**`pages/admin/products/[id]/faq.vue`** — route: `/admin/products/:id/faq` · module: **none — no Source Asset** (§12.1g) — 22 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 26, 27, 42, 46, 51, 58, 71 | `问题（EN）为必填项`; `答案（EN）为必填项`; `FAQ 已添加`; `添加失败`; `确认删除此 FAQ 条目？`; `删除失败`; `操作失败` | **UI** (7) | blocked — no Source Asset; 等待 Codex 决定 |
+| 79, 80, 90, 92, 98, 102, 106, 111 | `← 产品列表`; `产品编辑`; `产品 FAQ`; `取消` / `＋ 添加 FAQ`; `问题（EN）`; `答案（EN）`; `来源备注（内部用）`; `添加中…` / `确认添加` | **UI** (8) | blocked — no Source Asset |
+| 117, 118, 129, 131, 137, 138 | `此产品暂无 FAQ`; `点击「添加 FAQ」…`; `（无问题文字）`; `隐藏` / `启用`; `（无答案文字）`; `来源: ` | **UI** (6) | blocked — no Source Asset |
+| 107 | `placeholder="如：来自产品手册第 3 页"` | PLACEHOLDER | blocked — no Source Asset |
+
+*Subtotal: UI 21 · PLACEHOLDER 1 = 22. **Not registered in V-0.5 or V-0.5.1.***
+
+**`pages/admin/products/[id]/seo.vue`** — route: `/admin/products/:id/seo` · module: `PW-05` — 18 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 41, 45, 53, 54, 65, 69 | `SEO 信息已保存`; `保存失败，请重试`; `← 产品列表`; `产品编辑`; `SEO 设置`; `页面标题（EN）` | **UI** (6) | `PW-05` English pass |
+| 81, 86, 103, 105, 110 | `建议 50–70 个字符，留空则使用产品名称作为默认标题`; `页面描述（EN）`; `noindex（禁止搜索引擎收录此页面）`; `草稿或未完善页面建议勾选；发布正式页面时取消勾选`; `保存中…` / `保存 SEO` | **UI** (5) | `PW-05` English pass |
+| 118, 121, 122, 124 | `搜索预览（示意）`; `产品标题` (fallback); `（暂无描述）` (fallback); `⚠️ 此页面已设为 noindex，搜索引擎不会收录` | **UI** (4) | `PW-05` English pass |
+| 79, 96 | `placeholder="产品名称 — LITUBO"`; `placeholder="简洁描述产品核心价值，约 120–160 个字符效果最佳"` | PLACEHOLDER (2) | `PW-05` English pass |
+| 175 | CSS comment | COMMENT | may remain |
+
+*Subtotal: UI 15 · PLACEHOLDER 2 · COMMENT 1 = 18*
+
+**`components/admin/product/ProductSubNav.vue`** — route: all `/admin/products/:id/*` · module: `PW-00` — 10 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 7 | `基础信息` — tab 1 of 6 | **UI** | replaced by `PW-00` shell tabs |
+| 8 | `页面模块` — tab 2 of 6 | **UI** | replaced by `PW-00` shell tabs |
+| 9 | `技术参数` — tab 3 of 6 | **UI** | replaced by `PW-00` shell tabs |
+| 10 | `图片与资料` — tab 4 of 6 | **UI** | replaced by `PW-00` shell tabs |
+| 11 | `产品 FAQ` — tab 5 of 6 | **UI** | replaced by `PW-00` shell tabs |
+| — | *line 12 = `SEO`, tab 6 of 6 — already English, produces no match* | — | — |
+| 28 | `aria-label="产品编辑导航"` | ARIA | accessibility English pass |
+| 27, 40, 51, 81 | Template / CSS comments | COMMENT (4) | may remain |
+
+*Subtotal: UI 5 · ARIA 1 · COMMENT 4 = 10*
+
+**`components/admin/product/PublishPanel.vue`** — route: all `/admin/products/:id/*` · module: `PW-00` right Product Control — 9 lines
+
+| Line | Original text | Class | Future handling |
+|---|---|---|---|
+| 15 | `提交审核` — draft → review | **UI** | `PW-00` Product Control rebuild |
+| 17 | `退回草稿` — review → draft | **UI** | `PW-00` Product Control rebuild |
+| 18 | `发布` — review → published | **UI** | `PW-00` Product Control rebuild |
+| 20 | `撤回草稿` — published → draft | **UI** | `PW-00` Product Control rebuild |
+| 27 | `已归档状态，如需恢复请联系管理员` | **UI** | `PW-00` Product Control rebuild |
+| 33 | `确认发布此产品？发布后将对外公开可见。` | **UI** | `PW-00` Product Control rebuild |
+| 36 | `确认撤回至草稿？产品将立即从前台下线。` | **UI** | `PW-00` Product Control rebuild |
+| 44 | `发布状态` — panel title | **UI** | `PW-00` Product Control rebuild |
+| 49 | `首次发布：` + `toLocaleDateString('zh-CN')` | **UI** | `PW-00` Product Control rebuild — locale also changes |
+
+*Subtotal: UI 9 = 9*
+
+#### 12.1e Totals — computed from the rows above
+
+| Class | Count | In scope for English-first? |
+|---|---:|---|
+| `UI` | **207** | Yes |
+| `PLACEHOLDER` | **11** | Yes |
+| `OPTION` | **28** | Yes |
+| `ARIA` | 6 | Separate accessibility pass |
+| `DATA` — genuine Chinese business data | **0** | Out of scope — none found |
+| `COMMENT` | 26 | Out of scope — may remain |
+| **Total matching source lines** | **278** | — |
+
+> **Hardcoded user-visible Chinese UI = UI + PLACEHOLDER + OPTION = 207 + 11 + 28 = 246, across 11 files.**
+
+Per-file cross-check — column sums equal the class totals; row sums equal 278:
+
+| File | UI | PLACEHOLDER | OPTION | ARIA | COMMENT | Line total |
+|---|---:|---:|---:|---:|---:|---:|
+| `layouts/admin.vue` | 1 | 0 | 0 | 2 | 10 | 13 |
+| `pages/admin/login.vue` | 8 | 0 | 0 | 0 | 0 | 8 |
+| `pages/admin/settings.vue` | 47 | 1 | 1 | 0 | 5 | 54 |
+| `pages/admin/media/index.vue` | 0 | 0 | 0 | 0 | 1 | 1 |
+| `pages/admin/products/new.vue` | 6 | 0 | 0 | 0 | 0 | 6 |
+| `pages/admin/products/[id]/index.vue` | 9 | 0 | 0 | 0 | 0 | 9 |
+| `pages/admin/products/[id]/specs.vue` | 24 | 3 | 0 | 0 | 1 | 28 |
+| `pages/admin/products/[id]/content.vue` | 21 | 1 | 13 | 0 | 3 | 38 |
+| `pages/admin/products/[id]/media.vue` | 41 | 3 | 14 | 3 | 1 | 62 |
+| `pages/admin/products/[id]/faq.vue` | 21 | 1 | 0 | 0 | 0 | 22 |
+| `pages/admin/products/[id]/seo.vue` | 15 | 2 | 0 | 0 | 1 | 18 |
+| `components/admin/product/ProductSubNav.vue` | 5 | 0 | 0 | 1 | 4 | 10 |
+| `components/admin/product/PublishPanel.vue` | 9 | 0 | 0 | 0 | 0 | 9 |
+| **TOTAL** | **207** | **11** | **28** | **6** | **26** | **278** |
+
+#### 12.1f Correction to the V-0.5.1 figure
+
+V-0.5.1 reported "approximately **249** visible-UI occurrences across **9** files" without a line-level table. That estimate is **superseded**. The verified figure is **246 hardcoded user-visible Chinese lines across 11 files** (UI 207 + PLACEHOLDER 11 + OPTION 28). The file count rises from 9 to 11 because `login.vue` and `[id]/index.vue` were previously unregistered.
+
+No `DATA`-class occurrence exists: every Chinese string found is a hardcoded literal in source, not genuine business data supplied in Chinese. The §7 data carve-out therefore applies to none of the current occurrences.
+
+#### 12.1g Unmastered route
+
+`/admin/products/:id/faq` → `pages/admin/products/[id]/faq.vue` exists, is linked from `ProductSubNav.vue` line 11, and has a 4-endpoint BFF at `server/api/admin/products/[id]/faq/`. **No Source Asset in the §4.4 Matrix covers a standalone product FAQ tab.** In `P2-ADM05-CONTENT`, FAQ appears as a *module inside Page Content*, not as its own workspace tab. This route therefore has no visual contract and no engineering module ID. Status: `LEGACY`, Source Asset `NONE`. Next step: 等待 Codex 决定.
+
+#### 12.1h Superseded V-0.5.1 summary table (retained for audit trail)
 
 | Route | Source file | Lines | Representative visible Chinese | Class | Future module |
 |---|---|---|---|---|---|
@@ -694,11 +979,264 @@ Classification key — **UI** = rendered to an operator; **ARIA** = assistive-te
 | product forms | `components/admin/product/ProductBasicForm.vue` | — | **none** | — | compliant (English pass completed) |
 | Product Center | `ProductCentreSidebar.vue`, `ProductCatalogueNav.vue`, `ProductControlPanel.vue`, `StatusBadge.vue` | — | **none** | — | compliant |
 
-**Result: visible Chinese is NOT absent.** Approximately **249 visible-UI occurrences** remain across 9 files. Four files carrying visible Chinese were absent from the V-0.5 ledger entirely: `pages/admin/login.vue`, `pages/admin/products/[id]/index.vue`, `pages/admin/products/[id]/faq.vue`, and (as a comment-only, compliant case) `pages/admin/media/index.vue`.
+> **The table above is the superseded V-0.5.1 summary.** Its "approximately 249 across 9 files" figure was an estimate with no line-level basis and must not be cited. The authoritative figure is **246 across 11 files**, computed in §12.1e. The table is retained only so the correction in §12.1f remains auditable.
 
-#### 12.1a Unmastered route discovered
+### 12.1i Engineering module fact tables (V-0.5.2, complete — no summaries)
 
-`/admin/products/:id/faq` → `pages/admin/products/[id]/faq.vue` exists and is linked from `ProductSubNav.vue` line 11, with a 4-endpoint BFF at `server/api/admin/products/[id]/faq/`. **No ADM master in either package covers a standalone product FAQ tab.** In the P2 reference set, FAQ appears as a *module inside ADM-05 Page Content*, not as its own workspace tab. This route therefore has no visual contract. Status: `LEGACY`, master `NONE`. Resolution: 等待 Codex 决定.
+One complete table per engineering module. `PW-00` is included because FD-002 makes it the gating prerequisite for `PW-01`…`PW-06`, though the work order's required ten are `PC-01`, `PC-02`, `PW-01`…`PW-06`, `AI-01`, `IMP-01`.
+
+#### `PC-01` — Product Catalogue / All Products
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `VM1-ADM02-D1440` (PRIMARY, desktop) · `VM1-ADM02-M375` (PRIMARY, 375px) · `P2-ADM02-ALL` (SUPPLEMENTARY) |
+| Target route | `/admin/products` |
+| Current actual route | `/admin/products` → `pages/admin/products/index.vue` — exists |
+| Pages and shared components | `pages/admin/products/index.vue`; `components/admin/product/ProductCentreSidebar.vue`; `ProductCatalogueNav.vue`; `ProductControlPanel.vue`; `components/admin/StatusBadge.vue`; `layouts/admin.vue` |
+| server API | `server/api/admin/products/index.get.ts`; `products-summary.get.ts`; `categories-summary.get.ts`; `categories.get.ts`; `presets.get.ts`; `asset/[id].get.ts` |
+| types / data relations | `types/product-cms.ts` — `AdminProduct`, `ProductsSummary`, `ProductStatus`; `server/utils/adminProductsQuery.ts`; `server/utils/adminAssetProxy.ts`; Directus `products` ↔ `product_categories` |
+| Reusable | Status multi-select filter, category filter, search sanitisation, pagination, products/categories aggregates, hardened asset proxy, BFF input validation, `tests/productCenter.test.ts` + `tests/assetProxy.test.ts` |
+| Missing | 375px card-list layout (currently a desktop table — **FAILED**); real Readiness/completeness column; real media-reference count per row; real source/audit summary; Needs Attention query; category tab strip at the top of the central area |
+| Charter Gate | `CH-DG-11` (Readiness rule) — **unresolved**; `CH-DG-16` (visual pack backup) — unresolved |
+| Blueprint Gate | `BP-DG-02` (readiness/completeness formula) — **unresolved**; currently gates the disabled Needs Attention control |
+| English-first status | `index.vue` itself: **compliant, 0 occurrences**. Inherited from shared shell: `layouts/admin.vue` line 114 (1 UI) + 2 ARIA. Related `new.vue`: 6 UI. |
+| Desktop evidence | `SCREENSHOT_CONFIRMED` — Codex review; gaps vs `VM1-ADM02-D1440` noted (Readiness column absent, category tab strip absent, right-panel render unconfirmed at 1440px) |
+| Mobile 375px evidence | `SCREENSHOT_CONFIRMED` — user-supplied; **FAILED** against `VM1-ADM02-M375` (§8a) |
+| Implementation status | `AUTOMATED_CHECKED` |
+| Evidence status | `SCREENSHOT_CONFIRMED` + `RUNTIME_NOT_PROVEN` |
+| Acceptance status | Mobile 375px **`FAILED`** · Integrated **`SUSPENDED`** · `origin/master` **`BLOCKED`** |
+| Definition of Ready | **MET for a J-2 recovery work order.** PRIMARY assets identified for both viewports; target route exists; right-region contract fixed to Product Control (CF-5); English-first fixed (CF-4); mobile principle fixed (CF-3). Readiness/Needs Attention **values** remain gated by `CH-DG-11` / `BP-DG-02` and must render as "Not assessed" until those gates close. |
+| Next step | 等待 Codex 决定 |
+
+#### `PC-02` — Category Context
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `P2-ADM02A-CATEGORY` (SUPPLEMENTARY) · `VM1-ADM02-M375` (PRIMARY for 375px only, inherited via the shared Product Catalogue shell per CF-3) |
+| Target route | `/admin/products/categories` and `/admin/products/categories/:id` |
+| Current actual route | Both exist — `pages/admin/products/categories.vue`; `pages/admin/products/categories/[id].vue` |
+| Pages and shared components | The two pages above; `ProductCatalogueNav.vue`; CategoryContextPanel block inside `categories/[id].vue`; `StatusBadge.vue`; `layouts/admin.vue` |
+| server API | `server/api/admin/categories-summary.get.ts`; `categories.get.ts`; `products/index.get.ts` (category filter) |
+| types / data relations | `types/product-cms.ts` — `CategorySummary`; Directus `product_categories` ↔ `products` |
+| Reusable | Per-category status aggregates, category→product filtering, category list read path, tab navigation |
+| Missing | 375px card-list adaptation; Category Health value; average readiness; media-gap and attention counts; category-specific filters/segments |
+| Charter Gate | `CH-DG-10` (Category Health business definition) — **unresolved**; rendered as `Not assessed (DG-10)` |
+| Blueprint Gate | `BP-DG-01` (Category Health formula) — unresolved; `BP-DG-03` (taxonomy/hierarchy) — unresolved |
+| English-first status | Both page files **compliant, 0 occurrences**. Inherits shared-shell items only. |
+| Desktop evidence | `REPOSITORY_CONFIRMED`; Codex reviewed basic category context |
+| Mobile 375px evidence | **None.** No 375px screenshot captured for this route. |
+| Implementation status | `AUTOMATED_CHECKED` |
+| Evidence status | `REPOSITORY_CONFIRMED` + `RUNTIME_NOT_PROVEN` |
+| Acceptance status | `SUSPENDED` — tied to the J-2 chain |
+| Definition of Ready | **PARTIAL.** 375px principle is fixed by CF-3, but Category Health values stay blocked by `CH-DG-10` / `BP-DG-01`. A work order may rebuild layout and adopt the card list; it may **not** introduce any health or readiness value. |
+| Next step | 等待 Codex 决定 |
+
+#### `PW-00` — Product Workspace Shell (gating prerequisite)
+
+| Field | Value |
+|---|---|
+| Source Asset ID | **None single-authoritative.** Contract is §5.3 of this Register, assembled from the shared structure across `P2-ADM03-SPECS` … `P2-ADM08-SOURCES`, all SUPPLEMENTARY. |
+| Target route | Shared shell wrapping `/admin/products/:id/*` |
+| Current actual route | **No shell exists.** `pages/admin/products/[id]/index.vue` plus `ProductSubNav.vue` form a legacy tab strip, not a Workspace Shell. |
+| Pages and shared components | Legacy only: `pages/admin/products/[id]/index.vue`; `components/admin/product/ProductSubNav.vue` (6 tabs); `ProductBasicForm.vue`; `PublishPanel.vue` |
+| server API | `products/[id].get.ts`; `products/[id].patch.ts`; `products/index.post.ts`; `preview-data.get.ts` |
+| types / data relations | `types/product-cms.ts` — `AdminProduct`, `ProductStatus`; lifecycle `draft → review → published → archived` |
+| Reusable | `ProductBasicForm.vue` (English-compliant, preserve-first) as the Overview editor; lifecycle state machine; `product_code` invariants; preview endpoint |
+| Missing | The shell itself: module rail with completeness, breadcrumb + product identity + top actions, common horizontal tabs, persistent right Product Control, per-tab empty/error/no-permission contracts |
+| Charter Gate | `CH-DG-11` (Readiness, feeds the completeness rail) — unresolved |
+| Blueprint Gate | `BP-DG-02` (completeness formula) — unresolved; `BP-DG-10` (role matrix / final publisher) — unresolved |
+| English-first status | **Non-compliant.** `[id]/index.vue` 9 UI; `ProductSubNav.vue` 5 UI + 1 ARIA; `PublishPanel.vue` 9 UI. Total 23 UI + 1 ARIA. |
+| Desktop evidence | `REPOSITORY_CONFIRMED` — legacy pages reviewed |
+| Mobile 375px evidence | **None.** No approved mobile adaptation contract (CF-3). |
+| Implementation status | `NOT_STARTED` (shell); legacy pages are `LEGACY` |
+| Evidence status | `REPOSITORY_CONFIRMED` |
+| Acceptance status | `NOT_REVIEWED` |
+| Definition of Ready | **NOT MET.** No PRIMARY asset defines the shell; completeness rail is gated by `CH-DG-11` / `BP-DG-02`; the 375px contract is blocked by CF-3. Codex must supply a written shell contract before any `PW-*` work. |
+| Next step | 等待 Codex 决定 |
+
+#### `PW-01` — Specifications
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `P2-ADM03-SPECS` (SUPPLEMENTARY only) |
+| Target route | `/admin/products/:id/specs` inside the `PW-00` shell |
+| Current actual route | `/admin/products/:id/specs` → `pages/admin/products/[id]/specs.vue` — exists as a standalone legacy page |
+| Pages and shared components | `pages/admin/products/[id]/specs.vue`; `ProductSubNav.vue` (legacy) |
+| server API | **7 endpoints** under `server/api/admin/products/[id]/specs/`: `index.get.ts`, `index.post.ts`, `[gid].patch.ts`, `[gid].delete.ts`, `[gid]/items.post.ts`, `[gid]/items/[iid].patch.ts`, `[gid]/items/[iid].delete.ts` |
+| types / data relations | `ProductSpecGroup`, `ProductSpecItem`; Directus `product_spec_groups` ↔ `product_spec_items` (CASCADE); EN/ES/PT value and note fields |
+| Reusable | Group/item CRUD; ownership-chain validation (`assertProductExists`); existing multilingual value fields; sort order |
+| Missing | Category-defined field sets; unit model and conversion; per-value evidence/source link; per-value review state; completeness contribution; Workspace Shell integration |
+| Charter Gate | None assigned specifically; `CH-DG-11` consumes spec completeness |
+| Blueprint Gate | `BP-DG-04` (parameter model, units, conversions) — **unresolved; blocks `PW-01`** |
+| English-first status | **Non-compliant** — 24 UI + 3 PLACEHOLDER = 27 hardcoded visible |
+| Desktop evidence | `SCREENSHOT_CONFIRMED` (Codex) — Chinese legacy form, no shell |
+| Mobile 375px evidence | **BLOCKED** — no approved mobile adaptation contract (CF-3) |
+| Implementation status | `LEGACY` |
+| Evidence status | `REPOSITORY_CONFIRMED` + `SCREENSHOT_CONFIRMED` |
+| Acceptance status | `NOT_REVIEWED` |
+| Definition of Ready | **NOT MET.** `PW-00` incomplete; `BP-DG-04` unresolved; no PRIMARY asset; no mobile contract. |
+| Next step | 等待 Codex 决定 |
+
+#### `PW-02` — Media & Resources
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `P2-ADM04-MEDIA` (SUPPLEMENTARY only) |
+| Target route | `/admin/products/:id/media` inside the `PW-00` shell |
+| Current actual route | `/admin/products/:id/media` → `pages/admin/products/[id]/media.vue` — exists as a standalone legacy page |
+| Pages and shared components | `pages/admin/products/[id]/media.vue` (library picker modal, role select, focal-point grid); `ProductSubNav.vue` |
+| server API | **4 endpoints** under `products/[id]/media/`: `index.get.ts`, `index.post.ts`, `[mid].patch.ts`, `[mid].delete.ts`. Supporting: `admin/asset/[id].get.ts`, `admin/media/files.get.ts`, `admin/files/[uuid]/meta.get.ts`, `admin/files/[uuid]/focal.patch.ts` |
+| types / data relations | `ProductMedia`, `FileRole` (11 values); Directus `products_files` junction ↔ `directus_files`; product stores UUID references only |
+| Reusable | Reference-only model (files stay global — never copied); duplicate-link guard; role/alt/caption/sort/focal-point fields; hardened asset proxy; folder governance in the global library |
+| Missing | Public **resource** records (type, language, version, visibility, review state) — entirely absent; media→source evidence link; media review state; Workspace Shell integration |
+| Charter Gate | `CH-DG-12` (`file_role` enum and ordering rules) — **unresolved** |
+| Blueprint Gate | `BP-DG-05` (media roles, ordering, resource taxonomy) — **unresolved; blocks `PW-02` writes** |
+| English-first status | **Non-compliant** — 41 UI + 3 PLACEHOLDER + 14 OPTION = 58 hardcoded visible, plus 3 ARIA |
+| Desktop evidence | `REPOSITORY_CONFIRMED` — no route screenshot on record |
+| Mobile 375px evidence | **BLOCKED** — no approved mobile adaptation contract (CF-3) |
+| Implementation status | `LEGACY` |
+| Evidence status | `REPOSITORY_CONFIRMED` |
+| Acceptance status | `NOT_REVIEWED` |
+| Definition of Ready | **NOT MET.** `PW-00` incomplete; `PW-02` additionally requires the J-3.5 product-media-source audit; `CH-DG-12` / `BP-DG-05` unresolved. **`/admin/media` is the global Media Library and may never be cited as `PW-02` evidence.** |
+| Next step | 等待 Codex 决定 |
+
+#### `PW-03` — Page Content
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `P2-ADM05-CONTENT` (SUPPLEMENTARY only) |
+| Target route | `/admin/products/:id/content` inside the `PW-00` shell |
+| Current actual route | `/admin/products/:id/content` → `pages/admin/products/[id]/content.vue` — exists as a standalone legacy page |
+| Pages and shared components | `pages/admin/products/[id]/content.vue`; `ProductSubNav.vue` |
+| server API | **8 endpoints** under `products/[id]/sections/`: `index.get.ts`, `index.post.ts`, `[sid].patch.ts`, `[sid].delete.ts`, `[sid]/items.get.ts`, `[sid]/items.post.ts`, `[sid]/items/[iid].patch.ts`, `[sid]/items/[iid].delete.ts` |
+| types / data relations | `ProductSection`, `ProductSectionItem`, `SectionType` (13 values); Directus `product_sections` ↔ `product_section_items` (CASCADE) |
+| Reusable | Controlled module-type enum (not freeform); section/item CRUD; ownership-chain validation; enable/disable flag; sort order |
+| Missing | Per-module review state, version and rollback; locale-level readiness; source/evidence link per module; public-eligibility rule; Workspace Shell integration |
+| Charter Gate | `CH-DG-13` (content-module review granularity: whole product vs per module) — **unresolved** |
+| Blueprint Gate | `BP-DG-07` (content module types, review/version/rollback) — **unresolved; blocks `PW-03`** |
+| English-first status | **Non-compliant** — 21 UI + 1 PLACEHOLDER + 13 OPTION = 35 hardcoded visible. The 13 OPTION values are `SectionType` **labels**; the enum keys are English and must not change. |
+| Desktop evidence | `SCREENSHOT_CONFIRMED` (Codex) — Chinese module-type form, no shell |
+| Mobile 375px evidence | **BLOCKED** — no approved mobile adaptation contract (CF-3) |
+| Implementation status | `LEGACY` |
+| Evidence status | `REPOSITORY_CONFIRMED` + `SCREENSHOT_CONFIRMED` |
+| Acceptance status | `NOT_REVIEWED` |
+| Definition of Ready | **NOT MET.** `PW-00` incomplete; `CH-DG-13` / `BP-DG-07` unresolved; no PRIMARY asset; no mobile contract. |
+| Next step | 等待 Codex 决定 |
+
+#### `PW-04` — Relations
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `P2-ADM06-RELATIONS` (SUPPLEMENTARY only) |
+| Target route | `/admin/products/:id/relations` (planned) inside the `PW-00` shell |
+| Current actual route | **None.** Full enumeration of `pages/admin/**/*.vue` returns 15 files; no `relations.vue`. |
+| Pages and shared components | None. |
+| server API | **None.** Full enumeration of `server/api/admin/**/*.ts` returns 60 endpoints; none serves a product-relations domain. The `sources/` endpoints belong to `PW-06` and must not be counted here. |
+| types / data relations | No relation type in `types/product-cms.ts`; no Directus collection; no test |
+| Reusable | Nothing exists to preserve |
+| Missing | The entire domain — relation record, direction, allowed target kinds (product / application / resource / content), ordering, published-state check, placement approval. `AUDIT REQUIRED BEFORE SCHEMA`. |
+| Charter Gate | None assigned |
+| Blueprint Gate | `BP-DG-08` (relation semantics) — **unresolved; blocks all `PW-04` work** |
+| English-first status | Not applicable — no UI exists |
+| Desktop evidence | `REPOSITORY_CONFIRMED` — absence verified by full route and API enumeration |
+| Mobile 375px evidence | **BLOCKED** — no approved mobile adaptation contract (CF-3) |
+| Implementation status | `NOT_STARTED` |
+| Evidence status | `REPOSITORY_CONFIRMED` |
+| Acceptance status | `NOT_REVIEWED` |
+| Definition of Ready | **NOT MET.** `PW-00` incomplete; J-3.5 audit incomplete; `BP-DG-08` unresolved; schema undefined. |
+| Next step | 等待 Codex 决定 |
+
+#### `PW-05` — SEO & Locales
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `P2-ADM07-SEO` (SUPPLEMENTARY only) |
+| Target route | `/admin/products/:id/seo` inside the `PW-00` shell |
+| Current actual route | `/admin/products/:id/seo` → `pages/admin/products/[id]/seo.vue` — exists as a standalone legacy page. **It is linked from `ProductSubNav.vue` line 12 (tab 6 of 6).** |
+| Pages and shared components | `pages/admin/products/[id]/seo.vue` (title / description / noindex + SERP preview widget); `ProductSubNav.vue` |
+| server API | **2 endpoints**: `products/[id]/seo.get.ts`, `products/[id]/seo.patch.ts` |
+| types / data relations | `ProductSeoFields`; Directus `products.seo_title_en`, `seo_description_en`, `seo_noindex`, `seo_image` |
+| Reusable | EN SEO title/description with server-side length limits (title ≤120, desc ≤320); `seo_noindex` flag; existing sitemap/robots exclusion behaviour; `useSeoHead` public-side integration |
+| Missing | Locale readiness matrix (ES/PT); canonical route display; Open Graph media picker bound to the media reference model; structured-data and hreflang publication rule; Workspace Shell integration |
+| Charter Gate | `CH-DG-14` (SEO and multilingual publication rules, ES/PT activation) — **unresolved** |
+| Blueprint Gate | `BP-DG-09` (locale, canonical, noindex, SEO release) — **unresolved; blocks `PW-05` and the J-10 public cutover** |
+| English-first status | **Non-compliant** — 15 UI + 2 PLACEHOLDER = 17 hardcoded visible |
+| Desktop evidence | `REPOSITORY_CONFIRMED` — no route screenshot on record |
+| Mobile 375px evidence | **BLOCKED** — no approved mobile adaptation contract (CF-3) |
+| Implementation status | `LEGACY` |
+| Evidence status | `REPOSITORY_CONFIRMED` |
+| Acceptance status | `NOT_REVIEWED` |
+| Definition of Ready | **NOT MET.** `PW-00` incomplete; `CH-DG-14` / `BP-DG-09` unresolved; no PRIMARY asset; no mobile contract. |
+| Next step | 等待 Codex 决定 |
+
+#### `PW-06` — Sources & History
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `P2-ADM08-SOURCES` (SUPPLEMENTARY only) |
+| Target route | `/admin/products/:id/sources` (planned) inside the `PW-00` shell |
+| Current actual route | **None.** No sources or history page exists among the 15 admin pages. |
+| Pages and shared components | None. |
+| server API | **3 endpoints exist**: `products/[id]/sources/index.get.ts`, `index.post.ts`, `[sourceId]/archive.post.ts`. Backend-only — no Admin UI consumes them. |
+| types / data relations | `ProductSourceRecord`, `SourceReviewStatus`; Directus `product_source_records` (CASCADE to `products`); `tests/sourceRecords.test.ts` (21 cases) |
+| Reusable | Required-UUID `source_file_id` rule (zero-source defence, 422 `SOURCE_REFERENCE_REQUIRED`); `source_locator` as an in-file position descriptor only; logical archive with no physical DELETE; duplicate-archive 409; **`nuxt-server` role has no permission on `product_source_records`** |
+| Missing | The page itself; human decision queue; confidence model; cited excerpt / page / sheet display; change-history and audit timeline; publish-blocker derivation |
+| Charter Gate | None assigned |
+| Blueprint Gate | `BP-DG-06` (evidence confidence, `source_locator`, retention) — **unresolved; blocks `PW-06` and all AI provenance** |
+| English-first status | Not applicable — no UI exists |
+| Desktop evidence | `REPOSITORY_CONFIRMED` — BFF and types reviewed; no page |
+| Mobile 375px evidence | **BLOCKED** — no approved mobile adaptation contract (CF-3) |
+| Implementation status | `IN_DISCOVERY` — BFF foundation exists; page not implemented |
+| Evidence status | `REPOSITORY_CONFIRMED` |
+| Acceptance status | `NOT_REVIEWED` |
+| Definition of Ready | **NOT MET.** `PW-00` incomplete; J-3.5 audit incomplete; `BP-DG-06` unresolved. |
+| Next step | 等待 Codex 决定 |
+
+#### `AI-01` — Single Product Dossier
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `VM1-LOGIC01` (**FUTURE-REFERENCE — confers no build authorization**) |
+| Target route | None assigned |
+| Current actual route | **None.** |
+| Pages and shared components | None. |
+| server API | **None.** No AI provider adapter, snapshot store or proposal record exists anywhere in the working tree. |
+| types / data relations | None. Directus has no AI collection. |
+| Reusable | Nothing exists to preserve |
+| Missing | Frozen `InputSnapshot`; versioned proposal with evidence links; per-field human accept / edit / return decision; provider adapter; cost cap; retention and audit logging |
+| Charter Gate | Charter §H.4 AI Gate chain — **unresolved**; FD-001 and FD-002 both explicitly **do not** authorize AI |
+| Blueprint Gate | `BP-DG-11` (AI provider/model, budget, key, logs, retention) — **unresolved** |
+| English-first status | Not applicable — no UI exists |
+| Desktop evidence | `REPOSITORY_CONFIRMED` — absence verified |
+| Mobile 375px evidence | Not applicable |
+| Implementation status | `NOT_STARTED` |
+| Evidence status | `REPOSITORY_CONFIRMED` |
+| Acceptance status | `NOT_REVIEWED` |
+| Definition of Ready | **NOT MET.** Requires `PW-00`, J-3.5 and every `PW-01`…`PW-06` gate closed, plus separate explicit user authorization. Blueprint stage J-7. |
+| Next step | 等待 Codex 决定 |
+
+#### `IMP-01` — Import Review Queue
+
+| Field | Value |
+|---|---|
+| Source Asset ID | `VM1-LOGIC02` (**FUTURE-REFERENCE — confers no build authorization**). The AI batch rail visible in `VM1-ADM02-D1440` and `VM1-ADM02-M375` also belongs to this module (CF-5) and must not be built into `PC-01`. |
+| Target route | None assigned |
+| Current actual route | **None.** |
+| Pages and shared components | None. |
+| server API | **None.** No import job collection, mapping validator or queue exists. |
+| types / data relations | None. |
+| Reusable | Nothing exists to preserve |
+| Missing | Import batch record; field mapping; validation preview and error report; Draft-only creation; per-`product_code` isolation; rollback; idempotency |
+| Charter Gate | `CH-DG-15` (import template fields and error-correction rules) — **unresolved** |
+| Blueprint Gate | `BP-DG-12` (import template, duplicate/error correction) — **unresolved** |
+| English-first status | Not applicable — no UI exists |
+| Desktop evidence | `REPOSITORY_CONFIRMED` — absence verified |
+| Mobile 375px evidence | Not applicable |
+| Implementation status | `NOT_STARTED` |
+| Evidence status | `REPOSITORY_CONFIRMED` |
+| Acceptance status | `NOT_REVIEWED` |
+| Definition of Ready | **NOT MET.** Requires all `AI-01` prerequisites plus an approved import schema and batch governance. Blueprint stage J-8. **FD-002 explicitly forbids showing any AI/import affordance or fabricated state in `PC-01` now.** |
+| Next step | 等待 Codex 决定 |
 
 ### 12.2 Product Center route/component/API map
 
