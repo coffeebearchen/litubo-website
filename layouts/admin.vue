@@ -102,7 +102,7 @@ function closeMenu() {
       </div>
 
       <nav class="sidebar-nav">
-        <p class="nav-section-label">内容管理</p>
+        <p class="nav-section-label">Content Management</p>
         <NuxtLink to="/admin/products" class="nav-item" active-class="nav-item--active" @click="closeMenu">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -138,7 +138,7 @@ function closeMenu() {
       <div class="sidebar-footer">
         <div v-if="user" class="user-info">
           <span class="user-name">{{ user.first_name ?? user.email }}</span>
-          <button class="logout-btn" @click="logout">退出</button>
+          <button class="logout-btn" @click="logout">Sign out</button>
         </div>
       </div>
     </aside>

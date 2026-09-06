@@ -4,10 +4,10 @@ import type { ProductStatus } from '~/types/product-cms'
 defineProps<{ status: ProductStatus }>()
 
 const label: Record<ProductStatus, string> = {
-  draft: '草稿',
-  review: '审核中',
-  published: '已发布',
-  archived: '已归档',
+  draft: 'Draft',
+  review: 'In Review',
+  published: 'Published',
+  archived: 'Archived',
 }
 </script>
 

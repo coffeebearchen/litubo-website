@@ -215,6 +215,36 @@ Claude in Chrome 扩展在 Edge 中创建的标签组无法访问用户常规浏
 
 ---
 
+### Admin English UI — Phase A（2026-09-06，本地 commit 完成）
+
+**目标：** 将后台截图中"公共左侧导航 + 产品列表页"所有可见中文文案改为英文，范围严格限定在以下三个文件。
+
+**改动文件及内容：**
+
+| 文件 | 改动 |
+|------|------|
+| `layouts/admin.vue:105` | `内容管理` → `Content Management` |
+| `layouts/admin.vue:141` | 侧栏退出按钮 `退出` → `Sign out` |
+| `components/admin/StatusBadge.vue:7-10` | 4 个状态标签：草稿→Draft、审核中→In Review、已发布→Published、已归档→Archived |
+| `pages/admin/products/index.vue` | STATUS_TABS 5 个标签（全部→All、草稿→Draft、审核中→In Review、已发布→Published、已归档→Archived）、`新建产品`→`New Product`、表头 5 列（产品名称/型号/分类/状态/更新时间 → Product Name/Model Series/Category/Status/Last Updated）、日期 locale `zh-CN`→`en-US`、`编辑`→`Edit`、加载/空状态/分页文案全部英文化 |
+
+**明确未触碰：** Media Library（`pages/admin/media/index.vue`）、产品编辑页（`pages/admin/products/[id]/*.vue`）、新建页（`pages/admin/products/new.vue`）、PublishPanel.vue、settings.vue；API、schema、Directus 权限、数据均未改动。
+
+**自动化验证：**
+
+| 检查项 | 结果 |
+|--------|------|
+| Vitest：127/127 | ✅ |
+| vue-tsc --noEmit：0 errors | ✅ |
+| npm run lint：0 errors | ✅ |
+| npx nuxt build：Build complete | ✅ |
+| git diff --check：仅 LF/CRLF 警告（Windows 正常） | ✅ |
+| rg 验证：目标三文件零残留中文文案 | ✅ |
+
+**浏览器视觉验收：未完成**（与 P1 ProductBasicForm 同一原因：Edge MCP Tab 独立 session 无 admin cookie，所有 `/admin/*` 路由持续 302 跳转）。视觉确认转入下一次集中 Admin visual smoke test。
+
+---
+
 ## 4B. 原 P1 收口状态（2026-09-06，保持）
 
 **P1 已完成。product_code 不变量、zero-source 防线、Directus 角色绕过审计均已通过。**
