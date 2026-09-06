@@ -1440,3 +1440,66 @@ J-2.2 等待集中浏览器验收，验收通过后连同 J-2 / J-2.5 / J-2.5.1 
 之后按 Blueprint 顺序启动 **J-3 Product Workspace Shell + Product Control**。
 
 *最后更新：2026-09-06，由 Claude Code 在"J-2.2 Product Center 视觉结构对齐"任务中写入。*
+
+---
+
+## 图片代理安全边界补验（J-2.2.1，2026-09-06）
+
+**状态：J-2.2.1 安全加固 + 测试完成，本地 commit 已创建，等待 Codex 集中浏览器验收。**
+
+### 本次施工范围（仅允许文件清单）
+
+| 变更项 | 类型 | 说明 |
+|--------|------|------|
+| `server/api/admin/asset/[id].get.ts` | 安全加固重写 | 见下表 7 项修复 |
+| `tests/assetProxy.test.ts` | 新建 | 11 个 describe 块，67 个测试，覆盖施工单 9 类安全要求 |
+| `docs/project/CURRENT-STATE.md` | 更新 | 本节 |
+| `docs/project/MASTER-ROADMAP.md` | 更新 | J-2.2.1 里程碑记录 |
+
+### 代理端点安全修复（7 项）
+
+| # | 修复项 | 修改前 | 修改后 |
+|---|--------|--------|--------|
+| 1 | MIME 类型管控 | 仅转发 content-type，无验证 | `ALLOWED_MIME` Set（jpeg/png/webp/avif/gif），其余 → 415 |
+| 2 | Content-Disposition | 未设置 | `inline`（防止意外触发下载） |
+| 3 | X-Content-Type-Options | 未设置 | `nosniff` |
+| 4 | Cache-Control | `private, max-age=3600` | `private, no-store` |
+| 5 | id URL 编码 | `${id}` 直接拼接 | `encodeURIComponent(id)` |
+| 6 | 查询参数消毒 | 直接透传至 Directus | `clampInt` 约束 width/height/quality + `ALLOWED_FIT` Set 约束 fit |
+| 7 | 上游 redirect 拒绝 | 未设置，默认 follow | `redirect: 'manual'`；3xx → 502 |
+
+### 安全边界覆盖（施工单 9 类要求）
+
+| 要求 | 测试覆盖 | 结果 |
+|------|---------|------|
+| 1. 无会话/无效会话/非管理员 → 401，Directus 未被调用 | 源码证据断言（admin-auth.ts 前置）| ✅ |
+| 2. 非法 id / 路径注入 / URL 注入 → 400，Directus 未被调用 | 11 个 validateAssetId 测试 | ✅ |
+| 3. 合法 id → 固定内部 Directus 目标、仅服务端 Bearer | 源码证据断言 | ✅ |
+| 4. 非图片 MIME / SVG / PDF / XLSX → 415 | 15 个 validateMime 测试 | ✅ |
+| 5. 上游 redirect / 各类错误 → 安全无细节响应 | 7 个 mapUpstreamStatus 测试 | ✅ |
+| 6. 响应 headers：无 Set-Cookie/Location/CORS，含 private no-store 与 nosniff | 5 个 headers 测试 | ✅ |
+| 7. products-summary / products list BFF 安全性 | 6+6 个 BFF 测试 | ✅ |
+| 8. Needs Attention 无虚构统计（BP-DG-02 门控） | 3 个门控测试 | ✅ |
+| 9. ProductControlPanel 仅用 /api/admin/asset/:id，不直接调用 Directus | 3 个 ProductControlPanel 测试 | ✅ |
+
+### 验证结果
+
+| 验收项 | 结果 |
+|--------|------|
+| `npx vitest run` — 全套测试 | ✅ 218/218 通过（新增 67 个，assetProxy.test.ts 8 files） |
+| `npx vue-tsc --noEmit` — 类型检查 | ✅ 0 errors |
+| `npm run lint` — ESLint | ✅ 0 errors |
+| `npx nuxt build` — 构建 | ✅ Build complete |
+| `git diff --check` — trailing whitespace | ✅ 无错误（仅 LF→CRLF 警告） |
+| 4 个禁止资料包 `??` 未暂存 | ✅ 确认 |
+
+### 禁止声明（已遵守）
+
+- 未使用 `git add .` / `git add -A` / `git reset --hard` / `git clean` / `git stash` 等命令
+- 未修改 Directus schema、角色、权限、ProductBasicForm、admin-auth 中间件主逻辑
+- 未修改 J-3 或以后任何功能
+- 未触碰四个禁止资料包
+- 未 push、未部署、未输出凭证
+- 保护提交 `178b340`、`317bec0`、`fdc83d2`、`5821289` 未被 amend 或 rebase
+
+*最后更新：2026-09-06，由 Claude Code 在"J-2.2.1 图片代理安全边界补验"任务中写入。*

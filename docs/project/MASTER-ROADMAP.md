@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：J-2 Product Center 代码施工完成（commit 178b340，本地）。J-2.5 Blueprint 正式登记完成（本地）。J-2.5.1 DG 命名空间冲突修正完成（commit fdc83d2，本地）。J-2.2 Product Center 视觉结构对齐（ADM-02 + ADM-02a）代码施工完成（本地，待集中浏览器验收）。下一步：集中浏览器验收 J-2.2，验收通过后连同 J-2/J-2.5/J-2.5.1 一并 GitHub push（须用户授权），再按 Blueprint 顺序启动 J-3 Product Workspace Shell。**
+**当前位置：J-2 Product Center 代码施工完成（commit 178b340，本地）。J-2.5 Blueprint 正式登记完成（本地）。J-2.5.1 DG 命名空间冲突修正完成（commit fdc83d2，本地）。J-2.2 Product Center 视觉结构对齐（ADM-02 + ADM-02a）代码施工完成（commit 5821289，本地）。J-2.2.1 图片代理安全边界补验完成（本地 commit，待集中浏览器验收）。下一步：集中浏览器验收，验收通过后连同 J-2/J-2.5/J-2.5.1/J-2.2/J-2.2.1 一并 GitHub push（须用户授权），再按 Blueprint 顺序启动 J-3 Product Workspace Shell。**
 
 ---
 
@@ -348,6 +348,27 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 - git diff --check：仅 CRLF 警告 ✅
 
 **下一步：集中浏览器验收（/admin/products 1440px + 375px；/admin/products/categories/[id] 1440px + 375px）；验收通过后连同 J-2/J-2.5/J-2.5.1 一并 GitHub push；然后发 J-3 完整施工单。**
+
+---
+
+#### M4-Next-J2.2.1：图片代理安全边界补验 ✅（J-2.2.1，本地 commit，待集中浏览器验收）
+
+**完成内容：**
+
+- 重写 `server/api/admin/asset/[id].get.ts`（7 项安全加固）：MIME 白名单（jpeg/png/webp/avif/gif）、Content-Disposition:inline、X-Content-Type-Options:nosniff、Cache-Control:private no-store、encodeURIComponent(id)、查询参数 clamp 消毒（width/height/quality 上下界 + fit 枚举）、redirect:'manual' 拒绝上游 redirect
+- 新建 `tests/assetProxy.test.ts`（67 个测试，8 files 218/218 通过）：覆盖施工单 9 类安全要求（auth 边界、id 注入、MIME 验证、参数消毒、上游错误映射、响应头验证、BFF 输入校验、Needs Attention 门控、ProductControlPanel 代理路径）
+- 文档更新：CURRENT-STATE.md + MASTER-ROADMAP.md
+
+**验证结果（2026-09-06）：**
+
+- npx vitest run：218/218（8 files）✅
+- vue-tsc --noEmit：0 errors ✅
+- npm run lint：0 errors ✅
+- npx nuxt build：BUILD COMPLETE ✅
+- git diff --check：仅 CRLF 警告 ✅
+- 4 个禁止资料包 `??` 未暂存 ✅
+
+**下一步：集中浏览器验收（J-2 + J-2.2 范围）；验收通过后连同所有本地 commit 一并 GitHub push（须用户授权）；然后发 J-3 完整施工单。**
 
 ---
 
