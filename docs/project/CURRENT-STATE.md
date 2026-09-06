@@ -1622,6 +1622,10 @@ J-2.2.1 的安全代码实际由两个 commit 承载：
 
 ## V-0.5 视觉与数据对齐登记册注册 + 只读事实审计（2026-09-06）
 
+> **⚠️ 本节部分事实已被 V-0.5.1 更正，见文末「V-0.5.1 审计证据补正」节。**
+> 已知错误：ADM-07 的 ProductSubNav 判断（实为 6 个 tab，SEO 已链接）；`RUNTIME_PROVEN` 结论（实为 `RUNTIME_NOT_PROVEN`）；PID 33632（已不存在）；HEAD `5ea32f9`（已被本节自身的 commit 取代）；母版数量 10（实为 12）；可见中文台账遗漏 4 个文件。
+> 本节保留为历史记录，不得作为后续施工依据；以 V-0.5.1 为准。
+
 **状态：V-0.5 文档治理任务完成，Register 已安装，V-0 只读审计已完成，本地 commit 待创建。无业务代码变更。**
 
 ### Register 安装
@@ -1703,3 +1707,156 @@ Register 在权限层级上位于 Blueprint 之下、CURRENT-STATE.md 之上。C
 V-0.5 完成后，等待 Codex 下一份**单一、完整模块施工单**。每个模块须对应 Register 中的一个完整条目，且 DoR 状态通过后方可开始代码施工。
 
 *最后更新：2026-09-06，由 Claude Code 在"V-0.5 视觉与数据对齐登记册注册 + 只读事实审计"任务中写入。*
+
+---
+
+## V-0.5.1 审计证据补正（2026-09-06）
+
+**状态：V-0.5 的文档注册（commit `9a9d306`）与 checkpoint 备份保留有效；其"事实审计"部分证据不达标，本节予以补正。仅修改 3 个治理文档，无任何业务代码、测试、schema、Directus、权限、数据改动。**
+
+### 1. J-2 移动端验收：FAILED（已确认事实）
+
+用户提供的 `/admin/products` 375px 截图证明：
+
+| # | 缺陷 |
+|---|------|
+| 1 | 页面底部出现横向滚动条 |
+| 2 | `Product Center` 标题被顶部区域裁切/遮挡 |
+| 3 | 产品列表仍是桌面多列表格，右侧列落在可视区域之外 |
+| 4 | 手机端用户必须横向拖动，无法完整读取或操作主要产品信息 |
+
+**登记结论（不得软化）：**
+
+```text
+ADM-02 Product Center
+Evidence:                     SCREENSHOT_CONFIRMED
+Mobile 375px acceptance:      FAILED
+Integrated visual acceptance: SUSPENDED
+origin/master promotion:      BLOCKED
+Runtime provenance:           RUNTIME_NOT_PROVEN
+```
+
+自动化测试通过、页面能打开、HTTP 200 均**不得**用于降低上述 FAILED 结论。`SUSPENDED` 不得写成"移动端通过"。
+
+### 2. 运行来源：RUNTIME_NOT_PROVEN
+
+V-0.5 记录 "PID 33632 → RUNTIME_PROVEN"。V-0.5.1 核实：**该进程已不存在**；当前 3000 端口归属 **PID 27024**（17:19:37 启动）。
+
+可证明：端口 3000 监听进程自 `D:\LITUBO-website` 启动；该进程启动时间晚于 HEAD commit（17:15:49）；工作树所有受跟踪文件与 HEAD 逐字节一致（`git diff HEAD --name-only` 为空）。
+
+**不可证明（故判定为 NOT_PROVEN）：** Nuxt dev 服务的是工作树而非 commit，运行服务不输出任何 commit SHA；HMR 与模块缓存意味着内存中的字节未必等于磁盘字节；用户 375px 截图无时间戳、PID 或构建标识，无法归属任何 commit。V-0.5 的 PID 证据在一个会话内即失效，本身证明 PID 观测不构成持久来源证明。
+
+后果：现有证据下任何路由都**不得**标记为 `VISUALLY_VERIFIED`。
+
+### 3. 母版登记：10 → 12 个文件，两套资料包
+
+V-0.5 只登记了 10 张（全部来自 inbox 包）。V-0.5.1 发现视觉资料实际分属**两个独立且不一致的资料包**：
+
+| 包 | 路径根 | 自述状态 |
+|----|--------|---------|
+| **P1 — Visual Master V1** | `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/` | `README_VISUAL_INDEX.md` 自称"Claude 的视觉唯一入口"；ADM-02 行标 `DRAFT`；规则："没有对应 CONFIRMED 图，不得开始该页面正式代码施工" |
+| **P2 — Inbox draft input** | `docs/design-reference/inbox/admin-cms-ai-v1/` | `README.md`："**must not be treated as approved visual masters or as code specifications**"；"**No page may be implemented directly from these pictures**"；"it is not a 375px mobile specification" |
+
+**V-0.5 遗漏的 2 个文件（本次新登记）：**
+
+- `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/admin/desktop-1440/LITUBO_CMS_ADM-02_Product-Center__default__desktop-1440__v01.png`
+- `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/admin/mobile-375/LITUBO_CMS_ADM-02_Product-Center__default__mobile-375__v01.png`
+
+**375px 母版的意义：** 该母版规定 ADM-02 手机端为**堆叠卡片列表**（每卡含缩略图、名称、产品编号、完整度条、来源、更新时间、状态徽章、单卡操作），配吸顶头部、四格状态条、搜索/筛选/排序、底部固定操作栏。它**没有**规定 375px 下使用横向滚动的桌面表格。因此第 1 节的 FAILED 是对照既存母版的契约偏离，不是主观审美意见。
+
+### 4. 记录在案的事实冲突（须由 Codex 裁定，Claude 不得自行选边）
+
+| # | 冲突 |
+|---|------|
+| CF-1 | **ADM 编号命名空间冲突。** `README_VISUAL_INDEX.md` 定义 ADM-04–08 = 单型号 Product Dossier、ADM-09–11 = 多型号导入队列；Register 与 Blueprint 定义 ADM-04 = Media & Resources、ADM-05 = Page Content、ADM-06 = Relations、ADM-07 = SEO、ADM-08 = Sources。同一编号在两份文档中含义不同。 |
+| CF-2 | **P2 资料包禁止 V-0.5 对它的用法。** V-0.5 将 8 张 P2 图登记为"DRAFT retained / FD-001 授权施工"；包 README 明确禁止将其视为已批准母版或据此实施。FD-001 作为用户决定在权限序列上优先，但包自身的限制必须保持可见，不得被静默覆盖。 |
+| CF-3 | **ADM-02a 至 ADM-08 完全没有 375px 母版。** 索引规则要求每页同时具备 1440 与 375 的 CONFIRMED 图。这些模块的移动端契约未定义，无法据现有证据编写移动端验收标准。 |
+| CF-4 | **两张 ADM-02 母版渲染的是中文后台界面**，而 Register 第 7 节与 P2 README 均声明英文为后台确认基线。 |
+| CF-5 | **两张 ADM-02 母版的右栏契约不同。** P1 desktop-1440 右栏是 **"AI 批处理入口"**；Register 第 5.2 节规定右栏为常驻 **Product Control**。右栏契约未定，不得据假设施工。 |
+
+### 5. V-0.5 事实错误更正表
+
+| # | V-0.5 记载 | V-0.5.1 核实事实 |
+|---|-----------|-----------------|
+| C-1 | ADM-07 路由"未出现在 ProductSubNav（仅 5 个 tab）" | **错误。** `ProductSubNav.vue` 共 **6 个 tab**，第 12 行即 `{ label: 'SEO', … }`，SEO 已链接。V-0.5 把 5 个**中文**标签误当成标签总数。 |
+| C-2 | HEAD = `5ea32f9`，`RUNTIME_PROVEN` | HEAD = `9a9d306`；来源判定为 **`RUNTIME_NOT_PROVEN`**。 |
+| C-3 | localhost:3000 = PID 33632 | 该 PID 已不存在；当前为 **PID 27024**。 |
+| C-4 | Specs BFF = 6 端点 | **7 个端点。** |
+| C-5 | Sections BFF = 7 端点 | **8 个端点。** |
+| C-6 | 母版 10 个文件 / 2 个目录 | **12 个文件 / 2 个资料包。** |
+| C-7 | 可见中文台账覆盖 9 个文件 | 另有 4 个文件含中文：`login.vue`(8 处可见)、`[id]/index.vue`(9 处可见)、`[id]/faq.vue`(22 处可见)、`media/index.vue`(1 处注释，合规)。 |
+| C-8 | P2 图登记为可用母版，无限定 | P2 README 明确禁止（CF-2）。 |
+| C-9 | 未记录 ADM-02 移动端母版 | 375px 母版存在，规定卡片列表契约。 |
+
+### 6. English-first 可见中文台账（完整扫描结果）
+
+扫描方式：正则 `[\u4e00-\u9fff]` 覆盖 `layouts/admin.vue`、`pages/admin/`、`components/admin/`，带行号。`pages/admin/` 下共 **246 处 / 10 个文件**，另加 `layouts/admin.vue` 与 2 个组件。**未修改任何文案。**
+
+**结论：可见中文并非"无"，仍有约 249 处可见 UI 中文分布在 9 个文件。**
+
+| 源码文件 | 可见 UI 中文处数 | 说明 |
+|---------|:---:|------|
+| `pages/admin/settings.vue` | 50 | 整页中文；无 ADM 母版；独立英文化模块 |
+| `pages/admin/products/[id]/media.vue` | 61 | `FILE_ROLE_LABELS`(56–66) 与焦点九宫格(94–96) 均为渲染值 |
+| `pages/admin/products/[id]/content.vue` | 35 | `SECTION_LABELS`(33–45) 为下拉选项值 |
+| `pages/admin/products/[id]/specs.vue` | 27 | 表头、按钮、空状态 |
+| `pages/admin/products/[id]/faq.vue` | 22 | **V-0.5 未登记**；且无任何 ADM 母版覆盖此页 |
+| `pages/admin/products/[id]/seo.vue` | 17 | 含 `建议 50–70 个字符…`(81)、`搜索预览（示意）`(118) |
+| `components/admin/product/PublishPanel.vue` | 9 | 生命周期按钮、确认弹窗、`zh-CN` 日期格式(49) |
+| `pages/admin/products/[id]/index.vue` | 9 | **V-0.5 未登记** |
+| `pages/admin/login.vue` | 8 | **V-0.5 未登记** |
+| `pages/admin/products/new.vue` | 6 | 校验错误、返回链接、页标题 |
+| `components/admin/product/ProductSubNav.vue` | 5 | 6 个 tab 中 5 个中文标签；第 12 行 `SEO` 已是英文 |
+| `layouts/admin.vue` | 1 | 第 114 行 `title="Phase 9A-2 后开放"`（悬停提示，可见） |
+
+**已合规（零可见中文）：** `pages/admin/index.vue`、`pages/admin/products/index.vue`、`pages/admin/products/categories.vue`、`pages/admin/products/categories/[id].vue`、`pages/admin/media/index.vue`（仅第 126 行代码注释）、`components/admin/product/ProductBasicForm.vue`、`ProductCentreSidebar.vue`、`ProductCatalogueNav.vue`、`ProductControlPanel.vue`、`StatusBadge.vue`。
+
+逐行行号与分类（UI / ARIA / COMMENT）见 Register 第 12.1 节。
+
+### 7. 十张母版逐张状态（三轴独立，不得混淆）
+
+| 母版 | 实现状态 | 证据状态 | 验收状态 | 当前实际路由 |
+|------|---------|---------|---------|-------------|
+| ADM-02 | `AUTOMATED_CHECKED` | `SCREENSHOT_CONFIRMED` + `RUNTIME_NOT_PROVEN` | 375px **FAILED**；整体 **SUSPENDED** | `/admin/products` ✅ |
+| ADM-02a | `AUTOMATED_CHECKED` | `REPOSITORY_CONFIRMED` + `RUNTIME_NOT_PROVEN` | `SUSPENDED` | `/admin/products/categories`、`/categories/:id` ✅ |
+| ADM-03 | `LEGACY` | `REPOSITORY_CONFIRMED` + `SCREENSHOT_CONFIRMED` | `NOT_REVIEWED` | `/admin/products/:id/specs`（无 Workspace Shell） |
+| ADM-04 | `LEGACY` | `REPOSITORY_CONFIRMED` | `NOT_REVIEWED` | `/admin/products/:id/media`（无 Workspace Shell） |
+| ADM-05 | `LEGACY` | `REPOSITORY_CONFIRMED` + `SCREENSHOT_CONFIRMED` | `NOT_REVIEWED` | `/admin/products/:id/content`（无 Workspace Shell） |
+| ADM-06 | **`NOT_STARTED`** | `REPOSITORY_CONFIRMED`（已枚举 15 页 / 60 端点，确认缺席） | `NOT_REVIEWED` | **无** |
+| ADM-07 | `LEGACY` | `REPOSITORY_CONFIRMED` | `NOT_REVIEWED` | `/admin/products/:id/seo` ✅（**已在 SubNav 第 12 行**） |
+| ADM-08 | **`IN_DISCOVERY`** | `REPOSITORY_CONFIRMED` | `NOT_REVIEWED` | **无页面**；仅 3 个 BFF 端点 |
+| LOGIC-01 | `NOT_STARTED` | `REPOSITORY_CONFIRMED` | `NOT_REVIEWED` | 无 |
+| LOGIC-02 | `NOT_STARTED` | `REPOSITORY_CONFIRMED` | `NOT_REVIEWED` | 无 |
+
+**特别规则（已遵守）：** `/admin/media` 是全局 Media Library，**未**标为 ADM-04 已实现或 ADM-04 的 LEGACY——它是独立域。孤立的 Specs / Content / SEO 页在共享 Product Workspace Shell 建成前**未**被称为对应母版完成。Category Health、Readiness、来源统计、完成度均维持"未确认/Not assessed"，无任何造假值。
+
+### 8. 额外发现：无母版路由
+
+`/admin/products/:id/faq` → `pages/admin/products/[id]/faq.vue` 存在，由 `ProductSubNav.vue` 第 11 行链接，配 4 个 BFF 端点。**两套资料包中均无任何 ADM 母版覆盖独立的产品 FAQ 标签页**——在 P2 参考集中 FAQ 是 ADM-05 Page Content 内的一个模块，而非独立工作区标签。该路由无视觉契约。状态：`LEGACY`，母版 `NONE`。
+
+### 9. 本次修改的 3 个文件
+
+| 文件 | 修改内容 |
+|------|---------|
+| `docs/project/ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md` | 第 4 节重写（12 文件登记 + 两包权威 + CF-1～CF-5 冲突表）；第 8 节逐母版重写（14 项契约字段，含"下一步：等待 Codex 决定"）；新增 8a 节（375px FAILED 事实与卡片列表契约对照）；第 12 节重写（Git/运行证据、12 母版路径、完整英文台账、路由/API 映射、C-1～C-9 更正表） |
+| `docs/project/CURRENT-STATE.md` | V-0.5 节加更正指引；新增本节 |
+| `docs/project/MASTER-ROADMAP.md` | 当前位置更新；V-0.5.1 里程碑记录 |
+
+**未修改：** `CLAUDE.md`、Charter、Blueprint、`09-claude-first-read-only-instruction.md`，以及任何业务代码。
+
+### 10. 禁止声明（已遵守）
+
+- 未修改任何业务代码、tests、CSS、server API、types、schema、Directus、角色、权限、数据、媒体、来源记录、Docker、`.env`、部署配置
+- 未使用 `git add .` / `git add -A` / `git reset --hard` / `git clean` / `git stash` / `git restore` / `git checkout --` / `git rebase` / `git commit --amend` / `git push --force` / `git push origin master`
+- 9 个受保护 commit（`178b340` `317bec0` `fdc83d2` `5821289` `4a74e42` `69c0e18` `948ad9b` `5ea32f9` `9a9d306`）均经 `git merge-base --is-ancestor` 验证仍在 HEAD 祖先链中，未被改写
+- 四项保护资料全程保持 `??` 未跟踪，未移动、改名、修改、暂存或提交
+- 未运行 build / lint / typecheck / 业务测试（本任务不改业务代码，故不适用）
+- 无用户重复登录、无凭证输出、无 master push、无部署
+
+### 11. 下一步
+
+J-2 移动端 375px 仍为 **FAILED**；J-2 整体视觉验收仍为 **SUSPENDED**；`origin/master` 提升仍 **BLOCKED**。J-3 Workspace Shell、AI Dossier、Import Queue、真实产品试点、前台 CMS 切换**均未开始**。
+
+CF-1～CF-5 五项事实冲突须由 Codex 裁定后，方可编写下一份模块施工单。等待 Codex 下一份单一、完整施工单。
+
+*最后更新：2026-09-06，由 Claude Code 在"V-0.5.1 视觉与数据对齐审计证据补正"任务中写入。*

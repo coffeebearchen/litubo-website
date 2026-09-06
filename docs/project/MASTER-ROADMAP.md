@@ -2,7 +2,11 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：V-0.5 视觉与数据对齐登记册注册 + 只读事实审计完成（2026-09-06）。Register 已安装，V-0 审计已完成，6 个治理文件已更新，本地 commit 已创建，checkpoint backup/admin-cms-j2 已同步。J-2 浏览器视觉验收状态：SUSPENDED（Codex 前序宣告）。origin/master 未更新。下一步：等待 Codex 下一份单一、完整模块施工单；每个模块须对应 Register 中完整条目且 DoR 通过后方可开始代码施工。**
+**当前位置：V-0.5.1 审计证据补正完成（2026-09-06）。Register 证据已达标：12 张母版逐张登记（V-0.5 遗漏 2 张 ADM-02 母版已补入）、发现两套资料包权威冲突、9 项 V-0.5 事实错误已更正、English-first 完整台账已建立（约 249 处可见中文分布在 9 个文件）。**
+
+**J-2 移动端 375px 验收：FAILED（用户截图确认横向滚动条、标题被裁切、桌面表格右列不可见）。J-2 整体视觉验收：SUSPENDED。origin/master 提升：BLOCKED。运行来源：RUNTIME_NOT_PROVEN。**
+
+**下一步：CF-1～CF-5 五项事实冲突（ADM 编号命名空间、P2 包权威、ADM-02a–08 缺 375px 母版、母版中文 UI 与 English-first、ADM-02 右栏契约）须由 Codex 裁定；裁定后方可发下一份单一、完整模块施工单。J-3 Workspace Shell 及后续均未开始。**
 
 ---
 
@@ -398,7 +402,46 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 ---
 
-*最后更新：2026-09-06，V-0.5 视觉与数据对齐登记册注册 + 只读事实审计完成写入。*
+*最后更新：2026-09-06，V-0.5.1 审计证据补正完成写入。*
+
+---
+
+#### M4-Next-V0.5.1：视觉与数据对齐审计证据补正（2026-09-06）
+
+**状态：完成。仅修改 3 个治理文档（Register / CURRENT-STATE / MASTER-ROADMAP），无业务代码变更。V-0.5 的注册 commit `9a9d306` 与 checkpoint 备份保留有效。**
+
+**背景：** V-0.5 完成了 Register 的制度注册，但其"事实审计"部分证据不达标，不可作为下一轮代码施工依据。本次仅补正证据登记与报告质量。
+
+**核心补正：**
+
+1. **母版登记 10 → 12 个文件。** 发现视觉资料分属两个独立且不一致的资料包：
+   - **P1** `docs/design-reference/CMS-AI-VISUAL-MASTER-V1/` — 索引自称"视觉唯一入口"，ADM-02 标 `DRAFT`
+   - **P2** `docs/design-reference/inbox/admin-cms-ai-v1/` — README 明确禁止"treated as approved visual masters"与"implemented directly from these pictures"
+   - V-0.5 遗漏的 2 张：ADM-02 的 `admin/desktop-1440/…v01.png` 与 **`admin/mobile-375/…v01.png`**
+
+2. **375px 母版的发现使 FAILED 有了契约对照。** 该母版规定 ADM-02 手机端为**堆叠卡片列表**（缩略图 + 名称 + 产品编号 + 完整度条 + 来源 + 更新时间 + 状态徽章 + 单卡操作，配吸顶头部、四格状态条、底部固定操作栏），**未**规定横向滚动的桌面表格。当前 375px 失败是契约偏离，非审美意见。
+
+3. **运行来源改判 `RUNTIME_PROVEN` → `RUNTIME_NOT_PROVEN`。** V-0.5 所记 PID 33632 已不存在（当前为 PID 27024）；Nuxt dev 服务工作树而非 commit，且不输出任何 commit SHA；用户截图无时间戳/PID/构建标识。现有证据下任何路由都不得标记 `VISUALLY_VERIFIED`。
+
+4. **9 项 V-0.5 事实错误更正**，其中最关键：**ADM-07 的 SEO 路由确实已在 `ProductSubNav.vue` 第 12 行链接，共 6 个 tab**——V-0.5 把 5 个中文标签误当成标签总数。另更正 Specs BFF 6→7 端点、Sections BFF 7→8 端点、HEAD `5ea32f9`→`9a9d306`。
+
+5. **English-first 完整台账建立。** 扫描 `layouts/admin.vue` + `pages/admin/` + `components/admin/`，`pages/admin/` 下 246 处 / 10 文件。**约 249 处可见 UI 中文分布在 9 个文件**；V-0.5 遗漏的 4 个文件已补入（`login.vue` 8 处、`[id]/index.vue` 9 处、`[id]/faq.vue` 22 处、`media/index.vue` 1 处注释合规）。逐行行号见 Register 12.1 节。
+
+6. **额外发现无母版路由：** `/admin/products/:id/faq` 存在且被 SubNav 链接，配 4 个 BFF 端点，但两套资料包中均无 ADM 母版覆盖独立 FAQ 标签页。状态 `LEGACY` / 母版 `NONE`。
+
+**记录在案、须由 Codex 裁定的 5 项事实冲突：**
+
+| # | 冲突 |
+|---|------|
+| CF-1 | ADM 编号命名空间冲突：索引的 ADM-04–08 = 单型号 Dossier、ADM-09–11 = 导入队列；Register/Blueprint 的 ADM-04 = Media、ADM-05 = Content、ADM-06 = Relations、ADM-07 = SEO、ADM-08 = Sources |
+| CF-2 | P2 包 README 禁止 V-0.5 对它的用法；FD-001 作为用户决定优先，但包自身限制须保持可见 |
+| CF-3 | ADM-02a 至 ADM-08 **完全没有 375px 母版**，移动端契约未定义 |
+| CF-4 | 两张 ADM-02 母版渲染中文后台界面，与 English-first 基线冲突 |
+| CF-5 | 两张 ADM-02 母版右栏契约不同：P1 为"AI 批处理入口"，Register 5.2 节为常驻 Product Control |
+
+**十张母版状态（三轴独立）：** ADM-02 `AUTOMATED_CHECKED` / 375px **FAILED** / 整体 **SUSPENDED**；ADM-02a `AUTOMATED_CHECKED` / `SUSPENDED`；ADM-03/04/05/07 `LEGACY` / `NOT_REVIEWED`；ADM-06 **`NOT_STARTED`**（无路由无 BFF）；ADM-08 **`IN_DISCOVERY`**（仅 3 个 BFF 端点，无页面）；LOGIC-01/02 `NOT_STARTED`。
+
+**下一步：等待 Codex 裁定 CF-1～CF-5，再发下一份单一、完整模块施工单。**
 
 ---
 
