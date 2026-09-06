@@ -104,6 +104,13 @@ Codex/GPT 与 Claude 不得同时修改同一工作树。**Claude Code 是当前
 - 若发现 Blueprint 与仓库事实（代码、schema、运行服务、Directus 状态）冲突，**先报告事实冲突，不得猜测或静默施工**。
 - Claude 每次 Admin/CMS 开工报告须同时引用 Governing Charter V1.1 与 Implementation Blueprint V1，缺一不得开始代码修改。
 
+### C.5 Decision Gate 命名空间规则
+
+- **Charter Decision Gates（`DG-xx`，无前缀）**：由本 Charter 在 Section M.2 中定义，具有治理级效力；DG-01～DG-16 保持原有编号和业务含义，不得重编。
+- **Blueprint Decision Gates（`BP-DG-xx`，含前缀）**：由 Implementation Blueprint V1 Section 12 定义，是执行层实现门控；BP-DG-01～BP-DG-15 仅在 Blueprint 内部使用。
+- 两套编号是**完全独立的命名空间**；同一数字（如 DG-10 与 BP-DG-10）指向完全不同的决策内容，不得相互推断。
+- Claude 开工报告中列出的 Charter DG-xx 与 Blueprint BP-DG-xx 必须分列，不得合并；任何跨命名空间映射须由 Codex 显式建立并经用户确认后方可引用。
+
 ---
 
 ## D. 母版登记与追溯表

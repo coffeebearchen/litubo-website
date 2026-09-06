@@ -277,23 +277,30 @@ Desktop and 375px visual check when appropriate
 
 ## 12. Open Decision Gate register
 
+### Gate namespace rule
+
+`BP-DG-xx` denotes **Blueprint Decision Gates** — implementation-level gates managed within this document.
+`DG-xx` (no prefix) denotes **Charter Decision Gates** in `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md`.
+
+These are two independent namespaces. The same number in each namespace (e.g. BP-DG-10 and DG-10) refers to an entirely different decision and must never be conflated. Neither namespace may be inferred from the other. Any explicit cross-mapping between a Charter DG and a Blueprint BP-DG must be established by Codex and confirmed by the user; Claude must never assume a mapping.
+
 | Gate | Decision required | Blocks |
 |---|---|---|
-| DG-01 | Category Health formula | Calculated category health only |
-| DG-02 | Product readiness/completeness formula | Publish readiness and review dashboard |
-| DG-03 | Category taxonomy and hierarchy | Full category operations |
-| DG-04 | Parameter model, units, conversions | Specifications |
-| DG-05 | Media roles, ordering, resource taxonomy | Product Media & Resources writes |
-| DG-06 | Evidence confidence, `source_locator`, retention | Sources/History and AI provenance |
-| DG-07 | Content module types, review/version/rollback | Page Content |
-| DG-08 | Relation semantics | Relations |
-| DG-09 | Locale, canonical, noindex, SEO release | SEO/Locales and public cutover |
-| DG-10 | Role matrix and final publisher | Expanded review/publish actions |
-| DG-11 | AI provider/model, budget, key, logs, retention | AI Dossier |
-| DG-12 | Import template, duplicate/error correction | Import Queue |
-| DG-13 | Real pilot model and authority source package | Real product Draft |
-| DG-14 | Raw visual/construction pack backup/recovery | Long-term reference reliability |
-| DG-15 | Migration/recovery/deployment authority | Production mutation/release |
+| BP-DG-01 | Category Health formula | Calculated category health only |
+| BP-DG-02 | Product readiness/completeness formula | Publish readiness and review dashboard |
+| BP-DG-03 | Category taxonomy and hierarchy | Full category operations |
+| BP-DG-04 | Parameter model, units, conversions | Specifications |
+| BP-DG-05 | Media roles, ordering, resource taxonomy | Product Media & Resources writes |
+| BP-DG-06 | Evidence confidence, `source_locator`, retention | Sources/History and AI provenance |
+| BP-DG-07 | Content module types, review/version/rollback | Page Content |
+| BP-DG-08 | Relation semantics | Relations |
+| BP-DG-09 | Locale, canonical, noindex, SEO release | SEO/Locales and public cutover |
+| BP-DG-10 | Role matrix and final publisher | Expanded review/publish actions |
+| BP-DG-11 | AI provider/model, budget, key, logs, retention | AI Dossier |
+| BP-DG-12 | Import template, duplicate/error correction | Import Queue |
+| BP-DG-13 | Real pilot model and authority source package | Real product Draft |
+| BP-DG-14 | Raw visual/construction pack backup/recovery | Long-term reference reliability |
+| BP-DG-15 | Migration/recovery/deployment authority | Production mutation/release |
 
 Open Gates only block dependent stages. Codex consolidates user decisions at the relevant stage; Claude never guesses them.
 

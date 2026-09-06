@@ -1343,3 +1343,45 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 - 缺失文档（`docs/DB重构与初始化说明.md`、`docs/数据库设计文档.md`）已记录为 MISSING，未尝试创建替代文件
 
 *最后更新：2026-09-06，由 Claude Code 在"J-2.5 Blueprint 正式登记与入口规则固化"任务中写入。*
+
+---
+
+## Decision Gate 命名空间冲突修正（J-2.5.1，2026-09-06）
+
+**状态：J-2.5.1 文档治理任务完成，本地 commit 已创建，等待 Codex 审核。**
+
+### 问题背景
+
+Charter M.2 定义 DG-01～DG-16（治理级门控），Blueprint Section 12 原定义 DG-01～DG-15（执行级门控）。两套编号全部冲突：同一数字含义完全不同，对 Claude 造成歧义。
+
+### 已执行修改
+
+| 文件 | 修改内容 |
+|------|---------|
+| `docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` | Section 12 全部 DG-01～DG-15 改写为 BP-DG-01～BP-DG-15；新增 Gate Namespace Rule 段落 |
+| `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` | 新增 C.5 Decision Gate 命名空间规则（Charter DG-xx 与 Blueprint BP-DG-xx 独立，互不推断） |
+| `CLAUDE.md` | 开工报告必填项拆分为"Charter DG-xx"与"Blueprint BP-DG-xx"两行 |
+| `docs/project/CURRENT-STATE.md` | 本节记录 |
+| `docs/project/MASTER-ROADMAP.md` | 新增 J-2.5.1 里程碑记录 |
+
+### 不受影响的 DG 引用
+
+- `pages/admin/products/categories.vue:70` 中显示的 `(DG-10)` 指向 **Charter DG-10**（Category Health 业务定义），Charter DG-xx 未做任何改动，此引用保持正确。
+- Charter M.2 的 DG-01～DG-16 编号及含义**完全不变**。
+
+### 禁止声明（已遵守）
+
+- 未修改任何业务代码、Vue 页面、组件、API、types、tests
+- 未修改 Directus schema、角色、权限、数据
+- 未修改 Docker、.env、.gitignore、依赖
+- 未暂存四个禁止资料包
+- 未修改 Blueprint 的模块顺序、业务含义、AI/Import 边界
+- 未修改 Charter 现有 DG-01～DG-16 的编号或业务含义
+- 未触碰 `docs/project/09-claude-first-read-only-instruction.md`（J-2.5 已完成）
+- 未 push、未部署
+
+### 下一步
+
+J-2.5.1 完成后，等待 Codex 集中验收 J-2 + J-2.5 + J-2.5.1，授权 GitHub push；再按 Blueprint 顺序启动 J-3 Product Workspace Shell。
+
+*最后更新：2026-09-06，由 Claude Code 在"J-2.5.1 DG 命名空间冲突修正"任务中写入。*

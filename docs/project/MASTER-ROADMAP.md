@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：J-2 Product Center 代码施工完成（commit 178b340，本地，待验收）。J-2.5 Blueprint 正式登记完成（本地，待 Codex 审核）。下一步：Codex 集中验收 J-2 + J-2.5，授权 GitHub push，再按 Blueprint 顺序启动 J-3 Product Workspace Shell。**
+**当前位置：J-2 Product Center 代码施工完成（commit 178b340，本地，待验收）。J-2.5 Blueprint 正式登记完成（本地，待 Codex 审核）。J-2.5.1 DG 命名空间冲突修正完成（本地，待 Codex 审核）。下一步：Codex 集中验收 J-2 + J-2.5 + J-2.5.1，授权 GitHub push，再按 Blueprint 顺序启动 J-3 Product Workspace Shell。**
 
 ---
 
@@ -304,6 +304,22 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 | AI 自动发布 | 禁止；AI 只生成 Draft |
 | Token 泄露 | `.env` 不进 Git；Token 不出现在代码、日志、文档中 |
 | `product_source_records` | 绝不向 `nuxt-server` 开放任何权限 |
+
+---
+
+#### M4-Next-DG-Namespace：Decision Gate 命名空间冲突修正 🔨（J-2.5.1，本地 commit，待 Codex 审核）
+
+**完成内容：**
+- Blueprint Section 12 全部 DG-01～DG-15 改写为 BP-DG-xx；新增 Gate Namespace Rule 段落
+- Charter V1.1 新增 C.5：两套命名空间独立规则，不得互相推断
+- CLAUDE.md 开工报告必填项：Charter DG-xx 与 Blueprint BP-DG-xx 分列
+- CURRENT-STATE.md 更新：J-2.5.1 状态记录
+- MASTER-ROADMAP.md 更新：本条里程碑记录
+- **业务代码 `categories.vue:70` 的 `(DG-10)` 引用 Charter DG-10，未改动，保持正确**
+- **只修改五个治理文档；未修改任何业务代码、schema、Directus**
+- **未 push；178b340 / 317bec0 未被改写**
+
+**下一步：Codex 集中验收 J-2 + J-2.5 + J-2.5.1，授权 GitHub push，再发 J-3 完整施工单。**
 
 ---
 
