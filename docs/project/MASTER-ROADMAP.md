@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：J-2.2.1a 图片代理路由证据收口 + GitHub Checkpoint 规则写入完成（本地 commit，checkpoint 已推送至 backup/admin-cms-j2）。J-2 集成链（178b340/317bec0/fdc83d2/5821289/4a74e42 + J-2.2.1a）已备份至 GitHub。origin/master 未更新，浏览器视觉验收尚待进行。下一步：Codex 发集中浏览器验收施工单；验收通过 + 用户授权后 push origin/master；再启动 J-3 Product Workspace Shell。**
+**当前位置：J-2.2.1b 证据收口完成（Git 图谱核实、BFF 输入校验工具层、内联复制缺口关闭）。本地 commit 已创建，checkpoint backup/admin-cms-j2 已同步至 HEAD。J-2 集成链（7 个 commit）已备份至 GitHub。origin/master 未更新，浏览器视觉验收尚待进行。下一步：Codex 发集中浏览器验收施工单（/admin/products + /admin/products/categories/[id]，1440px + 375px）；验收通过 + 用户授权后 push origin/master；再启动 J-3 Product Workspace Shell。**
 
 ---
 

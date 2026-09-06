@@ -1541,12 +1541,79 @@ J-2.2 等待集中浏览器验收，验收通过后连同 J-2 / J-2.5 / J-2.5.1 
 | `backup/admin-cms-j2` checkpoint 推送 | ✅ |
 | `origin/master` 未更新 | ✅ |
 
-### 三个 hash 状态（2026-09-06 验收时）
+### Checkpoint 状态（2026-09-06）
 
-| 项目 | hash |
+| 项目 | 状态 |
 |------|------|
-| 本地 HEAD | `69c0e18` |
-| `backup/admin-cms-j2` | `69c0e18`（= 本地 HEAD，checkpoint 已备份）|
-| `origin/master` | `2a3e67f`（6 个 commit 落后于 HEAD，未更新）|
+| checkpoint 分支 | `backup/admin-cms-j2`（已推送，远程备份用途，不代表验收或可部署状态） |
+| `origin/master` | 未更新（落后于本地 HEAD，等待集中浏览器视觉验收 + 用户授权后才可 push） |
+| 精确 hash | 以当前 `git ls-remote --heads origin` 和 `git rev-parse HEAD` 实际输出为准；不在此文件硬编码（硬编码会因后续 commit 立即过时，产生误导性记录）|
 
-*最后更新：2026-09-06，由 Claude Code 在"J-2.2.1a 图片代理路由证据收口 + GitHub Checkpoint"任务中写入。*
+*最后更新：2026-09-06，由 Claude Code 在"J-2.2.1a + J-2.2.1b"任务中写入（J-2.2.1b 修正了错误的静态 hash 记录）。*
+
+---
+
+## Git 图谱证据收口 + BFF 输入校验（J-2.2.1b，2026-09-06）
+
+**状态：J-2.2.1b 完成，本地 commit 已创建。`backup/admin-cms-j2` checkpoint 已同步至最新 HEAD。**
+
+### Git 图谱核实结论
+
+| 项目 | 实际值 |
+|------|--------|
+| 本地 HEAD | `git rev-parse HEAD` 实际输出（当前为本次 commit hash） |
+| `origin/backup/admin-cms-j2` | 已同步至本次 commit（J-2.2.1b 完成后推送）|
+| `origin/master` | `2a3e67f`（未更新，等待集中浏览器验收 + 用户授权）|
+| 本地领先 origin/master | 7 个 commit（178b340 → 317bec0 → fdc83d2 → 5821289 → 4a74e42 → 69c0e18 → 948ad9b + 本次）|
+
+所有 7 个既有保护 commit 均在 HEAD 祖先链中（`git merge-base --is-ancestor` 全部返回成功）。
+
+J-2.2.1 的安全代码实际由两个 commit 承载：
+- `4a74e42`：原始安全加固（MIME 白名单、Content-Disposition、nosniff、no-store、encodeURIComponent、redirect:manual）
+- `69c0e18`：内联复制缺口关闭（提取 `adminAssetProxy.ts` 工具层，handler 和 tests 共享同一代码）
+
+### Product BFF 输入校验修复
+
+发现并修复三处真实缺口：
+
+| 缺口 | 原状态 | 修复方式 |
+|------|--------|---------|
+| `status` 未过滤已知值 | 任意字符串直接传给 Directus `_eq` / `_in[]` | `filterKnownStatuses()` — 未知状态静默丢弃 |
+| `category_id` 无格式校验 | 原始字符串直接拼接 | `validateCategoryId()` — 仅接受整数 FK 格式 |
+| `search` 无长度上限 | 无限长字符串 | `sanitizeSearch()` — 截断至 200 字符 |
+| 测试使用内联复制逻辑 | BFF 测试复制 handler 内部逻辑 | 改为 import 真实 helper，与 handler 共享同一代码 |
+
+### 新建工具层
+
+| 文件 | 导出符号 |
+|------|---------|
+| `server/utils/adminProductsQuery.ts` | `KNOWN_STATUSES`、`filterKnownStatuses`、`parsePageNum`、`parseLimitNum`、`validateCategoryId`、`sanitizeSearch`、`buildProductsFilterParts` |
+
+**handler 引用关系：**
+- `server/api/admin/products/index.get.ts` → import from `~/server/utils/adminProductsQuery`
+- `server/api/admin/products-summary.get.ts` → import `KNOWN_STATUSES` from `~/server/utils/adminProductsQuery`
+- `tests/assetProxy.test.ts` → import all helpers from `../server/utils/adminProductsQuery`（与 handler 共享同一代码）
+
+### 验证结果
+
+| 验收项 | 结果 |
+|--------|------|
+| `npx vitest run` | ✅ **222/222**（8 files；原 219 → +3 新增 BFF 测试） |
+| `npx vue-tsc --noEmit` | ✅ 0 errors |
+| `npm run lint` | ✅ 0 errors，0 warnings |
+| `npx nuxt build` | ✅ Build complete |
+| `git diff --check` | ✅ 无 whitespace 错误（仅 CRLF 警告，Windows 正常） |
+| 4 个禁止资料包 `??` 未暂存 | ✅ |
+| `backup/admin-cms-j2` checkpoint 已同步至 HEAD | ✅ |
+| `origin/master` 未更新 | ✅ |
+
+### 禁止声明（已遵守）
+
+- 未使用 `git add .` / `git add -A` / `git reset --hard` / `git clean` / `git stash` / `git rebase` / `git commit --amend` / `git push --force` / `git push origin master`
+- 未修改 Directus schema、角色、权限、真实产品/媒体/来源记录
+- 未修改 admin-auth 中间件主逻辑、SSR refresh 逻辑
+- 未触碰四个禁止资料包
+- 未修改 J-3 及以后任何功能
+- 七个保护 commit 均未被 amend、rebase 或覆盖
+
+*最后更新：2026-09-06，由 Claude Code 在"J-2.2.1b Git 历史核实、BFF 证据闭环与 Checkpoint 同步"任务中写入。*

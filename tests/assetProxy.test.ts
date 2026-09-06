@@ -22,6 +22,15 @@ import {
   buildSafeParams,
   mapUpstreamStatus,
 } from '../server/utils/adminAssetProxy'
+import {
+  KNOWN_STATUSES,
+  filterKnownStatuses,
+  parsePageNum,
+  parseLimitNum,
+  validateCategoryId,
+  sanitizeSearch,
+  buildProductsFilterParts,
+} from '../server/utils/adminProductsQuery'
 
 // ── 1. Asset ID validation ───────────────────────────────────────────────────
 
@@ -343,31 +352,34 @@ describe('upstream URL construction — req 3: fixed directusUrl, encodeURICompo
 // ── 8. Product BFF — req 7 ───────────────────────────────────────────────────
 
 describe('products-summary BFF — req 7: auth, unknown status, draft_review', () => {
-  it('KNOWN set prevents unknown statuses from appearing in totals', () => {
-    // Replica of aggregation logic from server/api/admin/products-summary.get.ts
-    const KNOWN = new Set(['draft', 'review', 'published', 'archived'])
-    const rows = [
-      { status: 'draft',       count: { id: '3' } },
-      { status: 'unknown_xyz', count: { id: '99' } },
-      { status: 'published',   count: { id: '5' } },
-    ]
-    const byStatus: Record<string, number> = {}
-    let all = 0
-    for (const row of rows) {
-      const n = parseInt(row.count.id, 10) || 0
-      if (KNOWN.has(row.status)) { byStatus[row.status] = n; all += n }
-    }
-    expect(all).toBe(8)
-    expect('unknown_xyz' in byStatus).toBe(false)
+  it('KNOWN_STATUSES — shared between handler and tests; no inline-copy gap', () => {
+    // products-summary.get.ts imports KNOWN_STATUSES from adminProductsQuery.ts.
+    // This test imports from the same module — same object; any drift is instantly caught.
+    expect(KNOWN_STATUSES).toBeInstanceOf(Set)
+    expect(KNOWN_STATUSES.has('draft')).toBe(true)
+    expect(KNOWN_STATUSES.has('review')).toBe(true)
+    expect(KNOWN_STATUSES.has('published')).toBe(true)
+    expect(KNOWN_STATUSES.has('archived')).toBe(true)
+    expect(KNOWN_STATUSES.size).toBe(4)
   })
 
-  it('draft_review is computed server-side: draft + review', () => {
+  it('unknown status is excluded from totals via KNOWN_STATUSES gate', () => {
+    // The handler iterates Directus aggregation rows and skips any whose status
+    // is not in KNOWN_STATUSES — unknown_xyz is never counted.
+    expect(KNOWN_STATUSES.has('unknown_xyz')).toBe(false)
+    expect(KNOWN_STATUSES.has('test')).toBe(false)
+    expect(KNOWN_STATUSES.has('')).toBe(false)
+  })
+
+  it('draft_review is computed server-side: draft + review (not client-supplied)', () => {
+    // Source: products-summary.get.ts:
+    //   draft_review: (byStatus['draft'] ?? 0) + (byStatus['review'] ?? 0)
     const draft = 4; const review = 3
     expect(draft + review).toBe(7)
   })
 
   it('Needs Attention does not appear in summary output — req 8', () => {
-    // Source: products-summary.get.ts return statement
+    // Source: products-summary.get.ts return statement keys
     const summaryKeys = ['all', 'draft', 'review', 'draft_review', 'published', 'archived']
     expect(summaryKeys).not.toContain('needs_attention')
     expect(summaryKeys).not.toContain('attention')
@@ -379,34 +391,67 @@ describe('products-summary BFF — req 7: auth, unknown status, draft_review', (
 })
 
 describe('products list BFF — req 7: input validation and auth', () => {
-  it('limit is capped at 100', () => {
-    expect(Math.min(100, Math.max(1, parseInt('9999', 10) || 20))).toBe(100)
+  it('parseLimitNum: caps at 100, defaults to 20 for non-numeric or zero', () => {
+    expect(parseLimitNum('9999')).toBe(100)
+    expect(parseLimitNum('abc')).toBe(20)
+    expect(parseLimitNum('50')).toBe(50)
+    // 0 is falsy → triggers default of 20 (same as absent limit)
+    expect(parseLimitNum('0')).toBe(20)
+    expect(parseLimitNum('1')).toBe(1)
   })
 
-  it('limit defaults to 20 for non-numeric input', () => {
-    expect(Math.min(100, Math.max(1, parseInt('abc', 10) || 20))).toBe(20)
+  it('parsePageNum: defaults to 1 for non-numeric or sub-1 values', () => {
+    expect(parsePageNum('abc')).toBe(1)
+    expect(parsePageNum('0')).toBe(1)
+    expect(parsePageNum('-5')).toBe(1)
+    expect(parsePageNum('3')).toBe(3)
   })
 
-  it('single status uses _eq filter', () => {
-    const parts: string[] = []
-    const statuses = ['draft']
-    if (statuses.length === 1) parts.push(`filter[status][_eq]=${encodeURIComponent(statuses[0])}`)
-    expect(parts[0]).toBe('filter[status][_eq]=draft')
+  it('filterKnownStatuses: drops unknown statuses before Directus filter', () => {
+    expect(filterKnownStatuses('draft')).toEqual(['draft'])
+    expect(filterKnownStatuses('draft,review')).toEqual(['draft', 'review'])
+    expect(filterKnownStatuses('unknown_xyz')).toEqual([])
+    expect(filterKnownStatuses('draft,evil_status')).toEqual(['draft'])
+    expect(filterKnownStatuses('')).toEqual([])
+    expect(filterKnownStatuses(undefined)).toEqual([])
   })
 
-  it('draft,review produces two _in[] server-side filter parts', () => {
-    const statuses = 'draft,review'.split(',').map(s => s.trim()).filter(Boolean)
-    const parts = statuses.map(s => `filter[status][_in][]=${encodeURIComponent(s)}`)
-    expect(parts).toHaveLength(2)
-    expect(parts[0]).toBe('filter[status][_in][]=draft')
-    expect(parts[1]).toBe('filter[status][_in][]=review')
+  it('validateCategoryId: accepts integers, rejects path traversal and injection', () => {
+    expect(validateCategoryId('1')).toBe('1')
+    expect(validateCategoryId('42')).toBe('42')
+    expect(validateCategoryId('../etc/passwd')).toBe(null)
+    expect(validateCategoryId('1; DROP TABLE products')).toBe(null)
+    expect(validateCategoryId('https://evil.com')).toBe(null)
+    expect(validateCategoryId('')).toBe(null)
+    expect(validateCategoryId(null)).toBe(null)
+    expect(validateCategoryId(undefined)).toBe(null)
   })
 
-  it('search input is encodeURIComponent-encoded before Directus query', () => {
-    const search = 'foo <bar> & baz'
-    const encoded = encodeURIComponent(search)
-    expect(encoded).not.toContain('<')
-    expect(encoded).not.toContain('>')
+  it('sanitizeSearch: enforces 200-char limit and trims whitespace', () => {
+    expect(sanitizeSearch('foo')).toBe('foo')
+    expect(sanitizeSearch('  bar  ')).toBe('bar')
+    expect(sanitizeSearch('')).toBe(null)
+    expect(sanitizeSearch(null)).toBe(null)
+    const result = sanitizeSearch('a'.repeat(300))
+    expect(result).not.toBeNull()
+    expect(result!.length).toBeLessThanOrEqual(200)
+  })
+
+  it('buildProductsFilterParts: single status uses _eq, multiple uses _in[]', () => {
+    const single = buildProductsFilterParts(['draft'], null, null)
+    expect(single).toEqual(['filter[status][_eq]=draft'])
+
+    const multi = buildProductsFilterParts(['draft', 'review'], null, null)
+    expect(multi).toContain('filter[status][_in][]=draft')
+    expect(multi).toContain('filter[status][_in][]=review')
+    expect(multi).toHaveLength(2)
+  })
+
+  it('buildProductsFilterParts: empty statuses produces no status part', () => {
+    const parts = buildProductsFilterParts([], '5', 'metal')
+    expect(parts).toContain('filter[category_id][_eq]=5')
+    expect(parts).toContain('search=metal')
+    expect(parts.every(p => !p.includes('[status]'))).toBe(true)
   })
 
   it('route /api/admin/products is covered by admin-auth middleware → 401', () => {

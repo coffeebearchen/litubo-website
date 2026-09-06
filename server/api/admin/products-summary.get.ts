@@ -1,9 +1,8 @@
 import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { KNOWN_STATUSES } from '~/server/utils/adminProductsQuery'
 import type { H3Event } from 'h3'
 
 interface AggRow { status: string; count: { id: string } }
-
-const KNOWN = new Set(['draft', 'review', 'published', 'archived'])
 
 export default defineEventHandler(async (event: H3Event) => {
   const result = await adminFetch<{ data: AggRow[] }>(
@@ -14,7 +13,7 @@ export default defineEventHandler(async (event: H3Event) => {
   let all = 0
   for (const row of result.data) {
     const n = parseInt(row.count.id, 10) || 0
-    if (KNOWN.has(row.status)) {
+    if (KNOWN_STATUSES.has(row.status)) {
       byStatus[row.status] = n
       all += n
     }
