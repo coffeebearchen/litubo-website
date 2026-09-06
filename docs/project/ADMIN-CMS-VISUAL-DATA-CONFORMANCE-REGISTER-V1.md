@@ -1138,6 +1138,39 @@ Three defects blocked PC-01/PC-02 acceptance after the recovery work order lande
 | Definition of Ready | **NOT MET.** No PRIMARY asset defines the shell; completeness rail is gated by `CH-DG-11` / `BP-DG-02`; the 375px contract is blocked by CF-3. Codex must supply a written shell contract before any `PW-*` work. |
 | Next step | 等待 Codex 决定 |
 
+##### PWS-00 read-only Shell + Overview contract (PWS-DOR-02, 2026-09-07)
+
+This freezes the written implementation contract for `PWS-00` (Workspace shell + Overview). It is a documentation freeze only — it does not raise `PW-00`'s Definition of Ready above `NOT MET` and it authorizes no `PWS-00` code. A separate Codex work order (`PWS-00A`) is still required before any code begins.
+
+**Visual master applicability.** `PW-VIS-01-OVERVIEW-D1440` (Register §4.5) remains the sole `PRIMARY` desktop reference for `PWS-00`. It governs the Workspace module navigation, the Overview information hierarchy, and desktop content layout and status expression. It does not override the Charter, this Register, any data/API contract, security rule, publication rule, or AI Gate. The image's left-most seven-item dark-green global navigation is environment context only — **the existing `layouts/admin.vue` global navigation, authentication logic, white sidebar, and mobile drawer are out of scope for `PWS-00` and remain unchanged.** `PWS-00` must not duplicate the J-2 Product Catalogue rail + main content + Product Control three-column structure, and must not produce a second, competing sidebar.
+
+**Read-only data scope.** `PWS-00`'s first version may display only the following fields of the canonical `products` record, all read-only: product name, product code, model/series, technical category, summary, hero media association, lifecycle status. No second product-fact table is created; media stays reference-only via the existing Media Library UUID model. If hero media is absent, the page shows a neutral empty state — never a fabricated image. `Assigned language` and `Tasks` (or any pseudo-task checklist) are **not displayed** — English-first is a platform policy stated in §7, not a per-product editable field, and no completion-tracking data model exists to back a task list.
+
+**Readiness — empty state and Gate distinction.** `PWS-00`'s only permitted Readiness display is the literal string:
+
+```text
+Not assessed — rule not configured
+```
+
+No percentage, progress bar, completion count, checkbox, or computed score may be shown. `CH-DG-11` and `BP-DG-02` remain **unresolved** and continue to block a real Readiness formula, a real review dashboard, and any readiness-gated `Submit for review`/Publish decision. Their being unresolved does **not** block this read-only Overview from showing the honest "rule not configured" state — the two facts are independent. Neither Gate is resolved, completed, or accepted by this task.
+
+**`CF-3` — PWS-00-only mobile contract.** The following 375px contract is approved **for `PWS-00` only**: reuse the existing Admin global-navigation drawer; the Workspace module navigation uses an accessible accordion (not a `<select>`); main content becomes a single column; Product context moves below main content; product identity, lifecycle, primary actions, current module and context remain reachable; no horizontal scrolling substitutes for layout; hard acceptance is `document.documentElement.scrollWidth <= window.innerWidth`. This contract does **not** extend to `PWS-01`…`PWS-08` or either `PWS-AI-*` module — each still requires its own mobile adaptation contract in its own work order before any 375px work begins, per §4.3/§4.5.
+
+**Button and navigation states (first version).**
+
+| Control | State |
+|---|---|
+| Preview | Enabled — reuses the existing read-only Admin preview (`pages/admin/products/[id]/preview.vue`) |
+| AI Fill Workspace | Not rendered — no disabled button, no AI affordance of any kind |
+| Save changes | Rendered, disabled, with a visible and accessible reason |
+| Submit for review | Rendered, disabled, with a visible and accessible reason |
+| Lifecycle transition controls | Not rendered |
+| Unimplemented Workspace module nav items | Visible, disabled, labelled not-yet-available; never navigate to a non-existent route |
+
+`PWS-00` issues **no** `PATCH`, `POST`, or other write request. The legacy editor at `/admin/products/:id/**` remains the sole writable surface for a product during the pilot; a future `PWS-00A` code work order may add a second, parallel `Open Workspace (read-only)` entry point but may not redirect or replace the existing `Open record` entry.
+
+**`PWS-00A` status.** This freeze makes `PWS-00` eligible for an independent code work order to be designed and reviewed — it does **not** mean `PWS-00` code has started, is implemented, is accepted, or is published. `PW-00`'s Definition of Ready (above) remains `NOT MET` until `CH-DG-11`/`BP-DG-02` and a written mobile contract are both satisfied in that future work order.
+
 #### `PW-01` — Specifications
 
 | Field | Value |

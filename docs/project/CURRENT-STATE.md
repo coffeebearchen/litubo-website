@@ -2126,3 +2126,34 @@ git diff --check       → 0 错误（仅 LF/CRLF 提示）
 等待 Codex 就 `PWS-00`（Workspace shell + Overview）单独发出完整施工单，并解决其 Definition of Ready 中仍未确认的完整度 Gate 与 375px 合同后方可开始设计/施工审查。
 
 *最后更新：2026-09-07，由 Claude Code 在"PW-GOV-01 登记冻结视觉母版并确立 Product Workspace 治理边界"任务中写入。*
+
+---
+
+## PWS-DOR-02 — PWS-00 Workspace Shell + Overview 合同冻结（2026-09-07）
+
+**状态：纯文档治理任务完成。仅修改 4 个治理文档（Register、Product Workspace child blueprint、本文件、MASTER-ROADMAP.md）；Implementation Blueprint 未改动。未写任何 Workspace 代码、路由、schema、API、产品/分类/媒体/AI 数据；未打开或修改任何 PNG 或 README；未改旧编辑器代码。**
+
+### 完成内容
+
+- `PWS-00`（Workspace Shell + Overview）的书面实施合同已冻结，登记于 Register `PW-00` 段落新增小节与 child blueprint 新增 §18。
+- 首版定位：只读 Shell + Overview——不发送任何 PATCH/POST，不提供保存、提交审核、发布或状态迁移；试点期旧编辑器仍是同一产品唯一可写工作表面。
+- 真实数据范围：产品名称、产品代码、型号/系列、技术分类、摘要、Hero 媒体关联、生命周期状态；不显示 Tasks 与 Assigned language；Media Library 仍是物理文件唯一来源；AI Fill Workspace 完全不显示。
+- Readiness 首版唯一文案：`Not assessed — rule not configured`；`CH-DG-11`、`BP-DG-02` 仍未解决，不因本次冻结而视为已解决。
+- 按钮状态：Preview 可用；Save/Submit for review 显示但禁用并附带说明；生命周期迁移控件不显示；未实施模块导航项可见但禁用。
+- `CF-3` 375px 合同仅对 `PWS-00` 生效（Admin 全局抽屉 + Workspace 模块 accordion + 单列 + 零横向溢出），不解除 `PWS-01`～`PWS-08` 或 AI 模块的 375px Gate。
+- 明确：本次只是登记与冻结书面合同，`PWS-00` 代码仍未开始；下一步需 Codex 单独发出 `PWS-00A` 代码施工单。
+
+### 明确边界（未做的事）
+
+- **未写任何 Workspace 代码、路由文件、页面、组件、API、schema、产品/分类/媒体/AI 数据**
+- **未打开、审阅或修改任何 PNG 或 README**（`PW-VIS-01` 已在 PWS-DOR-01 审阅，本次未再次打开）
+- **未修改** `CLAUDE.md`、Charter、Implementation Blueprint、旧编辑器代码（`pages/admin/products/[id]/**`、`ProductBasicForm.vue`、`PublishPanel.vue`、`ProductSubNav.vue`）、`layouts/admin.vue`、`nuxt.config.ts`
+- **`PWS-00` 代码仍未获授权、仍未开始**——等待 Codex 单独发出 `PWS-00A` 完整施工单
+- **J-2 像素级视觉签收与 `origin/master` 状态完全不变**，仍 `BLOCKED`
+- **未 push、未部署**
+
+### 下一步
+
+等待 Codex 审查本次冻结的书面合同，并单独发出 `PWS-00A` 代码施工单。不得自动开始任何代码。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-DOR-02 冻结 PWS-00 Workspace Shell + Overview 实施合同"任务中写入。*

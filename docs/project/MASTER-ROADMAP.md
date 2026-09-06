@@ -10,6 +10,8 @@
 
 **PW-GOV-01（2026-09-07）补充：Product Workspace 治理基线已完成——11 张桌面视觉母版已冻结并登记（Register §4.5/§4.6），`PWS-00`～`PWS-08` + `PWS-AI-01`/`PWS-AI-02` 命名空间已确立，child blueprint 状态升级为 `Approved governance baseline — controlled implementation remains gated`。这是纯文档治理：`PWS-00` 代码仍未获授权、仍未开始；J-2 视觉签收与 `origin/master` 状态不受此次影响，维持不变。**
 
+**PWS-DOR-02（2026-09-07）补充：`PWS-00`（Workspace Shell + Overview）的书面实施合同已冻结（只读首版：不可写、Readiness 显示 `Not assessed — rule not configured`、`CF-3` 375px 合同仅限 `PWS-00`）。纯文档治理，`PWS-00` 代码仍未开始，等待 Codex 单独发出 `PWS-00A` 代码施工单；J-2 视觉签收与 `origin/master` 状态不受影响。**
+
 ---
 
 ## 总览
@@ -575,3 +577,17 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 **明确边界：** `PWS-00` 完整度 Gate（`CH-DG-11`/`BP-DG-02`）与 375px 合同（CF-3）仍未解除，`PWS-00` 代码仍未授权、仍未开始；J-2 像素级视觉签收与 `origin/master` 锁定不受影响，维持原状；`AI-01`/`IMP-01` 均未开始。
 
 **下一步：等待 Codex 就 `PWS-00`（Workspace shell + Overview）单独发出完整施工单，满足其 Definition of Ready 后方可开始设计/施工审查。**
+
+---
+
+#### M4-Next-PWS-DOR-02：PWS-00 Workspace Shell + Overview 合同冻结 ✅（完成，本次，2026-09-07）
+
+**完成内容：**
+
+1. `PWS-00` 只读 Shell + Overview 书面合同已冻结：登记于 Register `PW-00` 段落新增小节 + child blueprint 新增 §18。
+2. 首版定位、路由并存、旧编辑器唯一写入口、真实数据范围、Media Library 原则、AI 不显示、Tasks/Assigned language 不显示、Readiness 空态与 Gate 区分、按钮状态、375px accordion 合同、未来 `PWS-00A` 候选/禁止文件范围，均已写入。
+3. **只修改 4 个治理文档**（Register、child blueprint、CURRENT-STATE.md、本文件）；Implementation Blueprint 未改动（其 PWS 命名空间/路由/从属关系已在 PW-GOV-01 的 §6.3 完成登记）；未写任何 Workspace 代码、路由、schema、API、产品/分类/媒体/AI 数据；未打开或修改任何 PNG 或 README；未触碰 Charter、CLAUDE.md、旧编辑器代码。
+
+**明确边界：** `CH-DG-11`、`BP-DG-02`、`BP-DG-10` 仍未解决；`CF-3` 只对 `PWS-00` 书面合同满足，`PWS-01`～`PWS-08`/AI 模块的 375px Gate 未解除；`PWS-00` 代码仍未授权、仍未开始；J-2 像素级视觉签收与 `origin/master` 锁定维持原状。
+
+**下一步：等待 Codex 审查并单独发出 `PWS-00A` 代码施工单，满足 `PW-00` Definition of Ready 后方可开始。**

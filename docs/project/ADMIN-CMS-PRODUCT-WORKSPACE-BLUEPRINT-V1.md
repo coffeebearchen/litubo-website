@@ -394,3 +394,60 @@ Freezing the 11 visual masters and fixing the `PWS-*` namespace does **not** aut
 ### 17.9 J-2 status unaffected
 
 This task does not touch, reference for reinterpretation, or change the status of J-2 (`PC-01`/`PC-02`). J-2's pixel-level visual sign-off and the `origin/master` lock remain exactly as recorded in the Register and `CURRENT-STATE.md` before this task began.
+
+---
+
+## 18. PWS-00 read-only contract freeze (PWS-DOR-02, 2026-09-07)
+
+This section freezes the written implementation contract for `PWS-00` (Workspace shell + Overview), the first Workspace screen. It is a governance freeze only. No `PWS-00` code, route, page, component, API, schema, test, or real data begins here — a separate Codex work order (`PWS-00A`) is required before any code starts.
+
+### 18.1 Read-only Shell + Overview boundary
+
+`PWS-00` is the shared Workspace shell (§5) plus the Overview tab (§6) only. Its first version is entirely **read-only**: no field on the page is editable, and the page issues no `PATCH`, `POST`, or other write request. It displays only fields already proven to exist on the canonical product record — name, product code, model/series, technical category, summary, hero media association, and lifecycle status — and the `PW-VIS-01-OVERVIEW-D1440` visual (frozen per Register §4.5) governs its desktop layout and information hierarchy only, never data, permissions, publication, or AI behaviour.
+
+### 18.2 New and legacy routes coexist; one canonical product ID
+
+The first `PWS-00` route is `/admin/product-workspace/:id/overview`. The existing legacy editor at `/admin/products/:id/**` is unchanged and remains fully available. Both surfaces address the same canonical `product_id`; no second product record, table, or data copy is created. This section records the route; it does not create it.
+
+### 18.3 Legacy editor is the sole writable surface
+
+During the pilot, the legacy editor is the **only** writable surface for a product. `PWS-00` never competes with it for writes. A future `PWS-00A` code work order may add a second, parallel `Open Workspace (read-only)` entry point alongside the existing `Open record` entry in Product Center — it may only be added in parallel; it must never redirect, replace, or remove the existing entry or the legacy editor.
+
+### 18.4 Real data, single media source, no AI surface
+
+All displayed fields must be real, already-existing product data — none is invented to match the visual. Media stays reference-only through the existing global Media Library UUID model; `PWS-00` never copies a physical file. If hero media is absent, the page shows a neutral, honest empty state, never a placeholder styled as a real image. `AI Fill Workspace` is not rendered in any form — not enabled, not disabled, not hinted at — consistent with §10: AI remains a future, single-product, source-cited, human-reviewed, Draft-only capability under `PWS-AI-01`/`PWS-AI-02`, and this task implements none of it.
+
+### 18.5 `Tasks` and `Assigned language` are not displayed
+
+Neither the visual's task checklist nor its "Assigned language" row has a backing data model. `PWS-00` does not display either — not as a static list, not as a disabled control, and not as a fabricated status. English-first is the standing platform policy in §1/§7 of the Register, not a per-product editable attribute.
+
+### 18.6 Readiness empty state; Gates remain open
+
+`PWS-00`'s only Readiness display is the literal text `Not assessed — rule not configured`. `CH-DG-11` and `BP-DG-02` remain unresolved and continue to block any real Readiness formula, review dashboard, or readiness-gated lifecycle action — this read-only empty state does not depend on their resolution and does not resolve them.
+
+### 18.7 Button states (first version)
+
+| Control | State |
+|---|---|
+| Preview | Enabled — reuses the existing `pages/admin/products/[id]/preview.vue` read-only preview |
+| AI Fill Workspace | Not rendered |
+| Save changes | Rendered, disabled, with a visible, accessible reason |
+| Submit for review | Rendered, disabled, with a visible, accessible reason |
+| Lifecycle transition controls | Not rendered |
+| Unimplemented Workspace module nav items | Visible, disabled, labelled not-yet-available; never navigate to a non-existent route |
+
+### 18.8 375px accordion contract (PWS-00 only)
+
+Reuse the existing Admin global-navigation drawer. The Workspace module navigation uses an accessible accordion — never a `<select>` substitute. Main content becomes a single column; Product context moves below it. Product identity, lifecycle, primary actions, current module, and context remain reachable without horizontal scrolling. Hard acceptance: `document.documentElement.scrollWidth <= window.innerWidth`. No `M375` visual master exists; this contract is not claimed to be pixel-accurate to one. This contract covers `PWS-00` only — every other `PWS-*`/`PWS-AI-*` module still needs its own mobile contract in its own future work order.
+
+### 18.9 Future `PWS-00A` code work order — candidate scope, not authorization
+
+Candidate new files: `pages/admin/product-workspace/[id]/overview.vue`, `components/admin/workspace/WorkspaceShell.vue`, `components/admin/workspace/WorkspaceModuleNav.vue`, `components/admin/workspace/WorkspaceOverview.vue`, `utils/productWorkspace.ts`, `tests/productWorkspaceOverview.test.ts`. Candidate minimal existing-file changes: `components/admin/product/ProductControlPanel.vue` (new parallel entry point only), `utils/productCentre.ts` (new parallel route helper only).
+
+Prohibited regardless of scope: changing `productDetailRoute()`'s legacy target; changing `pages/admin/products/[id]/**`; changing `ProductBasicForm.vue`, `PublishPanel.vue`, or `ProductSubNav.vue`; changing `layouts/admin.vue` or `nuxt.config.ts`; changing shared APIs, `types/product-cms.ts`, or real data. If an existing read-only API is missing a field the first version needs, the future work order must stop and report rather than silently widen scope, and a separate minimal API-contract task must be raised. A code commit must never be combined with a governance-document freeze commit.
+
+Future acceptance to record: 1440px checks limited to the approved `PWS-00` scope (shell, module nav, real data, read-only state, visual hierarchy); 375px accordion/single-column/context-reachable/zero-overflow checks; an invalid product ID shows a real "Product not found" empty state, never a blank form; no write request is ever issued; no new console error; and the relevant tests, typecheck, lint, build, and Git whitespace checks all pass.
+
+### 18.10 Not started
+
+No `PWS-00` code exists after this task. Implementation begins only when Codex issues a separate, complete `PWS-00A` work order and its Definition of Ready (Register `PW-00` row, §12.1i) is satisfied.
