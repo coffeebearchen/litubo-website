@@ -1541,12 +1541,12 @@ J-2.2 等待集中浏览器验收，验收通过后连同 J-2 / J-2.5 / J-2.5.1 
 | `backup/admin-cms-j2` checkpoint 推送 | ✅ |
 | `origin/master` 未更新 | ✅ |
 
-### 三个 hash 状态
+### 三个 hash 状态（2026-09-06 验收时）
 
 | 项目 | hash |
 |------|------|
-| 本地 HEAD | 见 git log（J-2.2.1a commit） |
-| `backup/admin-cms-j2` | = 本地 HEAD |
-| `origin/master` | 5 个 commit 落后于 HEAD |
+| 本地 HEAD | `69c0e18` |
+| `backup/admin-cms-j2` | `69c0e18`（= 本地 HEAD，checkpoint 已备份）|
+| `origin/master` | `2a3e67f`（6 个 commit 落后于 HEAD，未更新）|
 
 *最后更新：2026-09-06，由 Claude Code 在"J-2.2.1a 图片代理路由证据收口 + GitHub Checkpoint"任务中写入。*
