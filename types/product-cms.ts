@@ -71,6 +71,19 @@ export interface ProductCategory {
   name_pt: string | null
 }
 
+export interface CategorySummary {
+  id: number
+  slug: string
+  name_en: string
+  total: number
+  by_status: {
+    draft: number
+    review: number
+    published: number
+    archived: number
+  }
+}
+
 export interface AdminUser {
   id: string
   email: string

@@ -1246,4 +1246,56 @@ HubSpot 同步代码已准备，尚未配置 Token，当前询盘状态为 not_c
 
 ---
 
-*最后更新：2026-09-06，由 Claude Code 在"Charter V1.1 框架补全（J-1.1）"任务中写入。*
+*最后更新：2026-09-06（J-1.1），并于同日 J-2 完成后再次更新。*
+
+---
+
+## Product Center 结构性重构（J-2，2026-09-06）
+
+**状态：J-2 Product Center 代码施工完成，本地 commit 已创建，等待 Codex 验收。**
+
+### 本次施工范围
+
+| 变更项 | 类型 | 说明 |
+|--------|------|------|
+| `server/api/admin/products/index.get.ts` | 扩展 | 新增 `category_id`、`search` 过滤参数 |
+| `server/api/admin/categories-summary.get.ts` | 新建 | ADM-02a BFF：按分类聚合产品状态计数 |
+| `types/product-cms.ts` | 扩展 | 新增 `CategorySummary` 接口 |
+| `components/admin/product/ProductCatalogueNav.vue` | 新建 | 产品目录级别子导航（All Products / Categories） |
+| `components/admin/product/ProductControlPanel.vue` | 新建 | 产品控制面板（只读，右侧滑出） |
+| `pages/admin/products/index.vue` | 重构 | ADM-02 完整结构：状态 tab + 分类筛选 + 搜索 + 表格 + 面板 |
+| `pages/admin/products/categories.vue` | 新建 | ADM-02a 分类视图（Category Health = Not assessed / DG-10）|
+| `tests/productCenter.test.ts` | 新建 | 7 个单元测试覆盖 categories-summary 聚合逻辑 |
+
+### 验证结果
+
+| 验收项 | 结果 |
+|--------|------|
+| `npx vitest run` — 全套测试 | ✅ 134/134 通过（原 127 + 新增 7） |
+| `npx vue-tsc --noEmit` — 类型检查 | ✅ 0 errors |
+| `npm run lint` — ESLint | ✅ 0 errors, 0 warnings |
+| `npx nuxt build` — 构建 | ✅ Build complete |
+| `git diff --check` — trailing whitespace | ✅ 无错误（仅 LF→CRLF 换行警告，正常）|
+
+### Open Decision Gates（施工中确认状态）
+
+| DG | 主题 | 本次处理方式 |
+|----|------|------------|
+| DG-10 | Category Health 公式 | 显示"Not assessed — scoring rule not configured (DG-10)" |
+| DG-11 | 产品完整度计算规则 | 未在列表中显示，待 J-3 阶段确认 |
+
+### 禁止声明（已遵守）
+
+- 未暂存/修改/移动/删除四个禁止资料包
+- 未使用 `git add .` / `git add -A` / `git reset --hard` / `git clean` 等命令
+- 未修改 Directus schema、ProductBasicForm 业务逻辑、全局 Media Library
+- 未涉及 AI、Import Center、Product Workspace ADM-03～08
+- 未 push、未部署、未要求用户登录
+
+### 下一步施工顺序
+
+1. **J-3 — Product Workspace Shell + Product Control（ADM-03）**：J-2 验收通过后，等待 Codex 下一份完整施工单
+2. **J-4 — Content Editor（ADM-04）**：J-3 完成后
+3. DG-10（Category Health 公式）仍需用户在施工单中确认，J-2 已标注为 Not assessed
+
+*最后更新：2026-09-06，由 Claude Code 在"J-2 Product Center 结构性重构"任务中写入。*
