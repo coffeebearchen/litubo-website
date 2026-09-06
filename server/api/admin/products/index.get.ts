@@ -11,7 +11,14 @@ export default defineEventHandler(async (event) => {
   const offset = (pageNum - 1) * limitNum
 
   const filterParts: string[] = []
-  if (status) filterParts.push(`filter[status][_eq]=${encodeURIComponent(String(status))}`)
+  if (status) {
+    const statuses = String(status).split(',').map(s => s.trim()).filter(Boolean)
+    if (statuses.length === 1) {
+      filterParts.push(`filter[status][_eq]=${encodeURIComponent(statuses[0])}`)
+    } else {
+      statuses.forEach(s => filterParts.push(`filter[status][_in][]=${encodeURIComponent(s)}`))
+    }
+  }
   if (category_id) filterParts.push(`filter[category_id][_eq]=${encodeURIComponent(String(category_id))}`)
   if (search) filterParts.push(`search=${encodeURIComponent(String(search))}`)
   const filterQuery = filterParts.length ? '&' + filterParts.join('&') : ''

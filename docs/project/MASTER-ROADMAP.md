@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：J-2 Product Center 代码施工完成（commit 178b340，本地，待验收）。J-2.5 Blueprint 正式登记完成（本地，待 Codex 审核）。J-2.5.1 DG 命名空间冲突修正完成（本地，待 Codex 审核）。下一步：Codex 集中验收 J-2 + J-2.5 + J-2.5.1，授权 GitHub push，再按 Blueprint 顺序启动 J-3 Product Workspace Shell。**
+**当前位置：J-2 Product Center 代码施工完成（commit 178b340，本地）。J-2.5 Blueprint 正式登记完成（本地）。J-2.5.1 DG 命名空间冲突修正完成（commit fdc83d2，本地）。J-2.2 Product Center 视觉结构对齐（ADM-02 + ADM-02a）代码施工完成（本地，待集中浏览器验收）。下一步：集中浏览器验收 J-2.2，验收通过后连同 J-2/J-2.5/J-2.5.1 一并 GitHub push（须用户授权），再按 Blueprint 顺序启动 J-3 Product Workspace Shell。**
 
 ---
 
@@ -320,6 +320,34 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 - **未 push；178b340 / 317bec0 未被改写**
 
 **下一步：Codex 集中验收 J-2 + J-2.5 + J-2.5.1，授权 GitHub push，再发 J-3 完整施工单。**
+
+---
+
+#### M4-Next-J2.2：Product Center 视觉结构对齐 🔨（J-2.2，本地代码完成，待集中浏览器验收）
+
+**完成内容：**
+
+- 新建 `server/api/admin/products-summary.get.ts`：Directus aggregation → `{all, draft, review, draft_review, published, archived}`
+- 新建 `server/api/admin/asset/[id].get.ts`：UUID 校验 + admin Bearer token 代理 + `sendStream` 资产代理
+- 扩展 `server/api/admin/products/index.get.ts`：status 多选（`draft,review` → `_in[]` 重复参数）
+- 扩展 `types/product-cms.ts`：新增 `ProductsSummary` 接口
+- 新建 `components/admin/product/ProductCentreSidebar.vue`：SYSTEM VIEWS（4 视图含真实计数）+ Needs Attention 禁用门控（BP-DG-02，显示"DG-10"）+ PRODUCT TAXONOMY（NuxtLink + 真实 total）
+- 扩展 `components/admin/product/ProductControlPanel.vue`：hero image + panel-identity + summary_en + "View category →"
+- 重构 `pages/admin/products/index.vue`：3 列布局（Sidebar 204px + 主内容）+ filter bar + 缩略图列 + ProductControlPanel
+- 修改 `pages/admin/products/categories.vue`：行链接改为 `/admin/products/categories/${N}`
+- 新建 `pages/admin/products/categories/[id].vue`：ADM-02a 分类上下文页（tabs + 产品列表 + CategoryContextPanel）
+- 扩展 `tests/productCenter.test.ts`：新增 4 describe 块 / 17 个测试（总 24 个）
+- CURRENT-STATE.md + MASTER-ROADMAP.md 文档更新
+
+**验证结果（2026-09-06）：**
+
+- npx vitest run：151/151 ✅
+- vue-tsc --noEmit：0 errors ✅
+- npm run lint：0 errors ✅
+- npx nuxt build：BUILD COMPLETE ✅
+- git diff --check：仅 CRLF 警告 ✅
+
+**下一步：集中浏览器验收（/admin/products 1440px + 375px；/admin/products/categories/[id] 1440px + 375px）；验收通过后连同 J-2/J-2.5/J-2.5.1 一并 GitHub push；然后发 J-3 完整施工单。**
 
 ---
 

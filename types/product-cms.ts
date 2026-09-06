@@ -84,6 +84,15 @@ export interface CategorySummary {
   }
 }
 
+export interface ProductsSummary {
+  all: number
+  draft: number
+  review: number
+  draft_review: number
+  published: number
+  archived: number
+}
+
 export interface AdminUser {
   id: string
   email: string

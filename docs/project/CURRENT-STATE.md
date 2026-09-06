@@ -1385,3 +1385,58 @@ Charter M.2 定义 DG-01～DG-16（治理级门控），Blueprint Section 12 原
 J-2.5.1 完成后，等待 Codex 集中验收 J-2 + J-2.5 + J-2.5.1，授权 GitHub push；再按 Blueprint 顺序启动 J-3 Product Workspace Shell。
 
 *最后更新：2026-09-06，由 Claude Code 在"J-2.5.1 DG 命名空间冲突修正"任务中写入。*
+
+---
+
+## Product Center 视觉结构对齐（J-2.2，2026-09-06）
+
+**状态：J-2.2 代码施工完成，本地 commit 待创建，等待 Codex 集中浏览器验收。**
+
+### 本次施工范围（ADM-02 + ADM-02a 落地）
+
+| 变更项 | 类型 | 说明 |
+|--------|------|------|
+| `server/api/admin/products-summary.get.ts` | 新建 | Directus aggregation → `{all, draft, review, draft_review, published, archived}` |
+| `server/api/admin/asset/[id].get.ts` | 新建 | UUID 校验 + admin Bearer 代理 + `sendStream`；`private, max-age=3600` |
+| `server/api/admin/products/index.get.ts` | 扩展 | status 多选：单值用 `_eq`，多值用 `_in[]` 重复参数 |
+| `types/product-cms.ts` | 扩展 | 新增 `ProductsSummary` 接口 |
+| `components/admin/product/ProductCentreSidebar.vue` | 新建 | SYSTEM VIEWS（4 视图含真实计数）+ Needs Attention 禁用门控（BP-DG-02）+ PRODUCT TAXONOMY（NuxtLink / 真实 total）+ 移动端水平滚动条 |
+| `components/admin/product/ProductControlPanel.vue` | 扩展 | 标题→ Product Control；宽度→ 320px；hero image（真实或 SVG 占位）；`panel-identity`（name + status）；`summary_en`；"View category →" NuxtLink |
+| `pages/admin/products/index.vue` | 重构 | 3 列布局（Sidebar 204px + 主内容弹性）；filter bar（Search + Status 含 draft,review + Category + Clear filters）；产品表格（缩略图列 via asset proxy）；分页；ProductControlPanel 点击展开 |
+| `pages/admin/products/categories.vue` | 修改 | 行链接 `?category_id=N` → `/admin/products/categories/${N}` |
+| `pages/admin/products/categories/[id].vue` | 新建 | ADM-02a 分类上下文页：分类 tabs 导航 + filter bar + 产品表格 + CategoryContextPanel（counts + Category Health="Not assessed DG-10"）；375px panel 折叠至底部 |
+| `tests/productCenter.test.ts` | 扩展 | 新增 4 个 describe 块（products-summary 聚合 / multi-status 过滤器 / Needs Attention 门控 / category context 过滤）；总计 24 个测试 |
+
+### 验证结果
+
+| 验收项 | 结果 |
+|--------|------|
+| `npx vitest run` — 全套测试 | ✅ 151/151 通过（含 J-2.2 新增 17 个） |
+| `npx vue-tsc --noEmit` — 类型检查 | ✅ 0 errors |
+| `npm run lint` — ESLint | ✅ 0 errors, 0 warnings |
+| `npx nuxt build` — 构建 | ✅ Build complete |
+| `git diff --check` — trailing whitespace | ✅ 无错误（仅 LF→CRLF 警告，Windows 正常）|
+
+### Open Decision Gates（施工中状态）
+
+| DG | 主题 | 本次处理方式 |
+|----|------|------------|
+| Charter DG-10 | Category Health 公式 | `categories.vue` 显示"Not assessed (DG-10)"；`categories/[id].vue` 面板显示"Not assessed — Scoring rule not confirmed (DG-10)" |
+| Charter DG-11 | 产品完整度 Readiness | 列表中未展示；待 J-3 阶段处理 |
+| BP-DG-02 | Needs Attention 门控 | 侧边栏按钮 disabled，显示"(DG-10)"注释，不查询、不显示计数 |
+
+### 禁止声明（已遵守）
+
+- 未暂存/修改/移动/删除四个禁止资料包
+- 未使用 `git add .` / `git add -A` 等批量暂存命令
+- 未修改 Directus schema、角色、权限、真实产品/媒体/来源记录
+- 未修改 ProductBasicForm 业务逻辑、全局 Media Library
+- 未涉及 AI、Import Center、Product Workspace ADM-03～08
+- 未 push、未部署、未要求用户登录
+
+### 下一步
+
+J-2.2 等待集中浏览器验收，验收通过后连同 J-2 / J-2.5 / J-2.5.1 一并 GitHub push（须用户单独授权）。  
+之后按 Blueprint 顺序启动 **J-3 Product Workspace Shell + Product Control**。
+
+*最后更新：2026-09-06，由 Claude Code 在"J-2.2 Product Center 视觉结构对齐"任务中写入。*

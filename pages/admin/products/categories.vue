@@ -49,7 +49,7 @@ const categories = computed(() => data.value ?? [])
           <tr v-for="cat in categories" :key="cat.id" class="cat-row">
             <td>
               <NuxtLink
-                :to="`/admin/products?category_id=${cat.id}`"
+                :to="`/admin/products/categories/${cat.id}`"
                 class="cat-link"
               >
                 {{ cat.name_en }}
