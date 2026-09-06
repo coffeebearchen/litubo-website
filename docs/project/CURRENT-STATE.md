@@ -1502,4 +1502,51 @@ J-2.2 等待集中浏览器验收，验收通过后连同 J-2 / J-2.5 / J-2.5.1 
 - 未 push、未部署、未输出凭证
 - 保护提交 `178b340`、`317bec0`、`fdc83d2`、`5821289` 未被 amend 或 rebase
 
-*最后更新：2026-09-06，由 Claude Code 在"J-2.2.1 图片代理安全边界补验"任务中写入。*
+---
+
+## 图片代理路由证据收口 + GitHub Checkpoint 规则（J-2.2.1a，2026-09-06）
+
+**状态：J-2.2.1a 完成，本地 commit 已创建。GitHub checkpoint 分支 `backup/admin-cms-j2` 已推送。**
+
+### 证据缺口关闭（Section 3）
+
+原 `tests/assetProxy.test.ts` 使用内联复制逻辑，测试的是复制体而非生产代码。
+
+**修复方式：** 提取纯函数工具层 `server/utils/adminAssetProxy.ts`（无 Nuxt auto-imports，可被 Vitest 直接 import）。handler 改为从该工具层 import；测试改为从同一工具层 import。两者共享同一代码，消除内联复制缺口。
+
+| 变更项 | 类型 | 说明 |
+|--------|------|------|
+| `server/utils/adminAssetProxy.ts` | 新建 | 纯导出函数：UUID_RE、ALLOWED_MIME、ALLOWED_FIT、clampInt、validateAssetId、validateMime、buildSafeParams、mapUpstreamStatus |
+| `server/api/admin/asset/[id].get.ts` | 修改 | import 从工具层，handler 不再内嵌安全逻辑 |
+| `tests/assetProxy.test.ts` | 修改 | import 从工具层（非内联复制），新增 UUID_RE describe 块（总 219 tests） |
+
+### Checkpoint 规则写入治理文件
+
+| 文件 | 修改内容 |
+|------|---------|
+| `CLAUDE.md` | 新增"GitHub Checkpoint Protocol"节（7 条规则） |
+| `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` | 新增 L.4 Checkpoint 规则 |
+| `docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` | 新增 10.4 Checkpoint Protocol |
+
+### 验证结果
+
+| 验收项 | 结果 |
+|--------|------|
+| `npx vitest run` — 全套测试 | ✅ 219/219（8 files） |
+| `npx vue-tsc --noEmit` | ✅ 0 errors |
+| `npm run lint` | ✅ 0 errors |
+| `npx nuxt build` | ✅ Build complete |
+| `git diff --check` | ✅ 仅 CRLF 警告 |
+| 4 个禁止资料包 `??` 未暂存 | ✅ |
+| `backup/admin-cms-j2` checkpoint 推送 | ✅ |
+| `origin/master` 未更新 | ✅ |
+
+### 三个 hash 状态
+
+| 项目 | hash |
+|------|------|
+| 本地 HEAD | 见 git log（J-2.2.1a commit） |
+| `backup/admin-cms-j2` | = 本地 HEAD |
+| `origin/master` | 5 个 commit 落后于 HEAD |
+
+*最后更新：2026-09-06，由 Claude Code 在"J-2.2.1a 图片代理路由证据收口 + GitHub Checkpoint"任务中写入。*

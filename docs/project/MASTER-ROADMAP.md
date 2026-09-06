@@ -2,7 +2,7 @@
 
 > 本文件是项目总控路线图。所有新会话必须在读完 `CURRENT-STATE.md` 后读此文件，以确认当前处于哪个里程碑、有哪些进入条件和禁止事项。
 
-**当前位置：J-2 Product Center 代码施工完成（commit 178b340，本地）。J-2.5 Blueprint 正式登记完成（本地）。J-2.5.1 DG 命名空间冲突修正完成（commit fdc83d2，本地）。J-2.2 Product Center 视觉结构对齐（ADM-02 + ADM-02a）代码施工完成（commit 5821289，本地）。J-2.2.1 图片代理安全边界补验完成（本地 commit，待集中浏览器验收）。下一步：集中浏览器验收，验收通过后连同 J-2/J-2.5/J-2.5.1/J-2.2/J-2.2.1 一并 GitHub push（须用户授权），再按 Blueprint 顺序启动 J-3 Product Workspace Shell。**
+**当前位置：J-2.2.1a 图片代理路由证据收口 + GitHub Checkpoint 规则写入完成（本地 commit，checkpoint 已推送至 backup/admin-cms-j2）。J-2 集成链（178b340/317bec0/fdc83d2/5821289/4a74e42 + J-2.2.1a）已备份至 GitHub。origin/master 未更新，浏览器视觉验收尚待进行。下一步：Codex 发集中浏览器验收施工单；验收通过 + 用户授权后 push origin/master；再启动 J-3 Product Workspace Shell。**
 
 ---
 

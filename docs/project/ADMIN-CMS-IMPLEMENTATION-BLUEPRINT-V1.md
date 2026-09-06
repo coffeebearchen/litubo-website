@@ -252,6 +252,18 @@ Desktop and 375px visual check when appropriate
 - Visual and Construction Packs presently untracked: maintain a separate manifest/hash/backup location; never mix raw packs into a business-code commit.
 - Define health checks, service logs, capacity monitoring, dependency/security updates, and recovery procedures before production release.
 
+### 10.4 GitHub Checkpoint Protocol (fixed, 2026-09-06)
+
+A checkpoint is a remote backup only — it does not imply acceptance, release, or deployability.
+
+1. An atomic sub-task with passing automated verification must have an exact local commit before any checkpoint push.
+2. When the user or Codex explicitly authorises, create or fast-forward the designated GitHub remote checkpoint branch.
+3. `origin/master` is updated only after integration acceptance, user visual confirmation, and Codex explicit authorisation — never as part of a checkpoint.
+4. Never force-push, delete a branch, rewrite history, or change the remote URL.
+5. Checkpoint branches are never auto-deleted.
+6. Every report must list separately: local HEAD hash · checkpoint branch hash · `origin/master` hash · whether they differ and why.
+7. The single checkpoint branch for the J-2 integration chain is `backup/admin-cms-j2` (fixed name; do not create duplicates).
+
 ## 11. Mandatory programme sequence
 
 | Stage | Module | Dependency / unlock |

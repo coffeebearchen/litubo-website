@@ -813,6 +813,24 @@ git push 须经用户单独授权；
 push 前 git rev-list --left-right --count origin/master...HEAD 确认本地不超过预期 commit 数。
 ```
 
+### L.4 GitHub Checkpoint 规则（固定，2026-09-06）
+
+Checkpoint 是远程备份，不等于已验收、已发布或可部署。
+
+```text
+1. 自动化验证通过的原子子任务，必须先创建精确本地 commit，再创建 checkpoint；
+2. 用户 / Codex 授权时，创建或快进 GitHub 远程 checkpoint 分支；
+3. origin/master 只能在集成验收、用户视觉确认、Codex 明确授权后更新；
+4. 永不 force push、删除分支、改写历史或修改 remote URL；
+5. checkpoint 分支不得自动删除；
+6. 每次报告必须分别列出：
+     - 本地 HEAD hash
+     - checkpoint 分支 hash
+     - origin/master hash
+     - 三者是否相同或为何不同；
+7. J-2 集成链的唯一 checkpoint 分支名：backup/admin-cms-j2（固定，不得更改）。
+```
+
 ---
 
 ## M. 变更日志与可追溯附录

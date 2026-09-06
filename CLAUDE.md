@@ -150,6 +150,18 @@ Every module must complete all of the following before a local commit:
 
 GitHub push requires separate user authorization after the above checklist passes.
 
+## GitHub Checkpoint Protocol (fixed, 2026-09-06)
+
+A checkpoint is a remote backup — not an accepted, published, or deployable state.
+
+1. Passing automated verification → exact local commit first, then checkpoint.
+2. When user/Codex authorises → create or fast-forward the designated remote checkpoint branch (never force-push or delete).
+3. `origin/master` updated only after: integration acceptance + user visual confirmation + Codex explicit authorisation.
+4. Never force-push, delete branches, rewrite history, or modify the remote URL.
+5. Checkpoint branches are never auto-deleted.
+6. Every report must list separately: local HEAD · checkpoint branch hash · `origin/master` hash · whether they differ.
+7. J-2 integration chain checkpoint branch: `backup/admin-cms-j2` (fixed; no duplicates).
+
 ---
 
 ## Canonical Admin/CMS Task Entry and Mandatory Build Order
