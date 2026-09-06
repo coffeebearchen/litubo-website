@@ -245,6 +245,91 @@ Claude in Chrome 扩展在 Edge 中创建的标签组无法访问用户常规浏
 
 ---
 
+### Admin English UI — Phase B（2026-09-06，本地 commit 完成）
+
+**目标：** 将 `/admin/media` 工作界面所有可见静态中文文案改为英文，为录入真实媒体资产做好操作环境准备。
+
+**修改文件：** `pages/admin/media/index.vue`（唯一文件）
+
+**改动清单（修改前 → 修改后）：**
+
+| 位置 | 修改前 | 修改后 |
+|------|--------|--------|
+| `folderPath()` 函数 | `'待分类'` | `'Unclassified'` |
+| `currentViewLabel` computed | `'已归档'` / `'全部文件'` / `'待分类'` | `'Archived'` / `'All files'` / `'Unclassified'` |
+| 面包屑条件比较 | `!== '全部文件'` | `!== 'All files'` |
+| 批量移动成功 | `已将 N 个文件移至…` | `Moved N file(s) to…` |
+| 批量移动部分失败 | `N 个文件移动失败…` | `N of M file(s) failed to move…` |
+| 批量移动失败 | `批量移动失败` | `Batch move failed` |
+| 归档成功 | `文件已归档` | `File archived` |
+| 归档失败 | `归档失败` | `Archive failed` |
+| 恢复成功 | `文件已恢复` | `File restored` |
+| 恢复失败 | `恢复失败` | `Restore failed` |
+| 元数据保存成功 | `元数据已保存` | `Metadata saved` |
+| 保存失败 | `保存失败` | `Save failed` |
+| 上传失败（单文件） | `上传失败` | `Upload failed` |
+| 上传成功 | `成功上传 N 个文件` | `N file(s) uploaded successfully` |
+| 已选数量 | `N 已选` | `N selected` |
+| 上传目标 title | `上传目标正式目录` | `Upload destination folder` |
+| 上传按钮 | `上传中…` / `上传文件` | `Uploading…` / `Upload files` |
+| 搜索框 placeholder | `搜索文件名 / 标题…` | `Search by filename or title…` |
+| 格式筛选 | `所有格式` / `图片` | `All formats` / `Image` |
+| 文件计数 | `N 个文件` | `N file(s)` |
+| 上传失败横幅 | `部分文件上传失败：` | `Some files failed to upload:` |
+| 侧栏系统视图标签 | `系统视图` | `System views` |
+| 侧栏按钮 | `全部文件` / `待分类` / `已归档` | `All files` / `Unclassified` / `Archived` |
+| 加载状态 | `加载中…`（×2） | `Loading…`（×2） |
+| 空状态标题 | `暂无文件` | `No files found` |
+| 空状态提示 | `当前无已归档文件` / `所有文件均已归入正式目录` / `点击"上传文件"添加媒体资产` | 对应英文 |
+| 文件卡片归档徽章 | `归档` | `Archived` |
+| 文件路径未分类 | `待分类` | `Unclassified` |
+| 加载更多 | `加载更多（还有 N 个）` | `Load more (N remaining)` |
+| Detail 面板标题 | `文件详情` | `File details` |
+| Detail 关闭 aria-label | `关闭` | `Close` |
+| Detail 元数据标签 | `文件名` / `格式` / `分辨率` / `大小` / `上传时间` / `当前路径` | `Filename` / `Format` / `Resolution` / `Size` / `Uploaded` / `Current path` |
+| 旧版标签 | `旧版` | `Legacy` |
+| 引用状态标签 | `引用状态` | `Reference status` |
+| 已归档标签 | `已归档` | `Archived` |
+| 引用加载 | `查询引用中…` | `Loading references…` |
+| 无引用 | `无产品引用，可归档` | `Not referenced — safe to archive` |
+| 引用计数 | `被引用 N 次（M 个产品）` | `Referenced N time(s) by M product(s)` |
+| 引用说明 | `ALT / caption… 此处不可编辑` | 对应英文 |
+| 引用信息不可用 | `引用信息暂不可用` | `Reference information unavailable` |
+| 归档按钮 title | `有产品引用，无法归档` / `引用信息不可用` | 对应英文 |
+| 归档文件按钮 | `归档文件` | `Archive file` |
+| 归档确认提示 | `确认归档此文件？归档后可随时恢复。` | `Archive this file? It can be restored at any time.` |
+| 归档确认按钮 | `归档中…` / `确认归档` | `Archiving…` / `Confirm archive` |
+| 归档取消 | `取消` | `Cancel` |
+| 恢复文件按钮 | `恢复文件` | `Restore file` |
+| 恢复确认提示 | `确认恢复此文件？` | `Restore this file?` |
+| 恢复确认按钮 | `恢复中…` / `确认恢复` | `Restoring…` / `Confirm restore` |
+| 恢复取消 | `取消` | `Cancel` |
+| 旧版目录警告 | `此文件位于旧版目录（只读），建议移至正式目录。` | `This file is in a legacy folder (read only). Move it to an approved folder.` |
+| 标题字段标签 | `标题` | `Title` |
+| 标题 placeholder | `文件显示标题` | `Display title` |
+| 内部描述标签 | `内部描述` | `Internal description` |
+| 内部描述 placeholder | `内部备注（不对外展示）` | `Internal notes (not shown publicly)` |
+| 保存按钮 | `保存中…` / `保存` | `Saving…` / `Save` |
+| 取消按钮（详情） | `取消` | `Cancel` |
+| 文件加载失败 | `加载文件列表失败` | `Failed to load files` |
+
+**明确未改动：** API 逻辑、状态机、媒体/产品数据、Folder Registry、Directus schema/权限/角色；注释（第 126 行 `"正式目录"` 保留）；批量操作选框语义、归档/恢复触发逻辑。
+
+**自动化验证：**
+
+| 检查项 | 结果 |
+|--------|------|
+| Vitest：127/127 | ✅ |
+| vue-tsc --noEmit：0 errors | ✅ |
+| npm run lint：0 errors | ✅ |
+| npx nuxt build：Build complete | ✅ |
+| git diff --check：仅 LF/CRLF 警告 | ✅ |
+| rg 验证 media/index.vue：零可见中文（仅第 126 行代码注释） | ✅ |
+
+**浏览器视觉验收：未完成**（Edge MCP Tab 独立 session 无 admin cookie，持续 302 跳转）。视觉确认转入下一次集中 Admin visual smoke test。
+
+---
+
 ## 4B. 原 P1 收口状态（2026-09-06，保持）
 
 **P1 已完成。product_code 不变量、zero-source 防线、Directus 角色绕过审计均已通过。**

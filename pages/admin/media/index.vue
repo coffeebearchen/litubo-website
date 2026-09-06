@@ -100,7 +100,7 @@ const parentMap = computed(() => {
 
 // Full display path: "products / xray"
 function folderPath(folderId: string | null): string {
-  if (!folderId) return '待分类'
+  if (!folderId) return 'Unclassified'
   const parts: string[] = []
   let id: string | null = folderId
   while (id) {
@@ -188,7 +188,7 @@ async function loadFiles(reset = false) {
     }
   } catch (e: unknown) {
     const fe = e as { data?: { message?: string } }
-    errorMsg.value = fe.data?.message ?? '加载文件列表失败'
+    errorMsg.value = fe.data?.message ?? 'Failed to load files'
   } finally {
     loading.value = false
   }
@@ -229,9 +229,9 @@ function toggleArchivedView() {
 
 // Label for the current view (breadcrumb-style topbar heading)
 const currentViewLabel = computed(() => {
-  if (showArchivedView.value) return '已归档'
-  if (selectedFolder.value === null) return '全部文件'
-  if (selectedFolder.value === 'root') return '待分类'
+  if (showArchivedView.value) return 'Archived'
+  if (selectedFolder.value === null) return 'All files'
+  if (selectedFolder.value === 'root') return 'Unclassified'
   return folderPath(selectedFolder.value)
 })
 
@@ -259,16 +259,16 @@ async function batchMoveToFolder() {
       { method: 'POST', body: { file_ids: [...selectedIds.value], folder: batchTargetFolder.value } },
     )
     if (res.failed === 0) {
-      successMsg.value = `已将 ${res.moved} 个文件移至 ${folderPath(batchTargetFolder.value)}`
+      successMsg.value = `Moved ${res.moved} file(s) to ${folderPath(batchTargetFolder.value)}`
       setTimeout(() => (successMsg.value = ''), 3000)
       clearSelection()
       await loadFiles(true)
     } else {
-      errorMsg.value = `${res.failed} 个文件移动失败（共 ${res.moved + res.failed} 个），请重试`
+      errorMsg.value = `${res.failed} of ${res.moved + res.failed} file(s) failed to move — please retry`
     }
   } catch (e: unknown) {
     const fe = e as { data?: { message?: string } }
-    errorMsg.value = fe.data?.message ?? '批量移动失败'
+    errorMsg.value = fe.data?.message ?? 'Batch move failed'
   } finally {
     batchMovingFolder.value = false
   }
@@ -318,14 +318,14 @@ async function archiveFile() {
   errorMsg.value = ''
   try {
     await $fetch(`/api/admin/media/${selectedFile.value.id}/archive`, { method: 'POST' })
-    successMsg.value = '文件已归档'
+    successMsg.value = 'File archived'
     setTimeout(() => (successMsg.value = ''), 3000)
     detailArchived.value = true
     archivedFileIds.value = new Set([...archivedFileIds.value, selectedFile.value.id])
     await loadDetailRefs(selectedFile.value.id)
   } catch (e: unknown) {
     const fe = e as { data?: { message?: string } }
-    errorMsg.value = fe.data?.message ?? '归档失败'
+    errorMsg.value = fe.data?.message ?? 'Archive failed'
   } finally {
     lifecycleWorking.value = false
   }
@@ -338,7 +338,7 @@ async function restoreFile() {
   errorMsg.value = ''
   try {
     await $fetch(`/api/admin/media/${selectedFile.value.id}/restore`, { method: 'POST' })
-    successMsg.value = '文件已恢复'
+    successMsg.value = 'File restored'
     setTimeout(() => (successMsg.value = ''), 3000)
     detailArchived.value = false
     const ids = new Set(archivedFileIds.value)
@@ -347,7 +347,7 @@ async function restoreFile() {
     await loadDetailRefs(selectedFile.value.id)
   } catch (e: unknown) {
     const fe = e as { data?: { message?: string } }
-    errorMsg.value = fe.data?.message ?? '恢复失败'
+    errorMsg.value = fe.data?.message ?? 'Restore failed'
   } finally {
     lifecycleWorking.value = false
   }
@@ -378,7 +378,7 @@ async function saveMetadata() {
       method: 'PATCH',
       body: payload,
     })
-    successMsg.value = '元数据已保存'
+    successMsg.value = 'Metadata saved'
     setTimeout(() => (successMsg.value = ''), 3000)
     Object.assign(selectedFile.value, {
       title: editForm.value.title || null,
@@ -389,7 +389,7 @@ async function saveMetadata() {
     closeDetail()
   } catch (e: unknown) {
     const fe = e as { data?: { message?: string } }
-    errorMsg.value = fe.data?.message ?? '保存失败'
+    errorMsg.value = fe.data?.message ?? 'Save failed'
   } finally {
     editSaving.value = false
   }
@@ -428,7 +428,7 @@ async function onFilesSelected(evt: Event) {
           if (res.errors?.length) allErrors.push(...res.errors)
         } catch (e: unknown) {
           const fe = e as { data?: { message?: string } }
-          allErrors.push({ filename: file.name, message: fe.data?.message ?? '上传失败' })
+          allErrors.push({ filename: file.name, message: fe.data?.message ?? 'Upload failed' })
         }
       })(),
     )
@@ -441,7 +441,7 @@ async function onFilesSelected(evt: Event) {
 
   if (allErrors.length < fileList.length) {
     const okCount = fileList.length - allErrors.length
-    successMsg.value = `成功上传 ${okCount} 个文件`
+    successMsg.value = `${okCount} file(s) uploaded successfully`
     setTimeout(() => (successMsg.value = ''), 4000)
     await loadFiles(true)
   }
@@ -485,7 +485,7 @@ const selectedFileFolderIsLegacy = computed(() => {
     <div class="ml-topbar">
       <div class="ml-breadcrumb">
         <span class="breadcrumb-root">Media Library</span>
-        <template v-if="currentViewLabel !== '全部文件'">
+        <template v-if="currentViewLabel !== 'All files'">
           <span class="breadcrumb-sep">/</span>
           <span class="breadcrumb-current">{{ currentViewLabel }}</span>
         </template>
@@ -494,7 +494,7 @@ const selectedFileFolderIsLegacy = computed(() => {
       <div class="ml-topbar-actions">
         <!-- Batch actions -->
         <template v-if="selectedIds.size > 0">
-          <span class="selection-count">{{ selectedIds.size }} 已选</span>
+          <span class="selection-count">{{ selectedIds.size }} selected</span>
           <select v-model="batchTargetFolder" class="folder-select" title="Move to approved folder">
             <option value="">— Move to approved folder —</option>
             <option v-for="f in uploadableFlatFolders" :key="f.id" :value="f.id">
@@ -509,14 +509,14 @@ const selectedFileFolderIsLegacy = computed(() => {
 
         <!-- Upload actions -->
         <template v-else>
-          <select v-model="uploadFolder" class="folder-select" title="上传目标正式目录">
+          <select v-model="uploadFolder" class="folder-select" title="Upload destination folder">
             <option value="">— Needs Classification —</option>
             <option v-for="f in uploadableFlatFolders" :key="f.id" :value="f.id">
               {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
             </option>
           </select>
           <button class="btn-upload" :disabled="uploading" @click="triggerUpload">
-            {{ uploading ? '上传中…' : '上传文件' }}
+            {{ uploading ? 'Uploading…' : 'Upload files' }}
           </button>
         </template>
         <input
@@ -536,21 +536,21 @@ const selectedFileFolderIsLegacy = computed(() => {
         v-model="searchQuery"
         type="search"
         class="search-input"
-        placeholder="搜索文件名 / 标题…"
+        placeholder="Search by filename or title…"
       >
       <select v-model="typeFilter" class="type-select">
-        <option value="">所有格式</option>
-        <option value="image">图片</option>
+        <option value="">All formats</option>
+        <option value="image">Image</option>
         <option value="pdf">PDF</option>
       </select>
-      <span class="file-count">{{ totalCount }} 个文件</span>
+      <span class="file-count">{{ totalCount }} file(s)</span>
     </div>
 
     <!-- Banners -->
     <div v-if="errorMsg" class="banner banner--error">{{ errorMsg }}</div>
     <div v-if="successMsg" class="banner banner--success">{{ successMsg }}</div>
     <div v-if="uploadErrors.length" class="banner banner--warn">
-      <strong>部分文件上传失败：</strong>
+      <strong>Some files failed to upload:</strong>
       <ul class="error-list">
         <li v-for="e in uploadErrors" :key="e.filename">
           <strong>{{ e.filename }}</strong>：{{ e.message }}
@@ -562,22 +562,22 @@ const selectedFileFolderIsLegacy = computed(() => {
       <!-- ── Left sidebar ─────────────────────────────────────────────────── -->
       <aside class="ml-sidebar">
         <!-- Tier 1: System Views -->
-        <p class="sidebar-section-label">系统视图</p>
+        <p class="sidebar-section-label">System views</p>
         <button
           class="folder-item"
           :class="{ 'folder-item--active': selectedFolder === null && !showArchivedView }"
           @click="selectFolder(null)"
-        >全部文件</button>
+        >All files</button>
         <button
           class="folder-item"
           :class="{ 'folder-item--active': selectedFolder === 'root' && !showArchivedView }"
           @click="selectFolder('root')"
-        >待分类</button>
+        >Unclassified</button>
         <button
           class="folder-item folder-item--archived"
           :class="{ 'folder-item--active': showArchivedView }"
           @click="toggleArchivedView"
-        >已归档</button>
+        >Archived</button>
 
         <!-- Tier 2: Active destinations -->
         <div class="sidebar-divider" />
@@ -633,16 +633,16 @@ const selectedFileFolderIsLegacy = computed(() => {
       <div class="ml-main">
         <!-- Loading -->
         <div v-if="loading && files.length === 0" class="loading-state">
-          <span class="loading-dot" />加载中…
+          <span class="loading-dot" />Loading…
         </div>
 
         <!-- Empty -->
         <div v-else-if="!loading && files.length === 0" class="empty-state">
-          <p class="empty-title">暂无文件</p>
+          <p class="empty-title">No files found</p>
           <p class="empty-hint">
-            <template v-if="showArchivedView">当前无已归档文件</template>
-            <template v-else-if="selectedFolder === 'root'">所有文件均已归入正式目录</template>
-            <template v-else>点击"上传文件"添加媒体资产</template>
+            <template v-if="showArchivedView">No archived files</template>
+            <template v-else-if="selectedFolder === 'root'">All files have been moved to approved folders</template>
+            <template v-else>Click "Upload files" to add media assets</template>
           </p>
         </div>
 
@@ -670,7 +670,7 @@ const selectedFileFolderIsLegacy = computed(() => {
                 @change="toggleSelect(f.id, $event)"
               >
             </label>
-            <span v-if="archivedFileIds.has(f.id)" class="archived-badge">归档</span>
+            <span v-if="archivedFileIds.has(f.id)" class="archived-badge">Archived</span>
             <div class="file-card__thumb">
               <img
                 v-if="isImage(f.type)"
@@ -693,7 +693,7 @@ const selectedFileFolderIsLegacy = computed(() => {
               <!-- Folder path — single source of truth from server data -->
               <p class="file-card__folder">
                 <span v-if="f.folder && folderMap[f.folder]">{{ folderPath(f.folder) }}</span>
-                <span v-else class="folder-unset">待分类</span>
+                <span v-else class="folder-unset">Unclassified</span>
               </p>
             </div>
           </div>
@@ -701,17 +701,17 @@ const selectedFileFolderIsLegacy = computed(() => {
 
         <div v-if="hasMore && !loading" class="load-more">
           <button class="btn-load-more" @click="loadFiles(false)">
-            加载更多（还有 {{ totalCount - files.length }} 个）
+            Load more ({{ totalCount - files.length }} remaining)
           </button>
         </div>
-        <div v-if="loading && files.length > 0" class="loading-inline">加载中…</div>
+        <div v-if="loading && files.length > 0" class="loading-inline">Loading…</div>
       </div>
 
       <!-- ── Detail panel ──────────────────────────────────────────────────── -->
       <aside v-if="selectedFile" class="ml-detail">
         <div class="detail-header">
-          <h3 class="detail-title">文件详情</h3>
-          <button class="detail-close" aria-label="关闭" @click="closeDetail">✕</button>
+          <h3 class="detail-title">File details</h3>
+          <button class="detail-close" aria-label="Close" @click="closeDetail">✕</button>
         </div>
 
         <!-- Preview -->
@@ -727,42 +727,42 @@ const selectedFileFolderIsLegacy = computed(() => {
 
         <!-- File facts (read-only) — single source of truth from selectedFile -->
         <dl class="detail-info">
-          <dt>文件名</dt>
+          <dt>Filename</dt>
           <dd>{{ selectedFile.filename_download ?? selectedFile.filename_disk ?? '—' }}</dd>
-          <dt>格式</dt>
+          <dt>Format</dt>
           <dd>{{ selectedFile.type ?? '—' }}</dd>
           <template v-if="selectedFile.width && selectedFile.height">
-            <dt>分辨率</dt>
+            <dt>Resolution</dt>
             <dd>{{ selectedFile.width }} × {{ selectedFile.height }}</dd>
           </template>
-          <dt>大小</dt>
+          <dt>Size</dt>
           <dd>{{ formatSize(selectedFile.filesize) }}</dd>
-          <dt>上传时间</dt>
+          <dt>Uploaded</dt>
           <dd>{{ selectedFile.uploaded_on ? selectedFile.uploaded_on.slice(0, 10) : '—' }}</dd>
           <!-- Current folder path — always from server data, never from editForm -->
-          <dt>当前路径</dt>
+          <dt>Current path</dt>
           <dd :class="{ 'path-legacy': selectedFileFolderIsLegacy, 'path-unset': !selectedFile.folder }">
             {{ folderPath(selectedFile.folder) }}
-            <span v-if="selectedFileFolderIsLegacy" class="legacy-tag">旧版</span>
+            <span v-if="selectedFileFolderIsLegacy" class="legacy-tag">Legacy</span>
           </dd>
         </dl>
 
         <!-- Used in / References + lifecycle -->
         <div class="detail-lifecycle">
           <div class="lifecycle-header">
-            <span class="lifecycle-label">引用状态</span>
-            <span v-if="detailArchived" class="lifecycle-archived-tag">已归档</span>
+            <span class="lifecycle-label">Reference status</span>
+            <span v-if="detailArchived" class="lifecycle-archived-tag">Archived</span>
           </div>
 
-          <div v-if="detailRefsLoading" class="lifecycle-loading">查询引用中…</div>
+          <div v-if="detailRefsLoading" class="lifecycle-loading">Loading references…</div>
           <div v-else-if="detailRefs" class="lifecycle-refs">
-            <p v-if="detailRefs.total === 0" class="refs-none">无产品引用，可归档</p>
+            <p v-if="detailRefs.total === 0" class="refs-none">Not referenced — safe to archive</p>
             <template v-else>
               <p class="refs-count">
-                被引用 {{ detailRefs.total }} 次
-                （{{ detailRefs.product_count }} 个产品）
+                Referenced {{ detailRefs.total }} time(s)
+                by {{ detailRefs.product_count }} product(s)
               </p>
-              <p class="refs-note">ALT / caption / file_role 在产品或内容引用中设置，此处不可编辑</p>
+              <p class="refs-note">ALT / caption / file_role are set in product or content references and cannot be edited here</p>
               <ul v-if="detailRefs.references.length" class="refs-list">
                 <li v-for="ref in detailRefs.references" :key="`${ref.product_id}-${ref.file_role}`">
                   {{ ref.product_name }} · <code>{{ ref.file_role }}</code>
@@ -770,7 +770,7 @@ const selectedFileFolderIsLegacy = computed(() => {
               </ul>
             </template>
           </div>
-          <div v-else class="lifecycle-loading">引用信息暂不可用</div>
+          <div v-else class="lifecycle-loading">Reference information unavailable</div>
 
           <!-- Archive action -->
           <div v-if="!detailArchived" class="lifecycle-action">
@@ -778,17 +778,17 @@ const selectedFileFolderIsLegacy = computed(() => {
               <button
                 class="btn-lifecycle btn-archive"
                 :disabled="lifecycleWorking || !detailRefs || !detailRefs.can_archive"
-                :title="detailRefs && !detailRefs.can_archive ? '有产品引用，无法归档' : (detailRefs ? '' : '引用信息不可用')"
+                :title="detailRefs && !detailRefs.can_archive ? 'Referenced by a product — cannot archive' : (detailRefs ? '' : 'Reference information unavailable')"
                 @click="archiveConfirm = true"
-              >归档文件</button>
+              >Archive file</button>
             </template>
             <template v-else>
-              <p class="confirm-msg">确认归档此文件？归档后可随时恢复。</p>
+              <p class="confirm-msg">Archive this file? It can be restored at any time.</p>
               <div class="confirm-btns">
                 <button class="btn-lifecycle btn-archive-confirm" :disabled="lifecycleWorking" @click="archiveFile">
-                  {{ lifecycleWorking ? '归档中…' : '确认归档' }}
+                  {{ lifecycleWorking ? 'Archiving…' : 'Confirm archive' }}
                 </button>
-                <button class="btn-lifecycle btn-lifecycle-cancel" @click="archiveConfirm = false">取消</button>
+                <button class="btn-lifecycle btn-lifecycle-cancel" @click="archiveConfirm = false">Cancel</button>
               </div>
             </template>
           </div>
@@ -797,16 +797,16 @@ const selectedFileFolderIsLegacy = computed(() => {
           <div v-if="detailArchived" class="lifecycle-action">
             <template v-if="!restoreConfirm">
               <button class="btn-lifecycle btn-restore" :disabled="lifecycleWorking" @click="restoreConfirm = true">
-                恢复文件
+                Restore file
               </button>
             </template>
             <template v-else>
-              <p class="confirm-msg">确认恢复此文件？</p>
+              <p class="confirm-msg">Restore this file?</p>
               <div class="confirm-btns">
                 <button class="btn-lifecycle btn-restore-confirm" :disabled="lifecycleWorking" @click="restoreFile">
-                  {{ lifecycleWorking ? '恢复中…' : '确认恢复' }}
+                  {{ lifecycleWorking ? 'Restoring…' : 'Confirm restore' }}
                 </button>
-                <button class="btn-lifecycle btn-lifecycle-cancel" @click="restoreConfirm = false">取消</button>
+                <button class="btn-lifecycle btn-lifecycle-cancel" @click="restoreConfirm = false">Cancel</button>
               </div>
             </template>
           </div>
@@ -816,19 +816,19 @@ const selectedFileFolderIsLegacy = computed(() => {
         <div class="detail-edit">
           <!-- Legacy folder warning -->
           <div v-if="selectedFileFolderIsLegacy" class="legacy-notice">
-            此文件位于旧版目录（只读），建议移至正式目录。
+            This file is in a legacy folder (read only). Move it to an approved folder.
           </div>
 
           <div class="field-row">
-            <label class="field-label">标题</label>
-            <input v-model="editForm.title" type="text" class="field-input" placeholder="文件显示标题" maxlength="255">
+            <label class="field-label">Title</label>
+            <input v-model="editForm.title" type="text" class="field-input" placeholder="Display title" maxlength="255">
           </div>
           <div class="field-row">
-            <label class="field-label">内部描述</label>
+            <label class="field-label">Internal description</label>
             <textarea
               v-model="editForm.description"
               class="field-textarea"
-              placeholder="内部备注（不对外展示）"
+              placeholder="Internal notes (not shown publicly)"
               rows="3"
               maxlength="1000"
             />
@@ -845,9 +845,9 @@ const selectedFileFolderIsLegacy = computed(() => {
           </div>
           <div class="detail-actions">
             <button class="btn-save" :disabled="editSaving" @click="saveMetadata">
-              {{ editSaving ? '保存中…' : '保存' }}
+              {{ editSaving ? 'Saving…' : 'Save' }}
             </button>
-            <button class="btn-cancel" @click="closeDetail">取消</button>
+            <button class="btn-cancel" @click="closeDetail">Cancel</button>
           </div>
         </div>
       </aside>
