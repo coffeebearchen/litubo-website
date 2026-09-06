@@ -179,6 +179,64 @@ This matrix is the **single authoritative statement** of which visual asset may 
 
 ---
 
+### 4.5 Product Workspace Visual Masters — Frozen Desktop Set (PW-GOV-01, 2026-09-07)
+
+The user formally froze the following 11 images as the desktop visual masters for the new Product Workspace. This is a documentation-only registration: it authorizes no route, page, schema, API, product/category/media data, or AI feature. Freezing these 11 images does not by itself satisfy `PW-00`'s Definition of Ready (§12.1i) — see the explicit scope limit at the end of this section.
+
+**Frozen directory (immutable reference; never modify, rename, copy or overwrite):**
+
+```text
+docs/design-reference/approved/admin-cms-product-workspace-v1/LITUBO-Product-Workspace-Visual-Masters-V1/
+```
+
+| Source Asset ID | File | PWS module (§4.6) | Purpose (per pack README) | Authority | Dimensions it may influence | May **not** decide |
+|---|---|---|---|---|---|---|
+| `PW-VIS-01-OVERVIEW-D1440` | `PW-VIS-01-OVERVIEW-D1440.png` | `PWS-00` | Product identity, lifecycle, readiness and task list | `PRIMARY` (desktop 1440px only) | Workspace shell layout, Overview panel structure, task-list presence | Data/API contract; permissions; publication behaviour; AI write authority; any 375px structure |
+| `PW-VIS-02-PAGE-CONTENT-D1440` | `PW-VIS-02-PAGE-CONTENT-D1440.png` | `PWS-01` | Public page modules, module editing and preview | `PRIMARY` (desktop 1440px only) | Page-content module list, editor and preview layout | Same as above |
+| `PW-VIS-03-SPECIFICATIONS-D1440` | `PW-VIS-03-SPECIFICATIONS-D1440.png` | `PWS-02` | Structured specifications, citations and review states | `PRIMARY` (desktop 1440px only) | Specification table/group layout, review-state display | Same as above; does not define the parameter model itself (`BP-DG-04`) |
+| `PW-VIS-04-MEDIA-RESOURCES-D1440` | `PW-VIS-04-MEDIA-RESOURCES-D1440.png` | `PWS-03` | Media associations, document access and selected-asset inspector | `PRIMARY` (desktop 1440px only) | Media/document grid layout, selected-asset inspector | Same as above; does not authorize copying physical files out of the Media Library |
+| `PW-VIS-05-RELATIONS-D1440` | `PW-VIS-05-RELATIONS-D1440.png` | `PWS-04` | Applications, related products, accessories and compare sets | `PRIMARY` (desktop 1440px only) | Relations groupings and layout | Same as above; does not define the relation schema (`BP-DG-08`) |
+| `PW-VIS-06-SEO-LOCALES-D1440` | `PW-VIS-06-SEO-LOCALES-D1440.png` | `PWS-05` | SEO metadata, locale structure and previews | `PRIMARY` (desktop 1440px only) | SEO form and preview layout | Same as above; does not decide ES/PT activation (`CH-DG-14`/`BP-DG-09`) |
+| `PW-VIS-07-SHARE-DISTRIBUTION-D1440` | `PW-VIS-07-SHARE-DISTRIBUTION-D1440.png` | `PWS-06` | Draft-safe distribution and post-publication sharing | `PRIMARY` (desktop 1440px only) | Share/distribution panel layout, Draft-locked state | Same as above; does not authorize automatic posting or any public exposure while Draft |
+| `PW-VIS-08-SOURCES-EVIDENCE-D1440` | `PW-VIS-08-SOURCES-EVIDENCE-D1440.png` | `PWS-07` | Restricted evidence, citations and verification | `PRIMARY` (desktop 1440px only) | Evidence register and citation layout | Same as above; does not define the confidence/retention model (`BP-DG-06`) |
+| `PW-VIS-09-CHANGE-HISTORY-D1440` | `PW-VIS-09-CHANGE-HISTORY-D1440.png` | `PWS-08` | Immutable audit history for edits, reviews, AI proposals and publication | `PRIMARY` (desktop 1440px only) | Audit-trail layout | Same as above |
+| `PW-AI-01-SOURCE-INTAKE-D1440` | `PW-AI-01-SOURCE-INTAKE-D1440.png` | `PWS-AI-01` | AI source intake for one product only | `PRIMARY` (desktop 1440px only); **build authorization stays `FUTURE-REFERENCE`** — see below | Intake-flow layout | Any AI implementation now; FD-001/FD-002 explicitly do not authorize AI |
+| `PW-AI-02-PROPOSAL-REVIEW-D1440` | `PW-AI-02-PROPOSAL-REVIEW-D1440.png` | `PWS-AI-02` | Human review of AI proposals before writing to Draft | `PRIMARY` (desktop 1440px only); **build authorization stays `FUTURE-REFERENCE`** — see below | Proposal-review layout | Any AI implementation now; FD-001/FD-002 explicitly do not authorize AI |
+
+Each image is 1672×941px. **No `M375` mobile master exists for any of the 11 images** (confirmed by the pack's own `README.md`, "Desktop and mobile status" section). Per the CF-3 principle already established for `PW-01`…`PW-06` in §4.3, every future `PWS-*` code work order must independently supply its own mobile adaptation contract before 375px work begins; none of these 11 images may be cited as satisfying that requirement.
+
+**README status.** `docs/design-reference/approved/admin-cms-product-workspace-v1/LITUBO-Product-Workspace-Visual-Masters-V1/README.md` is `SUPPLEMENTARY` — an operational manifest (file/ID/purpose mapping), not an independent governance authority. Its own "Reading rule for Claude" clause ("Claude must open the exact named visual master at full size...") becomes a binding reading-tier requirement only now that it is registered here; it confers no implementation authorization by itself and never overrides the Charter, the Blueprint, this Register, or an approved Codex work order.
+
+**Explicit scope limit.** These 11 images fix visual hierarchy and desktop (1440px) layout intent only. They do **not** authorize, define, or imply any data/API contract, schema, permission rule, publication behaviour, or AI read/write capability. **`PWS-00` has no code authorization from this registration.** `PW-00`'s Definition of Ready (§12.1i) remains `NOT MET` — freezing these masters resolves only the "no PRIMARY asset" clause of that row; the completeness-rail gate (`CH-DG-11`/`BP-DG-02`) and the 375px contract gate (CF-3) remain open, and a separate, complete Codex work order is still required before any `PWS-00` code begins.
+
+### 4.6 PWS work-order namespace (fixed by PW-GOV-01, 2026-09-07)
+
+The Blueprint §6.1 engineering module IDs `PW-00`…`PW-06` were fixed by FD-002 before any Workspace visual master existed and before the child blueprint's own `PW-00`…`PW-07`+`AI-01` scheme (§12 of `ADMIN-CMS-PRODUCT-WORKSPACE-BLUEPRINT-V1.md`) was reconciled against it — the two disagreed on both numbering and module set (the child blueprint additionally lists Share & Distribution and Change History, which Blueprint §6.1 does not). PW-GOV-01 is the user's resolution: **future Product Workspace work orders use the `PWS-*` namespace below**, not the `PW-01`…`PW-06` subdivision in Blueprint §6.1.
+
+| `PWS-*` ID | Module | Visual master (§4.5) | Prior `PW-*` reference (Blueprint §6.1 / child blueprint) |
+|---|---|---|---|
+| `PWS-00` | Workspace shell + Overview | `PW-VIS-01-OVERVIEW-D1440` | `PW-00` (shell, no visual row) — Overview responsibility folded in |
+| `PWS-01` | Page Content | `PW-VIS-02-PAGE-CONTENT-D1440` | `PW-03` |
+| `PWS-02` | Specifications | `PW-VIS-03-SPECIFICATIONS-D1440` | `PW-01` |
+| `PWS-03` | Media & Resources | `PW-VIS-04-MEDIA-RESOURCES-D1440` | `PW-02` |
+| `PWS-04` | Relations | `PW-VIS-05-RELATIONS-D1440` | `PW-04` |
+| `PWS-05` | SEO & Locales | `PW-VIS-06-SEO-LOCALES-D1440` | `PW-05` |
+| `PWS-06` | Share & Distribution | `PW-VIS-07-SHARE-DISTRIBUTION-D1440` | Not in Blueprint §6.1; matches child blueprint's "Share & distribution" |
+| `PWS-07` | Sources & Evidence | `PW-VIS-08-SOURCES-EVIDENCE-D1440` | `PW-06` |
+| `PWS-08` | Change History | `PW-VIS-09-CHANGE-HISTORY-D1440` | Not in Blueprint §6.1; matches child blueprint's "Change history" |
+| `PWS-AI-01` | Source Intake | `PW-AI-01-SOURCE-INTAKE-D1440` | `AI-01` (Single Product Dossier), intake phase |
+| `PWS-AI-02` | Proposal Review | `PW-AI-02-PROPOSAL-REVIEW-D1440` | `AI-01` (Single Product Dossier), review phase |
+
+Rules:
+
+1. This is a **work-order naming ruling only**. It renumbers how future Workspace implementation work orders are addressed; it does not itself implement, authorize, or schedule any module.
+2. `IMP-01` (Import Review Queue) is **not** part of the `PWS-*` namespace and is unaffected by this decision — bulk import remains a separate future module.
+3. All existing gates in Blueprint §12 and Charter §M.2 that reference `PW-01`…`PW-06` continue to apply to the corresponding `PWS-*` module unchanged (e.g. `BP-DG-04` still gates `PWS-02` Specifications; `BP-DG-08` still gates `PWS-04` Relations). This ruling renames the address, not the gate.
+4. Blueprint §11's stage order (`J-3` through `J-6e`) is unchanged by this ruling; it governs sequence, and `PWS-*` numbering governs addressing only.
+5. `PWS-00` remains the gating prerequisite for `PWS-01`…`PWS-08` and both `PWS-AI-*` modules, exactly as `PW-00` gated `PW-01`…`PW-06`.
+
+---
+
 ## 5. Shared visual and interaction contracts
 
 ### 5.1 Admin global shell

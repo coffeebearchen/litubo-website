@@ -163,6 +163,30 @@ Two independent gate namespaces exist. FD-002 makes the Charter prefix explicit 
 - Existing business code that displays a bare `(DG-10)` string — `pages/admin/products/categories.vue` — refers to Charter `DG-10` / `CH-DG-10` and remains correct. FD-002 does not require a code change.
 - The same number in the two namespaces refers to entirely different decisions and must never be conflated. Any cross-mapping must be established by Codex and confirmed by the user; Claude must never assume one.
 
+### 6.3 PWS work-order namespace and child blueprint standing (fixed by PW-GOV-01, 2026-09-07)
+
+`docs/project/ADMIN-CMS-PRODUCT-WORKSPACE-BLUEPRINT-V1.md` is a child blueprint: it sits below this document and is bound by it and by the Charter. Its own `PW-00`…`PW-07`+`AI-01` numbering no longer addresses code work orders. Per the user's PW-GOV-01 governance decision (registered in full in the Register §4.5/§4.6), future Product Workspace implementation work orders use:
+
+```text
+PWS-00 Workspace shell + Overview
+PWS-01 Page Content
+PWS-02 Specifications
+PWS-03 Media & Resources
+PWS-04 Relations
+PWS-05 SEO & Locales
+PWS-06 Share & Distribution
+PWS-07 Sources & Evidence
+PWS-08 Change History
+PWS-AI-01 Source Intake
+PWS-AI-02 Proposal Review
+```
+
+This supersedes the `PW-01`…`PW-06` subdivision in §6.1 above **for addressing future Workspace work orders only**. §6.1's table, this document's module sequence (§11), and every gate in §12 are otherwise unchanged: a gate written against `PW-02` (e.g. `BP-DG-05`) continues to govern the module now addressed as `PWS-03`. `IMP-01` is not part of the `PWS-*` namespace and is unaffected.
+
+The new Product Workspace reserves the route prefix `/admin/product-workspace/:id/...` (defined in the child blueprint §6). The existing legacy editor keeps `/admin/products/:id/...` unchanged; both address the same canonical `product_id`. No legacy route, page, component, schema, or data is deleted, migrated, or rewritten by this decision — this is a routing reservation, not a route implementation.
+
+This section is a documentation cross-reference only. It authorizes no code, does not alter §11's stage order, and does not change any AI/Import gate. `PW-00`'s Definition of Ready (Register §12.1i) remains unresolved; no `PWS-*` code may begin without a separate Codex work order satisfying it.
+
 ## 7. Module contracts
 
 ### 7.1 Product Center and Categories — ADM-02 / ADM-02a

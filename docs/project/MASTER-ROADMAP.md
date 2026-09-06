@@ -8,6 +8,8 @@
 
 **下一步：等待 Codex 安排 J-2 的像素级视觉签收，或发出下一份完整施工单。PW-00 Workspace Shell（J-3）、AI-01、IMP-01 及后续模块均未开始，且 PW-00 自身 DoR 未达成。**
 
+**PW-GOV-01（2026-09-07）补充：Product Workspace 治理基线已完成——11 张桌面视觉母版已冻结并登记（Register §4.5/§4.6），`PWS-00`～`PWS-08` + `PWS-AI-01`/`PWS-AI-02` 命名空间已确立，child blueprint 状态升级为 `Approved governance baseline — controlled implementation remains gated`。这是纯文档治理：`PWS-00` 代码仍未获授权、仍未开始；J-2 视觉签收与 `origin/master` 状态不受此次影响，维持不变。**
+
 ---
 
 ## 总览
@@ -557,3 +559,19 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 **明确边界：** 不构成 Codex/用户对 `VM1-ADM02-D1440`/`VM1-ADM02-M375` 的像素级视觉签收；`origin/master` 提升仍 BLOCKED；未触碰 Product Workspace、AI-01、IMP-01；四项保护资料与 PW child blueprint 全程未触碰。
 
 **下一步：等待 Codex 安排 J-2 像素级视觉签收，或发出下一份完整施工单。**
+
+---
+
+#### M4-Next-PW-GOV-01：Product Workspace 治理基线与视觉母版冻结登记 ✅（完成，本次，2026-09-07）
+
+**完成内容：**
+
+1. **11 张桌面视觉母版已冻结**：`docs/design-reference/approved/admin-cms-product-workspace-v1/LITUBO-Product-Workspace-Visual-Masters-V1/` 下全部 11 个文件（`PW-VIS-01`～`09`、`PW-AI-01`/`02`）逐一登记为 Register §4.5 的 `PRIMARY`（仅桌面 1440px）资源，映射至新的 `PWS-*` 工程模块 ID（Register §4.6）；无任何 375px 母版，每个未来 `PWS-*` 代码施工单须独立提供移动端合同。
+2. **PWS 工程模块命名空间已确立**：`PWS-00`（Shell + Overview）～`PWS-08`（Change History）+ `PWS-AI-01`/`PWS-AI-02`，消除既有 Blueprint `PW-00`～`PW-06` 与 child blueprint 自身 `PW-00`～`PW-07`+`AI-01` 两套编号的碰撞；纯命名裁定，不代表任何模块已实施。
+3. **child blueprint 状态升级**为 `Approved governance baseline — controlled implementation remains gated`，新增 §17 记录上位文档从属、新旧路由并存（新 Workspace 预留 `/admin/product-workspace/:id/...`，旧编辑器保留 `/admin/products/:id/...`，共用 `product_id`，只记录决策不建路由）、单产品 AI Draft 原则、Media Library 唯一物理来源原则、`PWS-00` 尚未获代码授权的书面边界。
+4. **Implementation Blueprint 新增 §6.3**：PWS 命名空间与既有 Gate 对应关系交叉引用；未改动 §6.1/§11/§12 既有内容。
+5. **只修改 5 个治理文档**（Blueprint、Register、child blueprint、CURRENT-STATE.md、本文件）；未写任何 Workspace 代码、路由、schema、API、产品/分类/媒体/AI 数据；未修改任何 PNG 或 README；未触碰 Charter、CLAUDE.md。
+
+**明确边界：** `PWS-00` 完整度 Gate（`CH-DG-11`/`BP-DG-02`）与 375px 合同（CF-3）仍未解除，`PWS-00` 代码仍未授权、仍未开始；J-2 像素级视觉签收与 `origin/master` 锁定不受影响，维持原状；`AI-01`/`IMP-01` 均未开始。
+
+**下一步：等待 Codex 就 `PWS-00`（Workspace shell + Overview）单独发出完整施工单，满足其 Definition of Ready 后方可开始设计/施工审查。**

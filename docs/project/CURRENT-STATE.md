@@ -2098,3 +2098,31 @@ git diff --check       → 0 错误（仅 LF/CRLF 提示）
 - **全部 PW 文件与受保护资料包未触碰**
 
 *最后更新：2026-09-07，由 Claude Code 在"J2-CLOSE-03 分类路由拓扑修复、回归验收与本地收口"任务中写入。*
+
+---
+
+## PW-GOV-01 — Product Workspace 治理基线与视觉母版冻结登记（2026-09-07）
+
+**状态：纯文档治理任务完成。仅修改 5 个治理文档（Implementation Blueprint、Visual & Data Conformance Register、Product Workspace child blueprint、本文件、MASTER-ROADMAP.md）；未写任何 Workspace 代码、路由、schema、API、产品/分类/媒体/AI 数据；未修改任何 PNG 或 README。**
+
+### 完成内容
+
+1. **11 张桌面视觉母版已冻结**：`docs/design-reference/approved/admin-cms-product-workspace-v1/LITUBO-Product-Workspace-Visual-Masters-V1/` 下全部 11 个文件已登记为 Register §4.5 的 `PRIMARY`（仅桌面 1440px）资源，逐一映射至新的 `PWS-*` 工程模块 ID（Register §4.6）。全部 11 张均为 1672×941px，**无任何 375px 母版**；每个未来 `PWS-*` 代码施工单须独立提供移动端合同。
+2. **PWS 工程模块命名空间已确立**（Register §4.6，Blueprint §6.3 交叉引用）：`PWS-00`（Shell + Overview）～`PWS-08`（Change History）+ `PWS-AI-01`/`PWS-AI-02`，用于消除既有 Blueprint `PW-00`～`PW-06` 与 child blueprint 自身 `PW-00`～`PW-07`+`AI-01` 两套编号之间的碰撞。此为施工单命名裁定，不代表任何模块已实施；`PW-00` 完整度 Gate（`CH-DG-11`/`BP-DG-02`）与 375px 合同（CF-3）仍未解除。
+3. **Product Workspace child blueprint 状态升级**：从 `Draft for approval and controlled implementation` 改为 `Approved governance baseline — controlled implementation remains gated`；新增 §17 记录上位文档从属关系、新旧路由并存决定（新 Workspace 预留 `/admin/product-workspace/:id/...`，旧编辑器保留 `/admin/products/:id/...`，共用同一 `product_id`，本次只记录决策、不创建路由文件）、单产品 AI Draft 原则、Media Library 唯一物理来源原则、375px 合同要求、`PWS-00` 尚未获代码授权的书面边界。
+4. **Implementation Blueprint 新增 §6.3**：记录 PWS 命名空间与既有 Gate 的对应关系（Gate 随模块内容、不随编号变化）、child blueprint 从属层级、新旧路由并存与旧编辑器保留原则。未改动 §6.1 既有表格、§11 施工顺序或任何已确认 Gate。
+
+### 明确边界（未做的事）
+
+- **未写任何 Workspace 代码、路由文件、页面、组件、API、schema、产品/分类/媒体/AI 数据**
+- **未修改任何 PNG 或 README**（`docs/design-reference/approved/admin-cms-product-workspace-v1/` 及其下所有文件保持原样、未暂存）
+- **未触碰 Charter、CLAUDE.md**
+- **`PWS-00` 代码仍未获授权**——等待 Codex 就 `PWS-00` 单独发出完整施工单，满足 Register §12.1i 的 DoR 后方可开始
+- **J-2 状态未变**：PC-01/PC-02 像素级视觉签收仍未完成，`origin/master` 仍 `BLOCKED`
+- **未 push、未部署**
+
+### 下一步
+
+等待 Codex 就 `PWS-00`（Workspace shell + Overview）单独发出完整施工单，并解决其 Definition of Ready 中仍未确认的完整度 Gate 与 375px 合同后方可开始设计/施工审查。
+
+*最后更新：2026-09-07，由 Claude Code 在"PW-GOV-01 登记冻结视觉母版并确立 Product Workspace 治理边界"任务中写入。*
