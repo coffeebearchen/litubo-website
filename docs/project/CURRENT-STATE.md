@@ -2192,3 +2192,20 @@ git diff --check       → 0 错误（仅 LF/CRLF 提示）
 等待 Codex 对 `PWS-00A`（含本次范围纠正）的最终审查结论。不得自动开始下一模块。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-00A-SCOPE-CORRECT-01 隔离 Workspace 入口样式、恢复旧 Product Control 动作边界"任务中写入。*
+
+---
+
+## PWS-00A — 已通过 Codex 审查并收口（2026-09-07）
+
+**状态：`PWS-00A`（只读 Product Workspace Shell + Overview）已通过 Codex 审查并收口。**
+
+**关联本地提交：**
+
+- `18c77f5` — feat(admin): add read-only Product Workspace overview
+- `569f4f1` — fix(admin): preserve legacy product control styling（范围纠正）
+
+**已记录、范围外、留待后续 Product Center 修复的既有问题：**
+
+`server/api/admin/products/[id].get.ts`（既有共享 API，未被 `PWS-00A` 触碰）对不存在的产品 ID 返回 Directus 原生 `403 Forbidden`，而非语义正确的 `404`（该端点未使用 `assertProductExists()` 的列表过滤规避写法）。经只读审计（`PWS-00A-POST-AUDIT-01`）确认：该行为在完全未被 `PWS-00A` 触碰的既有 legacy 路由 `/admin/products/:id` 上同样可复现，且后果更严重（legacy 页面无错误处理，静默渲染空白可编辑表单）；`PWS-00A` 对同一错误的处理（诚实的 "Product not found" 空态）已验证正确。此问题归属 Product Center（`PC-01`）范围，不属于 `PWS-00A`，本次收口不修复，留待后续独立施工单处理。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-00A-CLOSE-PUSH-01 最终状态收口与 GitHub 备份"任务中写入。*
