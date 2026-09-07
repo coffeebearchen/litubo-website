@@ -20,8 +20,14 @@ import {
   WORKSPACE_READINESS_UNAVAILABLE,
   workspaceCategoryName,
   workspaceHeroUrl,
+  sourceFileTypeLabel,
+  sourceReviewStatusLabel,
 } from '../utils/productWorkspace'
-import { productDetailRoute, workspaceOverviewRoute } from '../utils/productCentre'
+import {
+  productDetailRoute,
+  workspaceOverviewRoute,
+  workspaceSourcesEvidenceRoute,
+} from '../utils/productCentre'
 import type { AdminProduct } from '../types/product-cms'
 
 const repoFile = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8')
@@ -37,6 +43,11 @@ const NEW_FILES = [
   'components/admin/workspace/WorkspaceShell.vue',
   'components/admin/workspace/WorkspaceModuleNav.vue',
   'components/admin/workspace/WorkspaceOverview.vue',
+]
+
+const PWS07_FILES = [
+  'pages/admin/product-workspace/[id]/sources-evidence.vue',
+  'components/admin/workspace/WorkspaceSourcesEvidence.vue',
 ]
 
 function baseProduct(overrides: Partial<AdminProduct> = {}): AdminProduct {
@@ -274,11 +285,10 @@ describe('Save and Submit are native-disabled (source evidence)', () => {
 describe('Workspace module navigation (source evidence)', () => {
   const source = repoFile('components/admin/workspace/WorkspaceModuleNav.vue')
 
-  it('defines all nine PWS-00…PWS-08 addresses with only Overview enabled', () => {
+  it('defines all nine PWS-00…PWS-08 addresses with only Overview and Sources & evidence enabled', () => {
     expect(WORKSPACE_MODULE_NAV).toHaveLength(9)
-    const enabled = WORKSPACE_MODULE_NAV.filter(i => i.enabled)
-    expect(enabled).toHaveLength(1)
-    expect(enabled[0]!.key).toBe('overview')
+    const enabled = WORKSPACE_MODULE_NAV.filter(i => i.enabled).map(i => i.key)
+    expect(enabled).toEqual(['overview', 'sources-evidence'])
   })
 
   it('groups modules under the three frozen headings', () => {
@@ -376,6 +386,174 @@ describe('workspaceCategoryName / workspaceHeroUrl (pure helpers)', () => {
 describe('PWS-00 surface is English-first (source evidence)', () => {
   it('no new file has visible or assistive Chinese in its template', () => {
     for (const file of NEW_FILES) {
+      expect(renderedMarkup(repoFile(file))).not.toMatch(/[一-鿿]/)
+    }
+  })
+})
+
+// ── PWS-07 — Sources & Evidence (read-only, PWS-07-FAST-01R) ─────────────────
+
+describe('PWS-07 module is enabled and routable (source evidence)', () => {
+  it('enables sources-evidence without touching any other module flag', () => {
+    const byKey = Object.fromEntries(WORKSPACE_MODULE_NAV.map(i => [i.key, i.enabled]))
+    expect(byKey['sources-evidence']).toBe(true)
+    expect(byKey.overview).toBe(true)
+    for (const key of ['page-content', 'specifications', 'media-resources', 'relations', 'seo-locales', 'share-distribution', 'change-history']) {
+      expect(byKey[key]).toBe(false)
+    }
+  })
+
+  it('workspaceSourcesEvidenceRoute builds the frozen PWS-07 route', () => {
+    expect(workspaceSourcesEvidenceRoute(42)).toBe('/admin/product-workspace/42/sources-evidence')
+  })
+
+  it('the module nav links enabled, non-active items with a real NuxtLink', () => {
+    const source = repoFile('components/admin/workspace/WorkspaceModuleNav.vue')
+    expect(source).toContain('workspaceSourcesEvidenceRoute')
+    expect(source).toContain('workspaceOverviewRoute')
+  })
+})
+
+describe('sourceReviewStatusLabel / sourceFileTypeLabel (pure helpers)', () => {
+  it('maps every enum value to clear English text without changing the enum itself', () => {
+    expect(sourceReviewStatusLabel('confirmed')).toBe('Verified')
+    expect(sourceReviewStatusLabel('needs_review')).toBe('Needs review')
+    expect(sourceReviewStatusLabel('missing')).toBe('Needs review')
+    expect(sourceReviewStatusLabel('conflict')).toBe('Needs review')
+  })
+
+  it('treats null/unset as the honest default: Pending verification', () => {
+    expect(sourceReviewStatusLabel(null)).toBe('Pending verification')
+  })
+
+  it('maps common MIME types to friendly labels, never a raw MIME string', () => {
+    expect(sourceFileTypeLabel('application/pdf')).toBe('PDF')
+    expect(sourceFileTypeLabel('image/jpeg')).toBe('Image')
+    expect(sourceFileTypeLabel(null)).toBe('File')
+    expect(sourceFileTypeLabel('application/octet-stream')).not.toContain('/')
+  })
+})
+
+describe('PWS-07 page composition (source evidence)', () => {
+  it('mounts WorkspaceShell, WorkspaceModuleNav and WorkspaceSourcesEvidence', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
+    expect(page).toContain('<WorkspaceShell')
+    expect(page).toContain('<WorkspaceModuleNav')
+    expect(page).toContain('<WorkspaceSourcesEvidence')
+    expect(page).toContain('active-key="sources-evidence"')
+  })
+
+  it('reads the same canonical product id and fetches sources for it', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
+    expect(page).toContain('route.params.id')
+    expect(page).toContain('/api/admin/products/${id}/sources')
+  })
+
+  it('renders a "Product not found" empty state rather than a blank form', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
+    expect(page).toContain('Product not found')
+    expect(page).toContain('notFound')
+  })
+})
+
+describe('PWS-07 never exposes restricted fields (source evidence)', () => {
+  it('the page and component never render raw_excerpt, source_locator, note or a file UUID field', () => {
+    for (const file of PWS07_FILES) {
+      const source = repoFile(file)
+      expect(source).not.toContain('raw_excerpt')
+      expect(source).not.toContain('source_locator')
+      expect(source).not.toMatch(/\bnote\b/)
+      expect(source).not.toContain('source_file_id')
+    }
+  })
+
+  it('the API response type never carries raw_excerpt, source_locator, note or the file UUID', () => {
+    const api = repoFile('server/api/admin/products/[id]/sources/index.get.ts')
+    const interfaceBlock = api.slice(
+      api.indexOf('interface SourceRecordSummary'),
+      api.indexOf('}', api.indexOf('interface SourceRecordSummary')),
+    )
+    expect(interfaceBlock).not.toContain('raw_excerpt')
+    expect(interfaceBlock).not.toContain('source_locator')
+    expect(interfaceBlock).not.toMatch(/\bnote\b/)
+    expect(interfaceBlock).not.toContain('source_file_id')
+  })
+
+  it('the GET endpoint only ever deep-fetches the file relation via dot-notation, never the bare field', () => {
+    const api = repoFile('server/api/admin/products/[id]/sources/index.get.ts')
+    expect(api).not.toMatch(/'id',\s*'product_id',[^\]]*'source_file_id'/)
+    expect(api).toContain("'source_file_id.filename_download'")
+  })
+
+  it('never renders a download link, direct file URL, or original-file preview', () => {
+    for (const file of PWS07_FILES) {
+      const source = repoFile(file)
+      // The security footnote is allowed to say the word "download" in prose
+      // (mirroring the frozen visual master's own disclaimer); no actual
+      // download affordance (link, href, asset proxy call) may exist.
+      expect(source).not.toMatch(/<a\s[^>]*href/)
+      expect(source).not.toContain('/api/admin/asset/')
+      expect(source.toLowerCase()).not.toMatch(/>\s*download\s*</)
+    }
+  })
+})
+
+describe('PWS-07 has no working write affordance (source evidence)', () => {
+  const WRITE_METHOD_RE = /method:\s*['"](POST|PATCH|PUT|DELETE)['"]/i
+
+  it('no PWS-07 file issues a POST, PATCH, PUT or DELETE request', () => {
+    for (const file of PWS07_FILES) {
+      expect(repoFile(file)).not.toMatch(WRITE_METHOD_RE)
+    }
+  })
+
+  it('the sources GET endpoint issues no write request', () => {
+    expect(repoFile('server/api/admin/products/[id]/sources/index.get.ts')).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('renders no Save, Archive, Edit or AI Fill button', () => {
+    for (const file of PWS07_FILES) {
+      const lower = repoFile(file).toLowerCase()
+      expect(lower).not.toContain('archive')
+      expect(lower).not.toContain('ai fill')
+      expect(lower).not.toContain('ai-fill')
+      expect(lower).not.toMatch(/>\s*edit\s*</)
+      expect(lower).not.toMatch(/>\s*save\s*</)
+    }
+  })
+
+  it('no new file renders an AI Fill Workspace control or any AI hint', () => {
+    for (const file of PWS07_FILES) {
+      const lower = repoFile(file).toLowerCase()
+      expect(lower).not.toContain('pws-ai')
+    }
+  })
+})
+
+describe('PWS-07 honest empty state and 375px card layout (source evidence)', () => {
+  it('shows an honest empty state when no source records exist', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceSourcesEvidence.vue')
+    expect(component).toMatch(/sources\.length === 0/)
+    expect(component).toContain('No sources recorded for this product yet.')
+  })
+
+  it('never fabricates a source row when the list is empty', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceSourcesEvidence.vue')
+    expect(component).not.toContain('DS_LT-180C')
+    expect(component).not.toContain('Technical datasheet')
+  })
+
+  it('the 375px breakpoint turns the table into stacked cards, never a horizontally scrolling grid', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceSourcesEvidence.vue')
+    const mobileBlock = component.slice(component.indexOf('max-width: 767px'))
+    expect(mobileBlock).toContain('display: block')
+    expect(mobileBlock).not.toContain('overflow-x: auto')
+  })
+})
+
+describe('PWS-07 is English-first and carries no Chinese (source evidence)', () => {
+  it('no PWS-07 file has visible or assistive Chinese in its template', () => {
+    for (const file of PWS07_FILES) {
       expect(renderedMarkup(repoFile(file))).not.toMatch(/[一-鿿]/)
     }
   })

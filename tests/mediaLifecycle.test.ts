@@ -12,7 +12,9 @@ const TEST_UUID = '11111111-1111-1111-1111-111111111111'
 
 describe('getFileReferences', () => {
   it('returns can_archive:true and empty references when no junction rows', async () => {
-    const fetch = vi.fn().mockResolvedValue({ data: [] })
+    const fetch = vi.fn()
+      .mockResolvedValueOnce({ data: [] }) // products_files
+      .mockResolvedValueOnce({ data: [] }) // product_source_records
     const result = await getFileReferences(TEST_UUID, fetch)
 
     expect(result.total).toBe(0)
@@ -20,8 +22,9 @@ describe('getFileReferences', () => {
     expect(result.references).toHaveLength(0)
     expect(result.product_count).toBe(0)
     expect(result.section_count).toBe(0)
-    // Only products_files queried (no section query when no junction rows)
-    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(result.source_count).toBe(0)
+    // products_files + product_source_records; no section query when no junction rows
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 
   it('returns can_archive:false when products_files references exist', async () => {
@@ -33,6 +36,7 @@ describe('getFileReferences', () => {
         ],
       })
       .mockResolvedValueOnce({ data: [], meta: { filter_count: 0 } }) // product_sections
+      .mockResolvedValueOnce({ data: [] }) // product_source_records
 
     const result = await getFileReferences(TEST_UUID, fetch)
 
@@ -40,6 +44,7 @@ describe('getFileReferences', () => {
     expect(result.total).toBe(2)
     expect(result.product_count).toBe(1) // same product
     expect(result.section_count).toBe(0)
+    expect(result.source_count).toBe(0)
     expect(result.references).toHaveLength(2)
     expect(result.references[0]).toMatchObject({ product_id: 3, file_role: 'hero' })
   })
@@ -50,6 +55,7 @@ describe('getFileReferences', () => {
         data: [{ id: 42, file_role: 'brochure', products_id: { id: 5, name: 'Product Beta' } }],
       })
       .mockResolvedValueOnce({ data: [{ id: 99 }], meta: { filter_count: 1 } })
+      .mockResolvedValueOnce({ data: [] }) // product_source_records
 
     const result = await getFileReferences(TEST_UUID, fetch)
 
@@ -69,12 +75,56 @@ describe('getFileReferences', () => {
         data: [{ id: 20, file_role: 'hero', products_id: null }],
       })
       .mockResolvedValueOnce({ data: [], meta: { filter_count: 0 } })
+      .mockResolvedValueOnce({ data: [] }) // product_source_records
 
     const result = await getFileReferences(TEST_UUID, fetch)
 
     expect(result.product_count).toBe(0)
     expect(result.references).toHaveLength(0)
     expect(result.total).toBe(1) // junction row still counts
+    expect(result.can_archive).toBe(false)
+  })
+
+  it('returns can_archive:false when only an active source record cites the file', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce({ data: [] }) // products_files — no media association
+      .mockResolvedValueOnce({
+        data: [{ id: 7, product_id: { id: 9, name: 'LT-180C Free-Fall Metal Detector' } }],
+      })
+
+    const result = await getFileReferences(TEST_UUID, fetch)
+
+    expect(result.can_archive).toBe(false)
+    expect(result.total).toBe(1)
+    expect(result.source_count).toBe(1)
+    expect(result.product_count).toBe(1)
+    expect(result.references).toHaveLength(1)
+    expect(result.references[0]).toMatchObject({ product_id: 9, file_role: 'source_evidence' })
+  })
+
+  it('queries product_source_records filtered to non-archived rows only', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] })
+
+    await getFileReferences(TEST_UUID, fetch)
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('filter[archived][_eq]=false'),
+    )
+  })
+
+  it('skips source rows with null product_id', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [{ id: 8, product_id: null }] })
+
+    const result = await getFileReferences(TEST_UUID, fetch)
+
+    expect(result.product_count).toBe(0)
+    expect(result.references).toHaveLength(0)
+    expect(result.total).toBe(1) // source row still counts toward total
     expect(result.can_archive).toBe(false)
   })
 })

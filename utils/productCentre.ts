@@ -73,6 +73,11 @@ export function workspaceOverviewRoute(id: number | string): string {
   return `/admin/product-workspace/${id}/overview`
 }
 
+/** PWS-07 read-only Sources & Evidence route (PWS-07-FAST-01R). Same shell, second enabled tab. */
+export function workspaceSourcesEvidenceRoute(id: number | string): string {
+  return `/admin/product-workspace/${id}/sources-evidence`
+}
+
 export function categoryContextRoute(id: number | string): string {
   return `/admin/products/categories/${id}`
 }

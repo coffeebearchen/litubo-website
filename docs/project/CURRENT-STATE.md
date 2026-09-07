@@ -2241,3 +2241,47 @@ SHA256SUMS.txt
 **Gate 关闭：** `CH-DG-16`（`docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` §M.2）与 `BP-DG-14`（`docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` §12）已因上述受控备份完成而关闭，记录于各自文件新增的 "Resolved gate record" 表格。
 
 *最后更新：2026-09-07，由 Claude Code 在"BK-GOV-03-CLOSE-PUSH-01 独立备份治理记录收口与 GitHub 备份"任务中写入。*
+
+---
+
+## PWS-07 — Sources & Evidence 只读版已交付（2026-09-07）
+
+**状态：`PWS-07`（Sources & Evidence）只读展示页已实现、测试通过、浏览器验收通过，并已同步修复 Media Library 归档引用保护的一处缺口。这不是完整的 `PWS-07` 写入功能，也不构成对 `PW-VIS-08-SOURCES-EVIDENCE-D1440` 的像素级视觉签收。**
+
+**新增/修改文件：**
+
+| 文件 | 作用 |
+|---|---|
+| `pages/admin/product-workspace/[id]/sources-evidence.vue`（新建） | 只读 Sources & Evidence 页面 |
+| `components/admin/workspace/WorkspaceSourcesEvidence.vue`（新建） | 只读证据登记表组件（安全摘要展示） |
+| `server/api/admin/products/[id]/sources/index.get.ts`（修改） | 响应改为经过脱敏的 `SourceRecordSummary`：服务端解析文件名/类型，永不返回文件 UUID、`source_locator`、`raw_excerpt`、`note` |
+| `utils/productWorkspace.ts`（修改） | `sources-evidence` 导航项启用；新增 `sourceReviewStatusLabel`/`sourceFileTypeLabel` 纯函数 |
+| `utils/productCentre.ts`（修改） | 新增 `workspaceSourcesEvidenceRoute()` 路由helper |
+| `components/admin/workspace/WorkspaceModuleNav.vue`（修改） | 支持在两个已启用模块（Overview / Sources & evidence）之间互相跳转 |
+| `pages/admin/product-workspace/[id]/overview.vue`（修改） | 传入 `product-id` 给导航组件，使跳转生效 |
+| `server/utils/mediaLifecycle.ts`（修改） | `getFileReferences()` 新增查询 `product_source_records`（非归档行），修复"仅被来源记录引用的文件被误判为可归档"的缺口 |
+| `tests/mediaLifecycle.test.ts`（修改） | 新增/更新用例覆盖来源记录引用检查 |
+| `tests/productWorkspaceOverview.test.ts`（修改） | 新增 PWS-07 专属 source-evidence 测试段落 |
+
+**已确认的一期范围裁定（本轮，不新增数据库迁移）：**
+
+- 证据目标一期仅限 `product_spec_items`；本轮只读，未创建任何 Evidence Link 写入
+- 来源一期仅限 Media Library 已有 `directus_files` UUID；不接受外部 URL 或纯文本来源
+- `SourceReviewStatus` 枚举未改动，仅在界面重新措辞为英文（`confirmed→Verified`、`needs_review→Needs review`、`missing/conflict→Needs review`、未设置→`Pending verification`）
+- `BP-DG-06`（证据置信度/`source_locator`/留存策略）**保持未解决，未被本轮关闭**
+- `PWS-08`（Change History）、人工审核写入、AI、外部 URL 来源、数据库迁移均延期，未在本轮触碰
+
+**验证结果：**
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 345/345 通过 |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告 |
+| `npx nuxt build` | Build complete |
+| 浏览器验收（真实产品 ID=3，1440px + 375px） | 无横向溢出；诚实空状态"No sources recorded for this product yet."；未登录访问返回 401，无资料泄露；Console 无本任务引入的新增错误；无 POST/PATCH/PUT/DELETE 请求 |
+
+**明确未做：** 未创建任何 Evidence Link 写入；未新增 `PWS-08` 模块表；未关闭任何 Decision Gate；未触碰旧 `ADM-08` 历史记录；未接入 AI；未做数据库 schema 迁移；未部署。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-07-FAST-01R Sources & Evidence 只读交付＋媒体来源保护"任务中写入。*

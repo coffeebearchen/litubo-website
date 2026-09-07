@@ -28,6 +28,7 @@ const previewHref = computed(() => `/admin/products/${id}/preview`)
   <WorkspaceShell v-else :product="(product as AdminProduct)" :preview-href="previewHref">
     <template #nav>
       <WorkspaceModuleNav
+        :product-id="(product as AdminProduct).id"
         :product-name="(product as AdminProduct).name_en"
         :product-code="(product as AdminProduct).product_code"
         active-key="overview"

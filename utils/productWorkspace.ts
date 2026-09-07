@@ -1,10 +1,12 @@
 /**
  * PWS-00 — Product Workspace Shell + Overview (read-only, PWS-00A).
+ * PWS-07 — Sources & Evidence (read-only, PWS-07-FAST-01R).
  *
  * Pure helpers only. This module never issues a write request and never
  * invents data: every value it formats comes from a field the Register
- * (§4.5/§12.1i "PW-00" row) and the child blueprint (§18) already confirm
- * exists on the canonical `products` record.
+ * (§4.5/§12.1i "PW-00" row, "PW-06" row) and the child blueprint (§18, §19)
+ * already confirm exists on the canonical `products` / `product_source_records`
+ * records.
  */
 
 import type { AdminProduct, ProductCategory } from '~/types/product-cms'
@@ -23,15 +25,15 @@ export interface WorkspaceModuleNavItem {
   key: string
   label: string
   group: WorkspaceModuleGroup
-  /** Only `overview` (PWS-00) is enabled until its own work order lands. */
+  /** Only a module with its own landed work order is enabled (`overview`, `sources-evidence`). */
   enabled: boolean
 }
 
 /**
  * PWS-00…PWS-08 addressing (Register §4.6 / child blueprint §6). Order and
- * grouping follow `PW-VIS-01-OVERVIEW-D1440`'s module rail. Every entry other
- * than `overview` is a visible-but-disabled placeholder — it must never
- * navigate anywhere, since no route exists for it yet.
+ * grouping follow `PW-VIS-01-OVERVIEW-D1440`'s module rail. Every disabled
+ * entry is a visible-but-disabled placeholder — it must never navigate
+ * anywhere, since no route exists for it yet.
  */
 export const WORKSPACE_MODULE_NAV: WorkspaceModuleNavItem[] = [
   { key: 'overview', label: 'Overview', group: 'PRODUCT RECORD', enabled: true },
@@ -41,7 +43,7 @@ export const WORKSPACE_MODULE_NAV: WorkspaceModuleNavItem[] = [
   { key: 'relations', label: 'Relations', group: 'PRODUCT RECORD', enabled: false },
   { key: 'seo-locales', label: 'SEO & locales', group: 'PUBLISH & DISTRIBUTE', enabled: false },
   { key: 'share-distribution', label: 'Share & distribution', group: 'PUBLISH & DISTRIBUTE', enabled: false },
-  { key: 'sources-evidence', label: 'Sources & evidence', group: 'CONTROL', enabled: false },
+  { key: 'sources-evidence', label: 'Sources & evidence', group: 'CONTROL', enabled: true },
   { key: 'change-history', label: 'Change history', group: 'CONTROL', enabled: false },
 ]
 
@@ -65,4 +67,32 @@ export function workspaceHeroUrl(product: AdminProduct | null): string | null {
   return product?.hero_image
     ? adminAssetUrl(product.hero_image, { width: 480, height: 320, quality: 75 })
     : null
+}
+
+/**
+ * PWS-07 review-status display mapping (PWS-07-FAST-01R, confirmed decision).
+ * The `SourceReviewStatus` enum on `product_source_records` is unchanged —
+ * this only renames the four existing values to clear English UI text.
+ * `null`/unset renders as "Pending verification", matching the default state
+ * a newly created source record is in before anyone reviews it.
+ */
+export function sourceReviewStatusLabel(status: string | null): string {
+  switch (status) {
+    case 'confirmed': return 'Verified'
+    case 'needs_review': return 'Needs review'
+    case 'missing': return 'Needs review'
+    case 'conflict': return 'Needs review'
+    default: return 'Pending verification'
+  }
+}
+
+/** Friendly file-type label from a Directus file's MIME `type`, never a raw MIME string. */
+export function sourceFileTypeLabel(mimeType: string | null): string {
+  if (!mimeType) return 'File'
+  if (mimeType === 'application/pdf') return 'PDF'
+  if (mimeType.startsWith('image/')) return 'Image'
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'Spreadsheet'
+  if (mimeType.includes('word')) return 'Document'
+  if (mimeType.startsWith('text/')) return 'Text'
+  return 'File'
 }

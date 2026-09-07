@@ -1290,24 +1290,34 @@ No percentage, progress bar, completion count, checkbox, or computed score may b
 
 | Field | Value |
 |---|---|
-| Source Asset ID | `P2-ADM08-SOURCES` (SUPPLEMENTARY only) |
-| Target route | `/admin/products/:id/sources` (planned) inside the `PW-00` shell |
-| Current actual route | **None.** No sources or history page exists among the 15 admin pages. |
-| Pages and shared components | None. |
-| server API | **3 endpoints exist**: `products/[id]/sources/index.get.ts`, `index.post.ts`, `[sourceId]/archive.post.ts`. Backend-only — no Admin UI consumes them. |
-| types / data relations | `ProductSourceRecord`, `SourceReviewStatus`; Directus `product_source_records` (CASCADE to `products`); `tests/sourceRecords.test.ts` (21 cases) |
-| Reusable | Required-UUID `source_file_id` rule (zero-source defence, 422 `SOURCE_REFERENCE_REQUIRED`); `source_locator` as an in-file position descriptor only; logical archive with no physical DELETE; duplicate-archive 409; **`nuxt-server` role has no permission on `product_source_records`** |
-| Missing | The page itself; human decision queue; confidence model; cited excerpt / page / sheet display; change-history and audit timeline; publish-blocker derivation |
+| Source Asset ID | `PW-VIS-08-SOURCES-EVIDENCE-D1440` (PRIMARY, desktop 1440px only — Register §4.5); `P2-ADM08-SOURCES` (SUPPLEMENTARY, superseded as sole reference by the PRIMARY freeze) |
+| Target route | `/admin/product-workspace/:id/sources-evidence` (Workspace route, per §4.6 `PWS-07` addressing) |
+| Current actual route | **Exists (read-only).** `pages/admin/product-workspace/[id]/sources-evidence.vue`, delivered by `PWS-07-FAST-01R` (2026-09-07). |
+| Pages and shared components | `pages/admin/product-workspace/[id]/sources-evidence.vue`; `components/admin/workspace/WorkspaceSourcesEvidence.vue`; shared `WorkspaceShell.vue` / `WorkspaceModuleNav.vue` (now link both enabled modules to each other) |
+| server API | **3 endpoints**: `products/[id]/sources/index.get.ts` (sanitized for this read-only surface — deep-fetches `source_file_id.filename_download/.title/.type` only, never the bare file UUID, and never returns `source_locator`/`raw_excerpt`/`note`), `index.post.ts`, `[sourceId]/archive.post.ts` (both write endpoints unchanged, not called by this read-only surface) |
+| types / data relations | `ProductSourceRecord`, `SourceReviewStatus`, new `SourceRecordSummary` (sanitized response shape, `server/api/admin/products/[id]/sources/index.get.ts`); Directus `product_source_records` (CASCADE to `products`); `tests/sourceRecords.test.ts` (31 cases), `tests/productWorkspaceOverview.test.ts` (PWS-07 section) |
+| Reusable | Required-UUID `source_file_id` rule (zero-source defence, 422 `SOURCE_REFERENCE_REQUIRED`); `source_locator` as an in-file position descriptor only; logical archive with no physical DELETE; duplicate-archive 409; **`nuxt-server` role has no permission on `product_source_records`**; new: media-reference protection now covers `product_source_records` (see Media Library note below) |
+| Missing | Human decision queue (accept/reject/needs-more-evidence writes); confidence model; per-field structured Evidence Link (current `fact_key` is free text, not a foreign key to `product_spec_items`); `PWS-08` change-history/audit timeline; publish-blocker derivation; AI source intake (`PWS-AI-01`/`PWS-AI-02`, unaffected by this task) |
 | Charter Gate | None assigned |
-| Blueprint Gate | `BP-DG-06` (evidence confidence, `source_locator`, retention) — **unresolved; blocks `PW-06` and all AI provenance** |
-| English-first status | Not applicable — no UI exists |
-| Desktop evidence | `REPOSITORY_CONFIRMED` — BFF and types reviewed; no page |
-| Mobile 375px evidence | **BLOCKED** — no approved mobile adaptation contract (CF-3) |
-| Implementation status | `IN_DISCOVERY` — BFF foundation exists; page not implemented |
-| Evidence status | `REPOSITORY_CONFIRMED` |
-| Acceptance status | `NOT_REVIEWED` |
-| Definition of Ready | **NOT MET.** `PW-00` incomplete; J-3.5 audit incomplete; `BP-DG-06` unresolved. |
+| Blueprint Gate | `BP-DG-06` (evidence confidence, `source_locator`, retention) — **remains unresolved.** `PWS-07-FAST-01R` narrows first-phase scope (evidence targets limited to `product_spec_items`; sources limited to existing Media Library `directus_files` UUIDs; the existing `SourceReviewStatus` enum is unchanged, only relabelled in the UI) but does **not** define a confidence model or retention policy — this Gate is not closed and must not be read as closed by this delivery. |
+| English-first status | **Compliant** — 0 hardcoded Chinese in the new page/component (verified by source-evidence test) |
+| Desktop evidence | Browser DOM verification (`PWS-07-FAST-01R`, 2026-09-07, logged-in session, 1440px, zero horizontal overflow, real product ID=3, honest empty state — this product currently has no source records) |
+| Mobile 375px evidence | Browser DOM verification (`PWS-07-FAST-01R`, 2026-09-07, logged-in session, 375px, zero horizontal overflow). **This task's own written instruction is the mobile adaptation contract for `PWS-07`** (reuse of the already-accepted `PWS-00` accordion/single-column/no-horizontal-scroll responsive language, per Codex's explicit direction) — it is scoped to `PWS-07` only and does not extend `CF-3` to any other module. |
+| Implementation status | `AUTOMATED_CHECKED` — read-only display path only; no write UI |
+| Evidence status | `REPOSITORY_CONFIRMED` + browser-verified 2026-09-07 (empty-state only; populated-row rendering covered by source-evidence unit tests, not yet observed against a real record because no product currently has one) |
+| Acceptance status | Read-only delivery only — **not** a Codex/user pixel-level sign-off against `PW-VIS-08-SOURCES-EVIDENCE-D1440`; `origin/master` promotion for the wider Admin/CMS effort is unaffected by this module-level task |
+| Definition of Ready | **NOT MET for any write-capable extension.** `BP-DG-06` unresolved; Evidence Link remains unstructured (`fact_key` free text); `PWS-08` audit timeline does not exist. The read-only surface delivered by `PWS-07-FAST-01R` did not require this Gate to be met — it is a display-only view of already-existing, already-permission-scoped data with no new write surface. |
 | Next step | 等待 Codex 决定 |
+
+##### PWS-07 read-only Sources & Evidence contract (PWS-07-FAST-01R, 2026-09-07)
+
+**Status: delivered and browser-verified.** This is a read-only display of existing `product_source_records` rows for the current product only. It issues no write request and creates no new data.
+
+**Deferred to a future work order (not delivered here):** human review-decision writes (accept/reject/needs-more-evidence); Evidence Link as a structured foreign key (current `fact_key` stays free text); evidence targets beyond `product_spec_items`; sources other than existing Media Library `directus_files` (no external URL, no free-text-only source); `PWS-08` Change History (no module table created, no Gate closed, `ADM-08`'s legacy record untouched); AI source intake/proposal review (`PWS-AI-01`/`PWS-AI-02`).
+
+**Security summary shown:** source display name (resolved server-side from the linked file's `title`/`filename_download`, never the raw UUID), file type (mapped to a friendly label, never a raw MIME string), related field (`fact_key`, shown as-is — no fabricated mapping), verification status (existing `SourceReviewStatus` enum, relabelled for clear English: `confirmed → Verified`, `needs_review → Needs review`, `missing/conflict → Needs review`, unset → `Pending verification`). **Never shown or returned by the API:** `raw_excerpt`, `source_locator`, the file UUID, internal `note`, any download URL, or an original-file preview.
+
+**`BP-DG-06` status:** unchanged and **not resolved** by this delivery — see the updated `PW-06` table above.
 
 #### `AI-01` — Single Product Dossier
 

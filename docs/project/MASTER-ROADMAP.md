@@ -12,6 +12,8 @@
 
 **PWS-DOR-02（2026-09-07）补充：`PWS-00`（Workspace Shell + Overview）的书面实施合同已冻结（只读首版：不可写、Readiness 显示 `Not assessed — rule not configured`、`CF-3` 375px 合同仅限 `PWS-00`）。纯文档治理，`PWS-00` 代码仍未开始，等待 Codex 单独发出 `PWS-00A` 代码施工单；J-2 视觉签收与 `origin/master` 状态不受影响。**
 
+**PWS-07-FAST-01R（2026-09-07）补充：`PWS-07`（Sources & Evidence）只读展示版已交付并通过自动化与浏览器验收（详见 `CURRENT-STATE.md`），同步修复 Media Library 归档引用保护遗漏 `product_source_records` 的缺口。一期范围仅限已有 Media Library 来源、`product_spec_items` 证据目标，`SourceReviewStatus` 枚举未改；`BP-DG-06` 保持未解决，未被关闭；`PWS-08`、人工审核写入、AI 均未开始。J-2 视觉签收与 `origin/master` 状态不受影响。**
+
 ---
 
 ## 总览

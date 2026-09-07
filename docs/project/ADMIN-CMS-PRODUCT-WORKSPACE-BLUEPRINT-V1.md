@@ -451,3 +451,39 @@ Future acceptance to record: 1440px checks limited to the approved `PWS-00` scop
 ### 18.10 Not started
 
 No `PWS-00` code exists after this task. Implementation begins only when Codex issues a separate, complete `PWS-00A` work order and its Definition of Ready (Register `PW-00` row, §12.1i) is satisfied.
+
+---
+
+## 19. PWS-07 read-only Sources & Evidence contract (PWS-07-FAST-01R, 2026-09-07)
+
+This section records the delivered read-only `PWS-07` (Sources & Evidence) screen and the media-reference protection fix that shipped alongside it. Unlike §18, this is not a governance freeze ahead of a future code task — the read-only surface described here has already been implemented, tested, and browser-verified.
+
+### 19.1 Scope actually delivered
+
+A second Workspace tab, `Sources & evidence`, at `/admin/product-workspace/:id/sources-evidence`, sharing the same `WorkspaceShell`/`WorkspaceModuleNav` as `PWS-00`. It lists the current product's existing `product_source_records` rows as a read-only evidence register: source display name, file type, related field (`fact_key`, shown as-is), and verification status. It issues no write request. `PW-VIS-08-SOURCES-EVIDENCE-D1440` (Register §4.5, PRIMARY, desktop 1440px only) governs its layout and information hierarchy only — never data, permissions, or AI behaviour.
+
+### 19.2 First-phase data-scope decisions (confirmed by Codex, this work order)
+
+- Evidence targets are limited to `product_spec_items` for a future write phase; this read-only phase does not create any Evidence Link at all.
+- Sources are limited to files already in the Media Library (`directus_files` UUIDs via `source_file_id`); no external URL and no free-text-only source are accepted at any phase.
+- The existing `SourceReviewStatus` enum (`confirmed | needs_review | missing | conflict`) is **unchanged**. The UI relabels it for clear English only: `confirmed → Verified`, `needs_review → Needs review`, `missing → Needs review`, `conflict → Needs review`, unset → `Pending verification`.
+- `product_source_records`'s existing fields (`raw_excerpt`, `fact_key`, `note`, `source_locator`, in addition to the fields already recorded in Charter §G.4) are **not migrated or reinterpreted** by this task. Charter §G.4 is updated in parallel (this same round) only to list the fields actually present on the collection today — this is a documentation-accuracy correction, not a policy change.
+- `BP-DG-06` (evidence confidence, `source_locator`, retention) **stays open**. Nothing in this delivery defines a confidence model or a retention policy.
+- `PWS-08` (Change History) is explicitly out of scope: no module table is added to the Register for it in this task, no Gate is closed for it, and the legacy `ADM-08` record in the Charter is left untouched.
+- `PWS-AI-01`/`PWS-AI-02`, external AI, and any database migration are out of scope.
+
+### 19.3 Security summary fields and the sanitized API shape
+
+The GET endpoint (`server/api/admin/products/[id]/sources/index.get.ts`) deep-fetches the linked file via dot-notation only (`source_file_id.filename_download`, `.title`, `.type`) so Directus can never return the bare file UUID, and returns a dedicated `SourceRecordSummary` shape that excludes `raw_excerpt`, `source_locator`, `note`, and the file UUID entirely — these are not merely hidden in the UI, they never leave the server for this endpoint. No download link, direct file URL, or original-file preview is rendered.
+
+### 19.4 Media reference-protection fix (shipped alongside, not a separate task)
+
+`server/utils/mediaLifecycle.ts`'s `getFileReferences()` previously checked only `products_files` and `product_sections` — a file cited only in an active `product_source_records` row (never added as a media association) could be archived from the Media Library while still being live evidence. `getFileReferences()` now also queries non-archived `product_source_records` rows by `source_file_id` and includes them in `total`/`can_archive`/`references`. This closes the gap identified during `PWS-07-DOR-01`/`PWS-07-DOR-02A`'s read-only review of `docs/project/PHASE-9C-2-MEDIA-LIBRARY-FOUNDATION-SPEC.md` §3.1, whose reference-source table is updated in the same documentation round to list `product_source_records`.
+
+### 19.5 375px — this work order is the mobile contract for `PWS-07`
+
+No `M375` visual master exists for `PW-VIS-08-SOURCES-EVIDENCE-D1440` (per Register §4.5/§4.6, consistent with all 11 Workspace masters). Per Codex's explicit instruction in this work order, `PWS-07` reuses the already-accepted `PWS-00` responsive language (§18.8: accordion module nav, single column, no horizontal scroll, `scrollWidth <= innerWidth`) instead of waiting for a new visual. This is the required per-module mobile adaptation contract for `PWS-07` specifically — it does not extend `CF-3` to any other `PWS-*` module, which each still need their own.
+
+### 19.6 Not delivered
+
+Human review-decision writes (accept/reject/needs-more-evidence); a structured Evidence Link (current `fact_key` stays free text, not a foreign key); `PWS-08` Change History; AI source intake or proposal review; any Directus schema change or migration.

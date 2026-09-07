@@ -9,6 +9,7 @@ export interface FileReference {
 export interface ReferencesResult {
   product_count: number
   section_count: number
+  source_count: number
   other_count: number
   total: number
   can_archive: boolean
@@ -47,9 +48,26 @@ async function querySectionCount(junctionIds: number[], fetch: FetchFn): Promise
   return res.meta?.filter_count ?? res.data?.length ?? 0
 }
 
+interface SourceRecordRow {
+  id: number
+  product_id: { id: number; name: string } | null
+}
+
+// A file cited as evidence in an active (non-archived) source record is still
+// referenced even if it was never added as a products_files media association —
+// PWS-07-DOR-01/02A found this collection missing from the reference check.
+async function querySourceRecords(fileUuid: string, fetch: FetchFn): Promise<SourceRecordRow[]> {
+  const res = await fetch<{ data: SourceRecordRow[] }>(
+    `/items/product_source_records?filter[source_file_id][_eq]=${fileUuid}` +
+    `&filter[archived][_eq]=false&fields=id,product_id.id,product_id.name&limit=500`,
+  )
+  return res.data ?? []
+}
+
 export async function getFileReferences(fileUuid: string, fetch: FetchFn): Promise<ReferencesResult> {
   const junctionRows = await queryProductsFiles(fileUuid, fetch)
   const sectionCount = await querySectionCount(junctionRows.map(r => r.id), fetch)
+  const sourceRows = await querySourceRecords(fileUuid, fetch)
 
   const seenProducts = new Set<number>()
   const references: FileReference[] = []
@@ -64,10 +82,22 @@ export async function getFileReferences(fileUuid: string, fetch: FetchFn): Promi
     })
   }
 
-  const total = junctionRows.length + sectionCount
+  for (const row of sourceRows) {
+    if (!row.product_id) continue
+    seenProducts.add(row.product_id.id)
+    references.push({
+      product_id: row.product_id.id,
+      product_name: row.product_id.name ?? String(row.product_id.id),
+      file_role: 'source_evidence',
+    })
+  }
+
+  const sourceCount = sourceRows.length
+  const total = junctionRows.length + sectionCount + sourceCount
   return {
     product_count: seenProducts.size,
     section_count: sectionCount,
+    source_count: sourceCount,
     other_count: 0,
     total,
     can_archive: total === 0,

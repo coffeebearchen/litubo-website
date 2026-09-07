@@ -201,6 +201,7 @@ upload.post.ts  ALLOWED_TYPES = { image/jpeg, image/jpg, image/png, image/webp, 
 |--------|---------|---------|---------|
 | `products_files`（M2M junction）| `directus_files_id`（文件 UUID）| 直接引用 | ✅ 已有 |
 | `product_sections`（页面模块）| `media_id`（`products_files.id` 整型，不是文件 UUID）| 间接引用（须经 junction JOIN）| ✅ 已有 |
+| `product_source_records`（来源证据记录）| `source_file_id`（文件 UUID，仅 `archived=false` 的行视为有效引用）| 直接引用 | ✅ 已有（`PWS-07-FAST-01R` 补入引用查询，此前遗漏） |
 | `site_content`（首页 Hero 等）| 待 Content Center 设计时确定 | - | ❌ 未实现 |
 | `site_settings`（品牌资产）| 待 Settings 扩展时确定 | - | ❌ 未实现 |
 
@@ -222,6 +223,7 @@ GET /api/admin/media/:uuid/references     ← 管理员 API，公开 API 不暴�
 {
   product_count: N,        // 直接引用该 UUID 的 products_files 行数（去重 product 数）
   section_count: N,        // product_sections 中间接引用的行数（via products_files join）
+  source_count: N,         // product_source_records 中非归档行数（PWS-07-FAST-01R 补入）
   other_count: N,          // 未来 site_content / site_settings 等引用数
   total: N,                // 上述合计
   can_archive: boolean,    // total === 0
@@ -229,9 +231,10 @@ GET /api/admin/media/:uuid/references     ← 管理员 API，公开 API 不暴�
     {
       product_id: N,       // products.id
       product_name: "...", // products.name（让管理员直观判断是否可归档）
-      file_role: "..."     // products_files.file_role（FileRole 11 值之一）
+      file_role: "..."     // products_files.file_role（FileRole 11 值之一）；
+                           // product_source_records 引用固定为 "source_evidence"
     }
-    // section 引用、未来 site_content 引用等亦列出
+    // section 引用、source 引用、未来 site_content 引用等亦列出
   ]
 }
 ```
@@ -247,6 +250,10 @@ SELECT COUNT(ps.id)
 FROM product_sections ps
 JOIN products_files pf ON pf.id = ps.media_id
 WHERE pf.directus_files_id = :uuid
+
+-- 直接引用：product_source_records（仅非归档行；PWS-07-FAST-01R 补入，此前遗漏）
+SELECT COUNT(*) FROM product_source_records
+WHERE source_file_id = :uuid AND archived = false
 
 -- 未来扩展：site_content, site_settings（Content Center 接入后补充）
 ```

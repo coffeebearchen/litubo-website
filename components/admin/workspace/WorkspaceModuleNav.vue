@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { WORKSPACE_MODULE_GROUPS, WORKSPACE_MODULE_NAV } from '~/utils/productWorkspace'
+import { workspaceOverviewRoute, workspaceSourcesEvidenceRoute } from '~/utils/productCentre'
 
-defineProps<{
+const props = defineProps<{
+  productId: number
   productName: string
   productCode: string | null
   activeKey: string
@@ -9,6 +11,16 @@ defineProps<{
 
 /** Collapsed by default on narrow viewports; always expanded from 768px up. */
 const navOpen = ref(false)
+
+/** Only enabled modules need a route; disabled ones never navigate anywhere. */
+const ENABLED_ROUTES: Record<string, (id: number) => string> = {
+  overview: workspaceOverviewRoute,
+  'sources-evidence': workspaceSourcesEvidenceRoute,
+}
+
+function routeFor(key: string): string {
+  return ENABLED_ROUTES[key]?.(props.productId) ?? ''
+}
 </script>
 
 <template>
@@ -46,13 +58,19 @@ const navOpen = ref(false)
               <span class="ws-nav-item-note">Coming soon</span>
             </button>
             <span
-              v-else
-              class="ws-nav-item"
-              :class="{ 'ws-nav-item--active': item.key === activeKey }"
-              :aria-current="item.key === activeKey ? 'page' : undefined"
+              v-else-if="item.key === activeKey"
+              class="ws-nav-item ws-nav-item--active"
+              aria-current="page"
             >
               <span class="ws-nav-item-label">{{ item.label }}</span>
             </span>
+            <NuxtLink
+              v-else
+              :to="routeFor(item.key)"
+              class="ws-nav-item"
+            >
+              <span class="ws-nav-item-label">{{ item.label }}</span>
+            </NuxtLink>
           </li>
         </ul>
       </div>

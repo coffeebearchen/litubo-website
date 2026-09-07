@@ -636,13 +636,20 @@ PATCH  /api/admin/settings
 ```text
 字段：product_id、source_file_id（FK→directus_files，必填）
       source_locator（文件内位置，非独立可溯源标识）
+      raw_excerpt（来源原文摘录）、fact_key（自由文本，标识关联的产品事实/字段，
+      非结构化外键）、review_status（枚举，见下）、note（内部审核备注）、
+      date_created
       archived（boolean）、archived_at（timestamptz）
 
 规则：
 - source_file_id 必须提供有效 UUID；locator-only 不允许（422 SOURCE_REFERENCE_REQUIRED）；
 - 无物理删除，仅逻辑归档（archive.post.ts）；
 - nuxt-server 角色无任何 product_source_records 权限；
-- Source Snapshot 冻结机制尚未实现（须 DG-08 确认）。
+- review_status 枚举：confirmed / needs_review / missing / conflict（PWS-07-FAST-01R 核实，
+  enum 本身未变，只在只读界面重新措辞为英文展示文案）；
+- Source Snapshot 冻结机制尚未实现（须 DG-08 确认）；
+- fact_key 目前是自由文本，不是到 product_spec_items 等表的结构化外键（PWS-07-DOR-02A/
+  PWS-07-FAST-01R 核实的既成事实，非新政策）。
 ```
 
 #### 产品—内容模块（product_sections + items）
