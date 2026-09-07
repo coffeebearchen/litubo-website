@@ -83,6 +83,11 @@ export function workspacePageContentRoute(id: number | string): string {
   return `/admin/product-workspace/${id}/page-content`
 }
 
+/** PWS-02 Specifications route (PWS-02-FAST-01). Fourth enabled tab, editable in the same shell. */
+export function workspaceSpecificationsRoute(id: number | string): string {
+  return `/admin/product-workspace/${id}/specifications`
+}
+
 export function categoryContextRoute(id: number | string): string {
   return `/admin/products/categories/${id}`
 }

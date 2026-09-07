@@ -2348,3 +2348,43 @@ SHA256SUMS.txt
 **验证结果：** `npx vitest run` 373/373 ✅ · `npx vue-tsc --noEmit` 0 errors ✅ · `npm run lint` 0 errors ✅ · `git diff --check` 仅 CRLF 警告 ✅ · `npx nuxt build` Build complete ✅ · 1440px/375px 浏览器核验三页面均无横向溢出、Console 无新增错误、未产生额外写入请求。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-VISUAL-ALIGN-01 Product Workspace 全面视觉对齐"任务中写入。*
+
+---
+
+## PWS-02 — Workspace Specifications 可编辑版已交付（2026-09-07）
+
+**状态：`PWS-02`（Specifications）已在 Product Workspace 中交付为可编辑模块，路由 `/admin/product-workspace/:id/specifications`。完全复用既有 `product_spec_groups`/`product_spec_items` 数据模型与管理端 API（9A-2A 起已上线），未新增 Directus schema、未做数据库迁移、未触碰真实产品数据。**
+
+**数据模型结论：** 仓库已有可复用的 canonical 结构（参数组 + 参数条目，含稳定 ID、可读名称、参数值、可选备注、可选分组、显示顺序），本次全部复用。**唯一缺口：无独立"单位"字段**——现有数据的单位一律嵌入 `value_en` 自由文本中（如 "150–1000 mm"、"AC 220 V, 50 Hz"，产品 ID=3 的真实数据已验证此惯例）。新增独立 `unit` 字段需要 Directus schema 变更，但本环境无可用的 Directus 管理员凭证（已尝试访问 Directus 原生后台 `:8055/admin`，确认 `Not Authenticated`，且不得自行输入或获取密码），故本轮不新增该字段，暂沿用"单位写入 Value 文本"的既有惯例，不影响既有数据、不需要任何转换或批量重写。
+
+**新增/修改文件：**
+
+| 文件 | 作用 |
+|---|---|
+| `pages/admin/product-workspace/[id]/specifications.vue`（新建） | Workspace Specifications 页面：拉取当前产品的参数组+条目，本地维护编辑状态与脏检测，唯一写入口 `handleSave()` |
+| `components/admin/workspace/WorkspaceSpecifications.vue`（新建） | 纯展示组件：可折叠参数组卡片 + 参数表格，所有编辑动作通过 emit 上抛 |
+| `components/admin/workspace/WorkspaceModuleNav.vue`（修改） | 新增 `specifications` 路由映射 |
+| `utils/productWorkspace.ts`（修改） | `specifications` 导航项启用 |
+| `utils/productCentre.ts`（修改） | 新增 `workspaceSpecificationsRoute()` |
+| `tests/productWorkspaceOverview.test.ts`（修改） | 新增 PWS-02 专属测试段落；修正因新增模块而失效的既有断言；修复 `renderedMarkup` 辅助函数在含内嵌 `<template v-if>` 片段的组件上误判闭合标签的问题 |
+
+**关键设计（沿用 PWS-01 已验证模式）：** 本地暂存 + 显式 Save；保存时按组、按条目逐一比对，只对真正变化的行发起写入（组新增用 `POST` 并解析新组 ID 供其条目使用、组删除依赖既有 CASCADE 关系连带删除条目、条目按需 `POST`/`PATCH`/`DELETE`）；已通过真实产品 ID=3 的编辑/保存/回滚全链路验证，确认恰好只对被修改的 1 条记录发起 1 次 `PATCH`。
+
+**明确未做（母版中存在但刻意不实现，避免伪造能力或越权）：** AI 相关全部内容（Refine with AI、AI proposal 及 Accept/Edit/Reject）、per-row "Review state"/"Source" 列（无 Evidence Link 支撑）、右侧 "Quick info"/"Source coverage" 面板（无真实跨模块统计数据支撑）、独立单位字段（见上）。
+
+**已知、非本次引入的预存问题：** 桌面端（≥768px）二级导航栏宽度下，仍处于禁用状态的模块标签（"Media & resources"、"Relations"、"SEO & locales"、"Share & distribution"）与其 "Coming soon" 徽章共同挤压导致标签被截断为单字母+省略号（如"M…"）；该问题在 375px 展开式抽屉（全宽）下不出现。经代码核实为链接列表既有 CSS（`.ws-nav-item-label` 的 `white-space: nowrap` + 固定栏宽）导致，与本次改动无关（本次未修改该 CSS），"Specifications" 自身标签在两个断点均完整可读，符合本次验收要求。此项超出本次严格授权范围（仅限启用 Specifications 所需的最小改动），未修复，供后续单独任务处理。
+
+**验证结果：**
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 397/397 通过 |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告 |
+| `npx nuxt build` | Build complete |
+| 浏览器验收（真实产品 ID=3，1440px + 375px） | 无横向溢出；真实 3 组 12 条参数正确渲染；编辑值→Save 启用→保存成功→仅对应 1 条记录发起 1 次 `PATCH`→数据回滚验证；未登录访问返回 401；Console 无新增错误；Overview/Page content/Specifications/Sources & evidence 四向导航互通 |
+
+**明确未做：** 未新增 AI、自动发布、批量导入；未改变产品生命周期状态；未新增 Directus schema/迁移/权限；未触碰 PWS-00/01/07、旧编辑器、Product Center、Media Library；未关闭任何 Decision Gate；未部署。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-02 FAST-01 Product Workspace Specifications"任务中写入。*

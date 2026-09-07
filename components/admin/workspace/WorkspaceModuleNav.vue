@@ -4,6 +4,7 @@ import {
   workspaceOverviewRoute,
   workspacePageContentRoute,
   workspaceSourcesEvidenceRoute,
+  workspaceSpecificationsRoute,
 } from '~/utils/productCentre'
 
 const props = defineProps<{
@@ -23,6 +24,7 @@ const ENABLED_ROUTES: Record<string, (id: number) => string> = {
   overview: workspaceOverviewRoute,
   'page-content': workspacePageContentRoute,
   'sources-evidence': workspaceSourcesEvidenceRoute,
+  specifications: workspaceSpecificationsRoute,
 }
 
 function routeFor(key: string): string {

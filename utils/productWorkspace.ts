@@ -41,7 +41,7 @@ export interface WorkspaceModuleNavItem {
 export const WORKSPACE_MODULE_NAV: WorkspaceModuleNavItem[] = [
   { key: 'overview', label: 'Overview', group: 'PRODUCT RECORD', enabled: true },
   { key: 'page-content', label: 'Page content', group: 'PRODUCT RECORD', enabled: true },
-  { key: 'specifications', label: 'Specifications', group: 'PRODUCT RECORD', enabled: false },
+  { key: 'specifications', label: 'Specifications', group: 'PRODUCT RECORD', enabled: true },
   { key: 'media-resources', label: 'Media & resources', group: 'PRODUCT RECORD', enabled: false },
   { key: 'relations', label: 'Relations', group: 'PRODUCT RECORD', enabled: false },
   { key: 'seo-locales', label: 'SEO & locales', group: 'PUBLISH & DISTRIBUTE', enabled: false },
