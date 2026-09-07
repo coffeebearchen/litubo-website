@@ -97,7 +97,7 @@ const heroUrl = computed(() =>
         <NuxtLink :to="productDetailRoute(product.id)" class="btn btn-primary btn-full">
           Open product record
         </NuxtLink>
-        <NuxtLink :to="workspaceOverviewRoute(product.id)" class="btn btn-secondary btn-full">
+        <NuxtLink :to="workspaceOverviewRoute(product.id)" class="workspace-entry-link">
           Open Workspace (read-only)
         </NuxtLink>
       </div>
@@ -232,41 +232,10 @@ const heroUrl = computed(() =>
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-line);
   flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
-
-/*
- * .btn / .btn-primary were referenced by the template above but never defined
- * in this file's scoped styles (pre-existing gap, predates this change). Both
- * are defined here now so the existing "Open product record" action and the
- * new parallel Workspace entry point render as real, consistent buttons.
- */
-.btn {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
-}
-
-.btn-primary { background: var(--color-primary); color: white; }
-.btn-primary:hover { background: var(--color-primary-deep); }
-
-.btn-secondary {
-  background: var(--color-surface);
-  color: var(--color-ink);
-  border-color: var(--color-line);
-}
-
-.btn-secondary:hover { background: var(--color-surface-alt); }
 
 .btn-full {
   width: 100%;
-  min-height: 40px;
   text-align: center;
   display: flex;
   align-items: center;
@@ -274,6 +243,36 @@ const heroUrl = computed(() =>
   text-decoration: none;
   box-sizing: border-box;
 }
+
+/*
+ * Dedicated to the new parallel Workspace entry point only (PWS-00A scope
+ * correction). Must never share a selector with .btn / .btn-primary /
+ * .btn-secondary / .btn-full above, which style the pre-existing "Open
+ * product record" action and must keep their exact pre-PWS-00A behaviour
+ * (that action had no such rules defined at commit cb15c42).
+ */
+.workspace-entry-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 40px;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none;
+  box-sizing: border-box;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.workspace-entry-link:hover { background: var(--color-surface-alt); }
 
 .panel-empty {
   flex: 1;

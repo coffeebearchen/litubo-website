@@ -93,6 +93,64 @@ describe('Product Control — parallel entry points (source evidence)', () => {
     expect(source).toContain('Open Workspace (read-only)')
     expect(source).toContain('workspaceOverviewRoute(product.id)')
   })
+
+  // ── PWS-00A-SCOPE-CORRECT-01 regression guards ──────────────────────────
+
+  it('legacy "Open product record" keeps its exact cb15c42 class list — never the new generic .btn* rules', () => {
+    const legacyLinkMatch = source.match(
+      /<NuxtLink :to="productDetailRoute\(product\.id\)" class="([^"]+)">/,
+    )
+    expect(legacyLinkMatch).not.toBeNull()
+    expect(legacyLinkMatch![1]).toBe('btn btn-primary btn-full')
+  })
+
+  it('legacy route target is still exactly /admin/products/:id (productDetailRoute unchanged)', () => {
+    expect(productDetailRoute(7)).toBe('/admin/products/7')
+  })
+
+  it('the Workspace entry point uses a dedicated class, never the legacy btn/btn-primary/btn-secondary classes', () => {
+    const workspaceLinkMatch = source.match(
+      /<NuxtLink :to="workspaceOverviewRoute\(product\.id\)" class="([^"]+)">/,
+    )
+    expect(workspaceLinkMatch).not.toBeNull()
+    expect(workspaceLinkMatch![1]).toBe('workspace-entry-link')
+    expect(workspaceLinkMatch![1]).not.toMatch(/\bbtn\b/)
+  })
+
+  it('defines no generic .btn / .btn-primary / .btn-secondary rule that could style the legacy link', () => {
+    expect(source).not.toMatch(/(?<!-)\.btn\s*\{/)
+    expect(source).not.toMatch(/\.btn-primary\s*\{/)
+    expect(source).not.toMatch(/\.btn-secondary\s*\{/)
+  })
+
+  it('the new entry point style is scoped to its own selector only', () => {
+    expect(source).toContain('.workspace-entry-link {')
+    expect(source).toContain('.workspace-entry-link:hover')
+  })
+
+  it('never uses inline style for the new Workspace entry point', () => {
+    const workspaceLinkTag = source.slice(
+      source.indexOf('<NuxtLink :to="workspaceOverviewRoute(product.id)"'),
+      source.indexOf('</NuxtLink>', source.indexOf('workspaceOverviewRoute(product.id)')),
+    )
+    expect(workspaceLinkTag).not.toContain('style=')
+  })
+
+  it('.panel-actions and .btn-full keep their exact cb15c42 declarations — no reintroduced flex/gap/min-height', () => {
+    const panelActionsBlock = source.slice(
+      source.indexOf('.panel-actions {'),
+      source.indexOf('}', source.indexOf('.panel-actions {')) + 1,
+    )
+    expect(panelActionsBlock).not.toContain('display: flex')
+    expect(panelActionsBlock).not.toContain('flex-direction: column')
+    expect(panelActionsBlock).not.toContain('gap:')
+
+    const btnFullBlock = source.slice(
+      source.indexOf('.btn-full {'),
+      source.indexOf('}', source.indexOf('.btn-full {')) + 1,
+    )
+    expect(btnFullBlock).not.toContain('min-height')
+  })
 })
 
 // ── 4. New page composes the shell, module nav and overview ─────────────────

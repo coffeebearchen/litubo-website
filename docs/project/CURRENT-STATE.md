@@ -2157,3 +2157,38 @@ git diff --check       → 0 错误（仅 LF/CRLF 提示）
 等待 Codex 审查本次冻结的书面合同，并单独发出 `PWS-00A` 代码施工单。不得自动开始任何代码。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-DOR-02 冻结 PWS-00 Workspace Shell + Overview 实施合同"任务中写入。*
+
+---
+
+## PWS-00A-SCOPE-CORRECT-01 — 范围纠正：隔离 Workspace 入口样式（2026-09-07）
+
+**状态：极小原子化范围纠正提交已完成。仅修改 `ProductControlPanel.vue`、`tests/productWorkspaceOverview.test.ts` 与本文件；未改动其他任何文件。`PWS-00A` 整体仍是"待 Codex 最终审查"的候选状态，本次纠正不构成、也不宣布 PWS-00A 的最终验收完成。**
+
+### 背景
+
+只读审计（`PWS-00A-POST-AUDIT-01`）发现：本地提交 `18c77f5` 在新增并行 Workspace 入口的同时，通过新增通用 `.btn`/`.btn-primary`/`.btn-secondary` 规则，一并改变了既有 `Open product record` 入口自 `cb15c42` 起的原有（无样式）视觉边界，超出了 `PWS-00A` 的授权范围。
+
+### 修正内容
+
+- `Open product record` 已恢复为与 `cb15c42` 逐字一致的结构、class（`btn btn-primary btn-full`）与视觉边界（无背景色、无圆角，仅 `.btn-full` 的布局规则）；实测计算样式 `background-color: rgba(0,0,0,0)`、`border-radius: 0px`，与 `cb15c42` 时的表现一致。
+- 新增的 `Open Workspace (read-only)` 入口改为使用专属、唯一命名的 `.workspace-entry-link` class，不再借用任何通用 `.btn*` 规则；`.panel-actions`、`.btn`、`.btn-primary`、`.btn-secondary`、`.btn-full` 均未被本次改动触及（`.btn`/`.btn-primary`/`.btn-secondary` 三个通用规则块已整体移除）。
+- `tests/productWorkspaceOverview.test.ts` 新增 7 项回归断言，防止旧入口 class/路由被再次替换、防止新入口再次借用通用 `.btn*` 规则、防止 `.panel-actions`/`.btn-full` 再次被添加 flex/gap/min-height。
+
+### 验证结果
+
+`npx vitest run` 321/321 通过；`npx vue-tsc --noEmit` 0 errors；`npm run lint` 0 errors；`git diff --check` 0 错误；`npx nuxt build` Build complete（仅执行一次）。1440px 与 375px 浏览器复验：两个入口并存、旧入口视觉边界恢复、Workspace 页面保持只读且无横向溢出、无本次新增控制台错误、无业务写入请求。
+
+### 明确边界（未做的事）
+
+- **未改动** `server/api/**`、Directus、403/404 错误映射（该既有共享 API 问题不在本任务范围内，未修复）
+- **未改动**旧编辑器页面、Workspace Shell/Overview/Module Nav 组件、`utils/productWorkspace.ts`、`utils/productCentre.ts`、任何 API、类型、配置、布局、视觉母版
+- **未涉及**真实产品、分类、媒体、审核、发布、AI 或凭证数据
+- **未开始** `PWS-01`～`PWS-08`、`PWS-AI-01`、`PWS-AI-02`
+- **未 push、未部署**
+- **`PWS-00A` 未被本次任务宣布为最终验收完成**——仍等待 Codex 审查后决定
+
+### 下一步
+
+等待 Codex 对 `PWS-00A`（含本次范围纠正）的最终审查结论。不得自动开始下一模块。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-00A-SCOPE-CORRECT-01 隔离 Workspace 入口样式、恢复旧 Product Control 动作边界"任务中写入。*
