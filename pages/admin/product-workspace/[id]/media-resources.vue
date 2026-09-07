@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AdminProduct, ProductMedia } from '~/types/product-cms'
+import type { AdminProduct, ProductMedia, FileRole } from '~/types/product-cms'
 import { workspaceHeroUrl } from '~/utils/productWorkspace'
 
 interface LibraryFile {
@@ -10,6 +10,28 @@ interface LibraryFile {
   filesize: number | null
   width: number | null
   height: number | null
+}
+
+/**
+ * A row on screen. `isNew` rows have never been sent to the server — they
+ * only exist locally until Save. `markedForDeletion` rows are still real,
+ * saved associations that will be removed on Save. Nothing else about an
+ * association is editable in this module, so this local/original diff is
+ * the entire dirty surface — there is no per-field PATCH.
+ */
+interface EditableMedia {
+  id: number | null
+  directus_files_id: string
+  filename_download: string | null
+  type: string | null
+  filesize: number | null
+  file_role: FileRole | null
+  alt_en: string | null
+  language: string | null
+  version_label: string | null
+  enabled: boolean
+  isNew: boolean
+  markedForDeletion: boolean
 }
 
 definePageMeta({ layout: 'admin' })
@@ -26,13 +48,66 @@ const [{ data: product, error: productError }, { data: mediaData, refresh: refre
 const notFound = computed(() => Boolean(productError.value) || !product.value)
 const previewHref = computed(() => `/admin/products/${id}/preview`)
 
-const mediaList = computed<ProductMedia[]>(() => mediaData.value ?? [])
+function toEditableMedia(m: ProductMedia): EditableMedia {
+  return {
+    id: m.id,
+    directus_files_id: m.directus_files_id ?? '',
+    filename_download: m.filename_download ?? null,
+    type: m.type ?? null,
+    filesize: m.filesize ?? null,
+    file_role: m.file_role,
+    alt_en: m.alt_en,
+    language: m.language,
+    version_label: m.version_label,
+    enabled: m.enabled,
+    isNew: false,
+    markedForDeletion: false,
+  }
+}
 
-const actionError = ref('')
-const actionSuccess = ref('')
+function fromLibraryFile(file: LibraryFile): EditableMedia {
+  return {
+    id: null,
+    directus_files_id: file.id,
+    filename_download: file.filename_download ?? file.title,
+    type: file.type,
+    filesize: file.filesize,
+    file_role: null,
+    alt_en: null,
+    language: null,
+    version_label: null,
+    enabled: true,
+    isNew: true,
+    markedForDeletion: false,
+  }
+}
 
-// ── Media Library picker: browsing the library is read-only; the only writes
-//    this page ever issues are the explicit link/unlink calls below. ────────
+const mediaRows = ref<EditableMedia[]>((mediaData.value ?? []).map(toEditableMedia))
+
+function resyncMediaRows() {
+  mediaRows.value = (mediaData.value ?? []).map(toEditableMedia)
+}
+
+const isDirty = computed(() => mediaRows.value.some((r: EditableMedia) => r.isNew || r.markedForDeletion))
+
+type SaveState = 'idle' | 'dirty' | 'saving' | 'success' | 'error'
+const saving = ref(false)
+const saveError = ref('')
+const justSaved = ref(false)
+
+const saveState = computed<SaveState>(() => {
+  if (saving.value) return 'saving'
+  if (saveError.value) return 'error'
+  if (justSaved.value) return 'success'
+  return isDirty.value ? 'dirty' : 'idle'
+})
+
+watch(isDirty, (dirty: boolean) => {
+  if (dirty) { justSaved.value = false; saveError.value = '' }
+})
+
+// ── Media Library picker: browsing the library is read-only — nothing here
+//    or anywhere else on this page issues a write until handleSave() runs. ──
 const libraryOpen = ref(false)
 const libraryFiles = ref<LibraryFile[]>([])
 const libraryLoading = ref(false)
@@ -60,7 +135,6 @@ async function loadLibraryFiles(reset = false) {
 
 function openLibrary() {
   libraryOpen.value = true
-  actionError.value = ''
   loadLibraryFiles(true)
 }
 
@@ -83,45 +157,59 @@ watch(librarySearch, () => {
 })
 watch(libraryTypeFilter, () => loadLibraryFiles(true))
 
-function linkedFileIds(list: ProductMedia[]): Set<string> {
-  const ids: string[] = []
-  for (const item of list) {
-    if (item.directus_files_id) ids.push(item.directus_files_id)
-  }
-  return new Set(ids)
-}
+const existingFileIds = computed(() => new Set(mediaRows.value.map((r: EditableMedia) => r.directus_files_id)))
 
-const existingFileIds = computed(() => linkedFileIds(mediaList.value))
+// ── Local-only staging. Neither of these ever issues a write request. ───────
 
-// ── The only two places that ever write: an explicit link or unlink click ──
-async function linkFile(fileId: string) {
+function stageLink(fileId: string) {
   if (existingFileIds.value.has(fileId)) return
-  actionError.value = ''
-  try {
-    await $fetch(`/api/admin/products/${productId}/media`, {
-      method: 'POST',
-      body: { directus_files_id: fileId, file_role: null },
-    })
-    await refreshMedia()
-    closeLibrary()
-    actionSuccess.value = 'Asset linked to this product.'
-    setTimeout(() => (actionSuccess.value = ''), 3000)
-  } catch (e: unknown) {
-    const fe = e as { data?: { message?: string } }
-    actionError.value = fe.data?.message ?? 'Linking failed. Please try again.'
-  }
+  const file = libraryFiles.value.find((f: LibraryFile) => f.id === fileId)
+  if (!file) return
+  mediaRows.value.push(fromLibraryFile(file))
+  closeLibrary()
 }
 
-async function unlinkMedia(mediaId: number) {
-  actionError.value = ''
+/** Toggles a row's pending state: a brand-new row is discarded outright; an
+ * already-saved row is marked/unmarked for removal — either way, nothing is
+ * sent to the server until Save. */
+function unstage(rowIndex: number) {
+  const row = mediaRows.value[rowIndex]
+  if (!row) return
+  if (row.isNew) {
+    mediaRows.value.splice(rowIndex, 1)
+    return
+  }
+  row.markedForDeletion = !row.markedForDeletion
+}
+
+// ── Save: the only place that ever issues a write request ───────────────────
+
+async function handleSave() {
+  if (!isDirty.value || saving.value) return
+  saving.value = true
+  saveError.value = ''
+
   try {
-    await $fetch(`/api/admin/products/${productId}/media/${mediaId}`, { method: 'DELETE' })
+    for (const row of mediaRows.value) {
+      if (row.isNew) {
+        await $fetch(`/api/admin/products/${productId}/media`, {
+          method: 'POST',
+          body: { directus_files_id: row.directus_files_id, file_role: null },
+        })
+      } else if (row.markedForDeletion) {
+        await $fetch(`/api/admin/products/${productId}/media/${row.id}`, { method: 'DELETE' })
+      }
+    }
+
     await refreshMedia()
-    actionSuccess.value = 'Association removed. The original file remains in Media Library.'
-    setTimeout(() => (actionSuccess.value = ''), 3000)
+    resyncMediaRows()
+    justSaved.value = true
+    setTimeout(() => { justSaved.value = false }, 3000)
   } catch (e: unknown) {
     const fe = e as { data?: { message?: string } }
-    actionError.value = fe.data?.message ?? 'Removing the association failed. Please try again.'
+    saveError.value = fe.data?.message ?? 'Save failed. Your unsaved changes are kept — try again.'
+  } finally {
+    saving.value = false
   }
 }
 </script>
@@ -140,6 +228,8 @@ async function unlinkMedia(mediaId: number) {
     :product="(product as AdminProduct)"
     title="Media & resources"
     :preview-href="previewHref"
+    :save-state="saveState"
+    @save="handleSave"
   >
     <template #nav>
       <WorkspaceModuleNav
@@ -152,11 +242,10 @@ async function unlinkMedia(mediaId: number) {
       />
     </template>
 
-    <p v-if="actionError" class="ws-save-error" role="alert">{{ actionError }}</p>
-    <p v-if="actionSuccess" class="ws-save-success" role="status">{{ actionSuccess }}</p>
+    <p v-if="saveError" class="ws-save-error" role="alert">{{ saveError }}</p>
 
     <WorkspaceMediaResources
-      :media="mediaList"
+      :media="mediaRows"
       :library-open="libraryOpen"
       :library-files="libraryFiles"
       :library-loading="libraryLoading"
@@ -168,8 +257,8 @@ async function unlinkMedia(mediaId: number) {
       @update-search="updateLibrarySearch"
       @update-type-filter="updateLibraryTypeFilter"
       @load-more="loadLibraryFiles(false)"
-      @pick-file="linkFile"
-      @unlink="unlinkMedia"
+      @pick-file="stageLink"
+      @unlink="unstage"
     />
   </WorkspaceShell>
 </template>
@@ -208,16 +297,6 @@ async function unlinkMedia(mediaId: number) {
   border: 1px solid #F5C6C2;
   border-radius: var(--radius-sm);
   color: #C0392B;
-  font-size: var(--text-sm);
-  padding: var(--space-3) var(--space-4);
-  margin: 0 0 var(--space-4);
-}
-
-.ws-save-success {
-  background: #D1F0E8;
-  border: 1px solid #A3DBC8;
-  border-radius: var(--radius-sm);
-  color: #0F5C4B;
   font-size: var(--text-sm);
   padding: var(--space-3) var(--space-4);
   margin: 0 0 var(--space-4);

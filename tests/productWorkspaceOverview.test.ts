@@ -1033,8 +1033,8 @@ describe('PWS-03 page composition (source evidence)', () => {
     expect(page).not.toMatch(/\/api\/admin\/products\/\d+\//)
   })
 
-  it('reuses the canonical ProductMedia type, never a new parallel model', () => {
-    expect(page).toContain("import type { AdminProduct, ProductMedia } from '~/types/product-cms'")
+  it('reuses the canonical ProductMedia and FileRole types, never a new parallel model', () => {
+    expect(page).toContain("import type { AdminProduct, ProductMedia, FileRole } from '~/types/product-cms'")
   })
 
   it('renders a "Product not found" empty state rather than a blank form', () => {
@@ -1042,13 +1042,59 @@ describe('PWS-03 page composition (source evidence)', () => {
     expect(page).toContain('notFound')
   })
 
-  it('does not pass a save-state — every write here is an explicit per-action link/unlink, not a batched Save', () => {
-    expect(page).not.toContain('save-state')
-    expect(page).not.toContain('saveState')
+  it('passes a save-state and listens for the shared Save changes event — R1 batches writes like PWS-01/02', () => {
+    expect(page).toContain(':save-state="saveState"')
+    expect(page).toContain('@save="handleSave"')
   })
 })
 
-describe('PWS-03 issues no write request on load or while browsing the library, only on explicit link/unlink (source evidence)', () => {
+// ── PWS-03-R1 — local dirty state + explicit Save (fix, 2026-09-07) ─────────
+//
+// R0 wrote to the server the instant a card was picked or removed. R1 replaces
+// that with the same local-snapshot + explicit-Save pattern already proven in
+// PWS-01/02: picking or removing only edits a local `mediaRows` array; the
+// diff (new rows -> POST, rows marked for deletion -> DELETE) is only ever
+// sent from inside handleSave(), which itself only runs on the shared
+// WorkspaceShell "Save changes" click.
+
+describe('PWS-03-R1 models associations as local dirty state, not immediate writes (source evidence)', () => {
+  const page = repoFile('pages/admin/product-workspace/[id]/media-resources.vue')
+
+  it('defines an EditableMedia row shape carrying isNew and markedForDeletion, mirroring PWS-01/02\'s row model', () => {
+    expect(page).toMatch(/interface EditableMedia\s*\{[\s\S]*?isNew: boolean[\s\S]*?markedForDeletion: boolean[\s\S]*?\}/)
+  })
+
+  it('builds mediaRows from the fetched association list on load, and resyncs it fresh after a save', () => {
+    expect(page).toContain('const mediaRows = ref<EditableMedia[]>((mediaData.value ?? []).map(toEditableMedia))')
+    expect(page).toContain('function resyncMediaRows()')
+    expect(page).toContain('resyncMediaRows()')
+  })
+
+  it('isDirty is true exactly when a row is staged-new or staged-for-deletion', () => {
+    expect(page).toContain('mediaRows.value.some((r: EditableMedia) => r.isNew || r.markedForDeletion)')
+  })
+
+  it('stageLink() only pushes a local row — it never calls $fetch', () => {
+    const block = page.slice(page.indexOf('function stageLink'), page.indexOf('function unstage'))
+    expect(block).not.toContain('$fetch')
+    expect(block).toContain('mediaRows.value.push')
+  })
+
+  it('unstage() discards a brand-new row outright, or toggles markedForDeletion on a saved row — both local-only, no $fetch', () => {
+    const block = page.slice(page.indexOf('function unstage'), page.indexOf('// ── Save'))
+    expect(block).not.toContain('$fetch')
+    expect(block).toContain('mediaRows.value.splice(rowIndex, 1)')
+    expect(block).toContain('row.markedForDeletion = !row.markedForDeletion')
+  })
+
+  it('a second unstage() call on the same still-unsaved row undoes the pending deletion (toggle, not one-way)', () => {
+    const block = page.slice(page.indexOf('function unstage'), page.indexOf('// ── Save'))
+    // The toggle expression itself proves undo: applying it twice returns to the original value.
+    expect(block).toMatch(/row\.markedForDeletion = !row\.markedForDeletion/)
+  })
+})
+
+describe('PWS-03-R1 issues zero write requests on load, tab switching, opening/closing the picker, or staging — only inside handleSave() (source evidence)', () => {
   const page = repoFile('pages/admin/product-workspace/[id]/media-resources.vue')
   const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
   const WRITE_METHOD_RE = /method:\s*['"](POST|PATCH|PUT|DELETE)['"]/g
@@ -1069,11 +1115,23 @@ describe('PWS-03 issues no write request on load or while browsing the library, 
     expect(libBlock).not.toMatch(WRITE_METHOD_RE)
   })
 
-  it('linkFile POSTs and unlinkMedia DELETEs — the only two write call sites in the page', () => {
-    const linkBlock = page.slice(page.indexOf('async function linkFile'), page.indexOf('async function unlinkMedia'))
-    expect(linkBlock).toMatch(/method:\s*['"]POST['"]/)
-    const unlinkBlock = page.slice(page.indexOf('async function unlinkMedia'), page.indexOf('</script>'))
-    expect(unlinkBlock).toMatch(/method:\s*['"]DELETE['"]/)
+  it('openLibrary/closeLibrary/stageLink/unstage — every function before handleSave — issue no write request', () => {
+    const preSaveBlock = page.slice(page.indexOf('function openLibrary'), page.indexOf('async function handleSave'))
+    expect(preSaveBlock).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('handleSave() is the only place in the page that issues POST or DELETE, and it does both — diffed per row', () => {
+    const beforeSave = page.slice(0, page.indexOf('async function handleSave'))
+    expect(beforeSave).not.toMatch(WRITE_METHOD_RE)
+
+    const saveBlock = page.slice(page.indexOf('async function handleSave'), page.indexOf('</script>'))
+    expect(saveBlock).toMatch(/method:\s*['"]POST['"]/)
+    expect(saveBlock).toMatch(/method:\s*['"]DELETE['"]/)
+    expect(saveBlock).not.toMatch(/method:\s*['"]PATCH['"]/)
+  })
+
+  it('save only runs when there are staged changes and not already saving — matching PWS-01/02\'s exact guard', () => {
+    expect(page).toContain('if (!isDirty.value || saving.value) return')
   })
 
   it('never mutates props directly in the presentational component — every action is emitted up to the page', () => {
@@ -1083,7 +1141,7 @@ describe('PWS-03 issues no write request on load or while browsing the library, 
 })
 
 describe('PWS-03 reuses the existing canonical product-media association API — no new data model (source evidence)', () => {
-  it('the four product-media endpoints already exist and are unmodified by this module (GET/POST/PATCH/DELETE on products_files)', () => {
+  it('the four product-media endpoints already exist and are unmodified in shape by this module (GET/POST/PATCH/DELETE on products_files)', () => {
     const getSource = repoFile('server/api/admin/products/[id]/media/index.get.ts')
     const postSource = repoFile('server/api/admin/products/[id]/media/index.post.ts')
     const patchSource = repoFile('server/api/admin/products/[id]/media/[mid].patch.ts')
@@ -1115,17 +1173,16 @@ describe('PWS-03 reuses the existing canonical product-media association API —
   })
 })
 
-describe('PWS-03 prevents linking the same media twice and isolates the current product (source evidence)', () => {
+describe('PWS-03-R1 duplicate protection is enforced both client-side (staging) and server-side (direct repeat POST) (source evidence)', () => {
   const page = repoFile('pages/admin/product-workspace/[id]/media-resources.vue')
 
-  it('computes existingFileIds from the current product\'s own media list only', () => {
-    expect(page).toContain('existingFileIds')
-    expect(page).toContain('linkedFileIds(mediaList.value)')
+  it('computes existingFileIds from every currently staged row (linked or pending-delete), so it can never be staged twice', () => {
+    expect(page).toContain('mediaRows.value.map((r: EditableMedia) => r.directus_files_id)')
   })
 
-  it('linkFile refuses to POST when the file is already linked to this product', () => {
-    const linkBlock = page.slice(page.indexOf('async function linkFile'), page.indexOf('async function unlinkMedia'))
-    expect(linkBlock).toContain('if (existingFileIds.value.has(fileId)) return')
+  it('stageLink refuses to push a row when the file is already staged for this product', () => {
+    const block = page.slice(page.indexOf('function stageLink'), page.indexOf('function unstage'))
+    expect(block).toContain('if (existingFileIds.value.has(fileId)) return')
   })
 
   it('the picker disables an already-linked file rather than allowing a second pick', () => {
@@ -1135,6 +1192,21 @@ describe('PWS-03 prevents linking the same media twice and isolates the current 
 
   it('every media read/write call is scoped to the route\'s own product id, never a second hardcoded product', () => {
     expect(page).not.toMatch(/\/api\/admin\/products\/\d+\/media/)
+  })
+
+  it('the POST endpoint enforces the duplicate guard server-side, so a direct repeat POST (bypassing the UI) is still rejected', () => {
+    const postSource = repoFile('server/api/admin/products/[id]/media/index.post.ts')
+    expect(postSource).toContain("import { assertNoDuplicateMediaLink } from '~/server/utils/productMediaLinks'")
+    expect(postSource).toContain('await assertNoDuplicateMediaLink(Number(id), body.directus_files_id, fetch)')
+  })
+
+  it('the server-side duplicate guard is unit-tested against the real exported function (not a copy), covering the direct-repeat-POST case', () => {
+    const guardSource = repoFile('server/utils/productMediaLinks.ts')
+    expect(guardSource).toContain('export async function assertNoDuplicateMediaLink')
+    expect(guardSource).toMatch(/statusCode:\s*409/)
+    const guardTest = repoFile('tests/productMediaLinks.test.ts')
+    expect(guardTest).toContain("import { assertNoDuplicateMediaLink } from '../server/utils/productMediaLinks'")
+    expect(guardTest).toContain('direct-repeat-POST case')
   })
 })
 
@@ -1189,6 +1261,27 @@ describe('PWS-03 has no AI surface and no lifecycle/publish control (source evid
       expect(lower).not.toContain('/publish')
       expect(lower).not.toContain("status: 'published'")
     }
+  })
+})
+
+describe('PWS-03-R1 pending-state badges make staged changes visible before Save (source evidence)', () => {
+  const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
+
+  it('marks a staged-new row distinctly from an already-saved association', () => {
+    expect(component).toContain('New — not saved yet')
+  })
+
+  it('marks a row staged for removal distinctly, and it is still visible (not yet gone) until Save', () => {
+    expect(component).toContain('Will be removed on Save')
+  })
+
+  it('the remove button reads "Discard" for an unsaved row, and "Undo removal" for a saved row already staged for deletion', () => {
+    expect(component).toContain("if (row.isNew) return 'Discard'")
+    expect(component).toContain("return row.markedForDeletion ? 'Undo removal' : 'Remove association'")
+  })
+
+  it('tells the admin that picking a file only stages it — nothing is sent until Save changes', () => {
+    expect(component).toContain('nothing is sent until you click Save changes')
   })
 })
 

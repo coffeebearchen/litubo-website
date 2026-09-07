@@ -2431,3 +2431,51 @@ SHA256SUMS.txt
 **明确未做：** 未新增 AI、自动发布、批量导入；未改变产品生命周期状态；未新增 Directus schema/迁移/权限；未触碰 PWS-00/01/02/07、旧编辑器、Product Center、全局 Media Library 代码；未开始 PWS-07 可写证据或 AI Source Intake/Proposal Review；未关闭任何 Decision Gate；未部署。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-03 FAST-01 Product Workspace Media & Resources"任务中写入。*
+
+---
+
+## PWS-03-R1 — Media & Resources 改为本地暂存 + 显式 Save（fix，2026-09-07）
+
+**背景：** `PWS-03`（commit `cec6dd5`）首版一旦点击"Select from Media Library"或"Remove association"就立即发起 `POST`/`DELETE`，与 PWS-01/02 已验证的"本地暂存 + 显式 Save"交互模式不一致，也不允许用户在保存前反悔。本次 fix **仅修正**该交互模式，不重做模块、不回退既有能力、不改动全局 Media Library、不部署。
+
+**起始基线核实：** 开工前确认 `master = origin/master = cec6dd5`（`git fetch --prune origin` + `rev-parse` 双重核对），五个受保护未跟踪路径未被触碰。
+
+**改动内容：**
+
+1. **本地 dirty state 模型**（页面 `media-resources.vue`）：新增 `EditableMedia` 行结构（`isNew` / `markedForDeletion` 两个标记，无其他可编辑字段——本模块从未支持编辑角色/Alt 等字段，因此脏检测只需判断"是否待新增"或"是否待删除"这一个集合层面的差异，无需逐字段 diff）。
+   - `Select from Media Library` 点击文件 → `stageLink()` 仅把一条本地行 `push` 进 `mediaRows`，不发任何请求；重复点击已暂存/已关联的文件会被拒绝（`existingFileIds` 覆盖全部当前行，含待删除行）。
+   - `Remove association` 点击 → `unstage()`：若该行是待保存的新增行，直接从本地数组移除（相当于放弃）；若是已保存的真实关联，仅切换 `markedForDeletion` 布尔值——再次点击（这时按钮文案变为"Undo removal"）即可撤销，保存前可无限次反悔。
+   - 只有点击共享 `WorkspaceShell` 头部的"Save changes"才会触发 `handleSave()`：按当前 `mediaRows` 逐行比对，`isNew` 行发 `POST`，`markedForDeletion` 行发 `DELETE`，成功后 `refreshMedia()` + 重建 `mediaRows` 快照；`isDirty` 为 false 或正在保存时直接 `return`，与 PWS-01/02 的保存守卫写法完全一致。
+   - 页面加载、标签切换、打开/关闭选择器、暂存/撤销暂存，全程零写请求——已通过真实浏览器网络面板逐步核实（见下）。
+
+2. **服务端重复关联防护（新增）：** 新增 `server/utils/productMediaLinks.ts` 导出 `assertNoDuplicateMediaLink(productId, fileUuid, fetch)`，复用 `mediaLifecycle.ts` 已有的 `FetchFn` 依赖注入模式（与 `getFileReferences()` 同款，可脱离 Nitro 运行时单元测试）；在 `POST /api/admin/products/[id]/media` 落库前调用，若该产品已存在同一 `directus_files_id` 的关联，直接 `409` 拒绝。这是客户端暂存去重之外的第二道防线——即使有人绕过 UI 直接重复调用 POST 接口，也无法在 `products_files` 中造出重复行。新增 `tests/productMediaLinks.test.ts`（5 个用例，直接针对导出的真实函数，而非复制一份逻辑），显式覆盖"连续两次 POST 同一文件"的场景。
+
+3. **只读重核视觉包：** 重新确认视觉母版目录仍为 12 个文件（README + 11 张 PNG），逐张以自然尺寸重新查看全部 11 张（含 `PW-AI-01`/`PW-AI-02`，确认仍为 FUTURE-REFERENCE、未被实现），README 映射表确认 `PW-VIS-04-MEDIA-RESOURCES-D1440` 仍是本模块唯一 PRIMARY 母版，未变化。视觉资料全程只读，未修改/暂存/提交。（观察记录，非本次改动：母版原图将"Product media"与"Documents & access"绘制为同屏两个区块，本仓库实现为可切换的两个标签页——这一差异在 PWS-03 首版即已存在，本次授权范围仅为交互模式修正，未涉及母版布局解读，故未改动，如需对齐需另行下达工作单。）
+
+**新增/修改文件：**
+
+| 文件 | 作用 |
+|---|---|
+| `pages/admin/product-workspace/[id]/media-resources.vue`（修改） | 关联列表改为 `EditableMedia[]` 本地行模型；新增 `handleSave()` 唯一写入口，`stageLink()`/`unstage()` 均为纯本地操作 |
+| `components/admin/workspace/WorkspaceMediaResources.vue`（修改） | 卡片/文档行新增"New — not saved yet"/"Will be removed on Save"待处理徽章；"Remove association"按钮按行状态显示"Discard"/"Undo removal"/"Remove association" |
+| `server/utils/productMediaLinks.ts`（新建） | `assertNoDuplicateMediaLink()`——服务端重复关联防护，`FetchFn` 依赖注入、可单测 |
+| `server/api/admin/products/[id]/media/index.post.ts`（修改） | 落库前调用 `assertNoDuplicateMediaLink()` |
+| `tests/productMediaLinks.test.ts`（新建） | 5 个用例，覆盖直接重复 POST 拒绝、按产品+文件精确 scope、跨产品不误判 |
+| `tests/productWorkspaceOverview.test.ts`（修改） | 重写/新增 PWS-03 专属测试段落，覆盖本地暂存模型、零写请求、撤销、待处理徽章、服务端去重引用 |
+| `docs/project/CURRENT-STATE.md`（修改） | 本记录 |
+
+**验证结果：**
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 452/452 通过（含新增 `productMediaLinks.test.ts` 5 个用例） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告 |
+| `npx nuxt build` | Build complete |
+| 浏览器验收（真实产品 ID=3） | **一图一档补齐测试**：打开选择器分两次分别暂存 1 张图片（"Home Hero Inspection Line"）与 1 份真实非图片文档（PDF "…9C1-batch-test.pdf"）→暂存期间 Network 面板确认零写请求、Save 按钮从禁用变为可点→点击 Save changes→**恰好 2 次 `POST`**（无 `PATCH`）→两条记录正确落库且徽章清除为"🔗 Linked from Media Library"；随后对两条记录分别点击 Remove association→立即验证"再点一次可撤销"（Undo removal→再次变回 Remove association，全程零请求）→重新标记两者为待删除→点击 Save changes→**恰好 2 次 `DELETE`**（`/media/13`、`/media/14`）→产品 3 恢复为原始 7 条关联（`GET /api/admin/products/3/media` 核验 `ids:[3,4,5,6,7,8,9]`），无残留测试数据；**重复关联防护**：已暂存但未保存的文件在选择器中立即变为禁用（`disabled:true`），证明去重覆盖待保存行，不止已保存行；1440px 主页面 + 选择器弹窗、375px 主页面 + 375px 展开导航（Media & resources 高亮）均已截图确认（见下），无横向溢出；全新空白 Tab 复验 Console 无任何错误（此前同一 Tab 因 Vite dev-server 一次自发重启而出现的 503/连接错误与本模块代码无关，已用干净 Tab 排除） |
+| 敏感字段/AI/自动发布/跨产品检查 | 详情栏与卡片仍只显示 Source/File type/File name/Alt text/Role 等安全字段，无 UUID、无原文件下载链接、无"Delivery access"伪造字段；未新增任何 AI Fill / Submit for review / 发布相关控件；`existingFileIds`/`assertNoDuplicateMediaLink` 均以 `products_id` 精确 scope，不跨产品 |
+
+**明确未做：** 未新增 AI、自动发布、批量导入；未改变产品生命周期状态；未新增 Directus schema/迁移/权限；未触碰 PWS-00/01/02/07、旧编辑器、Product Center、全局 Media Library 代码；未回退任何已交付能力；未部署；未修改视觉资料。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-03-R1"修正任务中写入。*

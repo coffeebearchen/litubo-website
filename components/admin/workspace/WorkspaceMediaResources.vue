@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProductMedia } from '~/types/product-cms'
+import type { FileRole } from '~/types/product-cms'
 import { fileRoleLabel, sourceFileTypeLabel, workspaceMediaThumbUrl, workspaceMediaIsImage } from '~/utils/productWorkspace'
 
 interface LibraryFile {
@@ -12,8 +12,25 @@ interface LibraryFile {
   height: number | null
 }
 
+/** Mirrors the page's EditableMedia shape — a row that may not exist on the
+ * server yet (isNew) or may be staged for removal (markedForDeletion). */
+interface EditableMedia {
+  id: number | null
+  directus_files_id: string
+  filename_download: string | null
+  type: string | null
+  filesize: number | null
+  file_role: FileRole | null
+  alt_en: string | null
+  language: string | null
+  version_label: string | null
+  enabled: boolean
+  isNew: boolean
+  markedForDeletion: boolean
+}
+
 const props = defineProps<{
-  media: ProductMedia[]
+  media: EditableMedia[]
   libraryOpen: boolean
   libraryFiles: LibraryFile[]
   libraryLoading: boolean
@@ -29,27 +46,41 @@ const emit = defineEmits<{
   'update-type-filter': [value: '' | 'image' | 'pdf']
   'load-more': []
   'pick-file': [fileId: string]
-  unlink: [mediaId: number]
+  unlink: [rowIndex: number]
 }>()
 
 const activeTab = ref<'media' | 'documents'>('media')
-const selectedId = ref<number | null>(null)
+const selectedIndex = ref<number | null>(null)
 
-const imageMedia = computed(() => props.media.filter(m => workspaceMediaIsImage(m.type ?? null)))
-const documentMedia = computed(() => props.media.filter(m => !workspaceMediaIsImage(m.type ?? null)))
+interface IndexedRow { row: EditableMedia, index: number }
 
-const selectedItem = computed(() => props.media.find(m => m.id === selectedId.value) ?? null)
+const rowsWithIndex = computed<IndexedRow[]>(() => props.media.map((row, index) => ({ row, index })))
+const imageRows = computed(() => rowsWithIndex.value.filter((r: IndexedRow) => workspaceMediaIsImage(r.row.type ?? null)))
+const documentRows = computed(() => rowsWithIndex.value.filter((r: IndexedRow) => !workspaceMediaIsImage(r.row.type ?? null)))
 
-const existingFileIds = computed(() => new Set(props.media.map(m => m.directus_files_id).filter((v): v is string => Boolean(v))))
+const selectedItem = computed(() => selectedIndex.value !== null ? props.media[selectedIndex.value] ?? null : null)
 
-function selectItem(id: number) {
-  selectedId.value = selectedId.value === id ? null : id
+// Every currently staged file (linked, or pending removal — still present until Save)
+// counts toward "already linked" so the picker can never stage the same file twice.
+const existingFileIds = computed(() => new Set(props.media.map(m => m.directus_files_id)))
+
+function selectItem(index: number) {
+  selectedIndex.value = selectedIndex.value === index ? null : index
+}
+
+function unlinkRow(index: number) {
+  emit('unlink', index)
+  if (selectedIndex.value === index) selectedIndex.value = null
 }
 
 function unlinkSelected() {
-  if (selectedId.value === null) return
-  emit('unlink', selectedId.value)
-  selectedId.value = null
+  if (selectedIndex.value === null) return
+  unlinkRow(selectedIndex.value)
+}
+
+function removeButtonLabel(row: EditableMedia): string {
+  if (row.isNew) return 'Discard'
+  return row.markedForDeletion ? 'Undo removal' : 'Remove association'
 }
 
 function formatSize(bytes: number | null | undefined): string {
@@ -102,7 +133,7 @@ function libraryThumb(id: string): string {
             <div>
               <h2 id="ws-media-heading" class="ws-card-title">Product media</h2>
               <p class="ws-card-hint">
-                {{ imageMedia.length }} asset{{ imageMedia.length === 1 ? '' : 's' }} linked to this product from Media Library.
+                {{ imageRows.length }} asset{{ imageRows.length === 1 ? '' : 's' }} linked to this product from Media Library.
               </p>
             </div>
             <button type="button" class="btn btn-primary" @click="emit('open-library')">
@@ -110,29 +141,40 @@ function libraryThumb(id: string): string {
             </button>
           </div>
 
-          <p v-if="imageMedia.length === 0" class="ws-empty">No media linked to this product yet.</p>
+          <p v-if="imageRows.length === 0" class="ws-empty">No media linked to this product yet.</p>
 
           <div v-else class="ws-media-grid">
-            <button
-              v-for="item in imageMedia"
-              :key="item.id"
-              type="button"
+            <div
+              v-for="entry in imageRows"
+              :key="entry.row.id ?? `new-${entry.index}`"
               class="ws-media-card"
-              :class="{ 'ws-media-card--selected': selectedId === item.id, 'ws-media-card--disabled': !item.enabled }"
-              @click="selectItem(item.id)"
+              :class="{
+                'ws-media-card--selected': selectedIndex === entry.index,
+                'ws-media-card--disabled': !entry.row.enabled,
+                'ws-media-card--pending-delete': entry.row.markedForDeletion,
+              }"
+              role="button"
+              tabindex="0"
+              @click="selectItem(entry.index)"
+              @keydown.enter="selectItem(entry.index)"
             >
               <div class="ws-media-card__thumb">
                 <img
-                  v-if="item.directus_files_id"
-                  :src="workspaceMediaThumbUrl(item.directus_files_id) ?? ''"
-                  :alt="item.alt_en ?? item.filename_download ?? ''"
+                  v-if="entry.row.directus_files_id"
+                  :src="workspaceMediaThumbUrl(entry.row.directus_files_id) ?? ''"
+                  :alt="entry.row.alt_en ?? entry.row.filename_download ?? ''"
                   loading="lazy"
                 >
-                <span v-if="item.file_role" class="ws-role-badge">{{ fileRoleLabel(item.file_role) }}</span>
+                <span v-if="entry.row.file_role" class="ws-role-badge">{{ fileRoleLabel(entry.row.file_role) }}</span>
               </div>
-              <p class="ws-media-card__name">{{ item.filename_download ?? 'Untitled asset' }}</p>
-              <p class="ws-media-card__tag">🔗 Linked from Media Library</p>
-            </button>
+              <p class="ws-media-card__name">{{ entry.row.filename_download ?? 'Untitled asset' }}</p>
+              <p v-if="entry.row.isNew" class="ws-media-card__pending ws-media-card__pending--new">New — not saved yet</p>
+              <p v-else-if="entry.row.markedForDeletion" class="ws-media-card__pending ws-media-card__pending--delete">Will be removed on Save</p>
+              <p v-else class="ws-media-card__tag">🔗 Linked from Media Library</p>
+              <button type="button" class="ws-media-card__remove" @click.stop="unlinkRow(entry.index)">
+                {{ removeButtonLabel(entry.row) }}
+              </button>
+            </div>
 
             <button type="button" class="ws-media-card ws-media-card--add" @click="emit('open-library')">
               <span class="ws-add-icon">+</span>
@@ -148,7 +190,7 @@ function libraryThumb(id: string): string {
             <div>
               <h2 id="ws-docs-heading" class="ws-card-title">Documents & access</h2>
               <p class="ws-card-hint">
-                {{ documentMedia.length }} document{{ documentMedia.length === 1 ? '' : 's' }} linked to this product from Media Library.
+                {{ documentRows.length }} document{{ documentRows.length === 1 ? '' : 's' }} linked to this product from Media Library.
               </p>
             </div>
             <button type="button" class="btn btn-primary" @click="emit('open-library')">
@@ -156,7 +198,7 @@ function libraryThumb(id: string): string {
             </button>
           </div>
 
-          <p v-if="documentMedia.length === 0" class="ws-empty">No documents linked to this product yet.</p>
+          <p v-if="documentRows.length === 0" class="ws-empty">No documents linked to this product yet.</p>
 
           <div v-else class="ws-table-wrap">
             <table class="ws-table">
@@ -167,23 +209,33 @@ function libraryThumb(id: string): string {
                   <th scope="col">Document role</th>
                   <th scope="col">Version</th>
                   <th scope="col">Association</th>
+                  <th scope="col" />
                 </tr>
               </thead>
               <tbody>
                 <tr
-                  v-for="item in documentMedia"
-                  :key="item.id"
+                  v-for="entry in documentRows"
+                  :key="entry.row.id ?? `new-${entry.index}`"
                   class="ws-doc-row"
-                  :class="{ 'ws-doc-row--selected': selectedId === item.id }"
-                  @click="selectItem(item.id)"
+                  :class="{ 'ws-doc-row--selected': selectedIndex === entry.index, 'ws-doc-row--pending-delete': entry.row.markedForDeletion }"
+                  @click="selectItem(entry.index)"
                 >
                   <td data-label="Name" class="ws-doc-name">
-                    {{ item.filename_download ?? 'Untitled document' }}
+                    {{ entry.row.filename_download ?? 'Untitled document' }}
                   </td>
-                  <td data-label="Language">{{ item.language ?? 'all' }}</td>
-                  <td data-label="Document role">{{ fileRoleLabel(item.file_role) }}</td>
-                  <td data-label="Version">{{ item.version_label ?? '—' }}</td>
-                  <td data-label="Association">🔗 Linked from Media Library</td>
+                  <td data-label="Language">{{ entry.row.language ?? 'all' }}</td>
+                  <td data-label="Document role">{{ fileRoleLabel(entry.row.file_role) }}</td>
+                  <td data-label="Version">{{ entry.row.version_label ?? '—' }}</td>
+                  <td data-label="Association">
+                    <span v-if="entry.row.isNew" class="ws-media-card__pending ws-media-card__pending--new">New — not saved yet</span>
+                    <span v-else-if="entry.row.markedForDeletion" class="ws-media-card__pending ws-media-card__pending--delete">Will be removed on Save</span>
+                    <span v-else>🔗 Linked from Media Library</span>
+                  </td>
+                  <td data-label="" class="ws-doc-actions">
+                    <button type="button" class="ws-media-card__remove" @click.stop="unlinkRow(entry.index)">
+                      {{ removeButtonLabel(entry.row) }}
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -207,6 +259,9 @@ function libraryThumb(id: string): string {
             <div v-else class="ws-detail-preview__icon">{{ sourceFileTypeLabel(selectedItem.type) }}</div>
           </div>
 
+          <p v-if="selectedItem.isNew" class="ws-media-card__pending ws-media-card__pending--new">New — not saved yet</p>
+          <p v-else-if="selectedItem.markedForDeletion" class="ws-media-card__pending ws-media-card__pending--delete">Will be removed on Save</p>
+
           <dl class="ws-detail-facts">
             <dt>Source</dt>
             <dd>Media Library</dd>
@@ -221,9 +276,9 @@ function libraryThumb(id: string): string {
           </dl>
 
           <button type="button" class="btn btn-secondary ws-detail-unlink" @click="unlinkSelected">
-            Remove association
+            {{ removeButtonLabel(selectedItem) }}
           </button>
-          <p class="ws-detail-lock">🔒 Original asset editing happens in Media Library.</p>
+          <p class="ws-detail-lock">🔒 Original asset editing happens in Media Library. Changes here are staged until Save.</p>
         </div>
       </aside>
     </div>
@@ -257,6 +312,8 @@ function libraryThumb(id: string): string {
               </select>
               <span class="ws-lib-count">{{ libraryTotal }} file(s)</span>
             </div>
+
+            <p class="ws-lib-note">Selecting a file stages it here — nothing is sent until you click Save changes.</p>
 
             <div v-if="libraryLoading && libraryFiles.length === 0" class="ws-lib-loading">Loading…</div>
             <div v-else-if="!libraryLoading && libraryFiles.length === 0" class="ws-lib-empty">
@@ -357,6 +414,7 @@ function libraryThumb(id: string): string {
 .ws-media-card:hover { border-color: var(--color-primary); }
 .ws-media-card--selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(15,92,75,0.12); }
 .ws-media-card--disabled { opacity: 0.55; }
+.ws-media-card--pending-delete { border-style: dashed; opacity: 0.7; }
 
 .ws-media-card__thumb {
   position: relative;
@@ -396,6 +454,27 @@ function libraryThumb(id: string): string {
   margin: 2px var(--space-2) var(--space-2);
 }
 
+.ws-media-card__pending {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  margin: 2px var(--space-2) var(--space-2);
+}
+.ws-media-card__pending--new { color: #1E6B4E; }
+.ws-media-card__pending--delete { color: #A23B3B; }
+
+.ws-media-card__remove {
+  margin: 0 var(--space-2) var(--space-2);
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+}
+.ws-media-card__remove:hover { border-color: #C0392B; color: #C0392B; background: #FDF0EE; }
+
 .ws-media-card--add {
   align-items: center;
   justify-content: center;
@@ -428,7 +507,9 @@ function libraryThumb(id: string): string {
 .ws-doc-row { cursor: pointer; }
 .ws-doc-row:hover { background: var(--color-surface-alt); }
 .ws-doc-row--selected { background: rgba(15,92,75,0.06); }
+.ws-doc-row--pending-delete { opacity: 0.6; }
 .ws-doc-name { font-weight: 500; overflow-wrap: anywhere; }
+.ws-doc-actions { white-space: nowrap; }
 
 .ws-detail {
   width: 260px;
@@ -531,6 +612,8 @@ function libraryThumb(id: string): string {
 }
 .ws-lib-type { height: 36px; padding: 0 var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--color-ink); background: var(--color-surface); }
 .ws-lib-count { font-size: var(--text-xs); color: var(--color-ink-muted); margin-left: auto; }
+
+.ws-lib-note { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; }
 
 .ws-lib-loading, .ws-lib-empty { text-align: center; padding: var(--space-8); font-size: var(--text-sm); color: var(--color-ink-muted); }
 
