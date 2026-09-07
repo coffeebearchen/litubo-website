@@ -1313,6 +1313,85 @@ describe('PWS-03 375px stacking, no horizontal overflow substitute (source evide
   })
 })
 
+// ── PWS-03-R2 — same-page layout, matching PW-VIS-04 (style fix, 2026-09-07) ──
+//
+// R0/R1 rendered "Product media" and "Documents & access" as two Tabs that
+// hide one another. Re-reading PW-VIS-04-MEDIA-RESOURCES-D1440 at full size
+// confirms the PRIMARY master draws both as two stacked sections on the SAME
+// page, alongside one persistent "Selected asset" rail — never a tab switch.
+// This fix removes the Tab structure entirely; the R1 dirty-state/Save logic
+// itself is untouched (verified by the still-passing PWS-03-R1 blocks above).
+
+describe('PWS-03-R2 renders Product media and Documents & access as one same-page layout, not Tabs (source evidence)', () => {
+  const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
+
+  it('no tab-switching structure remains — no role="tab"/tablist and no activeTab state', () => {
+    expect(component).not.toContain('role="tab"')
+    expect(component).not.toContain('role="tablist"')
+    expect(component).not.toContain('activeTab')
+  })
+
+  it('both sections are unconditional siblings — neither is gated behind the other with v-if/v-else', () => {
+    const mediaSectionIdx = component.indexOf('aria-labelledby="ws-media-heading"')
+    const docsSectionIdx = component.indexOf('aria-labelledby="ws-docs-heading"')
+    expect(mediaSectionIdx).toBeGreaterThan(-1)
+    expect(docsSectionIdx).toBeGreaterThan(mediaSectionIdx)
+
+    const betweenSections = component.slice(
+      component.lastIndexOf('<section', mediaSectionIdx),
+      component.lastIndexOf('<section', docsSectionIdx),
+    )
+    // The closing </section> for Product media must appear before the Documents
+    // section opens — i.e. they are sequential siblings, not alternates of one v-if/v-else.
+    expect(betweenSections).toContain('</section>')
+    expect(component.slice(component.lastIndexOf('<section', docsSectionIdx), docsSectionIdx)).not.toContain('v-else')
+  })
+
+  it('Product media keeps its own "Select from Media Library" entry point, and Documents & access has its own "Add documents" entry point — both open the same picker', () => {
+    expect(component).toContain('+ Select from Media Library')
+    expect(component).toContain('+ Add documents')
+    const openCalls = component.match(/emit\('open-library'\)/g) ?? []
+    expect(openCalls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('Documents & access still shows an honest empty state — never a fabricated row', () => {
+    expect(component).toContain('No documents linked to this product yet.')
+  })
+
+  it('the right-rail Selected asset panel stays visible alongside both sections on desktop (sticky, ≥768px only)', () => {
+    const desktopBlock = component.slice(component.indexOf('@media (min-width: 768px)'))
+    expect(desktopBlock).toContain('.ws-detail')
+    expect(desktopBlock).toContain('position: sticky')
+  })
+
+  it('the mobile breakpoint still stacks the detail rail to full width, not the sticky desktop layout', () => {
+    const mobileBlock = component.slice(component.indexOf('max-width: 767px'))
+    expect(mobileBlock).toContain('.ws-detail { width: 100%; }')
+  })
+})
+
+describe('PWS-03-R2 preserves every R1 dirty-state guarantee — this is a style-only fix (source evidence)', () => {
+  const page = repoFile('pages/admin/product-workspace/[id]/media-resources.vue')
+  const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
+
+  it('EditableMedia rows, isDirty, stageLink, unstage and handleSave are all unchanged in shape', () => {
+    expect(page).toContain('interface EditableMedia')
+    expect(page).toContain('const isDirty = computed(')
+    expect(page).toContain('function stageLink(fileId: string)')
+    expect(page).toContain('function unstage(rowIndex: number)')
+    expect(page).toContain('async function handleSave()')
+  })
+
+  it('the server-side duplicate guard is still wired into the POST endpoint', () => {
+    const postSource = repoFile('server/api/admin/products/[id]/media/index.post.ts')
+    expect(postSource).toContain("import { assertNoDuplicateMediaLink } from '~/server/utils/productMediaLinks'")
+  })
+
+  it('the presentational component still never issues a write request', () => {
+    expect(component).not.toMatch(/method:\s*['"](POST|PATCH|PUT|DELETE)['"]/)
+  })
+})
+
 describe('PWS-03 is English-first and carries no Chinese (source evidence)', () => {
   it('no PWS-03 file has visible or assistive Chinese in its template', () => {
     for (const file of PWS03_FILES) {

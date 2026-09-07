@@ -2479,3 +2479,46 @@ SHA256SUMS.txt
 **明确未做：** 未新增 AI、自动发布、批量导入；未改变产品生命周期状态；未新增 Directus schema/迁移/权限；未触碰 PWS-00/01/02/07、旧编辑器、Product Center、全局 Media Library 代码；未回退任何已交付能力；未部署；未修改视觉资料。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-03-R1"修正任务中写入。*
+
+---
+
+## PWS-03-R2 — Media & Resources 视觉对齐修正（2026-09-07）
+
+**背景：** `PWS-03-R1`（commit `f5113a3`）修正了写入时序问题，但仍把 "Product media" 与 "Documents & access" 实现为互斥的两个 Tabs。重新以自然尺寸完整查看 README + 全部 11 张 PNG 后再次确认：**PW-VIS-04-MEDIA-RESOURCES-D1440 仍是本模块唯一 PRIMARY 母版**，其原图把这两块内容绘制为**同一页面内的两个纵向区块**（先 Product media 卡片网格，下方紧接 Documents & access 表格），并配一个贯穿两块内容的常驻 "Selected asset" 右侧详情栏——从未出现 Tab 切换控件。本次 fix **仅修正该布局差异**，不重做数据逻辑、不回退 R1 已交付能力、不触碰 PWS-07、不触碰全局 Media Library、不部署。
+
+**起始基线核实：** 开工前确认 `master = origin/master = f5113a3`（`git fetch --prune origin` + `rev-parse` 双重核对），五个受保护未跟踪路径未被触碰。
+
+**改动内容（仅 `components/admin/workspace/WorkspaceMediaResources.vue` 的模板与样式）：**
+- 移除 `activeTab` 状态与 `role="tab"`/`role="tablist"` 的 Tab 切换结构。
+- "Product media" 与 "Documents & access" 改为两个始终同时渲染的 `<section>`，在同一页面中按母版顺序纵向堆叠（不再用 `v-if`/`v-else` 互斥）。
+- "Documents & access" 区块保留独立入口按钮，文案改为 **"+ Add documents"**（与母版一致），与 "Product media" 区块的 "+ Select from Media Library" 按钮分别触发，但两者仍打开**同一个** Media Library 选择器（本模块数据模型本就是单一 `products_files` 集合，按真实 MIME 类型区分展示区块，未新增任何数据模型或独立的"文档选择"通路）。
+- 右侧 "Selected asset" 详情栏在 ≥768px 视口下改为 `position: sticky`，随页面滚动持续可见，贴合母版"两块内容共享一个常驻详情栏"的视觉意图；375px 下保持原有整宽堆叠，不引入粘性定位。
+- Documents 区块在没有真实关联文档时仍显示诚实空态 "No documents linked to this product yet."，未伪造任何数据。
+
+**R1 逻辑零改动确认：** `pages/admin/product-workspace/[id]/media-resources.vue`（`EditableMedia`、`isDirty`、`stageLink()`、`unstage()`、`handleSave()`）与 `server/utils/productMediaLinks.ts`（服务端重复关联防护）**均未修改一行**；`tests/productWorkspaceOverview.test.ts` 新增的 PWS-03-R2 测试段落显式复核这些函数签名仍然存在、服务端去重仍被 POST 端点引用、展示组件仍不发起任何写请求。
+
+**新增/修改文件：**
+
+| 文件 | 作用 |
+|---|---|
+| `components/admin/workspace/WorkspaceMediaResources.vue`（修改） | 移除 Tabs，两区块同页纵向堆叠；"Add documents" 独立入口；右侧详情栏桌面端改为 sticky |
+| `tests/productWorkspaceOverview.test.ts`（修改） | 新增 PWS-03-R2 测试段落：验证无 Tab 结构、两区块非互斥兄弟节点、两个入口共用同一选择器、诚实空态、sticky 布局仅限桌面端；并显式复核 R1 全部 dirty-state/Save/服务端防护逻辑签名未变 |
+| `docs/project/CURRENT-STATE.md`（修改） | 本记录 |
+
+**验证结果：**
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 461/461 通过 |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告 |
+| `npx nuxt build` | Build complete |
+| 浏览器验收（真实产品 ID=3，登录会话过期后由用户手动重新登录一次，之后全部为自动化操作） | 1440px：`get_page_text` 确认 "Product media"（7 assets）与 "Documents & access"（0 documents，诚实空态）**同屏可见于一个页面**，无 Tab 切换；打开选择器弹窗正常，安全字段限制不变；375px：完整页面单列堆叠两区块，`scrollWidth === innerWidth === 375` 全程无横向溢出；375px 展开 Workspace 导航，"Media & resources" 高亮且标签完整可读；**R1 逻辑逐步复验**：暂存 1 张图片 + 1 份真实 PDF → 全程零写请求 → 点击 Save changes → 恰好 2 次 `POST` → 标记两者待删除（含 Undo removal 验证）→ 全程零写请求 → 点击 Save changes → 恰好 2 次 `DELETE`（`/media/15`、`/media/16`）→ `GET` 核验产品 3 恢复为原始 7 条关联（`ids:[3,4,5,6,7,8,9]`），**无残留测试数据**；全新空白 Tab 复验 Console 零错误 |
+| 敏感字段/跨产品/AI/发布检查 | 详情栏与卡片仍只显示 Source/File type/File name/Alt text/Role 等安全字段，无 UUID、无原文件下载链接、无伪造的"Delivery access"列；未新增任何 AI Fill / Submit for review / 发布相关控件；`existingFileIds`/`assertNoDuplicateMediaLink` 仍以 `products_id` 精确 scope，不跨产品 |
+
+**截图交付方式说明：** 当前工具链无法将浏览器截图导出为独立本地文件（`computer` 截图工具只把图像以内联形式返回到工具调用结果中，没有"保存到磁盘路径"的能力，也没有可用的替代截屏机制能产出真实像素文件）；因此四张截图（1440px 主页面同屏两区块、1440px 选择器弹窗、375px 完整页面、375px 展开导航）已如实以内联图片形式提供在本轮对话的工具调用结果与最终回复中，供直接查看——这是本环境的已知能力边界，并非本次引入的限制，此前 PWS-03-R1 报告已说明过同一边界。未创建任何本地占位文件或虚构路径。
+
+**明确未做：** 未重做本模块的读写逻辑；未回退任何已交付能力（暂存新增/待删除/Undo/Discard/当前产品隔离/双重去重防护/解除关联不删原文件/不复制移动文件/无 AI/无上传/无发布/无跨产品）；未新增 Directus schema/迁移/权限；未触碰 PWS-00/01/02/07、旧编辑器、Product Center、全局 Media Library 代码；未修改/暂存/提交视觉资料；未部署。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-03-R2"视觉对齐修正任务中写入。*

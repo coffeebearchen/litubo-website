@@ -49,7 +49,6 @@ const emit = defineEmits<{
   unlink: [rowIndex: number]
 }>()
 
-const activeTab = ref<'media' | 'documents'>('media')
 const selectedIndex = ref<number | null>(null)
 
 interface IndexedRow { row: EditableMedia, index: number }
@@ -104,31 +103,8 @@ function libraryThumb(id: string): string {
 
     <div class="ws-media-body">
       <div class="ws-media-main">
-        <div class="ws-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            class="ws-tab"
-            :class="{ 'ws-tab--active': activeTab === 'media' }"
-            :aria-selected="activeTab === 'media'"
-            @click="activeTab = 'media'"
-          >
-            Product media
-          </button>
-          <button
-            type="button"
-            role="tab"
-            class="ws-tab"
-            :class="{ 'ws-tab--active': activeTab === 'documents' }"
-            :aria-selected="activeTab === 'documents'"
-            @click="activeTab = 'documents'"
-          >
-            Documents & access
-          </button>
-        </div>
-
-        <!-- ── Product media tab ─────────────────────────────────────────── -->
-        <section v-if="activeTab === 'media'" class="ws-card" aria-labelledby="ws-media-heading">
+        <!-- ── Product media — same page as Documents & access, per PW-VIS-04 ── -->
+        <section class="ws-card" aria-labelledby="ws-media-heading">
           <div class="ws-card-header">
             <div>
               <h2 id="ws-media-heading" class="ws-card-title">Product media</h2>
@@ -184,8 +160,8 @@ function libraryThumb(id: string): string {
           </div>
         </section>
 
-        <!-- ── Documents & access tab ────────────────────────────────────── -->
-        <section v-else class="ws-card" aria-labelledby="ws-docs-heading">
+        <!-- ── Documents & access — same page as Product media, per PW-VIS-04 ── -->
+        <section class="ws-card" aria-labelledby="ws-docs-heading">
           <div class="ws-card-header">
             <div>
               <h2 id="ws-docs-heading" class="ws-card-title">Documents & access</h2>
@@ -194,7 +170,7 @@ function libraryThumb(id: string): string {
               </p>
             </div>
             <button type="button" class="btn btn-primary" @click="emit('open-library')">
-              + Select from Media Library
+              + Add documents
             </button>
           </div>
 
@@ -357,20 +333,7 @@ function libraryThumb(id: string): string {
 .ws-media-hint { font-size: var(--text-sm); color: var(--color-ink-muted); margin: 0; max-width: 68ch; }
 
 .ws-media-body { display: flex; align-items: flex-start; gap: var(--space-5); }
-.ws-media-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); }
-
-.ws-tabs { display: flex; gap: var(--space-2); border-bottom: 1px solid var(--color-line); }
-.ws-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--color-ink-muted);
-  cursor: pointer;
-}
-.ws-tab--active { color: var(--color-primary-deep); border-bottom-color: var(--color-primary); font-weight: 600; }
+.ws-media-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-5); }
 
 .ws-card {
   background: var(--color-surface);
@@ -518,6 +481,10 @@ function libraryThumb(id: string): string {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   padding: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .ws-detail { position: sticky; top: var(--space-4); }
 }
 .ws-detail-title { font-size: var(--text-sm); font-weight: 700; color: var(--color-ink); margin: 0 0 var(--space-3); }
 .ws-detail-empty { font-size: var(--text-sm); color: var(--color-ink-muted); margin: 0; }
