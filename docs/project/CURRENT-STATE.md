@@ -2388,3 +2388,46 @@ SHA256SUMS.txt
 **明确未做：** 未新增 AI、自动发布、批量导入；未改变产品生命周期状态；未新增 Directus schema/迁移/权限；未触碰 PWS-00/01/07、旧编辑器、Product Center、Media Library；未关闭任何 Decision Gate；未部署。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-02 FAST-01 Product Workspace Specifications"任务中写入。*
+
+---
+
+## PWS-03 — Workspace Media & Resources 已交付（2026-09-07）
+
+**状态：`PWS-03`（Media & Resources）已在 Product Workspace 中交付，路由 `/admin/product-workspace/:id/media-resources`。完全复用既有 `products_files` 产品↔媒体关联数据模型与既有管理端 API（`server/api/admin/products/[id]/media/*`，四个端点均未修改一行），未新增 Directus schema、未做数据库迁移、未触碰真实产品数据、未复制或移动任何物理文件。**
+
+**数据模型结论：** 仓库已存在完整、安全、按产品隔离的 canonical 关联结构——`products_files` M2M 关联表（`ProductMedia` 类型）+ `FileRole` 枚举（11 个值）+ 四个既有端点（GET 列表 / POST 关联 / PATCH 更新 / DELETE 解除关联），均通过 `directus_files_id`（稳定 UUID）引用文件，从不使用文件路径。本次核实 `[mid].delete.ts` 早已只删除 `products_files` 的关联行（代码注释明确写明"Only delete the products_files record...NOT the directus_files asset"），未修改该文件也已天然满足"解除关联不删除原始文件"的要求。因此本任务**未新增任何新的数据模型或迁移**，只新增了一个 Workspace 页面 + 一个展示组件来调用既有 API。
+
+**媒体引用保护核实：** 重新核查 `server/utils/mediaLifecycle.ts` 的 `getFileReferences()`/`queryProductsFiles()`，确认其已经按 `directus_files_id` 查询 `products_files` 并计入 `total`/`can_archive`/`references`（`tests/mediaLifecycle.test.ts` 已有专门覆盖）。因此本模块新建立的产品↔媒体关联**自动被现有引用保护机制识别**，无需任何代码改动。
+
+**新增/修改文件：**
+
+| 文件 | 作用 |
+|---|---|
+| `pages/admin/product-workspace/[id]/media-resources.vue`（新建） | Workspace Media & Resources 页面：拉取当前产品的媒体关联列表；管理 Media Library 选择器状态（仅 GET）；`linkFile()`/`unlinkMedia()` 是页面中仅有的两处写入口，均为显式点击触发 |
+| `components/admin/workspace/WorkspaceMediaResources.vue`（新建） | 纯展示组件：Product media / Documents & access 两个标签页 + 右侧 Selected asset 详情栏 + Media Library 选择器弹窗；从不自行发起写请求，所有动作通过 emit 上抛 |
+| `components/admin/workspace/WorkspaceModuleNav.vue`（修改） | 新增 `media-resources` 路由映射（导航图标此前视觉对齐任务已内置，未新增） |
+| `utils/productWorkspace.ts`（修改） | `media-resources` 导航项启用；新增纯函数 `fileRoleLabel()`、`workspaceMediaThumbUrl()`、`workspaceMediaIsImage()` |
+| `utils/productCentre.ts`（修改） | 新增 `workspaceMediaResourcesRoute()` |
+| `tests/productWorkspaceOverview.test.ts`（修改） | 新增 PWS-03 专属测试段落（约 30 个用例）；修正因新增模块而失效的既有导航断言 |
+| `docs/project/CURRENT-STATE.md`（修改） | 本记录 |
+
+**关键设计（区别于 PWS-01/02 的本地暂存+批量 Save 模式）：** 本模块每个动作（关联/解除关联）都是显式点击即时写入，不设批量暂存/统一 Save——这与母版要求"用户必须显式点击才能关联"、既有旧编辑器 `pages/admin/products/[id]/media.vue` 的成熟交互模式完全一致。因此 `WorkspaceShell` 的 `save-state` 沿用默认 `'unavailable'`（"Save changes" 按钮保持禁用，与 Sources & evidence 一致）。重复关联防护：客户端 `existingFileIds`（由当前产品自身的关联列表计算）禁用选择器中已关联的文件卡片，`linkFile()` 内部也做同样判断后才 `return`；解除关联仅删除 `products_files` 关联行，原始文件保留在 Media Library 且其他合法引用不受影响（已通过真实浏览器操作验证，见下）。
+
+**明确未做（母版中存在但刻意不实现，避免伪造能力或越权）：** AI Fill Workspace；"Delivery access"（Public download / Contact-gated / Internal only）列——现有 schema 无对应字段，与 PWS-02 的"unit"字段缺口同理，本环境无 Directus 管理员凭证，未新增字段，直接省略该列而非伪造；卡片上的"⋮" overflow 菜单（母版含有，但无角色编辑等实际功能可挂载，故省略）；新的文件上传入口（上传仍完全归属 Media Library）。
+
+**Media Library 缩略图异常 — 只读诊断结论：** 在 `/admin/media` 页面观察到部分卡片缩略图为空白灰框而非图片（如 "TEST ONLY — UI UPLOAD METADATA TEST"、"Test Only Not for Publication 9 C1 Batch Test" 等）。通过 `/api/admin/media/files` 直接核查数据发现：这些文件的 `filesize` 均为可疑的统一值 `8192` 字节，且 `width`/`height` 均为 `null`——即 Directus 从未能从这些文件中提取出真实图片尺寸，说明它们是此前测试/验收会话中上传的**占位测试夹具**（声明了 `image/png`/`image/webp` MIME 类型，但内容并非可解码的真实图片数据），并非本次或近期任务引入的代码缺陷。真实产品图片（如 `XR-180C-2*.jpg`、`180C3.png`、`Home Hero Inspection Line`）均有效渲染，缩略图 API 请求全部返回 `200 OK`，浏览器控制台无报错。**该异常不阻断本模块的安全选择流程**（这些占位文件在选择器中仍可被查看、区分、正常关联/取消关联，只是缺少可视缩略图，不会崩溃或误导），因此本次未触碰全局 Media Library 代码，仅记录为独立、非本次引入的历史测试数据清理问题，供后续单独处理。
+
+**验证结果：**
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 433/433 通过 |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告 |
+| `npx nuxt build` | Build complete |
+| 浏览器验收（真实产品 ID=3，1440px + 375px + 375px 展开导航） | 无横向溢出（`scrollWidth === innerWidth === 375`）；真实 7 条已关联媒体正确渲染；打开选择器→选择未关联文件"Home Hero Inspection Line"→仅发起 1 次 `POST`→新卡片正确出现→选中卡片→右侧详情栏正确显示安全元数据（Source/File type/File name/Alt text/Role，无 UUID/无原文件下载链接）→点击"Remove association"→仅发起 1 次 `DELETE /products/3/media/12`→卡片消失、恢复到原始 7 条，产品 3 无残留测试数据；Documents & access 标签页诚实空态（0 documents）；Console 无新增错误；页面加载与标签切换全程只有 `GET`（含既有 `auth/refresh` 后台刷新），无任何 `POST/PATCH/PUT/DELETE`；导航互通 Overview/Page content/Specifications/Media & resources/Sources & evidence 五向正常 |
+
+**明确未做：** 未新增 AI、自动发布、批量导入；未改变产品生命周期状态；未新增 Directus schema/迁移/权限；未触碰 PWS-00/01/02/07、旧编辑器、Product Center、全局 Media Library 代码；未开始 PWS-07 可写证据或 AI Source Intake/Proposal Review；未关闭任何 Decision Gate；未部署。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-03 FAST-01 Product Workspace Media & Resources"任务中写入。*

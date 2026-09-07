@@ -22,6 +22,9 @@ import {
   workspaceHeroUrl,
   sourceFileTypeLabel,
   sourceReviewStatusLabel,
+  fileRoleLabel,
+  workspaceMediaThumbUrl,
+  workspaceMediaIsImage,
 } from '../utils/productWorkspace'
 import {
   productDetailRoute,
@@ -29,6 +32,7 @@ import {
   workspacePageContentRoute,
   workspaceSourcesEvidenceRoute,
   workspaceSpecificationsRoute,
+  workspaceMediaResourcesRoute,
 } from '../utils/productCentre'
 import type { AdminProduct } from '../types/product-cms'
 
@@ -313,10 +317,10 @@ describe('Submit for review lives on Overview only, inside the Lifecycle card (s
 describe('Workspace module navigation (source evidence)', () => {
   const source = repoFile('components/admin/workspace/WorkspaceModuleNav.vue')
 
-  it('defines all nine PWS-00…PWS-08 addresses with only the four landed modules enabled', () => {
+  it('defines all nine PWS-00…PWS-08 addresses with only the five landed modules enabled', () => {
     expect(WORKSPACE_MODULE_NAV).toHaveLength(9)
     const enabled = WORKSPACE_MODULE_NAV.filter(i => i.enabled).map(i => i.key)
-    expect(enabled).toEqual(['overview', 'page-content', 'specifications', 'sources-evidence'])
+    expect(enabled).toEqual(['overview', 'page-content', 'specifications', 'media-resources', 'sources-evidence'])
   })
 
   it('groups modules under the three frozen headings', () => {
@@ -428,7 +432,7 @@ describe('PWS-07 module is enabled and routable (source evidence)', () => {
     expect(byKey.overview).toBe(true)
     expect(byKey['page-content']).toBe(true)
     expect(byKey.specifications).toBe(true)
-    for (const key of ['media-resources', 'relations', 'seo-locales', 'share-distribution', 'change-history']) {
+    for (const key of ['relations', 'seo-locales', 'share-distribution', 'change-history']) {
       expect(byKey[key]).toBe(false)
     }
   })
@@ -602,7 +606,7 @@ describe('PWS-01 module is enabled and routable (source evidence)', () => {
     expect(byKey['page-content']).toBe(true)
     expect(byKey.overview).toBe(true)
     expect(byKey['sources-evidence']).toBe(true)
-    for (const key of ['media-resources', 'relations', 'seo-locales', 'share-distribution', 'change-history']) {
+    for (const key of ['relations', 'seo-locales', 'share-distribution', 'change-history']) {
       expect(byKey[key]).toBe(false)
     }
   })
@@ -808,7 +812,7 @@ describe('PWS-02 module is enabled and routable (source evidence)', () => {
     expect(byKey.overview).toBe(true)
     expect(byKey['page-content']).toBe(true)
     expect(byKey['sources-evidence']).toBe(true)
-    for (const key of ['media-resources', 'relations', 'seo-locales', 'share-distribution', 'change-history']) {
+    for (const key of ['relations', 'seo-locales', 'share-distribution', 'change-history']) {
       expect(byKey[key]).toBe(false)
     }
   })
@@ -979,5 +983,270 @@ describe('PWS-02 is English-first and carries no Chinese (source evidence)', () 
     for (const file of PWS02_FILES) {
       expect(renderedMarkup(repoFile(file))).not.toMatch(/[一-鿿]/)
     }
+  })
+})
+
+// ── PWS-03 — Media & Resources (product↔media associations, read+explicit-write) ──
+
+const PWS03_FILES = [
+  'pages/admin/product-workspace/[id]/media-resources.vue',
+  'components/admin/workspace/WorkspaceMediaResources.vue',
+]
+
+describe('PWS-03 module is enabled and routable (source evidence)', () => {
+  it('enables media-resources without disabling any already-landed module', () => {
+    const byKey = Object.fromEntries(WORKSPACE_MODULE_NAV.map(i => [i.key, i.enabled]))
+    expect(byKey['media-resources']).toBe(true)
+    expect(byKey.overview).toBe(true)
+    expect(byKey['page-content']).toBe(true)
+    expect(byKey.specifications).toBe(true)
+    expect(byKey['sources-evidence']).toBe(true)
+    for (const key of ['relations', 'seo-locales', 'share-distribution', 'change-history']) {
+      expect(byKey[key]).toBe(false)
+    }
+  })
+
+  it('workspaceMediaResourcesRoute builds the frozen PWS-03 route, matching the pre-registered nav key', () => {
+    expect(workspaceMediaResourcesRoute(42)).toBe('/admin/product-workspace/42/media-resources')
+  })
+
+  it('the module nav links media-resources alongside the other landed modules', () => {
+    const source = repoFile('components/admin/workspace/WorkspaceModuleNav.vue')
+    expect(source).toContain('workspaceMediaResourcesRoute')
+  })
+})
+
+describe('PWS-03 page composition (source evidence)', () => {
+  const page = repoFile('pages/admin/product-workspace/[id]/media-resources.vue')
+
+  it('mounts WorkspaceShell, WorkspaceModuleNav and WorkspaceMediaResources', () => {
+    expect(page).toContain('<WorkspaceShell')
+    expect(page).toContain('<WorkspaceModuleNav')
+    expect(page).toContain('<WorkspaceMediaResources')
+    expect(page).toContain('active-key="media-resources"')
+    expect(page).toContain('title="Media & resources"')
+  })
+
+  it('reads the same canonical product id for every read and write, never a second product', () => {
+    expect(page).toContain('route.params.id')
+    expect(page).toContain('/api/admin/products/${id}/media')
+    expect(page).not.toMatch(/\/api\/admin\/products\/\d+\//)
+  })
+
+  it('reuses the canonical ProductMedia type, never a new parallel model', () => {
+    expect(page).toContain("import type { AdminProduct, ProductMedia } from '~/types/product-cms'")
+  })
+
+  it('renders a "Product not found" empty state rather than a blank form', () => {
+    expect(page).toContain('Product not found')
+    expect(page).toContain('notFound')
+  })
+
+  it('does not pass a save-state — every write here is an explicit per-action link/unlink, not a batched Save', () => {
+    expect(page).not.toContain('save-state')
+    expect(page).not.toContain('saveState')
+  })
+})
+
+describe('PWS-03 issues no write request on load or while browsing the library, only on explicit link/unlink (source evidence)', () => {
+  const page = repoFile('pages/admin/product-workspace/[id]/media-resources.vue')
+  const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
+  const WRITE_METHOD_RE = /method:\s*['"](POST|PATCH|PUT|DELETE)['"]/g
+
+  it('the presentational component never issues a write request itself', () => {
+    expect(component).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('the top-level data fetch only ever calls useFetch (GET), never $fetch with a write method', () => {
+    const initialFetchBlock = page.slice(0, page.indexOf('async function loadLibraryFiles'))
+    const fetchCalls = initialFetchBlock.match(/useFetch[^\n]*/g) ?? []
+    expect(fetchCalls.length).toBeGreaterThan(0)
+    for (const call of fetchCalls) expect(call).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('loadLibraryFiles (browsing Media Library) only ever issues a GET', () => {
+    const libBlock = page.slice(page.indexOf('async function loadLibraryFiles'), page.indexOf('function openLibrary'))
+    expect(libBlock).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('linkFile POSTs and unlinkMedia DELETEs — the only two write call sites in the page', () => {
+    const linkBlock = page.slice(page.indexOf('async function linkFile'), page.indexOf('async function unlinkMedia'))
+    expect(linkBlock).toMatch(/method:\s*['"]POST['"]/)
+    const unlinkBlock = page.slice(page.indexOf('async function unlinkMedia'), page.indexOf('</script>'))
+    expect(unlinkBlock).toMatch(/method:\s*['"]DELETE['"]/)
+  })
+
+  it('never mutates props directly in the presentational component — every action is emitted up to the page', () => {
+    expect(component).toContain('defineEmits')
+    expect(component).not.toMatch(/defineProps[\s\S]*?\bmedia\[[^\]]*\]\s*\.\s*\w+\s*=/)
+  })
+})
+
+describe('PWS-03 reuses the existing canonical product-media association API — no new data model (source evidence)', () => {
+  it('the four product-media endpoints already exist and are unmodified by this module (GET/POST/PATCH/DELETE on products_files)', () => {
+    const getSource = repoFile('server/api/admin/products/[id]/media/index.get.ts')
+    const postSource = repoFile('server/api/admin/products/[id]/media/index.post.ts')
+    const patchSource = repoFile('server/api/admin/products/[id]/media/[mid].patch.ts')
+    const deleteSource = repoFile('server/api/admin/products/[id]/media/[mid].delete.ts')
+    expect(getSource).toContain('products_files')
+    expect(postSource).toContain('/items/products_files')
+    expect(patchSource).toContain('products_files')
+    expect(deleteSource).toContain('/items/products_files')
+  })
+
+  it('unlink deletes only the join row, never the underlying Directus asset', () => {
+    const deleteSource = repoFile('server/api/admin/products/[id]/media/[mid].delete.ts')
+    expect(deleteSource).toContain('Only delete the products_files record')
+    expect(deleteSource).not.toMatch(/\/items\/directus_files\/\$\{/)
+  })
+
+  it('the media reference-protection check already counts products_files associations — no change needed for PWS-03', () => {
+    const lifecycle = repoFile('server/utils/mediaLifecycle.ts')
+    expect(lifecycle).toContain('queryProductsFiles')
+    expect(lifecycle).toContain("/items/products_files?filter[directus_files_id][_eq]=")
+  })
+
+  it('files are addressed only by stable Directus file UUID, never by filesystem path', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/media-resources.vue')
+    const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
+    for (const source of [page, component]) {
+      expect(source).not.toMatch(/filename_disk/)
+    }
+  })
+})
+
+describe('PWS-03 prevents linking the same media twice and isolates the current product (source evidence)', () => {
+  const page = repoFile('pages/admin/product-workspace/[id]/media-resources.vue')
+
+  it('computes existingFileIds from the current product\'s own media list only', () => {
+    expect(page).toContain('existingFileIds')
+    expect(page).toContain('linkedFileIds(mediaList.value)')
+  })
+
+  it('linkFile refuses to POST when the file is already linked to this product', () => {
+    const linkBlock = page.slice(page.indexOf('async function linkFile'), page.indexOf('async function unlinkMedia'))
+    expect(linkBlock).toContain('if (existingFileIds.value.has(fileId)) return')
+  })
+
+  it('the picker disables an already-linked file rather than allowing a second pick', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
+    expect(component).toContain(':disabled="existingFileIds.has(f.id)"')
+  })
+
+  it('every media read/write call is scoped to the route\'s own product id, never a second hardcoded product', () => {
+    expect(page).not.toMatch(/\/api\/admin\/products\/\d+\/media/)
+  })
+})
+
+describe('PWS-03 never displays restricted or fabricated data (source evidence)', () => {
+  it('never renders raw source text, locator, internal note, download URL, or original-file preview link', () => {
+    for (const file of PWS03_FILES) {
+      const source = repoFile(file)
+      expect(source).not.toContain('raw_excerpt')
+      expect(source).not.toContain('source_locator')
+      expect(source).not.toMatch(/<a\s[^>]*href/)
+      expect(source.toLowerCase()).not.toMatch(/>\s*download\s*</)
+    }
+  })
+
+  it('never renders a bare Directus file UUID as visible text — only safe display fields', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
+    const template = component.slice(component.indexOf('<template>'), component.lastIndexOf('</template>'))
+    expect(template).not.toMatch(/\{\{\s*(item|f)\.(directus_files_id|id)\s*\}\}/)
+  })
+
+  it('adds no new upload entry point — uploading stays Media-Library-only', () => {
+    for (const file of PWS03_FILES) {
+      const lower = repoFile(file).toLowerCase()
+      expect(lower).not.toContain('upload')
+      expect(lower).not.toContain('<input type="file"')
+    }
+  })
+
+  it('never fabricates a "Delivery access" value the schema does not have', () => {
+    for (const file of PWS03_FILES) {
+      expect(repoFile(file)).not.toContain('Delivery access')
+      expect(repoFile(file)).not.toContain('Contact-gated')
+      expect(repoFile(file)).not.toContain('Internal only')
+    }
+  })
+})
+
+describe('PWS-03 has no AI surface and no lifecycle/publish control (source evidence)', () => {
+  it('no PWS-03 file renders an AI Fill Workspace control or any AI hint', () => {
+    for (const file of PWS03_FILES) {
+      const lower = repoFile(file).toLowerCase()
+      expect(lower).not.toContain('ai fill')
+      expect(lower).not.toContain('ai-fill')
+      expect(lower).not.toContain('pws-ai')
+    }
+  })
+
+  it('never calls a publish, submit-for-review, or lifecycle-status endpoint', () => {
+    for (const file of PWS03_FILES) {
+      const lower = repoFile(file).toLowerCase()
+      expect(lower).not.toContain('submit for review')
+      expect(lower).not.toContain('/publish')
+      expect(lower).not.toContain("status: 'published'")
+    }
+  })
+})
+
+describe('PWS-03 honest empty states, no fabricated resource rows (source evidence)', () => {
+  const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
+
+  it('shows an honest empty state when there is no linked media or no linked documents', () => {
+    expect(component).toContain('No media linked to this product yet.')
+    expect(component).toContain('No documents linked to this product yet.')
+  })
+
+  it('never fabricates a real product\'s asset row when the list is empty', () => {
+    expect(component).not.toContain('LT-180C')
+    expect(component).not.toContain('Free-Fall')
+  })
+
+  it('names the core business rule against auto-inheriting other products\' materials', () => {
+    expect(component).toContain('never inherited or mixed in automatically')
+  })
+})
+
+describe('PWS-03 375px stacking, no horizontal overflow substitute (source evidence)', () => {
+  it('the 375px breakpoint stacks the document table into cards and the detail rail to full width', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
+    const mobileBlock = component.slice(component.indexOf('max-width: 767px'))
+    expect(mobileBlock).toContain('flex-direction: column')
+    expect(mobileBlock).toContain('display: block')
+    expect(mobileBlock).not.toContain('overflow-x: auto')
+  })
+})
+
+describe('PWS-03 is English-first and carries no Chinese (source evidence)', () => {
+  it('no PWS-03 file has visible or assistive Chinese in its template', () => {
+    for (const file of PWS03_FILES) {
+      expect(renderedMarkup(repoFile(file))).not.toMatch(/[一-鿿]/)
+    }
+  })
+})
+
+describe('fileRoleLabel / workspaceMediaThumbUrl / workspaceMediaIsImage (pure helpers)', () => {
+  it('maps every canonical FileRole to a clear English label without inventing a new role', () => {
+    expect(fileRoleLabel('hero')).toBe('Hero image')
+    expect(fileRoleLabel('datasheet')).toBe('Datasheet')
+    expect(fileRoleLabel('certificate')).toBe('Certificate')
+  })
+
+  it('reports an honest fallback when no role is set, never a blank string', () => {
+    expect(fileRoleLabel(null)).toBe('Role not set')
+  })
+
+  it('builds the thumbnail URL through the same hardened proxy the legacy editor and Media Library page already use', () => {
+    expect(workspaceMediaThumbUrl('abc-123')).toBe('/api/admin/media/abc-123?width=240&height=180&fit=cover')
+    expect(workspaceMediaThumbUrl(null)).toBeNull()
+  })
+
+  it('splits Product media vs. Documents & access by real MIME type, never by filename guesswork', () => {
+    expect(workspaceMediaIsImage('image/jpeg')).toBe(true)
+    expect(workspaceMediaIsImage('application/pdf')).toBe(false)
+    expect(workspaceMediaIsImage(null)).toBe(false)
   })
 })

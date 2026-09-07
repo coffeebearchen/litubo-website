@@ -88,6 +88,11 @@ export function workspaceSpecificationsRoute(id: number | string): string {
   return `/admin/product-workspace/${id}/specifications`
 }
 
+/** PWS-03 Media & Resources route (PWS-03 FAST-01). Fifth enabled tab, editable in the same shell. */
+export function workspaceMediaResourcesRoute(id: number | string): string {
+  return `/admin/product-workspace/${id}/media-resources`
+}
+
 export function categoryContextRoute(id: number | string): string {
   return `/admin/products/categories/${id}`
 }

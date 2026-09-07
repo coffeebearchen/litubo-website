@@ -12,7 +12,7 @@
  * calls it directly.
  */
 
-import type { AdminProduct, ProductCategory } from '~/types/product-cms'
+import type { AdminProduct, ProductCategory, FileRole } from '~/types/product-cms'
 import { adminAssetUrl } from './productCentre'
 
 /**
@@ -42,7 +42,7 @@ export const WORKSPACE_MODULE_NAV: WorkspaceModuleNavItem[] = [
   { key: 'overview', label: 'Overview', group: 'PRODUCT RECORD', enabled: true },
   { key: 'page-content', label: 'Page content', group: 'PRODUCT RECORD', enabled: true },
   { key: 'specifications', label: 'Specifications', group: 'PRODUCT RECORD', enabled: true },
-  { key: 'media-resources', label: 'Media & resources', group: 'PRODUCT RECORD', enabled: false },
+  { key: 'media-resources', label: 'Media & resources', group: 'PRODUCT RECORD', enabled: true },
   { key: 'relations', label: 'Relations', group: 'PRODUCT RECORD', enabled: false },
   { key: 'seo-locales', label: 'SEO & locales', group: 'PUBLISH & DISTRIBUTE', enabled: false },
   { key: 'share-distribution', label: 'Share & distribution', group: 'PUBLISH & DISTRIBUTE', enabled: false },
@@ -98,4 +98,46 @@ export function sourceFileTypeLabel(mimeType: string | null): string {
   if (mimeType.includes('word')) return 'Document'
   if (mimeType.startsWith('text/')) return 'Text'
   return 'File'
+}
+
+/**
+ * PWS-03 — Media & Resources (product-media associations, `products_files`).
+ * Display-only mapping for the existing, unchanged `FileRole` enum — never a
+ * fabricated 12th value. A role only ever labels an association a human
+ * already made in this module; it is never inferred from filename or folder.
+ */
+const FILE_ROLE_LABELS: Record<FileRole, string> = {
+  hero: 'Hero image',
+  overview: 'Overview',
+  application: 'Application',
+  detail: 'Detail',
+  gallery: 'Gallery',
+  video_poster: 'Video poster',
+  brochure: 'Brochure',
+  datasheet: 'Datasheet',
+  drawing: 'Drawing',
+  manual: 'Manual',
+  certificate: 'Certificate',
+}
+
+export function fileRoleLabel(role: FileRole | null): string {
+  if (!role) return 'Role not set'
+  return FILE_ROLE_LABELS[role] ?? role
+}
+
+/**
+ * Thumbnail through the same hardened `/api/admin/media/:id` proxy the legacy
+ * per-product editor (`pages/admin/products/[id]/media.vue`) and the global
+ * Media Library page already use — never a raw Directus asset URL.
+ */
+export function workspaceMediaThumbUrl(
+  fileId: string | null,
+  opts: { width: number, height: number } = { width: 240, height: 180 },
+): string | null {
+  return fileId ? `/api/admin/media/${fileId}?width=${opts.width}&height=${opts.height}&fit=cover` : null
+}
+
+/** Product media (image-like) vs. Documents & access — split by the file's real MIME type, never by role or filename guesswork. */
+export function workspaceMediaIsImage(mimeType: string | null): boolean {
+  return (mimeType ?? '').startsWith('image/')
 }

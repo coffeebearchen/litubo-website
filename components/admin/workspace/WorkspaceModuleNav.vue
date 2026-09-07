@@ -5,6 +5,7 @@ import {
   workspacePageContentRoute,
   workspaceSourcesEvidenceRoute,
   workspaceSpecificationsRoute,
+  workspaceMediaResourcesRoute,
 } from '~/utils/productCentre'
 
 const props = defineProps<{
@@ -25,6 +26,7 @@ const ENABLED_ROUTES: Record<string, (id: number) => string> = {
   'page-content': workspacePageContentRoute,
   'sources-evidence': workspaceSourcesEvidenceRoute,
   specifications: workspaceSpecificationsRoute,
+  'media-resources': workspaceMediaResourcesRoute,
 }
 
 function routeFor(key: string): string {
