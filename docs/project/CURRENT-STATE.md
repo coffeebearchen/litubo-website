@@ -2522,3 +2522,88 @@ SHA256SUMS.txt
 **明确未做：** 未重做本模块的读写逻辑；未回退任何已交付能力（暂存新增/待删除/Undo/Discard/当前产品隔离/双重去重防护/解除关联不删原文件/不复制移动文件/无 AI/无上传/无发布/无跨产品）；未新增 Directus schema/迁移/权限；未触碰 PWS-00/01/02/07、旧编辑器、Product Center、全局 Media Library 代码；未修改/暂存/提交视觉资料；未部署。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-03-R2"视觉对齐修正任务中写入。*
+
+---
+
+## PWS-07-WRITE-AUDIT-01 — Specifications 可写证据关联 + append-only 审计（2026-09-07）
+
+**状态：`PWS-07` 在其既有只读页面 `/admin/product-workspace/:id/sources-evidence` 之上，新增了一个独立、明确授权的可写扩展——允许管理员为"当前产品的一条动态规格参数"显式建立"spec item ↔ 当前产品已关联的 Media Library 来源文件 ↔ 人工 review status ↔ 服务端生成的 append-only 审计事件"四者的关联。原有只读"Evidence register"（`WorkspaceSourcesEvidence.vue`）未做任何修改。未开始 PWS-AI-01/02，未部署。**
+
+### 一、数据模型结论：零新增 Directus 集合/字段
+
+**证据关联本身**：完整复用既有 `product_source_records`（PWS-07 起已存在），未新增任何表或字段。`fact_key` 由服务端按约定生成为 `spec_item:<当前产品的 product_spec_items.id>`——前端永远不能提交 `fact_key`、表名、字段名、`target_id` 或 `target_type`，只能提交 `spec_item_id`（整数）与 `source_file_id`（UUID）。
+
+**审计事件**：**完整复用 Directus 自带的 `directus_activity` / `directus_revisions` 系统集合**，未新增 `product_workspace_audit_events` 或任何自定义审计表。原因：本项目每个后台管理员登录时使用的是其**真实、独立的 Directus 用户会话令牌**（`server/api/admin/auth/login.post.ts` 直接对 Directus 原生 `/auth/login` 完成认证，`admin_at` Cookie 就是该管理员本人的 Directus access token；`adminFetch()` 全程使用这个真实令牌，而非共享的服务账号）。因此，每一次对 `product_source_records` 的 `POST`/`PATCH`，Directus 都会在**同一次内部数据库事务**中自动、不可绕过地记录一条 `directus_activity`（真实 actor、真实 UTC 时间戳、真实 action）与对应的 `directus_revisions`（该次写入前后的字段快照）。这就是"优先复用现有审计机制"这一规则字面意义上要求我先检查的对象——检查后确认它完全满足需求，因此**未新增任何数据表，也就不涉及 Directus schema 变更，不需要任何管理员级 schema 凭证**。
+
+### 二、母版要求 → 实际实现
+
+| `PW-VIS-08-SOURCES-EVIDENCE-D1440` 母版要求 | 实际实现 |
+|---|---|
+| "Evidence register" 表（只读） | 原样保留，未改一行 |
+| "Source citations" 表：Product field / Cited source / Verification / Action | 新增"Specification evidence"表：Specification / Cited source / Verification / Action（限定为 Specifications 范围，未做跨模块字段关联） |
+| 右侧 "Selected evidence" 详情栏：Verification status + "Record verification" + "Linked product fields" + "Choose source" | 新增右侧"Selected evidence"栏：显示所选证据的规格参数、来源、文件类型、Verification 下拉（对应"Record verification"）、"Remove evidence"（对应"Choose source"的反向操作）、本条证据自己的历史（见下） |
+| 留白、分栏、桌面/移动布局 | 复用 PWS-03-R2 已验证的同页两栏 + 右栏 sticky（≥768px）+ 375px 整宽堆叠模式 |
+| **未实现（母版中存在但明确超出本次授权范围）**：AI import、AI review queue、Publish blocker、完整 Change History（PWS-08）、自动冲突识别 | 均未实现，也未在 UI 中出现任何相关文案或控件 |
+
+### 三、审计原子性与真实 actor 的证明
+
+未编写任何"先写 evidence、后补 audit"的两步式代码——`index.post.ts`/`[linkId].patch.ts` 各自只发起**一次** `adminFetch` 调用；audit 的生成完全是 Directus 内部对这次调用的副作用。真实浏览器验证（见下）中，创建一条证据关联后立即查询 `GET /api/admin/products/:id/evidence/audit`，返回：
+
+```json
+{ "action": "linked", "at": "2026-09-07T12:02:13.393Z", "actor": "dev@litubo.com", "from_status": null, "to_status": "needs_review" }
+```
+
+`actor` 是当时真实登录管理员的邮箱（服务端从 `directus_activity.user` 读出，从未由客户端传入）；`at` 是 Directus 自己生成的真实 UTC 时间戳。这证明了：(1) 单次写入必然同时产生证据记录与审计记录，两者不可能"半成功"；(2) actor 是真实会话身份，从未伪造 "Admin"/"System"。
+
+### 四、隔离测试如何验证、且产品 3 无残留修改
+
+**产品 3（真实、共享的既有测试产品）浏览器验证范围严格限定为**：页面加载、打开选择器、动态下拉数据核对、本地暂存（新增/撤销/Discard）、零写请求核对、375px/1440px 布局与截图。**在产品 3 上，仅本地暂存过一条证据（从未点击 Save），随后已 Discard**；另发起的两次跨产品/重复校验请求（见下）均被服务端在写入前拒绝（404/400）。会话结束前二次核验：`GET /api/admin/products/3/evidence` 与 `GET /api/admin/products/3/sources` 均返回空数组——**产品 3 无任何残留证据记录或审计事件**。
+
+**真实"Save → evidence + audit 同时生成"的验证在一个新建的、明确标注的隔离测试产品中完成**：由于审计是 append-only、不可清理，任何真实写入必然永久保留在其所属产品下；为避免把测试留痕永久绑定在共享产品 3 上，本次新建了一个专用沙箱产品（ID=5，`[TEST ONLY — EVIDENCE AUDIT VERIFICATION — DO NOT USE]`，Draft 状态，通过既有、未改动的 `POST /api/admin/products` 创建——这是一次完全可逆、低风险、Product Center 本身早已支持的标准操作，不涉及任何 schema 变更）。在该沙箱产品上完成的真实写入验证：
+
+1. 创建一个测试规格组+条目（沙箱专属，供关联使用）。
+2. 通过既有 Media & Resources API 关联一个已存在的 "TEST ONLY" 媒体库测试文件（`products_files`）。
+3. 通过新 UI 暂存 1 条证据关联 → 点击 Save changes → 恰好 1 次 `POST /evidence` → 立即查询 audit，确认真实 `linked` 事件（见上）。
+4. 修改 Verification 状态为 confirmed → Save → 恰好 1 次 `PATCH /evidence/:id` → audit 追加 `status_changed`（`needs_review → confirmed`），原 `linked` 事件依旧存在（append-only 确认）。
+5. 解除该证据 → Save → 恰好 1 次 `POST /sources/:id/archive`（复用既有 PWS-07 归档端点，未改一行）→ audit 追加 `archived` 事件；随后核验：`product_source_records` 该行仍存在（仅 `archived:true`）、`products_files` 关联仍存在、Media Library 原文件仍存在（按文件名搜索命中 3 个格式变体，未被删除/改名/移动）。
+6. **跨产品拒绝**：用产品 3 的路由 + 产品 5 的 `spec_item_id` → `404`；用产品 3 真实存在的 `spec_item_id` + 产品 5 的 `source_file_id`（未关联到产品 3）→ `400`——两种跨产品对象均"按不存在/未关联处理"，从未泄露另一产品信息。
+7. **服务端重复防护**：对同一 `(product, spec_item, source)` 直接连续两次 `POST` → 第二次 `409`；两个**并发**（`Promise.all`）请求同时发起 → 均被拒绝为 `409`，最终仅存在预期的 1 条记录，未产生重复。
+8. **归档后的二次保护**：对已归档的证据再次归档 → `409`"already archived"（复用既有端点行为）；对已归档证据 `PATCH` 状态 → `409`"Cannot change the review status of an archived evidence link"。
+9. 全程 Console 零错误；最终该沙箱产品的两条证据均已归档（未删除任何行），完整 5 条 append-only 审计事件保留。
+
+### 五、发现但未修复的既有缺陷（超出本次授权范围，未触碰 `mediaLifecycle.ts`）
+
+验证过程中发现：`GET /api/admin/media/:id/references`（`server/utils/mediaLifecycle.ts` 的 `queryProductsFiles()`）在任何文件存在 `products_files` 关联时会因请求 `products_id.name` 字段而返回 Directus `403 Forbidden`（该字段在 `products` 集合权限/结构中不可访问；产品名称字段实际是 `name_en`/`name_es`/`name_pt`）。经核实这是**本次任务开始前就已存在、与本次改动无关的缺陷**（调用栈完全落在未被本次改动触及的原有代码路径），会导致 Media Library 的"引用状态/是否可归档"检查在有真实 `products_files` 关联时报错。由于本任务明确禁止触碰 `mediaLifecycle.ts` 且该修复超出本次授权范围，**未做任何修改**，仅在此如实记录，供后续单独任务处理。
+
+### 六、新增/修改文件
+
+| 文件 | 作用 |
+|---|---|
+| `server/utils/productEvidenceLinks.ts`（新建） | `fact_key` 构造/解析、spec item/source file 归属校验、重复关联防护、审计条目的纯函数解释逻辑（`computeEvidenceAuditEntries`），全部基于依赖注入 `FetchFn`，可脱离 Nitro 单测 |
+| `server/api/admin/products/[id]/evidence/index.get.ts`（新建） | 列出当前产品的 Specifications 证据关联，安全摘要 |
+| `server/api/admin/products/[id]/evidence/index.post.ts`（新建） | 创建证据关联（校验归属+去重后写入 `product_source_records`） |
+| `server/api/admin/products/[id]/evidence/[linkId].patch.ts`（新建） | 仅允许修改 `review_status`，白名单字段 |
+| `server/api/admin/products/[id]/evidence/audit.get.ts`（新建） | 只读，从 Directus `/revisions` 解释出安全的审计时间线 |
+| `pages/admin/product-workspace/[id]/sources-evidence.vue`（修改） | 新增本地 dirty-state 证据管理逻辑与 `save-state`/`@save`；原有只读数据获取与 `WorkspaceSourcesEvidence` 挂载不变 |
+| `components/admin/workspace/WorkspaceEvidenceLinks.vue`（新建） | 纯展示：证据表格 + 选择器弹窗 + 右侧详情/历史栏，从不自行发起写请求 |
+| `tests/productEvidenceLinks.test.ts`（新建） | 23 个用例，覆盖 fact_key 约定、归属校验、去重防护、审计解释逻辑 |
+| `tests/productWorkspaceOverview.test.ts`（修改） | 新增本任务测试段落；修正因新增写入能力而失效的既有 PWS-07 只读断言（缩小到仍然只读的 `WorkspaceSourcesEvidence.vue`） |
+| `docs/project/CURRENT-STATE.md`（修改） | 本记录 |
+
+### 七、验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 519/519 通过 |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告 |
+| `npx nuxt build` | Build complete |
+| 浏览器验收 | 见上"四"节；1440px 同屏正常页 + 选择器/暂存详情、375px 完整页面、375px 展开导航共四张截图已提供；全新空白 Tab 复验 Console 零错误；`scrollWidth === innerWidth === 375`（移动端全程无横向溢出） |
+| 敏感字段确认 | UI/API 全程未出现 `raw_excerpt`/`source_locator`/UUID/`source_file_id`/文件路径/下载链接/原文件预览/`internal note`/其他产品信息/Directus 原始错误；审计摘要仅展示 action/时间/actor/安全的状态转换 |
+
+### 八、明确未做
+
+未开始 PWS-AI-01/AI-02；未实现 AI 调用/自动提取/自动确认/自动填规格；未新增发布/审核流转/生命周期改动；未触碰全局 Media Library、Product Center、PWS-01/02/03；未新建 PWS-08 完整 History 页面；未新增上传/下载/文件复制/跨产品关联入口；未新增 Directus schema/迁移/权限；未修改/暂存/提交视觉资料；未部署；未强推；五个受保护未跟踪路径全程未被触碰。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-07-WRITE-AUDIT-01"任务中写入。*
