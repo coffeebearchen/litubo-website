@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AdminProduct } from '~/types/product-cms'
-import { adminAssetUrl, categoryContextRoute, productDetailRoute } from '~/utils/productCentre'
+import { adminAssetUrl, categoryContextRoute, productDetailRoute, workspaceOverviewRoute } from '~/utils/productCentre'
 
 const props = defineProps<{
   /** null keeps the desktop column in place with an empty state (persistent workspace region). */
@@ -96,6 +96,9 @@ const heroUrl = computed(() =>
       <div class="panel-actions">
         <NuxtLink :to="productDetailRoute(product.id)" class="btn btn-primary btn-full">
           Open product record
+        </NuxtLink>
+        <NuxtLink :to="workspaceOverviewRoute(product.id)" class="btn btn-secondary btn-full">
+          Open Workspace (read-only)
         </NuxtLink>
       </div>
     </template>
@@ -229,10 +232,41 @@ const heroUrl = computed(() =>
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--color-line);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
+
+/*
+ * .btn / .btn-primary were referenced by the template above but never defined
+ * in this file's scoped styles (pre-existing gap, predates this change). Both
+ * are defined here now so the existing "Open product record" action and the
+ * new parallel Workspace entry point render as real, consistent buttons.
+ */
+.btn {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.btn-primary { background: var(--color-primary); color: white; }
+.btn-primary:hover { background: var(--color-primary-deep); }
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border-color: var(--color-line);
+}
+
+.btn-secondary:hover { background: var(--color-surface-alt); }
 
 .btn-full {
   width: 100%;
+  min-height: 40px;
   text-align: center;
   display: flex;
   align-items: center;

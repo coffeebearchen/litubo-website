@@ -64,6 +64,15 @@ export function productDetailRoute(id: number | string): string {
   return `/admin/products/${id}`
 }
 
+/**
+ * PWS-00 read-only Workspace entry point (PWS-DOR-02 / PWS-00A). Added in
+ * parallel to productDetailRoute() above, which is unchanged and remains the
+ * sole writable surface for a product during the pilot (child blueprint §18.3).
+ */
+export function workspaceOverviewRoute(id: number | string): string {
+  return `/admin/product-workspace/${id}/overview`
+}
+
 export function categoryContextRoute(id: number | string): string {
   return `/admin/products/categories/${id}`
 }
