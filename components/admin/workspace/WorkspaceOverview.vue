@@ -63,6 +63,15 @@ const heroUrl = computed(() => workspaceHeroUrl(props.product))
         <p v-else class="ws-card-note">
           Read-only in this preview. Lifecycle changes remain in the existing product editor.
         </p>
+        <button
+          type="button"
+          class="ws-btn-primary ws-btn-full"
+          disabled
+          title="Submit for review is disabled in this read-only preview — the readiness rule is not yet configured."
+        >
+          Submit for review
+        </button>
+        <p class="ws-card-footnote">Submit when the product information is ready for internal review.</p>
       </section>
 
       <section class="ws-card" aria-labelledby="ws-readiness-heading">
@@ -131,6 +140,31 @@ const heroUrl = computed(() => workspaceHeroUrl(props.product))
   color: var(--color-ink-muted);
   line-height: 1.5;
   margin: var(--space-3) 0 0;
+}
+
+.ws-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border: 1px solid transparent;
+  background: var(--color-primary);
+  color: white;
+  cursor: pointer;
+}
+
+.ws-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.ws-btn-full { width: 100%; margin-top: var(--space-4); box-sizing: border-box; }
+
+.ws-card-footnote {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  line-height: 1.5;
+  margin: var(--space-2) 0 0;
 }
 
 .ws-field-list { margin: 0; display: flex; flex-direction: column; gap: var(--space-4); }

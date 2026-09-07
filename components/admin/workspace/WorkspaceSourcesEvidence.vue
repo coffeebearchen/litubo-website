@@ -21,8 +21,7 @@ function statusClass(status: string | null): string {
 <template>
   <div class="ws-sources">
     <div class="ws-sources-header">
-      <h2 class="ws-sources-title">Sources &amp; evidence</h2>
-      <span class="ws-restricted-badge">Restricted — not visible to customers</span>
+      <span class="ws-restricted-badge">🔒 Restricted — not visible to customers</span>
     </div>
     <p class="ws-sources-hint">
       Record where product facts originate and how they were verified. Original files, internal
@@ -77,13 +76,6 @@ function statusClass(status: string | null): string {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-3);
-}
-
-.ws-sources-title {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  color: var(--color-ink);
-  margin: 0;
 }
 
 .ws-restricted-badge {

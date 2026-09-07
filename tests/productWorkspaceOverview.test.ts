@@ -269,21 +269,39 @@ describe('Save and Submit are native-disabled (source evidence)', () => {
     expect(source).toContain("{ saveState: 'unavailable' }")
   })
 
-  it('renders Submit for review as a disabled button with a visible reason', () => {
-    const submitBlock = template.slice(template.indexOf('Submit for review') - 300, template.indexOf('Submit for review'))
-    expect(submitBlock).toContain('disabled')
-    expect(submitBlock).toMatch(/title="[^"]+"/)
+  it('the shared Shell header no longer renders Submit for review — PWS-VISUAL-ALIGN-01 moved it into Overview\'s Lifecycle card, matching PW-VIS-01/03/04/05/06/07/09', () => {
+    expect(template).not.toContain('Submit for review')
   })
 
-  it('renders no lifecycle transition control (draft/review/published/archived actions)', () => {
+  it('renders no lifecycle transition control (draft/review/published/archived actions) in the shared header', () => {
     const lower = source.toLowerCase()
     expect(lower).not.toContain('publish')
-    expect(lower).not.toContain('submit for review".*@click')
   })
 
   it('Preview reuses the existing read-only Admin preview route', () => {
     expect(source).toContain('previewHref')
     expect(repoFile('pages/admin/product-workspace/[id]/overview.vue')).toContain('/preview')
+  })
+})
+
+describe('Submit for review lives on Overview only, inside the Lifecycle card (source evidence)', () => {
+  const overview = repoFile('components/admin/workspace/WorkspaceOverview.vue')
+  const overviewTemplate = overview.slice(overview.indexOf('<template>'), overview.indexOf('</template>'))
+
+  it('renders Submit for review as a disabled button with a visible reason', () => {
+    const idx = overviewTemplate.indexOf('Submit for review')
+    const submitBlock = overviewTemplate.slice(idx - 60, idx + 250)
+    expect(submitBlock).toContain('disabled')
+    expect(submitBlock).toMatch(/title="[^"]+"/)
+  })
+
+  it('sits inside the Lifecycle status card, not a standalone control', () => {
+    const lifecycleBlock = overviewTemplate.slice(
+      overviewTemplate.indexOf('ws-lifecycle-heading'),
+      overviewTemplate.indexOf('Submit for review'),
+    )
+    expect(lifecycleBlock.length).toBeGreaterThan(0)
+    expect(lifecycleBlock).toContain('StatusBadge')
   })
 })
 
@@ -741,5 +759,33 @@ describe('WorkspaceShell save-state extension keeps other tabs byte-identical by
     for (const file of [...NEW_FILES.filter(f => f.includes('overview')), 'pages/admin/product-workspace/[id]/sources-evidence.vue']) {
       expect(repoFile(file)).not.toContain('save-state')
     }
+  })
+})
+
+// ── PWS-VISUAL-ALIGN-01 — module-name H1 per PW-VIS-02…09 (source evidence) ──
+
+describe('WorkspaceShell H1 is the module name, not the product name (source evidence)', () => {
+  const shell = repoFile('components/admin/workspace/WorkspaceShell.vue')
+
+  it('requires a title prop and renders it as the H1 — every PRIMARY master except Overview shows the module name here', () => {
+    expect(shell).toMatch(/title:\s*string/)
+    const template = shell.slice(shell.indexOf('<template>'), shell.indexOf('</template>'))
+    const h1Block = template.slice(template.indexOf('<h1'), template.indexOf('</h1>'))
+    expect(h1Block).toContain('{{ title }}')
+    expect(h1Block).not.toContain('product.name_en')
+    // The breadcrumb's last segment legitimately still shows the product name — untouched.
+    expect(template).toContain('{{ product.name_en }}')
+  })
+
+  it('Overview passes the real product name as the title (its title happens to equal the product name)', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/overview.vue')
+    expect(page).toMatch(/:title="\(product as AdminProduct\)\.name_en"/)
+  })
+
+  it('Page content and Sources & evidence pass their own module name, never the product name', () => {
+    const pageContent = repoFile('pages/admin/product-workspace/[id]/page-content.vue')
+    const sources = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
+    expect(pageContent).toContain('title="Page content"')
+    expect(sources).toContain('title="Sources & evidence"')
   })
 })

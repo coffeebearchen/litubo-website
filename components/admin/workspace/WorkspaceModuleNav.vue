@@ -10,6 +10,8 @@ const props = defineProps<{
   productId: number
   productName: string
   productCode: string | null
+  productStatus: 'draft' | 'review' | 'published' | 'archived'
+  productHeroUrl: string | null
   activeKey: string
 }>()
 
@@ -31,11 +33,7 @@ function routeFor(key: string): string {
 <template>
   <aside class="ws-nav" :class="{ 'ws-nav--open': navOpen }" aria-label="Product workspace navigation">
     <div class="ws-nav-titlebar">
-      <div class="ws-nav-identity">
-        <p class="ws-nav-eyebrow">Product workspace</p>
-        <p class="ws-nav-name">{{ productName }}</p>
-        <p v-if="productCode" class="ws-nav-code">{{ productCode }}</p>
-      </div>
+      <p class="ws-nav-eyebrow">Product workspace</p>
       <button
         type="button"
         class="ws-nav-toggle"
@@ -45,6 +43,22 @@ function routeFor(key: string): string {
       >
         {{ navOpen ? 'Hide' : 'Browse' }}
       </button>
+    </div>
+
+    <div class="ws-nav-identity">
+      <div v-if="productHeroUrl" class="ws-nav-thumb">
+        <img :src="productHeroUrl" :alt="productName" loading="lazy">
+      </div>
+      <div v-else class="ws-nav-thumb ws-nav-thumb--empty" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <polyline points="21 15 16 10 5 21" />
+        </svg>
+      </div>
+      <p class="ws-nav-name">{{ productName }}</p>
+      <p v-if="productCode" class="ws-nav-code">{{ productCode }}</p>
+      <StatusBadge :status="productStatus" />
     </div>
 
     <div id="workspace-module-nav" class="ws-nav-content">
@@ -59,6 +73,7 @@ function routeFor(key: string): string {
               disabled
               :title="`${item.label} is not yet available`"
             >
+              <WorkspaceNavIcon :module-key="item.key" />
               <span class="ws-nav-item-label">{{ item.label }}</span>
               <span class="ws-nav-item-note">Coming soon</span>
             </button>
@@ -67,6 +82,7 @@ function routeFor(key: string): string {
               class="ws-nav-item ws-nav-item--active"
               aria-current="page"
             >
+              <WorkspaceNavIcon :module-key="item.key" />
               <span class="ws-nav-item-label">{{ item.label }}</span>
             </span>
             <NuxtLink
@@ -74,6 +90,7 @@ function routeFor(key: string): string {
               :to="routeFor(item.key)"
               class="ws-nav-item"
             >
+              <WorkspaceNavIcon :module-key="item.key" />
               <span class="ws-nav-item-label">{{ item.label }}</span>
             </NuxtLink>
           </li>
@@ -95,14 +112,11 @@ function routeFor(key: string): string {
 
 .ws-nav-titlebar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--color-line);
+  padding: var(--space-4) var(--space-4) 0;
 }
-
-.ws-nav-identity { min-width: 0; }
 
 .ws-nav-eyebrow {
   font-size: 0.6875rem;
@@ -110,7 +124,37 @@ function routeFor(key: string): string {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-ink-muted);
-  margin: 0 0 var(--space-1);
+  margin: 0;
+}
+
+.ws-nav-identity {
+  min-width: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.ws-nav-thumb {
+  width: 100%;
+  height: 84px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ws-nav-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.ws-nav-thumb--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-muted);
+  opacity: 0.6;
 }
 
 .ws-nav-name {
@@ -125,7 +169,7 @@ function routeFor(key: string): string {
   font-size: var(--text-xs);
   color: var(--color-ink-muted);
   font-family: 'Courier New', monospace;
-  margin: var(--space-1) 0 0;
+  margin: calc(-1 * var(--space-1)) 0 0;
 }
 
 /* Disclosure control exists only on narrow viewports. */

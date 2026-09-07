@@ -8,9 +8,17 @@ import type { AdminProduct } from '~/types/product-cms'
  * unaffected. Only a tab with real editable content (Page content, PWS-01)
  * passes a live state and listens for the `save` event.
  */
+/**
+ * `title` is the module name shown as the page H1 (e.g. "Page content",
+ * "Sources & evidence") — every PRIMARY visual master (PW-VIS-02…09) shows
+ * the module name here, not the product name; only Overview's own title
+ * happens to equal the product name, which the Overview page passes
+ * explicitly rather than this component assuming it.
+ */
 withDefaults(
   defineProps<{
     product: AdminProduct
+    title: string
     previewHref: string
     saveState?: 'unavailable' | 'idle' | 'dirty' | 'saving' | 'success' | 'error'
   }>(),
@@ -37,7 +45,7 @@ function saveLabel(state: string): string {
 
     <div class="ws-header">
       <div class="ws-header-title">
-        <h1 class="ws-page-title">{{ product.name_en }}</h1>
+        <h1 class="ws-page-title">{{ title }}</h1>
         <StatusBadge :status="product.status" />
       </div>
 
@@ -64,14 +72,6 @@ function saveLabel(state: string): string {
           @click="emit('save')"
         >
           {{ saveLabel(saveState) }}
-        </button>
-        <button
-          type="button"
-          class="btn btn-primary"
-          disabled
-          title="Submit for review is disabled in this read-only preview — the readiness rule is not yet configured."
-        >
-          Submit for review
         </button>
       </div>
     </div>
@@ -149,9 +149,6 @@ function saveLabel(state: string): string {
 
 .btn-secondary { background: var(--color-surface); color: var(--color-ink); border-color: var(--color-line); }
 .btn-secondary:hover:not(:disabled) { background: var(--color-surface-alt); }
-
-.btn-primary { background: var(--color-primary); color: white; }
-.btn-primary:hover:not(:disabled) { background: var(--color-primary-deep); }
 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 

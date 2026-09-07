@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AdminProduct, ProductFaq, ProductSection, SectionType } from '~/types/product-cms'
 import { SECTION_TYPES } from '~/types/product-cms'
+import { workspaceHeroUrl } from '~/utils/productWorkspace'
 
 definePageMeta({ layout: 'admin' })
 
@@ -243,6 +244,7 @@ async function handleSave() {
   <WorkspaceShell
     v-else
     :product="(product as AdminProduct)"
+    title="Page content"
     :preview-href="previewHref"
     :save-state="saveState"
     @save="handleSave"
@@ -252,6 +254,8 @@ async function handleSave() {
         :product-id="(product as AdminProduct).id"
         :product-name="(product as AdminProduct).name_en"
         :product-code="(product as AdminProduct).product_code"
+        :product-status="(product as AdminProduct).status"
+        :product-hero-url="workspaceHeroUrl(product as AdminProduct)"
         active-key="page-content"
       />
     </template>

@@ -2326,3 +2326,25 @@ SHA256SUMS.txt
 **明确未做：** 未新增 AI、自动发布、批量导入；未改变产品生命周期状态；未编辑 `product_section_items`、`body_en`、`media_id` 等旧编辑器未开放的字段；未新增 Directus schema/迁移/权限；未关闭任何 Decision Gate；未部署。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-01-FAST-01 Workspace Page Content 编辑页"任务中写入。*
+
+---
+
+## PWS-VISUAL-ALIGN-01 — Product Workspace 视觉对齐（2026-09-07）
+
+**状态：完整阅读 `docs/design-reference/approved/admin-cms-product-workspace-v1/`（README + 全部 11 张 PNG）后，对已交付的 Overview、Page content、Sources & evidence 三个页面及共享 `WorkspaceShell`/`WorkspaceModuleNav` 做视觉对齐修正，均已通过自动化验证与浏览器 1440px/375px 核验。未改动数据模型、API、保存逻辑或权限。**
+
+**修正内容：**
+
+| 母版依据 | 修正 |
+|---|---|
+| 全部 8 张非 Overview 的 PRIMARY 图（02/03/04/05/06/07/08/09）H1 均为模块名，非产品名 | `WorkspaceShell.vue` 新增必填 `title` prop；三个页面分别传入产品名（Overview）/"Page content"/"Sources & evidence" |
+| 8 张图头部按钮固定为 3 个（Preview/AI Fill/Save），仅 Overview 在 Lifecycle 卡内单独放置 Submit for review | 从 `WorkspaceShell` 头部移除 Submit for review，移入 `WorkspaceOverview.vue` 的 Lifecycle status 卡 |
+| 二级导航每个模块项均带图标 | 新增 `WorkspaceNavIcon.vue`，`WorkspaceModuleNav.vue` 全部 9 个模块项加图标 |
+| 二级导航顶部固定展示产品缩略图 + 状态徽章 | `WorkspaceModuleNav.vue` 新增 `productHeroUrl`/`productStatus` prop，渲染缩略图与 `StatusBadge` |
+| Page content 模块列表为"工作台卡片"而非连续表单 | `WorkspacePageContent.vue` 行改为图标 + 类型徽章 + 标题 + 开关式 Enabled 切换 + 图标删除按钮；FAQ 行同款视觉语言 |
+
+**明确未做（母版中存在但刻意不实现，避免伪造能力）：** 拖拽排序、"Refine with AI"、每模块审核状态（Ready for review 等）、Page preview 实时预览面板、Sources & evidence 的 Source citations 反查表与"Selected evidence"详情面板——均因无对应数据/API 支撑而不实现。
+
+**验证结果：** `npx vitest run` 373/373 ✅ · `npx vue-tsc --noEmit` 0 errors ✅ · `npm run lint` 0 errors ✅ · `git diff --check` 仅 CRLF 警告 ✅ · `npx nuxt build` Build complete ✅ · 1440px/375px 浏览器核验三页面均无横向溢出、Console 无新增错误、未产生额外写入请求。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-VISUAL-ALIGN-01 Product Workspace 全面视觉对齐"任务中写入。*

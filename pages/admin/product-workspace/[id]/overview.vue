@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AdminProduct, ProductCategory } from '~/types/product-cms'
+import { workspaceHeroUrl } from '~/utils/productWorkspace'
 
 definePageMeta({ layout: 'admin' })
 
@@ -25,12 +26,19 @@ const previewHref = computed(() => `/admin/products/${id}/preview`)
     <NuxtLink to="/admin/products" class="ws-not-found-link">← Back to Product Center</NuxtLink>
   </div>
 
-  <WorkspaceShell v-else :product="(product as AdminProduct)" :preview-href="previewHref">
+  <WorkspaceShell
+    v-else
+    :product="(product as AdminProduct)"
+    :title="(product as AdminProduct).name_en"
+    :preview-href="previewHref"
+  >
     <template #nav>
       <WorkspaceModuleNav
         :product-id="(product as AdminProduct).id"
         :product-name="(product as AdminProduct).name_en"
         :product-code="(product as AdminProduct).product_code"
+        :product-status="(product as AdminProduct).status"
+        :product-hero-url="workspaceHeroUrl(product as AdminProduct)"
         active-key="overview"
       />
     </template>
