@@ -380,7 +380,7 @@ All rows below were re-verified in V-0.5.1 against the working tree at HEAD `9a9
 | types / tests evidence | `types/product-cms.ts` (`AdminProduct`, `ProductsSummary`); `server/utils/adminProductsQuery.ts`; `server/utils/adminAssetProxy.ts`; `tests/productCenter.test.ts`, `tests/assetProxy.test.ts` — 222 tests recorded green at commit `5ea32f9`; **not re-run in V-0.5.1** (this task runs no tests). |
 | Data/API preservable | Product identity/status/category read path; `product_code`; status multi-select filtering; category aggregate; asset proxy security boundary; BFF input validation helpers. |
 | Data/API to confirm or add | Real Readiness/completeness value and its rule; real media-reference count per row; real source/audit summary; Needs Attention query. None of these may be rendered until their rule is approved. |
-| Charter DG | DG-11 (产品完整度 Readiness 计算规则) — **unresolved**. DG-16 (视觉资料包备份) — unresolved. |
+| Charter DG | DG-11 (产品完整度 Readiness 计算规则) — **unresolved**. DG-16 (视觉资料包备份) — resolved 2026-09-07 via controlled backup `bk-gov-02-2026-09-07` → `e8d3d58c434468a339ace0726be6be5d52d9e30a`; 39/39 verified. |
 | Blueprint BP-DG | BP-DG-02 (readiness/completeness formula) — **unresolved**; currently gates the disabled Needs Attention control. |
 | Prerequisites | J-2 stage. No upstream module blocks it. |
 | English-first status | `pages/admin/products/index.vue` — **zero Chinese occurrences** (verified by scan). Shared `layouts/admin.vue` contributes one visible Chinese tooltip (`title="Phase 9A-2 后开放"`, line 114) plus two Chinese `aria-label` values. |
@@ -1081,7 +1081,7 @@ Three defects blocked PC-01/PC-02 acceptance after the recovery work order lande
 | types / data relations | `types/product-cms.ts` — `AdminProduct`, `ProductsSummary`, `ProductStatus`; `server/utils/adminProductsQuery.ts`; `server/utils/adminAssetProxy.ts`; Directus `products` ↔ `product_categories` |
 | Reusable | Status multi-select filter, category filter, search sanitisation, pagination, products/categories aggregates, hardened asset proxy, BFF input validation, `tests/productCenter.test.ts` + `tests/assetProxy.test.ts` |
 | Missing | Real Readiness/completeness column (gated by `CH-DG-11`/`BP-DG-02`, correctly rendered as absent, not fabricated); real media-reference count per row; real source/audit summary; Needs Attention query; category tab strip at the top of the central area. 375px card-list layout is **no longer missing** — see the 2026-09-07 closure evidence above. |
-| Charter Gate | `CH-DG-11` (Readiness rule) — **unresolved**; `CH-DG-16` (visual pack backup) — unresolved |
+| Charter Gate | `CH-DG-11` (Readiness rule) — **unresolved**; `CH-DG-16` (visual pack backup) — resolved 2026-09-07 via controlled backup `bk-gov-02-2026-09-07` → `e8d3d58c434468a339ace0726be6be5d52d9e30a`, 39/39 verified |
 | Blueprint Gate | `BP-DG-02` (readiness/completeness formula) — **unresolved**; currently gates the disabled Needs Attention control |
 | English-first status | `index.vue` itself: **compliant, 0 occurrences**. Inherited from shared shell: `layouts/admin.vue` line 114 (1 UI) + 2 ARIA. Related `new.vue`: 6 UI. |
 | Desktop evidence | `SCREENSHOT_CONFIRMED` (Codex review) + browser DOM verification 2026-09-07 (logged-in session, 1440px, zero overflow, rail/tiles/table/control panel all render with real data) |

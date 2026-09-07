@@ -383,8 +383,13 @@ These are two independent namespaces. The same number in each namespace (e.g. BP
 | BP-DG-11 | AI provider/model, budget, key, logs, retention | AI Dossier |
 | BP-DG-12 | Import template, duplicate/error correction | Import Queue |
 | BP-DG-13 | Real pilot model and authority source package | Real product Draft |
-| BP-DG-14 | Raw visual/construction pack backup/recovery | Long-term reference reliability |
 | BP-DG-15 | Migration/recovery/deployment authority | Production mutation/release |
+
+**Resolved gate record**
+
+| ID | Resolved on | Decision and evidence |
+| --- | --- | --- |
+| BP-DG-14 | 2026-09-07 | Controlled private backup completed: `https://github.com/coffeebearchen/litubo-governance-assets`; immutable raw-asset snapshot is annotated tag `bk-gov-02-2026-09-07` → `e8d3d58c434468a339ace0726be6be5d52d9e30a`; `SHA256SUMS.txt` verifies 39/39 original files. See `CURRENT-STATE.md`. |
 
 Open Gates only block dependent stages. Codex consolidates user decisions at the relevant stage; Claude never guesses them.
 

@@ -2209,3 +2209,35 @@ git diff --check       → 0 错误（仅 LF/CRLF 提示）
 `server/api/admin/products/[id].get.ts`（既有共享 API，未被 `PWS-00A` 触碰）对不存在的产品 ID 返回 Directus 原生 `403 Forbidden`，而非语义正确的 `404`（该端点未使用 `assertProductExists()` 的列表过滤规避写法）。经只读审计（`PWS-00A-POST-AUDIT-01`）确认：该行为在完全未被 `PWS-00A` 触碰的既有 legacy 路由 `/admin/products/:id` 上同样可复现，且后果更严重（legacy 页面无错误处理，静默渲染空白可编辑表单）；`PWS-00A` 对同一错误的处理（诚实的 "Product not found" 空态）已验证正确。此问题归属 Product Center（`PC-01`）范围，不属于 `PWS-00A`，本次收口不修复，留待后续独立施工单处理。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-00A-CLOSE-PUSH-01 最终状态收口与 GitHub 备份"任务中写入。*
+
+---
+
+## BK-GOV-02 — 独立受控资料备份完成，`CH-DG-16` / `BP-DG-14` 已关闭（2026-09-07）
+
+**状态：五项原始视觉与治理资料的独立受控备份（`BK-GOV-02`）已完成并 push 至独立私有仓库。这不是官网代码仓库的一部分，原件也未被混入 `coffeebearchen/litubo-website`。**
+
+```text
+Controlled backup repository:
+https://github.com/coffeebearchen/litubo-governance-assets
+
+Immutable raw-asset snapshot:
+Annotated tag bk-gov-02-2026-09-07
+Peeled commit e8d3d58c434468a339ace0726be6be5d52d9e30a
+
+Current backup repository main at verification:
+bc35ae937664f43d8dcf22c57a123a801cf39209
+(README consolidation only; not the immutable snapshot anchor.)
+
+Integrity baseline:
+SHA256SUMS.txt
+39 original files, 39/39 SHA-256 verified
+```
+
+**未变的事项：**
+
+- 五项原件在业务代码仓库 `D:\LITUBO-website` 中**仍刻意保持未跟踪状态**（`??`），未被 `git add`、未被 commit、未被 push 至 `coffeebearchen/litubo-website`；今后对这五项路径的任何暂存操作只能显式列出精确路径，**禁止使用 `git add .` 或 `git add -A`**。
+- 这批原件**未被混入官网代码仓库**，也不会因本次独立备份而改变其未跟踪状态。
+
+**Gate 关闭：** `CH-DG-16`（`docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` §M.2）与 `BP-DG-14`（`docs/project/ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md` §12）已因上述受控备份完成而关闭，记录于各自文件新增的 "Resolved gate record" 表格。
+
+*最后更新：2026-09-07，由 Claude Code 在"BK-GOV-03-CLOSE-PUSH-01 独立备份治理记录收口与 GitHub 备份"任务中写入。*

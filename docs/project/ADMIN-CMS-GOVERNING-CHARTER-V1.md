@@ -982,7 +982,12 @@ Checkpoint 是远程备份，不等于已验收、已发布或可部署。
 | DG-13 | 页面内容模块（product_sections）的审核粒度（整产品审核还是逐模块审核） | 未定义 | ADM-05 Page Content 施工前置条件（J-6） |
 | DG-14 | SEO 与多语言发布规则（ES/PT 激活条件、hreflang 策略、noindex 范围） | 未定义 | ADM-07 SEO & Locales 施工前置条件（J-6）及 J-10 验收 |
 | DG-15 | 导入工作簿模板字段与错误修复规则（字段映射、422 错误处理、重复导入） | 未定义 | Import Center 施工前置条件（J-8） |
-| DG-16 | 原始视觉资料包的独立备份位置与方式（CMS-AI-VISUAL-MASTER-V1 等四个包的异地备份） | 未确认 | 视觉资料安全保障 |
+
+**Resolved gate record**
+
+| ID | Resolved on | Decision and evidence |
+| --- | --- | --- |
+| DG-16 | 2026-09-07 | Controlled private backup completed: `https://github.com/coffeebearchen/litubo-governance-assets`; immutable raw-asset snapshot is annotated tag `bk-gov-02-2026-09-07` → `e8d3d58c434468a339ace0726be6be5d52d9e30a`; `SHA256SUMS.txt` verifies 39/39 original files. See `CURRENT-STATE.md`. |
 
 ### M.3 路由 / 组件 / API / 测试追溯矩阵
 
