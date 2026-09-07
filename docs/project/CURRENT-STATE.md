@@ -2285,3 +2285,44 @@ SHA256SUMS.txt
 **明确未做：** 未创建任何 Evidence Link 写入；未新增 `PWS-08` 模块表；未关闭任何 Decision Gate；未触碰旧 `ADM-08` 历史记录；未接入 AI；未做数据库 schema 迁移；未部署。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-07-FAST-01R Sources & Evidence 只读交付＋媒体来源保护"任务中写入。*
+
+---
+
+## PWS-01 — Workspace Page Content 可编辑版已交付（2026-09-07）
+
+**状态：`PWS-01`（Page Content）已在 Product Workspace 中交付为可编辑模块——首个允许真实写入的 Workspace 标签页。写入完全复用旧编辑器（`content.vue`/`faq.vue`）自 9A-2A 起已在使用的同一套 `product_sections`/`product_faqs` 管理端 API 与字段，未新增数据模型、未新增审核流程、未触碰产品生命周期状态。**
+
+**新增/修改文件：**
+
+| 文件 | 作用 |
+|---|---|
+| `pages/admin/product-workspace/[id]/page-content.vue`（新建） | Workspace Page Content 页面：拉取当前产品的 sections + FAQ，本地维护编辑状态与脏检测，唯一的写入入口 `handleSave()` |
+| `components/admin/workspace/WorkspacePageContent.vue`（新建） | 纯展示组件：两张卡片分别渲染 Page content modules 与 FAQ，所有编辑动作通过 emit 上抛，自身不发起任何请求 |
+| `components/admin/workspace/WorkspaceShell.vue`（修改） | 新增可选 `saveState`/`save` 契约，默认值 `'unavailable'` 保持 Overview／Sources & evidence 两个既有标签页的按钮逐字节不变 |
+| `components/admin/workspace/WorkspaceModuleNav.vue`（修改） | 新增 `page-content` 路由映射，三个已启用模块可互相跳转 |
+| `utils/productWorkspace.ts`（修改） | `page-content` 导航项启用 |
+| `utils/productCentre.ts`（修改） | 新增 `workspacePageContentRoute()` |
+| `tests/productWorkspaceOverview.test.ts`（修改） | 新增 PWS-01 专属 source-evidence 测试段落；修正因新增可选 `saveState` 而失效的既有断言 |
+
+**关键设计（已确认决策）：**
+
+- 仅暴露旧编辑器已支持的字段：section 的 `type`/`title_en`/`enabled`；FAQ 的 `question_en`/`answer_en`/`source_note`/`enabled`。`body_en`/`eyebrow_en`/`media_id`/`layout_variant`/`external_url`/`product_section_items` 均不暴露——这些字段旧编辑器 UI 本身也从未开放编辑，不是本次遗漏
+- 交互模型从旧编辑器的"每次点击立即写入"改为"本地暂存 + 显式 Save"：`Save changes` 仅在有实际改动时可点击；点击后逐行比对，只对真正变化的行发起 `PATCH`，新增行 `POST`，标记删除行 `DELETE`——已通过真实产品 ID=3 的编辑/保存/回滚全链路验证，确认不会对未改动的行发起多余写入
+- 旧编辑器 `content.vue`/`faq.vue`/`ProductSubNav.vue` 完全未改动，仍是同一 `product_id` 下同一批数据的并行可写入口
+- 未新增 AI、未新增审核状态、未触碰发布/生命周期、未新增 Directus 字段或迁移
+- `CH-DG-13`/`BP-DG-07` 均保持未解决，未被本轮关闭
+
+**验证结果：**
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 368/368 通过 |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告 |
+| `npx nuxt build` | Build complete |
+| 浏览器验收（真实产品 ID=3，1440px + 375px） | 无横向溢出；真实 3 个 section + 8 条 FAQ 正确渲染；编辑标题→Save 按钮启用→保存成功→仅对应行发起一次 `PATCH`→数据回滚验证；未登录访问两个 API 均返回 401；Console 无新增错误；Overview/Page content/Sources & evidence 三向导航互通 |
+
+**明确未做：** 未新增 AI、自动发布、批量导入；未改变产品生命周期状态；未编辑 `product_section_items`、`body_en`、`media_id` 等旧编辑器未开放的字段；未新增 Directus schema/迁移/权限；未关闭任何 Decision Gate；未部署。
+
+*最后更新：2026-09-07，由 Claude Code 在"PWS-01-FAST-01 Workspace Page Content 编辑页"任务中写入。*

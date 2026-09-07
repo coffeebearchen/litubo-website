@@ -26,6 +26,7 @@ import {
 import {
   productDetailRoute,
   workspaceOverviewRoute,
+  workspacePageContentRoute,
   workspaceSourcesEvidenceRoute,
 } from '../utils/productCentre'
 import type { AdminProduct } from '../types/product-cms'
@@ -255,15 +256,21 @@ describe('No AI surface in PWS-00 (source evidence)', () => {
 
 describe('Save and Submit are native-disabled (source evidence)', () => {
   const source = repoFile('components/admin/workspace/WorkspaceShell.vue')
+  const template = source.slice(source.indexOf('<template>'), source.indexOf('</template>'))
 
-  it('renders Save changes as a disabled button with a visible reason', () => {
-    const saveBlock = source.slice(source.indexOf('Save changes') - 300, source.indexOf('Save changes'))
+  it('renders Save changes as a disabled button with a visible reason when saveState is unavailable (PWS-00, Sources & evidence default)', () => {
+    const saveBlock = template.slice(template.indexOf('Save changes') - 300, template.indexOf('Save changes'))
     expect(saveBlock).toContain('disabled')
     expect(saveBlock).toMatch(/title="[^"]+"/)
+    expect(saveBlock).toContain("saveState === 'unavailable'")
+  })
+
+  it("defaults saveState to 'unavailable' so tabs that don't pass it keep the exact original disabled button", () => {
+    expect(source).toContain("{ saveState: 'unavailable' }")
   })
 
   it('renders Submit for review as a disabled button with a visible reason', () => {
-    const submitBlock = source.slice(source.indexOf('Submit for review') - 300, source.indexOf('Submit for review'))
+    const submitBlock = template.slice(template.indexOf('Submit for review') - 300, template.indexOf('Submit for review'))
     expect(submitBlock).toContain('disabled')
     expect(submitBlock).toMatch(/title="[^"]+"/)
   })
@@ -285,10 +292,10 @@ describe('Save and Submit are native-disabled (source evidence)', () => {
 describe('Workspace module navigation (source evidence)', () => {
   const source = repoFile('components/admin/workspace/WorkspaceModuleNav.vue')
 
-  it('defines all nine PWS-00…PWS-08 addresses with only Overview and Sources & evidence enabled', () => {
+  it('defines all nine PWS-00…PWS-08 addresses with only the three landed modules enabled', () => {
     expect(WORKSPACE_MODULE_NAV).toHaveLength(9)
     const enabled = WORKSPACE_MODULE_NAV.filter(i => i.enabled).map(i => i.key)
-    expect(enabled).toEqual(['overview', 'sources-evidence'])
+    expect(enabled).toEqual(['overview', 'page-content', 'sources-evidence'])
   })
 
   it('groups modules under the three frozen headings', () => {
@@ -394,11 +401,12 @@ describe('PWS-00 surface is English-first (source evidence)', () => {
 // ── PWS-07 — Sources & Evidence (read-only, PWS-07-FAST-01R) ─────────────────
 
 describe('PWS-07 module is enabled and routable (source evidence)', () => {
-  it('enables sources-evidence without touching any other module flag', () => {
+  it('enables sources-evidence without touching any module flag beyond the landed set', () => {
     const byKey = Object.fromEntries(WORKSPACE_MODULE_NAV.map(i => [i.key, i.enabled]))
     expect(byKey['sources-evidence']).toBe(true)
     expect(byKey.overview).toBe(true)
-    for (const key of ['page-content', 'specifications', 'media-resources', 'relations', 'seo-locales', 'share-distribution', 'change-history']) {
+    expect(byKey['page-content']).toBe(true)
+    for (const key of ['specifications', 'media-resources', 'relations', 'seo-locales', 'share-distribution', 'change-history']) {
       expect(byKey[key]).toBe(false)
     }
   })
@@ -555,6 +563,183 @@ describe('PWS-07 is English-first and carries no Chinese (source evidence)', () 
   it('no PWS-07 file has visible or assistive Chinese in its template', () => {
     for (const file of PWS07_FILES) {
       expect(renderedMarkup(repoFile(file))).not.toMatch(/[一-鿿]/)
+    }
+  })
+})
+
+// ── PWS-01 — Page Content (editable, PWS-01-FAST-01) ─────────────────────────
+
+const PWS01_FILES = [
+  'pages/admin/product-workspace/[id]/page-content.vue',
+  'components/admin/workspace/WorkspacePageContent.vue',
+]
+
+describe('PWS-01 module is enabled and routable (source evidence)', () => {
+  it('enables page-content without disabling any already-landed module', () => {
+    const byKey = Object.fromEntries(WORKSPACE_MODULE_NAV.map(i => [i.key, i.enabled]))
+    expect(byKey['page-content']).toBe(true)
+    expect(byKey.overview).toBe(true)
+    expect(byKey['sources-evidence']).toBe(true)
+    for (const key of ['specifications', 'media-resources', 'relations', 'seo-locales', 'share-distribution', 'change-history']) {
+      expect(byKey[key]).toBe(false)
+    }
+  })
+
+  it('workspacePageContentRoute builds the frozen PWS-01 route', () => {
+    expect(workspacePageContentRoute(42)).toBe('/admin/product-workspace/42/page-content')
+  })
+
+  it('the module nav links page-content alongside the other two enabled modules', () => {
+    const source = repoFile('components/admin/workspace/WorkspaceModuleNav.vue')
+    expect(source).toContain('workspacePageContentRoute')
+  })
+})
+
+describe('PWS-01 page composition (source evidence)', () => {
+  const page = repoFile('pages/admin/product-workspace/[id]/page-content.vue')
+
+  it('mounts WorkspaceShell, WorkspaceModuleNav and WorkspacePageContent', () => {
+    expect(page).toContain('<WorkspaceShell')
+    expect(page).toContain('<WorkspaceModuleNav')
+    expect(page).toContain('<WorkspacePageContent')
+    expect(page).toContain('active-key="page-content"')
+  })
+
+  it('reads the same canonical product id for every read and write', () => {
+    expect(page).toContain('route.params.id')
+    expect(page).toContain('/api/admin/products/${id}/sections')
+    expect(page).toContain('/api/admin/products/${id}/faq')
+    // Every write call must target the same productId derived from the route — never a
+    // second, hardcoded, or cross-product id.
+    expect(page).not.toMatch(/\/api\/admin\/products\/\d+\//)
+  })
+
+  it('renders a "Product not found" empty state rather than a blank form', () => {
+    expect(page).toContain('Product not found')
+    expect(page).toContain('notFound')
+  })
+})
+
+describe('PWS-01 issues no write request on load, only on explicit Save (source evidence)', () => {
+  const page = repoFile('pages/admin/product-workspace/[id]/page-content.vue')
+  const component = repoFile('components/admin/workspace/WorkspacePageContent.vue')
+  const WRITE_METHOD_RE = /method:\s*['"](POST|PATCH|PUT|DELETE)['"]/g
+
+  it('the presentational component never issues a write request itself', () => {
+    expect(component).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('every write call in the page lives inside handleSave(), never at top-level/mount time', () => {
+    const initialFetchBlock = page.slice(0, page.indexOf('async function handleSave'))
+    expect(initialFetchBlock).not.toMatch(WRITE_METHOD_RE)
+
+    const saveBlock = page.slice(page.indexOf('async function handleSave'), page.indexOf('</script>'))
+    const writeCalls = [...saveBlock.matchAll(WRITE_METHOD_RE)]
+    expect(writeCalls.length).toBeGreaterThan(0)
+  })
+
+  it('the top-level data fetch only ever calls useFetch (GET), never $fetch with a write method', () => {
+    const initialFetchBlock = page.slice(0, page.indexOf('async function handleSave'))
+    const fetchCalls = initialFetchBlock.match(/useFetch[^\n]*/g) ?? []
+    expect(fetchCalls.length).toBeGreaterThan(0)
+    for (const call of fetchCalls) expect(call).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('Save changes is wired through the shared WorkspaceShell save event, not a local button', () => {
+    expect(page).toContain('@save="handleSave"')
+    expect(page).toContain(':save-state="saveState"')
+  })
+
+  it('save only runs when there are local changes and not already saving', () => {
+    expect(page).toContain('if (!isDirty.value || saving.value) return')
+  })
+})
+
+describe('PWS-01 stays within legacy-proven fields and module types (source evidence)', () => {
+  const component = repoFile('components/admin/workspace/WorkspacePageContent.vue')
+  const page = repoFile('pages/admin/product-workspace/[id]/page-content.vue')
+
+  it('never references a section field beyond type/title_en/enabled — the legacy editor never exposed body/eyebrow/media/layout editing', () => {
+    for (const file of [component, page]) {
+      expect(file).not.toContain('body_en')
+      expect(file).not.toContain('eyebrow_en')
+      expect(file).not.toContain('layout_variant')
+      expect(file).not.toContain('media_id')
+      expect(file).not.toContain('external_url')
+    }
+  })
+
+  it('imports SECTION_TYPES from the canonical type module rather than inventing a new module-type list', () => {
+    expect(page).toContain("import { SECTION_TYPES } from '~/types/product-cms'")
+  })
+
+  it('never mutates props directly — every edit is emitted up to the page that owns the data', () => {
+    expect(component).not.toMatch(/defineProps[\s\S]*?\bsections\[[^\]]*\]\s*\.\s*\w+\s*=/)
+    expect(component).toContain('defineEmits')
+  })
+})
+
+describe('PWS-01 has no AI surface and no lifecycle/publish control (source evidence)', () => {
+  it('no PWS-01 file renders an AI Fill Workspace control or any AI hint', () => {
+    for (const file of PWS01_FILES) {
+      const lower = repoFile(file).toLowerCase()
+      expect(lower).not.toContain('ai fill')
+      expect(lower).not.toContain('ai-fill')
+      expect(lower).not.toContain('pws-ai')
+    }
+  })
+
+  it('never calls a publish, submit-for-review, or lifecycle-status endpoint', () => {
+    for (const file of PWS01_FILES) {
+      const lower = repoFile(file).toLowerCase()
+      expect(lower).not.toContain('submit for review')
+      expect(lower).not.toContain('/publish')
+      expect(lower).not.toContain('status: \'published\'')
+    }
+  })
+})
+
+describe('PWS-01 honest empty states and dirty/save states (source evidence)', () => {
+  const component = repoFile('components/admin/workspace/WorkspacePageContent.vue')
+
+  it('shows an honest empty state for modules and FAQ when there is no data', () => {
+    expect(component).toContain('No page content modules for this product yet.')
+    expect(component).toContain('No FAQ entries for this product yet.')
+  })
+
+  it('never fabricates a section or FAQ row when the list is empty', () => {
+    expect(component).not.toContain('LT-180C')
+    expect(component).not.toContain('Free-Fall')
+  })
+
+  it('marks unsaved new rows and pending deletions distinctly', () => {
+    expect(component).toContain('New — not saved yet')
+    expect(component).toContain('Will be removed on Save')
+  })
+})
+
+describe('PWS-01 375px stacking, no horizontal overflow substitute (source evidence)', () => {
+  it('the 375px breakpoint stacks controls in a column, never a horizontally scrolling table', () => {
+    const component = repoFile('components/admin/workspace/WorkspacePageContent.vue')
+    const mobileBlock = component.slice(component.indexOf('max-width: 767px'))
+    expect(mobileBlock).toContain('flex-direction: column')
+    expect(mobileBlock).not.toContain('overflow-x: auto')
+    expect(component.toLowerCase()).not.toContain('<table')
+  })
+})
+
+describe('PWS-01 is English-first and carries no Chinese (source evidence)', () => {
+  it('no PWS-01 file has visible or assistive Chinese in its template', () => {
+    for (const file of PWS01_FILES) {
+      expect(renderedMarkup(repoFile(file))).not.toMatch(/[一-鿿]/)
+    }
+  })
+})
+
+describe('WorkspaceShell save-state extension keeps other tabs byte-identical by default (source evidence)', () => {
+  it('Overview and Sources & evidence pages never pass a save-state, so they keep the original disabled button', () => {
+    for (const file of [...NEW_FILES.filter(f => f.includes('overview')), 'pages/admin/product-workspace/[id]/sources-evidence.vue']) {
+      expect(repoFile(file)).not.toContain('save-state')
     }
   })
 })

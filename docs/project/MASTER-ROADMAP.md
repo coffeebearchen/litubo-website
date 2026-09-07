@@ -14,6 +14,8 @@
 
 **PWS-07-FAST-01R（2026-09-07）补充：`PWS-07`（Sources & Evidence）只读展示版已交付并通过自动化与浏览器验收（详见 `CURRENT-STATE.md`），同步修复 Media Library 归档引用保护遗漏 `product_source_records` 的缺口。一期范围仅限已有 Media Library 来源、`product_spec_items` 证据目标，`SourceReviewStatus` 枚举未改；`BP-DG-06` 保持未解决，未被关闭；`PWS-08`、人工审核写入、AI 均未开始。J-2 视觉签收与 `origin/master` 状态不受影响。**
 
+**PWS-01-FAST-01（2026-09-07）补充：`PWS-01`（Page Content）已在 Workspace 中交付为可编辑模块（详见 `CURRENT-STATE.md`），完全复用旧编辑器自 9A-2A 起已在使用的 `product_sections`/`product_faqs` API 与字段，仅将交互模型改为"本地暂存 + 显式 Save"，未新增字段、模块类型、审核流程或发布行为。`CH-DG-13`/`BP-DG-07` 均保持未解决，未被关闭；旧编辑器 `content.vue`/`faq.vue` 未改动，仍是并行可写入口。J-2 视觉签收与 `origin/master` 状态不受影响。**
+
 ---
 
 ## 总览

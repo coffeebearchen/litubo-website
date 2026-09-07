@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { WORKSPACE_MODULE_GROUPS, WORKSPACE_MODULE_NAV } from '~/utils/productWorkspace'
-import { workspaceOverviewRoute, workspaceSourcesEvidenceRoute } from '~/utils/productCentre'
+import {
+  workspaceOverviewRoute,
+  workspacePageContentRoute,
+  workspaceSourcesEvidenceRoute,
+} from '~/utils/productCentre'
 
 const props = defineProps<{
   productId: number
@@ -15,6 +19,7 @@ const navOpen = ref(false)
 /** Only enabled modules need a route; disabled ones never navigate anywhere. */
 const ENABLED_ROUTES: Record<string, (id: number) => string> = {
   overview: workspaceOverviewRoute,
+  'page-content': workspacePageContentRoute,
   'sources-evidence': workspaceSourcesEvidenceRoute,
 }
 

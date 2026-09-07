@@ -78,6 +78,11 @@ export function workspaceSourcesEvidenceRoute(id: number | string): string {
   return `/admin/product-workspace/${id}/sources-evidence`
 }
 
+/** PWS-01 Page Content route (PWS-01-FAST-01). Third enabled tab, editable in the same shell. */
+export function workspacePageContentRoute(id: number | string): string {
+  return `/admin/product-workspace/${id}/page-content`
+}
+
 export function categoryContextRoute(id: number | string): string {
   return `/admin/products/categories/${id}`
 }

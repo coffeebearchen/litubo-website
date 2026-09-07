@@ -1,10 +1,30 @@
 <script setup lang="ts">
 import type { AdminProduct } from '~/types/product-cms'
 
-defineProps<{
-  product: AdminProduct
-  previewHref: string
-}>()
+/**
+ * `saveState` defaults to `'unavailable'`, which renders the exact
+ * pre-PWS-01 disabled button (byte-identical title text) — every Workspace
+ * tab that does not pass this prop (Overview, Sources & evidence) is
+ * unaffected. Only a tab with real editable content (Page content, PWS-01)
+ * passes a live state and listens for the `save` event.
+ */
+withDefaults(
+  defineProps<{
+    product: AdminProduct
+    previewHref: string
+    saveState?: 'unavailable' | 'idle' | 'dirty' | 'saving' | 'success' | 'error'
+  }>(),
+  { saveState: 'unavailable' },
+)
+
+const emit = defineEmits<{ save: [] }>()
+
+function saveLabel(state: string): string {
+  if (state === 'saving') return 'Saving…'
+  if (state === 'success') return 'Saved'
+  if (state === 'error') return 'Save failed — retry'
+  return 'Save changes'
+}
 </script>
 
 <template>
@@ -26,12 +46,24 @@ defineProps<{
           Preview product
         </NuxtLink>
         <button
+          v-if="saveState === 'unavailable'"
           type="button"
           class="btn btn-secondary"
           disabled
           title="This read-only preview cannot save changes. Editing arrives in a later Workspace work order."
         >
           Save changes
+        </button>
+        <button
+          v-else
+          type="button"
+          class="btn btn-secondary"
+          :class="{ 'btn-save--error': saveState === 'error' }"
+          :disabled="saveState !== 'dirty' && saveState !== 'error'"
+          :title="saveState === 'idle' ? 'No changes to save yet' : undefined"
+          @click="emit('save')"
+        >
+          {{ saveLabel(saveState) }}
         </button>
         <button
           type="button"
@@ -122,6 +154,8 @@ defineProps<{
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-deep); }
 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-save--error { border-color: #C0392B; color: #C0392B; }
 
 .ws-body {
   display: flex;

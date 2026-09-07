@@ -1221,24 +1221,36 @@ No percentage, progress bar, completion count, checkbox, or computed score may b
 
 | Field | Value |
 |---|---|
-| Source Asset ID | `P2-ADM05-CONTENT` (SUPPLEMENTARY only) |
-| Target route | `/admin/products/:id/content` inside the `PW-00` shell |
-| Current actual route | `/admin/products/:id/content` → `pages/admin/products/[id]/content.vue` — exists as a standalone legacy page |
-| Pages and shared components | `pages/admin/products/[id]/content.vue`; `ProductSubNav.vue` |
-| server API | **8 endpoints** under `products/[id]/sections/`: `index.get.ts`, `index.post.ts`, `[sid].patch.ts`, `[sid].delete.ts`, `[sid]/items.get.ts`, `[sid]/items.post.ts`, `[sid]/items/[iid].patch.ts`, `[sid]/items/[iid].delete.ts` |
-| types / data relations | `ProductSection`, `ProductSectionItem`, `SectionType` (13 values); Directus `product_sections` ↔ `product_section_items` (CASCADE) |
-| Reusable | Controlled module-type enum (not freeform); section/item CRUD; ownership-chain validation; enable/disable flag; sort order |
-| Missing | Per-module review state, version and rollback; locale-level readiness; source/evidence link per module; public-eligibility rule; Workspace Shell integration |
-| Charter Gate | `CH-DG-13` (content-module review granularity: whole product vs per module) — **unresolved** |
-| Blueprint Gate | `BP-DG-07` (content module types, review/version/rollback) — **unresolved; blocks `PW-03`** |
-| English-first status | **Non-compliant** — 21 UI + 1 PLACEHOLDER + 13 OPTION = 35 hardcoded visible. The 13 OPTION values are `SectionType` **labels**; the enum keys are English and must not change. |
-| Desktop evidence | `SCREENSHOT_CONFIRMED` (Codex) — Chinese module-type form, no shell |
-| Mobile 375px evidence | **BLOCKED** — no approved mobile adaptation contract (CF-3) |
-| Implementation status | `LEGACY` |
-| Evidence status | `REPOSITORY_CONFIRMED` + `SCREENSHOT_CONFIRMED` |
-| Acceptance status | `NOT_REVIEWED` |
-| Definition of Ready | **NOT MET.** `PW-00` incomplete; `CH-DG-13` / `BP-DG-07` unresolved; no PRIMARY asset; no mobile contract. |
+| Source Asset ID | `PW-VIS-02-PAGE-CONTENT-D1440` (PRIMARY, desktop 1440px only — Register §4.5); `P2-ADM05-CONTENT` (SUPPLEMENTARY, superseded as sole reference by the PRIMARY freeze) |
+| Target route | `/admin/product-workspace/:id/page-content` (Workspace route, per §4.6 `PWS-01` addressing). Legacy `/admin/products/:id/content` and `/admin/products/:id/faq` remain unchanged and fully available — this is a parallel entry point, not a replacement. |
+| Current actual route | **Exists (editable).** `pages/admin/product-workspace/[id]/page-content.vue`, delivered by `PWS-01-FAST-01` (2026-09-07). |
+| Pages and shared components | `pages/admin/product-workspace/[id]/page-content.vue`; `components/admin/workspace/WorkspacePageContent.vue`; shared `WorkspaceShell.vue` (now supports an optional, dirty-tracked `saveState`/`save` contract — defaults to the original always-disabled button for every tab that doesn't opt in) / `WorkspaceModuleNav.vue` (links all three enabled modules) |
+| server API | **Unchanged, reused as-is:** `products/[id]/sections/{index.get,index.post,[sid].patch,[sid].delete}.ts` (4 of the existing 8 section endpoints — the two `items` sub-resource endpoints are not used by this task) and `products/[id]/faq/{index.get,index.post,[fid].patch,[fid].delete}.ts` (FAQ was previously undocumented in this table; it is a sibling legacy-proven resource, not a new module) |
+| types / data relations | `ProductSection`, `ProductFaq`, `SectionType` (13 values, unchanged); Directus `product_sections` (CASCADE to `products`), `product_faqs` (CASCADE to `products`) |
+| Reusable | Controlled module-type enum (not freeform); section/FAQ CRUD; ownership-chain validation (`assertProductExists` + per-row `product_id` check, unchanged); enable/disable flag; the existing PATCH endpoints' full field whitelist (already accepted `title_en`/`question_en`/`answer_en`/`source_note` before this task — the legacy UI simply never exposed editing them after creation) |
+| Missing | Per-module review state, version and rollback; locale-level readiness (ES/PT editing); source/evidence link per module; public-eligibility rule; section body/eyebrow/media/layout editing (legacy UI never exposed these either — out of scope, not a regression); `product_section_items` editing |
+| Charter Gate | `CH-DG-13` (content-module review granularity: whole product vs per module) — **remains unresolved.** `PWS-01-FAST-01` adds no review workflow of any kind (plain overwrite save only) and does not touch this Gate. |
+| Blueprint Gate | `BP-DG-07` (content module types, review/version/rollback) — **remains unresolved.** `PWS-01-FAST-01` introduces no new module type, no review state, no versioning, and no rollback; it is a second, parallel entry point onto the exact same already-shipped, already-live CRUD capability the legacy editor has used since 9A-2A — it does not "implement `PW-03`" in the sense this Gate gates, and does not close it. |
+| English-first status | **Compliant** — 0 hardcoded Chinese in the new page/component (verified by source-evidence test); does not change the legacy page's existing non-compliance |
+| Desktop evidence | Browser DOM verification (`PWS-01-FAST-01`, 2026-09-07, logged-in session, 1440px, zero horizontal overflow, real product ID=3 with real existing sections and FAQ entries — edit/save/revert cycle observed end-to-end, confirmed exactly one `PATCH` per actually-changed row) |
+| Mobile 375px evidence | Browser DOM verification (`PWS-01-FAST-01`, 2026-09-07, logged-in session, 375px, zero horizontal overflow, stacked single-column cards). **This task's own written instruction is the mobile adaptation contract for `PWS-01`** (reuse of the already-accepted `PWS-00` responsive language), scoped to `PWS-01` only. |
+| Implementation status | `AUTOMATED_CHECKED` — editable Draft-content path only; no review/publish workflow |
+| Evidence status | `REPOSITORY_CONFIRMED` + browser-verified 2026-09-07 (real data, real save round-trip observed) |
+| Acceptance status | Parallel editable delivery only — **not** a Codex/user pixel-level sign-off against `PW-VIS-02-PAGE-CONTENT-D1440`; legacy `pages/admin/products/[id]/content.vue` and `faq.vue` are unchanged and remain the system of record for any capability this task does not cover |
+| Definition of Ready | **NOT MET for any capability beyond what the legacy editor already does.** `CH-DG-13` / `BP-DG-07` unresolved; per-module review, versioning, and body/media editing all remain undefined. The parallel editable surface delivered by `PWS-01-FAST-01` did not require this Gate because it adds no new module type, review state, or publish behaviour — it is the same CRUD the legacy editor already performs, through a second UI, gated behind an explicit Save action instead of per-click instant writes. |
 | Next step | 等待 Codex 决定 |
+
+##### PWS-01 editable Page Content contract (PWS-01-FAST-01, 2026-09-07)
+
+**Status: delivered, tested, and browser-verified.** Unlike `PWS-00`/`PWS-07`, this module allows real writes — but only to Draft-safe, already-existing fields on the current product's own `product_sections`/`product_faqs` rows, through the exact same admin API endpoints the legacy editor has used since 9A-2A. It does not add AI, review workflow, publish behaviour, or any new data entity.
+
+**Fields exposed (all already legacy-proven, none invented):** section `type` (13-value enum, unchanged), section `title_en`, section `enabled`; FAQ `question_en`, `answer_en`, `source_note`, `enabled`. Section `body_en`/`eyebrow_en`/`media_id`/`layout_variant`/`external_url` and all `product_section_items` fields are **not** exposed — the legacy editor never exposed them either, so adding them here would be new functionality, not reuse.
+
+**Interaction model — explicit Save only, never per-click instant writes:** every add/edit/remove action is held in local component state; `WorkspaceShell`'s header `Save changes` button (now optionally dirty-tracked via a `saveState` prop that defaults to the original always-disabled behaviour for every other tab) becomes enabled only while there is an actual difference from the last-saved snapshot, and a single click flushes only the rows that changed — new rows via `POST`, edited existing rows via `PATCH` (diffed per-row, not "PATCH everything"), and rows marked for removal via `DELETE`. No request of any kind fires outside that one handler.
+
+**Legacy editor untouched:** `pages/admin/products/[id]/content.vue`, `faq.vue`, and `ProductSubNav.vue` are unmodified and remain the pre-existing writable surface; this task adds a second, parallel, equally-writable entry point in the Workspace, exactly as `PWS-00A` added a second parallel *read-only* entry point alongside the legacy record view.
+
+**Not delivered:** AI, auto-publish, submit-for-review, lifecycle-status changes, `product_section_items` editing, locale (ES/PT) editing, any new Directus field, collection, or migration.
 
 #### `PW-04` — Relations
 

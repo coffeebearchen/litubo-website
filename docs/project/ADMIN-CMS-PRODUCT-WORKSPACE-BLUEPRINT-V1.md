@@ -487,3 +487,35 @@ No `M375` visual master exists for `PW-VIS-08-SOURCES-EVIDENCE-D1440` (per Regis
 ### 19.6 Not delivered
 
 Human review-decision writes (accept/reject/needs-more-evidence); a structured Evidence Link (current `fact_key` stays free text, not a foreign key); `PWS-08` Change History; AI source intake or proposal review; any Directus schema change or migration.
+
+---
+
+## 20. PWS-01 editable Page Content contract (PWS-01-FAST-01, 2026-09-07)
+
+This section records the delivered, write-capable `PWS-01` (Page Content) screen — the first Workspace tab that saves real data. It reuses the exact CRUD the legacy content/FAQ editors have performed since 9A-2A; it does not implement a new module, review workflow, or publish path.
+
+### 20.1 Scope actually delivered
+
+A third Workspace tab, `Page content`, at `/admin/product-workspace/:id/page-content`, sharing the same `WorkspaceShell`/`WorkspaceModuleNav` as `PWS-00`/`PWS-07`. It shows two clearly separated cards — page content modules (`product_sections`) and FAQ (`product_faqs`) — for the current product only, and lets an administrator add, edit, enable/disable, and remove rows using the same fields the legacy editors already write. `PW-VIS-02-PAGE-CONTENT-D1440` (Register §4.5, PRIMARY, desktop 1440px only) governs its layout and information hierarchy only.
+
+### 20.2 Fields and API — reused, not extended
+
+Section fields: `type` (13-value `SectionType` enum, unchanged), `title_en`, `enabled`. FAQ fields: `question_en`, `answer_en`, `source_note`, `enabled`. Every one of these fields was already accepted by the existing `sections/[sid].patch.ts` and `faq/[fid].patch.ts` whitelists before this task — the legacy UI simply never exposed editing them after creation, only at add-time or via an enable/disable toggle. This task exposes no field, module type, or endpoint that did not already exist. Section `body_en`/`eyebrow_en`/`media_id`/`layout_variant`/`external_url` and `product_section_items` are deliberately **not** exposed, matching the legacy editor's own actual UI capability, not the full data-model capability.
+
+### 20.3 Explicit-Save interaction model (new UX pattern, same API semantics)
+
+The legacy editors commit every add/toggle/delete instantly, one API call per click, with no batching. `PWS-01` instead holds all edits in local component state and only writes when the administrator clicks the shared `WorkspaceShell` header's `Save changes` button — which is disabled whenever there are no local changes, and diffs each row individually so only actually-changed rows are sent (`POST` for new rows, `PATCH` for changed existing rows, `DELETE` for rows marked for removal; unchanged rows are never re-sent). This is a UI/interaction change only — it does not alter what the underlying API accepts, validates, or authorizes.
+
+`WorkspaceShell.vue` gained an optional `saveState` prop (`'unavailable' | 'idle' | 'dirty' | 'saving' | 'success' | 'error'`) and a `save` emit. It defaults to `'unavailable'`, which renders the exact original always-disabled button — `PWS-00`'s Overview and `PWS-07`'s Sources & evidence pass no such prop and are therefore byte-identical to before this task.
+
+### 20.4 Legacy editor coexistence
+
+`pages/admin/products/[id]/content.vue`, `faq.vue`, and `ProductSubNav.vue` are unmodified. Both the legacy editor and the new Workspace tab read and write the same canonical `product_sections`/`product_faqs` rows for the same `product_id` — there is no second content model, no second product identity, and no data fork. An edit made in one surface is immediately visible in the other on next load.
+
+### 20.5 375px — this work order is the mobile contract for `PWS-01`
+
+No `M375` visual master exists for `PW-VIS-02-PAGE-CONTENT-D1440`. Per Codex's explicit instruction in this work order, `PWS-01` reuses the already-accepted `PWS-00` responsive language (single column, stacked cards, no horizontal scroll, `scrollWidth <= innerWidth`) instead of waiting for a new visual. This is the required per-module mobile adaptation contract for `PWS-01` specifically.
+
+### 20.6 Not delivered
+
+AI, auto-publish, submit-for-review, or any lifecycle-status change; per-module review/version/rollback; `product_section_items` editing; section `body_en`/`eyebrow_en`/`media_id`/`layout_variant`/`external_url` editing; ES/PT locale editing; any new Directus field, collection, permission, or migration.

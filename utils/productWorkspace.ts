@@ -1,12 +1,15 @@
 /**
  * PWS-00 — Product Workspace Shell + Overview (read-only, PWS-00A).
+ * PWS-01 — Page Content (editable, PWS-01-FAST-01).
  * PWS-07 — Sources & Evidence (read-only, PWS-07-FAST-01R).
  *
- * Pure helpers only. This module never issues a write request and never
- * invents data: every value it formats comes from a field the Register
- * (§4.5/§12.1i "PW-00" row, "PW-06" row) and the child blueprint (§18, §19)
- * already confirm exists on the canonical `products` / `product_source_records`
- * records.
+ * Pure helpers never invent data or issue a write request themselves: every
+ * value they format comes from a field the Register (§4.5/§12.1i "PW-00" row,
+ * "PW-03" row, "PW-06" row) and the child blueprint (§18, §19, §20) already
+ * confirm exists on the canonical `products` / `product_sections` /
+ * `product_faqs` / `product_source_records` records. `PWS-01`'s own writes go
+ * through the existing, already-shipped sections/FAQ admin API — nothing here
+ * calls it directly.
  */
 
 import type { AdminProduct, ProductCategory } from '~/types/product-cms'
@@ -25,7 +28,7 @@ export interface WorkspaceModuleNavItem {
   key: string
   label: string
   group: WorkspaceModuleGroup
-  /** Only a module with its own landed work order is enabled (`overview`, `sources-evidence`). */
+  /** Only a module with its own landed work order is enabled (`overview`, `page-content`, `sources-evidence`). */
   enabled: boolean
 }
 
@@ -37,7 +40,7 @@ export interface WorkspaceModuleNavItem {
  */
 export const WORKSPACE_MODULE_NAV: WorkspaceModuleNavItem[] = [
   { key: 'overview', label: 'Overview', group: 'PRODUCT RECORD', enabled: true },
-  { key: 'page-content', label: 'Page content', group: 'PRODUCT RECORD', enabled: false },
+  { key: 'page-content', label: 'Page content', group: 'PRODUCT RECORD', enabled: true },
   { key: 'specifications', label: 'Specifications', group: 'PRODUCT RECORD', enabled: false },
   { key: 'media-resources', label: 'Media & resources', group: 'PRODUCT RECORD', enabled: false },
   { key: 'relations', label: 'Relations', group: 'PRODUCT RECORD', enabled: false },
