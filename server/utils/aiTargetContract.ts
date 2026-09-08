@@ -74,6 +74,28 @@ export const UNTRUSTED_SOURCE_MATERIAL_PREAMBLE =
   + 'Only extract facts the source material actually supports. If information is insufficient or ambiguous, omit it — never guess or invent a value. '
   + 'Never include the source material\'s own text, page numbers, locators, file names, file ids, UUIDs, paths, download URLs, or internal notes in your response — only the structured output itself.'
 
+/**
+ * PWS-AI-ENGINE-01R2-SAFETY-02 — every non-source string that reaches a model
+ * prompt goes through this first.
+ *
+ * The extracted source texts are declared untrusted by the preamble above and
+ * are wrapped in labeled blocks, but the *surrounding* fields were not: the
+ * product name comes from a Directus record an admin can type anything into,
+ * and `contextNote` is free text. Either could carry a newline plus a fake
+ * block delimiter and pose as instructions. This caps the length, strips
+ * control and zero-width characters, and neutralizes the block-delimiter
+ * sequence so such a field can only ever be a single, inert line.
+ */
+export function sanitizeModelInputText(value: string, maxLength = 200): string {
+  return value
+    .normalize('NFKC')
+    .replace(/[\p{Cf}\p{Cc}]/gu, ' ')
+    .replace(/-{3,}/g, '--')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .slice(0, maxLength)
+}
+
 /** Formats extracted source texts into one labeled block for a provider prompt — pure text, no network/IO. */
 export function buildSourceMaterialBlock(sources: Array<{ displayName: string, text: string }>): string {
   return sources
@@ -97,9 +119,47 @@ const UNSAFE_VALUE_PATTERNS: RegExp[] = [
   /\.(pdf|xlsx?|csv|tsv|txt|docx?)\b/i, // an echoed source file name/extension
   /\bpage\s+\d+\b/i, // a page-number locator
   /[\r\n]/, // a newline — a structured short field (group/parameter/value) is never legitimately multi-line
+  // ── PWS-AI-ENGINE-01R2-SAFETY-02: locator shapes the original six patterns missed ──
+  /\b(?:javascript|data|vbscript|file|blob):/i, // javascript:/data:/file: URI — never legitimate in a spec value
+  /(?:^|[\s(])\/\/[\w-]+(?:\.[\w-]+)+/, // protocol-relative URL (//host.tld/...)
+  /\b[\w-]+\.(?:com|net|org|io|co|cn|ru|info|biz|xyz|dev|app|cloud|site|online)\b/i, // bare domain with no scheme
+  /\b[0-9a-f]{24,}\b/i, // a long hyphen-less hex id (a de-hyphenated UUID, storage key, or token)
+  /\b[a-z]:[\\/]/i, // single-segment Windows path (C:\file.txt), which the two-segment pattern above misses
+  /[\p{Cf}\p{Cc}]/u, // zero-width/format/control characters (U+200B, U+2060, U+00AD, U+FEFF …) — pure evasion machinery
 ]
 
 /** True if `value` contains any pattern that must never reach product data from a model. */
 export function containsUnsafeSourceLeakage(value: string): boolean {
   return UNSAFE_VALUE_PATTERNS.some(pattern => pattern.test(value))
+}
+
+/**
+ * PWS-AI-ENGINE-01R2-SAFETY-02 — the single normalization used for every
+ * "did the model echo the source material back?" comparison.
+ *
+ * A naive lowercase + whitespace-collapse comparison was bypassable two ways:
+ *
+ *  1. Invisible characters. Inserting U+200B / U+2060 / U+00AD (or any other
+ *     Unicode format character) between letters produces output that renders
+ *     identically to the source but matches no substring of it. NFKC
+ *     normalization plus outright removal of `\p{Cf}`/`\p{Cc}` closes that.
+ *  2. Whitespace reflow. Re-spacing or re-wrapping a copied run changes the
+ *     character sequence without changing the information. Removing ALL
+ *     whitespace (rather than collapsing it) makes the comparison immune to
+ *     that, and — importantly — lets a run that was split across two output
+ *     fields rejoin into the contiguous run it came from.
+ *
+ * Trade-off, stated honestly: because whitespace is removed rather than
+ * collapsed, a faithful extraction of many short specs from a source whose
+ * only delimiter is whitespace can itself concatenate into an 80+ character
+ * run that appears in the source, and will be refused. That is a deliberate
+ * fail-closed choice — a refused proposal costs a retry, an undetected
+ * exfiltration does not announce itself.
+ */
+export function normalizeForLeakageComparison(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(/[\p{Cf}\p{Cc}]/gu, '')
+    .toLowerCase()
+    .replace(/\s+/gu, '')
 }

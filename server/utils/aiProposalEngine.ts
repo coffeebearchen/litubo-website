@@ -6,6 +6,7 @@ import {
   sanitizeDisplayNameForBrowser,
   capTotalCharacters,
   MAX_FILES_PER_REQUEST,
+  MAX_FILE_BYTES,
   MAX_TOTAL_EXTRACTED_CHARS,
   type ExtractedSource,
 } from './aiTextExtraction'
@@ -107,6 +108,34 @@ async function fetchProductName(fetch: FetchFn, productId: number): Promise<stri
   return result.data?.name_en ?? 'This product'
 }
 
+/**
+ * PWS-AI-ENGINE-01R2-SAFETY-02 — a single asset download may not run longer
+ * than this. The trusted-metadata size check above still runs BEFORE any byte
+ * is requested and remains the primary defence against an oversized file;
+ * this deadline bounds the other failure mode that check cannot see — a
+ * response that is slow, stalled, or endless — and the byte assertion after
+ * it catches a server that returned more than its own metadata claimed.
+ */
+export const MAX_ASSET_DOWNLOAD_MS = 15_000
+
+async function downloadSourceBytes(fetch: FetchFn, fileUuid: string): Promise<ArrayBuffer | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), MAX_ASSET_DOWNLOAD_MS)
+  })
+  try {
+    const bytes = await Promise.race([
+      fetch<ArrayBuffer>(`/assets/${fileUuid}`, { responseType: 'arrayBuffer' }),
+      deadline,
+    ])
+    if (!bytes) return null
+    if (bytes.byteLength > MAX_FILE_BYTES) return null
+    return bytes
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 const NOT_FOUND_ERROR = 'Product not found.'
 const NOT_CONFIGURED_ERROR = 'AI provider is not configured.'
 const NO_SELECTION_ERROR = 'Select at least one source file to analyze.'
@@ -201,10 +230,13 @@ export async function runProposalEngine<TOutput>(
       continue
     }
 
-    let bytes: ArrayBuffer
+    let bytes: ArrayBuffer | null
     try {
-      bytes = await fetch<ArrayBuffer>(`/assets/${row.directus_files_id.id}`, { responseType: 'arrayBuffer' })
+      bytes = await downloadSourceBytes(fetch, row.directus_files_id.id)
     } catch {
+      bytes = null
+    }
+    if (!bytes) {
       fileResults.push({ displayName: browserDisplayName, status: 'unreadable', reason: 'This file could not be read.' })
       continue
     }

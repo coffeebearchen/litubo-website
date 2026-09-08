@@ -56,8 +56,34 @@ const CALL_FAILED_ERROR = 'The AI provider could not generate a proposal right n
  * does no validation of its own, because `target.parseAndValidate()` is the
  * single place that decides what is safe to trust.
  */
-/** Zero automatic retries and a hard 30s timeout — this project never falls back to another provider or silently retries a slow/failed call. */
+/**
+ * Zero automatic retries and a 30s request timeout. Two distinct mechanisms,
+ * described accurately (PWS-AI-ENGINE-01R2-SAFETY-02):
+ *
+ *  - `timeout` on the SDK client aborts the underlying HTTP request itself,
+ *    and `maxRetries: 0` means one attempt only — no retry, and this project
+ *    never falls back to the other provider.
+ *  - `withCallDeadline()` below additionally bounds how long THIS FUNCTION's
+ *    caller waits, covering an injected or future `callModel` that hangs
+ *    without ever reaching the SDK. It is a caller wait limit, not a
+ *    cancellation of work already in flight — the SDK's own timeout is what
+ *    cancels the network call.
+ */
 const REQUEST_TIMEOUT_MS = 30_000
+
+const CALL_DEADLINE_MS = REQUEST_TIMEOUT_MS + 5_000
+
+async function withCallDeadline<T>(work: Promise<T>): Promise<T | 'deadline-exceeded'> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<'deadline-exceeded'>((resolve) => {
+    timer = setTimeout(() => resolve('deadline-exceeded'), CALL_DEADLINE_MS)
+  })
+  try {
+    return await Promise.race([work, deadline])
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 async function defaultDeepSeekModelCaller(
   target: TargetDefinition<unknown>,
@@ -106,10 +132,11 @@ export function createDeepSeekStructuredProvider(
 
     let raw: unknown
     try {
-      raw = await callModel(target as TargetDefinition<unknown>, input, config)
+      raw = await withCallDeadline(callModel(target as TargetDefinition<unknown>, input, config))
     } catch {
       return { ok: false, error: CALL_FAILED_ERROR }
     }
+    if (raw === 'deadline-exceeded') return { ok: false, error: CALL_FAILED_ERROR }
 
     const sourceMaterial = input.extractedSourceTexts.map(s => s.text).join('\n\n')
     return target.parseAndValidate(raw, { sourceMaterial })

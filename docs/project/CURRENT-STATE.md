@@ -3199,3 +3199,78 @@ Apply 仍保持前端 disabled + 服务端 503（真实链路复验通过）；�
 未调用真实 DeepSeek/OpenAI API（本机 provider 本就未配置 Key）；未产生任何费用；未读取、打印或修改 `.env` 与任何 Key；未实现 Directus transaction / Page Content / FAQ / SEO；未部署；**未 push master**（仅按授权推送了备份分支）。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-SAFETY-01"任务中写入。*
+
+---
+
+## PWS-AI-ENGINE-01R2-SAFETY-02 — 分片回显、Unicode 绕过与可终止 PDF 解析（2026-09-09）
+
+**性质：** 对 `1a95e6f` 的窄化安全修复，在其之上新增一个本地提交。未 reset/revert/rebase/amend/force push，未 push master，未部署。Apply 全程保持前端 disabled + 服务端 503。
+
+### 一、A：分片回显与 Unicode 绕过（已修复）
+
+**修复的两个真实绕过：**
+
+1. **分片回显。** 上一版只逐字段检查 80 字符回显，模型把一段 158 字符原文拆成两个 79 字符的 `value` 即可全身而过。现在改为对**按输出顺序拼接后的多个投影**做检测：全字段拼接、仅 values、仅 parameters、仅 group 名、以及每个 item 的 parameter+value。**这一点是实现过程中被自己写的测试推翻后才发现的**——最初只做"全字段单一拼接"，但模型把碎片放进 values 时，中间夹着的 group/parameter 标签会切断连续性，测试因此失败；补上分角色投影后才真正拦住。命中任一投影即**整份 proposal 安全失败**，不保留碎片。
+2. **不可见字符绕过。** 归一化改为：NFKC → 删除 `\p{Cf}`/`\p{Cc}`（含 U+200B / U+2060 / U+00AD / U+FEFF）→ 小写 → **删除全部空白**（不是折叠）。删除空白而非折叠，同时解决了"重新排版即绕过"和"碎片跨字段重新拼接"两个问题。零宽字符同时也被加入 `UNSAFE_VALUE_PATTERNS` 直接拒收。
+
+**权衡（如实记录）：** 因为空白被删除而非折叠，一份"仅以空白分隔"的资料被忠实提取出多条短规格时，拼接后也可能凑出 80 字符连续匹配而被整份拒绝。这是刻意的 fail-closed 选择：被拒只是重来一次，泄露不会自己报警。
+
+**新增上限：** 单份 proposal 总条目 ≤ 200、总字符 ≤ 20,000，在任何扫描前先行检查，防止 50×100 的异常响应变成 CPU 消耗或碎片走私通道。
+
+**扩展的 locator 检测：** `javascript:`/`data:`/`file:`/`blob:` URI、协议相对 URL（`//host/…`）、无 scheme 裸域名、≥24 位无连字符 hex ID、单段 Windows 路径（`C:\x.pdf`）、零宽/控制字符。`0.8 mm`、`IP65`、`Stainless steel 304`、`220V / 50Hz`、`±0.5 g` 等正常短值均有测试保证不被误杀。
+
+**行为收紧（已同步更新旧测试）：** 回显命中时不再"丢掉问题条目、保留干净兄弟条目"，而是整份失败——保留碎片正是分片走私得逞的方式。
+
+### 二、B：PDF 改为真正可终止的隔离解析（已实现，非降级）
+
+**原问题：** `Promise.race` 只让调用方超时返回，卡死的 pdf.js 仍在服务器唯一的 JS 线程上继续跑，"硬超时"的说法不成立。
+
+**现方案：** 新增 `server/utils/pdfExtractionWorker.ts`，PDF 解析放进 `worker_threads` Worker；超时到期**真正调用 `worker.terminate()`**，并等待线程 `exit` 事件后才返回。并发上限 `MAX_CONCURRENT_PDF_WORKERS = 2`，超出的调用排队。文件大小、页数、字符上限在 **worker 内部再次强制执行**，不只在主线程侧。
+
+**测试证明（`tests/pdfExtractionWorker.test.ts`，真实 worker、无 mock）：** 注入一个 `getDocumentProxy` 永远死循环的替身模块（死循环会彻底堵死 worker 事件循环，只有真正 terminate 才能停下），断言超时后 `getLivePdfWorkerCount() === 0`——即线程确已退出，而不只是 Promise 返回了错误；另有并发峰值 ≤ 2、真实 PDF 仍能正常解析、worker 内字节上限生效等用例。
+
+**生产构建下的实测修正（重要）：** 首版用 `createRequire(...).resolve('unpdf')` 取模块路径，在 dev/测试下正常；**对真实 `nuxt build` 产物实测后发现会失败**——产物只随附 `unpdf` 的 ESM 构建（`dist/index.mjs`），CJS 条件解析会去找并不存在的 `dist/index.cjs` 并抛 `MODULE_NOT_FOUND`，PDF 支持会在生产静默降级。已改为优先 `import.meta.resolve('unpdf')`（保留 `createRequire` 兜底），并在真实 `.output` 布局中实测确认：解析得到 `file:///…/.output/server/node_modules/unpdf/dist/index.mjs`，worker 在生产布局下成功 import 到 `getDocumentProxy`。因此 PDF 是**真正可终止地被支持**，不需要退回"暂不支持"。
+
+**资产下载：** 下载前的可信元数据大小检查保持不变（仍是第一道防线，有测试断言超限文件根本不发起 `/assets/` 请求）；新增 `MAX_ASSET_DOWNLOAD_MS = 15s` 下载 deadline（停滞的下载被放弃并诚实标为不可读）与下载后的字节上限复核（Directus 声称很小却返回超大响应时同样拒绝）。三种情况均有测试。
+
+### 三、C：端点边界自动化测试（不再只靠浏览器口头说明）
+
+新增 `tests/aiEndpointBoundaries.test.ts`，**执行真实的全局 `admin-auth` 中间件与真实的路由 handler**（只补齐 vitest 缺少的 Nitro 自动导入 `defineEventHandler`/`useRuntimeConfig`/`$fetch`，未绕过也未重写任何 auth 逻辑）：
+
+| 覆盖 | 结果 |
+|---|---|
+| 未登录访问 `/api/admin/products/3/ai/**` 的 generate 与 apply | 401，且完全没有请求 Directus |
+| 已登录但非 Administrator | 403 |
+| Administrator | 放行并写入已验证 token |
+| 这些路径上的 CSRF（POST 缺 Origin） | 403 |
+| AI 路径不属于 `/api/admin/auth/` 豁免前缀 | 已验证 |
+| 跨产品：产品 A 请求产品 B 的 `products_files` id | 零 `/assets/` 下载、零 provider 调用、只返回通用不可用文案；序列化结果不含 id/UUID/文件名/路径/归属提示；并断言查询本身带 `filter[products_id][_eq]` 与 `filter[enabled][_eq]=true` |
+| Apply：6 种请求体（含空体、超长 changes、非数组） | 全部 503，且零非 GET 请求；另有源码断言禁止 `applyAcceptedSpecificationChanges`/`productSpecWriter`/写方法重新出现 |
+| Generate 请求体防护 | 声明超长 `Content-Length` → 413，**在 `readBody` 之前**，零 fetch；并有源码顺序断言保证守卫在解析之前 |
+
+### 四、Provider 与提示词完整性
+
+- 单一分发、零 fallback、零双发、零自动重试保持不变（fallback 断言改为只扫描非注释代码，避免把解释性注释误判为实现）。
+- **不再只靠 `timeout: 30_000` 文字断言**：两个适配器新增 `withCallDeadline()`（35s 调用方等待上限）并有 fake-timer 行为测试（永不 settle 的 `callModel` 到期返回安全错误）。文档同时如实区分两件事：SDK 的 `timeout` 才是真正**取消 HTTP 请求**的机制，`withCallDeadline` 是**调用方等待上限**，不是对已在飞行中的工作的取消。
+- **productName / contextNote 边界处理：** 新增 `sanitizeModelInputText()`（NFKC、控制/零宽字符转空格、`---` 连字符序列中和、空白折叠、长度截断），应用于进入 prompt 的产品名、文件类型标签与 contextNote。测试证明：带换行 + 伪造 `--- Source: system ---` 分隔符 + 提示词的产品名会被压成单行、prompt 中只剩一个真实 source 区块。
+- **AI Source Intake 文件展示：** `utils/aiProposal.ts` 新增客户端镜像 `safeSourceDisplayName()`，`aiIntakeFileDisplayName()` 改为走该规则；测试用同一张恶意文件名表断言**客户端镜像与服务端 `sanitizeDisplayNameForBrowser()` 逐条一致**，防止两侧漂移。
+
+### 五、验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 779/779 通过（较上一任务 723 新增 56 项） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告 |
+| `npx nuxt build` | Build complete；`.output/server/node_modules/unpdf` 仍被正确 trace |
+| 浏览器 1440px | 无横向溢出（scrollWidth == clientWidth），Console 零错误 |
+| 浏览器 375px | 无横向溢出，Console 零错误 |
+| 真实链路（已登录、无 Key、零 mock） | Apply 任意 body → 503；5 万元素 `mediaIds` → **413**（解析前拒绝）；正常 generate → `AI provider is not configured.` 诚实失败 |
+| 业务数据零写入 | 验收后复查产品 3：仍为原有 2 个 TEST 规格组（12 + 5 条）与 7 个关联文件，无新增残留 |
+
+### 明确未做
+
+未启用 Apply、未恢复 saga、未实现 Directus transaction；未改 `docker-compose.yml`、Directus schema / 权限 / 迁移；未改产品数据与 Media Library；未读取或修改 `.env`；未调用真实 DeepSeek/OpenAI；零费用；未部署；**未 push master**。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-SAFETY-02"任务中写入。*

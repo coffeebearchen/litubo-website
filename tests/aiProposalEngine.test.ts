@@ -9,10 +9,11 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { runProposalEngine } from '../server/utils/aiProposalEngine'
+import { runProposalEngine, MAX_ASSET_DOWNLOAD_MS } from '../server/utils/aiProposalEngine'
 import type { FetchFn } from '../server/utils/mediaLifecycle'
 import type { AiProviderRegistry, AiProviderSummary, AiStructuredProvider } from '../server/utils/aiProviderRegistry'
 import { specificationsTarget, type SpecificationProposal } from '../server/utils/aiTargets/specificationsTarget'
+import { MAX_FILE_BYTES } from '../server/utils/aiTextExtraction'
 
 const VALID_PROPOSAL: SpecificationProposal = {
   groups: [{ group: 'Detection performance', items: [{ parameter: 'Detection sensitivity (Fe)', value: '0.8 mm' }] }],
@@ -400,6 +401,70 @@ describe('runProposalEngine — a hostile filename never reaches the AI provider
 
     const result = await runProposalEngine(fetch, mockRegistry(), specificationsTarget, { productId: 1, providerId: 'deepseek', mediaIds: [1] })
     expect(result.fileResults).toEqual([{ displayName: 'LT-180C spec sheet (rev 2).txt', status: 'read' }])
+  })
+})
+
+describe('runProposalEngine — asset downloads are bounded (PWS-AI-ENGINE-01R2-SAFETY-02)', () => {
+  it('a stalled download is abandoned at the deadline and reported as unreadable, never hanging the request', async () => {
+    vi.useFakeTimers()
+    try {
+      const base = mockFetch({
+        productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-stall', filename_download: 'notes.txt', type: 'text/plain', filesize: SMALL_SIZE } }],
+      })
+      const stallingFetch = (async <T>(path: string, opts?: Record<string, unknown>): Promise<T> => {
+        if (path.startsWith('/assets/')) return new Promise<T>(() => { /* never settles */ })
+        return base<T>(path, opts)
+      }) as FetchFn
+
+      const promise = runProposalEngine(stallingFetch, mockRegistry(), specificationsTarget, {
+        productId: 1, providerId: 'deepseek', mediaIds: [1],
+      })
+      await vi.advanceTimersByTimeAsync(MAX_ASSET_DOWNLOAD_MS + 100)
+      const result = await promise
+
+      expect(result.ok).toBe(false)
+      expect(result.fileResults).toEqual([
+        { displayName: 'notes.txt', status: 'unreadable', reason: 'This file could not be read.' },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a response larger than the byte ceiling is refused even when the metadata claimed it was small', async () => {
+    const oversized = new ArrayBuffer(MAX_FILE_BYTES + 1024)
+    const fetch = mockFetch({
+      // Directus claims a small size…
+      productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-liar', filename_download: 'notes.txt', type: 'text/plain', filesize: SMALL_SIZE } }],
+      // …but actually returns far more bytes than that.
+      assetBytesByUuid: { 'uuid-liar': oversized },
+    })
+
+    const result = await runProposalEngine(fetch, mockRegistry(), specificationsTarget, {
+      productId: 1, providerId: 'deepseek', mediaIds: [1],
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.fileResults).toEqual([
+      { displayName: 'notes.txt', status: 'unreadable', reason: 'This file could not be read.' },
+    ])
+  })
+
+  it('the trusted-metadata check still runs first, so an oversized file is never downloaded at all', async () => {
+    const paths: string[] = []
+    const base = mockFetch({
+      productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-huge', filename_download: 'huge.txt', type: 'text/plain', filesize: 50 * 1024 * 1024 } }],
+    })
+    const trackingFetch = (async <T>(path: string, opts?: Record<string, unknown>): Promise<T> => {
+      paths.push(path)
+      return base<T>(path, opts)
+    }) as FetchFn
+
+    await runProposalEngine(trackingFetch, mockRegistry(), specificationsTarget, {
+      productId: 1, providerId: 'deepseek', mediaIds: [1],
+    })
+
+    expect(paths.some(p => p.startsWith('/assets/'))).toBe(false)
   })
 })
 

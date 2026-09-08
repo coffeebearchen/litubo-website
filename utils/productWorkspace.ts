@@ -14,6 +14,7 @@
 
 import type { AdminProduct, ProductCategory, FileRole } from '~/types/product-cms'
 import { adminAssetUrl } from './productCentre'
+import { safeSourceDisplayName } from './aiProposal'
 
 /**
  * Mandated literal Readiness text (Register §12.1i "PW-00" row + PWS-DOR-02).
@@ -149,9 +150,14 @@ export function workspaceMediaIsImage(mimeType: string | null): boolean {
  * PWS-AI-01-FAST-01 — honest display name for an AI Source Intake file card.
  * Never falls back to any fragment of the Directus file UUID (stricter than
  * the Sources & evidence picker's fallback, per this task's own boundary).
+ *
+ * PWS-AI-ENGINE-01R2-SAFETY-02 — the chosen name now goes through the same
+ * safety rule the server applies to AI file results, so a hostile filename
+ * cannot be echoed here just because this list reads Directus directly
+ * instead of a Generate response.
  */
 export function aiIntakeFileDisplayName(m: { filename_download?: string | null, caption_en?: string | null, alt_en?: string | null }): string {
-  return m.filename_download || m.caption_en || m.alt_en || 'Untitled file'
+  return safeSourceDisplayName(m.filename_download || m.caption_en || m.alt_en || null)
 }
 
 /** Whether a product-media association is currently readable/available, in plain English — never a raw boolean. */

@@ -1,4 +1,4 @@
-import { getDocumentProxy } from 'unpdf'
+import { extractPdfTextInWorker } from './pdfExtractionWorker'
 
 /**
  * PWS-AI-ENGINE-01R — server-only, text-only source extraction.
@@ -32,6 +32,11 @@ import { getDocumentProxy } from 'unpdf'
  * Windows `nuxt dev` server — verified fixed by starting a clean dev server
  * and loading `/`, an authenticated admin page, and both AI Workspace routes
  * (see this task's final report for the exact commands and results).
+ *
+ * PWS-AI-ENGINE-01R2-SAFETY-02 — the PDF parse itself no longer runs in this
+ * process: it is delegated to a terminable worker thread (see
+ * `pdfExtractionWorker.ts`), so `MAX_PROCESSING_MS` is enforced by really
+ * stopping the parse rather than by abandoning a promise that keeps running.
  *
  * File bytes and extracted text exist only for the lifetime of one request:
  * this module returns plain strings to its caller and keeps no cache, no
@@ -142,68 +147,24 @@ export function isFileSizeSafeToDownload(knownSizeBytes: number | null | undefin
   return knownSizeBytes <= MAX_FILE_BYTES
 }
 
-/** Mirrors pdf.js's own per-line-position text join: same-line items are concatenated, a new line otherwise. */
-function joinPageText(items: Array<{ str: string, transform: number[] }>): string {
-  let lastY: number | undefined
-  let text = ''
-  for (const item of items) {
-    if (lastY === item.transform[5] || lastY === undefined) text += item.str
-    else text += '\n' + item.str
-    lastY = item.transform[5]
-  }
-  return text
-}
-
-/** Injectable so tests can simulate a page whose parse never resolves, without a real multi-second wait. Production always uses the real `unpdf` export. */
-export type GetDocumentProxyFn = typeof getDocumentProxy
-
-async function extractPdfTextUnbounded(bytes: Uint8Array, getDocProxy: GetDocumentProxyFn): Promise<string> {
-  const doc = await getDocProxy(bytes)
-  try {
-    let text = ''
-    const pageCount = Math.min(doc.numPages, MAX_PDF_PAGES)
-    for (let i = 1; i <= pageCount; i++) {
-      if (text.length >= MAX_PER_FILE_CHARS) break
-      const page = await doc.getPage(i)
-      const content = await page.getTextContent()
-      text += '\n\n' + joinPageText(content.items as Array<{ str: string, transform: number[] }>)
-    }
-    return text
-  } finally {
-    // Best-effort: if the timeout below already won the race, this may run
-    // after the caller has moved on — still worth attempting.
-    await doc.cleanup().catch(() => {})
-  }
-}
-
 /**
- * PWS-AI-ENGINE-01R2-SAFETY-01 — reads a PDF page by page, stopping the
- * moment `MAX_PDF_PAGES` or `MAX_PER_FILE_CHARS` is hit, AND bounded to
- * `MAX_PROCESSING_MS` by a real `Promise.race` against a timer — not just a
- * between-pages check. A between-pages check alone cannot bound a single
- * slow/pathological page's own `getPage()`/`getTextContent()` call, so the
- * previous "10 second timeout" wording was not actually true. `Promise.race`
- * is what "hard timeout" honestly means for a call like this in JS: Node
- * cannot forcibly preempt a pending `unpdf`/pdf.js call already in flight,
- * so that background work may keep running briefly after this function
- * returns — but this function itself always resolves or rejects within
- * `MAX_PROCESSING_MS`, and the caller never receives anything from an
- * abandoned parse (only this function's own race result). Verified by
- * `tests/aiTextExtraction.test.ts` injecting a `getDocumentProxy` double
- * whose page parse never resolves and asserting the call still returns
- * (safely, as a failure) within the timeout window, using fake timers so
- * the test itself does not wait 10 real seconds.
+ * PWS-AI-ENGINE-01R2-SAFETY-02 — PDF parsing runs in a terminable worker
+ * thread (`pdfExtractionWorker.ts`), not in this process. `MAX_PROCESSING_MS`
+ * is enforced by actually terminating that thread, so a pathological PDF
+ * cannot keep burning the server's JavaScript thread after the caller has
+ * given up. Page and character limits are re-applied inside the worker
+ * itself, not only here.
  */
-export async function extractPdfText(bytes: Uint8Array, getDocProxy: GetDocumentProxyFn = getDocumentProxy): Promise<string> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('pdf-extraction-timeout')), MAX_PROCESSING_MS)
+async function extractPdfText(bytes: ArrayBuffer, moduleEntry?: string): Promise<string> {
+  const outcome = await extractPdfTextInWorker(bytes, {
+    timeoutMs: MAX_PROCESSING_MS,
+    maxPages: MAX_PDF_PAGES,
+    maxChars: MAX_PER_FILE_CHARS,
+    maxBytes: MAX_FILE_BYTES,
+    moduleEntry,
   })
-  try {
-    return await Promise.race([extractPdfTextUnbounded(bytes, getDocProxy), timeout])
-  } finally {
-    clearTimeout(timer)
-  }
+  if (!outcome.ok) throw new Error(outcome.reason)
+  return outcome.text
 }
 
 /**
@@ -217,6 +178,8 @@ export async function extractTextFromFile(
   bytes: ArrayBuffer,
   mimeType: string | null | undefined,
   displayName: string,
+  /** Test-only: the module the PDF worker imports `getDocumentProxy` from. Production always uses the real `unpdf`. */
+  pdfModuleEntry?: string,
 ): Promise<ExtractionResult> {
   if (bytes.byteLength === 0) {
     return { ok: false, reason: 'This file is empty.' }
@@ -236,7 +199,7 @@ export async function extractTextFromFile(
   let text = ''
   try {
     if (mime === 'application/pdf') {
-      text = await extractPdfText(new Uint8Array(bytes))
+      text = await extractPdfText(bytes, pdfModuleEntry)
     } else {
       // text/csv, text/tab-separated-values, text/plain
       text = Buffer.from(bytes).toString('utf-8')

@@ -8,10 +8,9 @@
  * project's real Windows `nuxt dev` server (see this task's final report).
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   extractTextFromFile,
-  extractPdfText,
   sanitizeDisplayNameForBrowser,
   isSupportedTextSourceMime,
   isFormerlyUnsupportedTextSourceMime,
@@ -23,7 +22,6 @@ import {
   MAX_PER_FILE_CHARS,
   MAX_PDF_PAGES,
   MAX_PROCESSING_MS,
-  type GetDocumentProxyFn,
 } from '../server/utils/aiTextExtraction'
 
 function toArrayBuffer(buffer: Buffer): ArrayBuffer {
@@ -263,34 +261,12 @@ describe('sanitizeDisplayNameForBrowser — PWS-AI-ENGINE-01R2-SAFETY-01', () =>
   })
 })
 
-describe('extractPdfText — real hard timeout via Promise.race, not just a between-pages check', () => {
-  it('a page whose parse never resolves still causes the call to reject within MAX_PROCESSING_MS (fake timers — no real multi-second wait)', async () => {
-    vi.useFakeTimers()
-    try {
-      const stuckDoc = {
-        numPages: 1,
-        getPage: () => new Promise(() => { /* never resolves — simulates a pathological/slow page */ }),
-        cleanup: async () => {},
-      }
-      const getDocProxy = (async () => stuckDoc) as unknown as GetDocumentProxyFn
-
-      const promise = extractPdfText(new Uint8Array([1, 2, 3]), getDocProxy)
-      let settled = false
-      promise.then(() => { settled = true }, () => { settled = true })
-      // Flush the microtask from `getDocProxy()`'s own resolution before checking timer state.
-      await Promise.resolve()
-
-      await vi.advanceTimersByTimeAsync(MAX_PROCESSING_MS - 1)
-      expect(settled).toBe(false) // deadline has not passed yet — must not resolve early
-
-      await vi.advanceTimersByTimeAsync(2)
-      await expect(promise).rejects.toThrow()
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-})
+// PWS-AI-ENGINE-01R2-SAFETY-02 — the `Promise.race` timeout test that lived
+// here was removed along with the implementation it covered. It could only
+// prove the caller stopped waiting, never that the parse stopped running.
+// PDF parsing now happens in a terminable worker thread, and
+// `tests/pdfExtractionWorker.test.ts` proves the stronger property: after a
+// timeout the worker thread has actually exited.
 
 describe('PWS-AI-ENGINE-01R explicit, tested limits exist', () => {
   it('all limits are finite, positive numbers', () => {

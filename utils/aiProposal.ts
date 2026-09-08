@@ -36,6 +36,38 @@ export const MAX_FILES_PER_REQUEST = 5
 /** Human-readable list of currently-supported text-source formats, for empty-state and help copy. */
 export const SUPPORTED_TEXT_SOURCE_FORMATS_LABEL = 'PDF (with extractable text), CSV, TSV, TXT'
 
+/** A filename this long is anomalous regardless of content. Mirrors the server's own ceiling. */
+const MAX_SAFE_DISPLAY_NAME_LENGTH = 120
+
+const UNSAFE_FILENAME_PATTERNS: RegExp[] = [
+  /https?:\/\//i,
+  /\bwww\./i,
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i,
+  /[/\\]/,
+  // eslint-disable-next-line no-control-regex
+  /[\x00-\x1F\x7F]/,
+]
+
+/**
+ * PWS-AI-ENGINE-01R2-SAFETY-02 — the client mirror of the server's
+ * `sanitizeDisplayNameForBrowser()` (`server/utils/aiTextExtraction.ts`).
+ *
+ * The AI Source Intake file list renders names straight from Directus rather
+ * than from a Generate response, so it needs the same rule applied at the same
+ * strength: a normal human filename is shown as-is, and anything carrying a
+ * URL, a UUID, a path separator, a control character, or an anomalous length
+ * collapses to one generic label instead of being echoed even in part.
+ * `tests/aiSourceIntakeReview.test.ts` asserts this mirror and the server
+ * helper agree on a shared table of hostile names, so the two cannot drift.
+ */
+export function safeSourceDisplayName(rawName: string | null | undefined): string {
+  const name = (rawName ?? '').trim()
+  if (!name) return 'Untitled file'
+  if (name.length > MAX_SAFE_DISPLAY_NAME_LENGTH) return 'Source file'
+  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(name))) return 'Source file'
+  return name
+}
+
 // ── Canonical proposal shape — mirrors the server's Zod-validated output ────
 
 export interface SpecificationProposalItem {

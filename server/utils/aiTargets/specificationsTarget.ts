@@ -3,6 +3,8 @@ import {
   UNTRUSTED_SOURCE_MATERIAL_PREAMBLE,
   buildSourceMaterialBlock,
   containsUnsafeSourceLeakage,
+  normalizeForLeakageComparison,
+  sanitizeModelInputText,
   type AiGenerationInput,
   type TargetDefinition,
   type TargetGenerationResult,
@@ -45,32 +47,70 @@ export type SpecificationProposal = z.infer<typeof SpecificationProposalSchema>
 const MALFORMED_RESPONSE_ERROR = 'The AI provider returned a response that could not be safely used.'
 const NO_SAFE_ITEMS_ERROR = 'The AI provider\'s response did not contain any safely usable specification suggestions.'
 
+const OVERSIZED_RESPONSE_ERROR = 'The AI provider returned more suggestions than can be safely reviewed at once.'
+
 /**
  * A model that regurgitates a long, contiguous run of the source material it
  * was given (instead of extracting a short structured fact) matches none of
  * `containsUnsafeSourceLeakage()`'s patterns — a copied sentence has no URL,
- * UUID, path, or file extension in it. This is a second, independent check:
- * any 80+ normalized-character window of an output string that also appears
- * verbatim in the source material it was generated from is treated as an
- * unsafe echo, regardless of surrounding text. A genuine short spec value
- * ("0.8 mm", "IP65", "Stainless steel 304") is always far shorter than 80
- * characters and is never affected.
+ * UUID, path, or file extension in it. Any 80+ normalized-character run that
+ * also appears in the source material is treated as an unsafe echo. A genuine
+ * short spec value ("0.8 mm", "IP65", "Stainless steel 304") is far shorter
+ * than 80 characters and is never affected.
+ *
+ * PWS-AI-ENGINE-01R2-SAFETY-02 — this check runs on the ORDERED CONCATENATION
+ * of every model-controlled string, not on each field in isolation. Checking
+ * fields one at a time was trivially bypassable: a 158-character passage split
+ * across two 79-character values (or spread over several items) passes every
+ * per-field check while still delivering the whole passage to the reviewer's
+ * screen. Because the shared normalization removes all whitespace, the
+ * fragments rejoin into exactly the contiguous run they were cut from,
+ * wherever the model chose to cut it.
  */
 const MIN_UNSAFE_ECHO_LENGTH = 80
 
-function normalizeForEchoCheck(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, ' ').trim()
+/** Hard ceilings on one proposal, checked before any scanning work — a 50x100 response must never turn into a CPU sink or a fragment-smuggling channel. */
+const MAX_PROPOSAL_ITEMS = 200
+const MAX_PROPOSAL_TOTAL_CHARS = 20_000
+
+/** Every distinct 80-character window of the source, so each projection below costs one hash lookup per position instead of a full substring search. */
+function buildSourceWindowSet(normalizedSourceMaterial: string): Set<string> {
+  const windows = new Set<string>()
+  for (let i = 0; i + MIN_UNSAFE_ECHO_LENGTH <= normalizedSourceMaterial.length; i++) {
+    windows.add(normalizedSourceMaterial.slice(i, i + MIN_UNSAFE_ECHO_LENGTH))
+  }
+  return windows
 }
 
-function containsLongSourceEcho(value: string, normalizedSourceMaterial: string): boolean {
-  if (!normalizedSourceMaterial) return false
-  const normalizedValue = normalizeForEchoCheck(value)
-  if (normalizedValue.length < MIN_UNSAFE_ECHO_LENGTH) return false
-  for (let start = 0; start + MIN_UNSAFE_ECHO_LENGTH <= normalizedValue.length; start++) {
-    const window = normalizedValue.slice(start, start + MIN_UNSAFE_ECHO_LENGTH)
-    if (normalizedSourceMaterial.includes(window)) return true
+function containsLongSourceEcho(normalizedValue: string, sourceWindows: Set<string>): boolean {
+  for (let i = 0; i + MIN_UNSAFE_ECHO_LENGTH <= normalizedValue.length; i++) {
+    if (sourceWindows.has(normalizedValue.slice(i, i + MIN_UNSAFE_ECHO_LENGTH))) return true
   }
   return false
+}
+
+/** Every model-controlled string in the exact order the model emitted it. */
+function modelControlledStringsInOrder(groups: SpecificationProposal['groups']): string[] {
+  return groups.flatMap(g => [g.group, ...g.items.flatMap(it => [it.parameter, it.value])])
+}
+
+/**
+ * The ordered concatenations a split-up passage could be reassembled from.
+ * One全-field concatenation is not enough on its own: a model that puts each
+ * fragment in a `value` leaves the group/parameter labels sitting between
+ * them, which breaks contiguity in that single string while the fragments
+ * still line up perfectly for anyone reading the values down the column. So
+ * each field role also gets its own ordered projection, plus per-item
+ * parameter+value pairs for a passage split across an item's two fields.
+ */
+function echoProjections(groups: SpecificationProposal['groups']): string[] {
+  return [
+    modelControlledStringsInOrder(groups).join(''),
+    groups.flatMap(g => g.items.map(it => it.value)).join(''),
+    groups.flatMap(g => g.items.map(it => it.parameter)).join(''),
+    groups.map(g => g.group).join(''),
+    groups.flatMap(g => g.items.map(it => it.parameter + it.value)).join(''),
+  ]
 }
 
 const SPECIFICATION_PROPOSAL_JSON_SCHEMA = {
@@ -120,15 +160,35 @@ function parseAndValidate(raw: unknown, context: TargetValidationContext): Targe
   const structural = SpecificationProposalSchema.safeParse(raw)
   if (!structural.success) return { ok: false, error: MALFORMED_RESPONSE_ERROR }
 
-  const normalizedSourceMaterial = normalizeForEchoCheck(context.sourceMaterial)
-  const isUnsafe = (v: string) => containsUnsafeSourceLeakage(v) || containsLongSourceEcho(v, normalizedSourceMaterial)
+  const groups = structural.data.groups
+  const allStrings = modelControlledStringsInOrder(groups)
 
-  const safeGroups = structural.data.groups
+  // Size ceilings first — before any scanning runs over the response.
+  const totalItems = groups.reduce((n, g) => n + g.items.length, 0)
+  const totalChars = allStrings.reduce((n, s) => n + s.length, 0)
+  if (totalItems > MAX_PROPOSAL_ITEMS || totalChars > MAX_PROPOSAL_TOTAL_CHARS) {
+    return { ok: false, error: OVERSIZED_RESPONSE_ERROR }
+  }
+
+  // Aggregate echo check — the whole proposal fails together, because keeping
+  // the "clean" fragments of a split-up passage would deliver the passage.
+  const normalizedSourceMaterial = normalizeForLeakageComparison(context.sourceMaterial)
+  if (normalizedSourceMaterial.length >= MIN_UNSAFE_ECHO_LENGTH) {
+    const sourceWindows = buildSourceWindowSet(normalizedSourceMaterial)
+    for (const projection of echoProjections(groups)) {
+      if (containsLongSourceEcho(normalizeForLeakageComparison(projection), sourceWindows)) {
+        return { ok: false, error: NO_SAFE_ITEMS_ERROR }
+      }
+    }
+  }
+
+  // Per-field pattern scan — a single bad value only drops its own item.
+  const safeGroups = groups
     .map(g => ({
       group: g.group,
-      items: g.items.filter(it => !isUnsafe(it.parameter) && !isUnsafe(it.value)),
+      items: g.items.filter(it => !containsUnsafeSourceLeakage(it.parameter) && !containsUnsafeSourceLeakage(it.value)),
     }))
-    .filter(g => g.items.length > 0 && !isUnsafe(g.group))
+    .filter(g => g.items.length > 0 && !containsUnsafeSourceLeakage(g.group))
 
   if (safeGroups.length === 0) return { ok: false, error: NO_SAFE_ITEMS_ERROR }
 
@@ -137,12 +197,13 @@ function parseAndValidate(raw: unknown, context: TargetValidationContext): Targe
 
 function buildUserInput(input: AiGenerationInput): string {
   const fileList = input.sourceFileSummaries
-    .map(f => `- ${f.displayName} (${f.fileType})`)
+    .map(f => `- ${sanitizeModelInputText(f.displayName, 60)} (${sanitizeModelInputText(f.fileType, 20)})`)
     .join('\n')
+  const contextNote = input.contextNote ? sanitizeModelInputText(input.contextNote, 500) : ''
   return (
-    `Product: ${input.productName}\n`
+    `Product: ${sanitizeModelInputText(input.productName)}\n`
     + `Approved source materials (already associated with this product):\n${fileList}\n`
-    + (input.contextNote ? `Additional approved context: ${input.contextNote}\n` : '')
+    + (contextNote ? `Additional approved context: ${contextNote}\n` : '')
     + 'Propose specification groups and parameters supported by these materials. '
     + 'Return only group, parameter and value for each item — do not include a note, source reference, or page number.\n\n'
     + buildSourceMaterialBlock(input.extractedSourceTexts)
