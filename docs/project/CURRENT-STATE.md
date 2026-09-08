@@ -3065,3 +3065,66 @@ npm run dev -- --port 3200
 未开始 AI Page Content、FAQ、SEO、Relations、History；未调用真实 DeepSeek/OpenAI API；未产生费用；未新增/修改任何测试产品或真实业务数据；未部署；**未 push**，等待 Codex 独立复审与用户明确授权。
 
 *最后更新：2026-09-08，由 Claude Code 在"PWS-AI-ENGINE-01R"任务中写入。*
+
+---
+
+## PWS-AI-ENGINE-01R2 — Transactional AI Apply + real server-chain verification（2026-09-08）
+
+**性质：** 对本地未推送的 `13a3484`（PWS-AI-ENGINE-01R）之上新增一个本地提交，未 amend/reset/rebase 任何既有提交。开工核对确认 `origin/master = 8f2e384`、本地 HEAD 领先三个提交（`74b4da0`/`bd34175`/`13a3484`），五个受保护未跟踪路径未被触碰。
+
+### 一、普通 Windows dev 验收（先清理再验证）
+
+只读列出并确认属于本仓库（命令行含 `D:\LITUBO-website`）的 Nuxt dev 进程后，用 `Stop-Process -Force` 停止全部 9 个 PID（3 组并发会话：无端口默认、`--port 3100`、`--port 3300`），确认零残留，随后启动一个**未设置 `NUXT_BUILD_DIR`** 的普通干净会话：`npm run dev -- --port 3200`。浏览器实际访问以下四个路由，全部真实渲染、Console 零错误：`/`、`/admin/login`、`/admin/product-workspace/3/ai-source-intake`（已登录会话）、`/admin/product-workspace/3/ai-proposal-review`（已登录会话，显示诚实空态）。验证完成后已停止该会话。**结论：Windows 普通 dev 通过，无需任何隔离构建目录。**
+
+（本节验证完成、进程已停止之后，为完成 `npx nuxt build` 自动化检查而重新执行了一次生产构建；构建与随后新启动的 dev 会话共享同一 `.nuxt` 目录，短暂复现过一次 `#app-manifest` 解析错误——这是"生产 build 产物与 dev 共享 `.nuxt`"导致的已知冲突，与本任务代码无关；删除 `.nuxt` 后重新启动即恢复正常，Section 六的浏览器验收即在这次干净会话上完成。）
+
+### 二、彻底移除 best-effort saga（不是包装/改名）
+
+`server/utils/aiSpecificationApply.ts` 中原 `applyAcceptedSpecificationChanges()`（多个独立 Directus REST 请求 + 逐项 `try{}catch{}` 吞掉失败的补偿回滚）已**整段删除**，未保留、未包装、未改名继续使用。保留的仅有 `ApplyChangeSchema`/`ApplyRequestSchema`（Zod 请求形状契约，作为未来真实事务写入器的既定合同）与 `normalizeSpecName`（在 `productSpecWriter.ts`，未改动）。
+
+### 三、Directus 事务接入方式 — 只读调查结论：当前无法实现，已按施工单回退条款处理
+
+只读检查 `docker-compose.yml`（该文件文件头注释自述"Production: docker compose -f docker-compose.yml up -d"，本地开发与生产共用同一份）：`directus/directus:11` 镜像（容器内确认实际版本 **11.17.4**），卷挂载仅 `${DIRECTUS_UPLOADS_DIR}:/directus/uploads` 与 `./directus/schema:/schema`，**不存在 `/directus/extensions` 挂载**；`docker-compose.local.yml` 仅覆盖 `LOG_LEVEL`。容器内 `/directus/extensions` 目录存在但为空、且未挂载宿主机路径——若不加挂载直接在容器内写文件，重建容器即丢失，不可复现，也不构成可提交进 Git 的实现。
+
+**结论：** 要实现一个真正在同一数据库事务内完成校验+写入+Activity/Revision+commit-or-rollback 的 Directus custom endpoint，需要给 `docker-compose.yml` 增加 `/directus/extensions` 卷挂载——这是对**生产共用**的 Docker 基础设施的修改，属于 CLAUDE.md 明确禁止、需逐次单独授权的事项，本任务未获得该授权，也未在本任务中请求。按施工单第三节明确的回退条款执行：**不实现 Apply all，不退回 saga，禁用 Apply，保留 Generate/Review**，并在此如实报告这一精确技术阻塞。
+
+### 四、禁用 Apply（服务端 + 界面）
+
+- `server/api/admin/products/[id]/ai/specification-proposal/apply.post.ts`：确认产品存在后，**无条件**抛出 `503`，错误信息明确说明"a verified atomic database transaction is not yet available for this write path"；不再调用任何写入函数，函数体内不含任何 POST/PATCH/DELETE 调用。
+- `components/admin/workspace/WorkspaceAiProposalReview.vue`：`canApply` 计算属性恒为 `false`（不再随 accepted 行数变化），Apply 按钮改为恒 `disabled`，按钮旁新增常驻说明文字解释原因；步骤条第 4 步标注"(temporarily unavailable)"。Accept / Reject / Edit 审阅交互（不产生任何写入）保持可用。
+- Generate（AI 分析）与 Review（人工审阅界面）功能未改动，均保持可用。
+
+### 五、测试更新
+
+- `tests/aiSpecificationApply.test.ts`：删除全部针对已移除的 `applyAcceptedSpecificationChanges()` 的执行测试（预校验、成功写入、失败补偿三组），只保留 Zod schema 与 `normalizeSpecName` 的纯函数测试——因为生产代码已不再有对应的写入路径可测。
+- `tests/components/WorkspaceAiProposalReview.component.test.ts`：原"Apply 随 accepted 行数启用/发送请求体/成功 emit/失败 emit"四个测试替换为两个新测试——真实挂载组件后确认 Apply 按钮在 accept 一行之后仍保持 `disabled`、且全程 `$fetch` 从未被调用；确认页面渲染出"Apply is temporarily unavailable"说明文字。
+- 修复 `tests/aiProposalEngine.test.ts`、`tests/aiTargetContract.test.ts` 中的 `Buffer.from(s, 'utf-8').buffer` 测试辅助函数：`.buffer` 是底层内存池的 `ArrayBuffer`，对短字符串可能比实际内容更大、且有偏移，现改为按 `byteOffset`/`byteLength` 精确截取。
+
+**由于 Apply 已无任何生产写入路径，本任务未新增"事务成功/各阶段失败回滚/并发锁"这类 Docker/Directus 集成测试**——没有可测的事务实现存在。真实服务端验证改为：在一个真实、已登录的浏览器会话中，用 `fetch()` 直接对真实运行中的 `apply.post.ts` 发起 POST（真实 Cookie、真实 Nitro handler、零 mock），确认返回 `503` 与预期的禁用文案，且该端点源码内不含任何写入调用。
+
+### 六、浏览器验收
+
+**A. 组件级 UI 验证（`tests/components/WorkspaceAiProposalReview.component.test.ts`，真实挂载 `.vue` 组件）：** 确认 Apply 按钮在有 accepted 行时依旧保持 `disabled`、`$fetch` 全程未被调用、说明文字真实渲染。
+
+**B. 真实浏览器 + 真实服务端链路验证（无 mock）：** 干净 dev 会话（`--port 3400`，Section 一验证完成、进程停止后，为配合自动化 `npx nuxt build` 重新启动，清理过共享 `.nuxt` 冲突）中，用户手动登录后：
+- 访问 `/admin/product-workspace/3/ai-source-intake`：真实渲染，显示该产品真实的 7 个已关联文件全部为图片、诚实空态"None of this product's linked files can be analyzed as text yet..."，Console 无页面级错误。
+- 访问 `/admin/product-workspace/3/ai-proposal-review`：真实渲染"No active proposal. Return to AI Source Intake."诚实空态。
+- 在已认证的页面 JS 上下文中对真实运行的 `/api/admin/products/3/ai/specification-proposal/apply` 发起真实 `fetch()` POST（真实 Cookie、真实 Nitro handler，零 mock、零 window.fetch 拦截）：返回 `HTTP 503`，响应体 `message` 为"Applying AI-proposed specification changes is temporarily disabled: a verified atomic database transaction is not yet available for this write path, so nothing can be saved...";未产生任何 Directus 写入（该端点源码路径上已不存在任何写入调用）。
+
+未使用真实 Provider Key、未产生费用、未污染任何真实产品数据。
+
+### 七、验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 686/686 通过 |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告（Windows 正常） |
+| `npx nuxt build` | Build complete |
+
+### 明确未做
+
+未实现事务性 Apply all（技术阻塞已如实报告，见第三节）；未修改 `docker-compose.yml` 或任何生产 Docker 基础设施；未开始 Content Center、Page Content AI、FAQ、SEO、Relations、History；未调用真实 DeepSeek/OpenAI API；未产生费用；未新增/修改任何测试产品或真实业务数据；未部署；**未 push**，等待 Codex 独立复审与用户明确授权。
+
+*最后更新：2026-09-08，由 Claude Code 在"PWS-AI-ENGINE-01R2"任务中写入。*

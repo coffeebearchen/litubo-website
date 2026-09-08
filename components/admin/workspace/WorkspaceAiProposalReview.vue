@@ -139,7 +139,10 @@ const unsupportedFiles = computed(() => props.fileResults.filter(f => f.status !
 const readFiles = computed(() => props.fileResults.filter(f => f.status === 'read'))
 
 const acceptedCount = computed(() => rows.value.filter((r: ReviewRow) => r.status === 'accepted').length)
-const canApply = computed(() => acceptedCount.value > 0 && !props.applying)
+// PWS-AI-ENGINE-01R2 — Apply is disabled: no real atomic transaction exists
+// yet for this write path (see aiSpecificationApply.ts), so the button stays
+// disabled regardless of how many rows are accepted. Review still works.
+const canApply = computed(() => false)
 
 function rowsForGroup(displayName: string): ReviewRow[] {
   return rows.value.filter((r: ReviewRow) => r.group === displayName)
@@ -195,7 +198,7 @@ async function applyAccepted() {
       <li class="ws-step"><span class="ws-step-index">1</span> Select sources</li>
       <li class="ws-step"><span class="ws-step-index">2</span> Analyze</li>
       <li class="ws-step ws-step--current"><span class="ws-step-index">3</span> Review proposals</li>
-      <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft</li>
+      <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft (temporarily unavailable)</li>
     </ol>
 
     <section v-if="unsupportedFiles.length > 0" class="ws-card ws-card--notice">
@@ -273,9 +276,12 @@ async function applyAccepted() {
       </div>
 
       <div class="ws-apply-row">
-        <button type="button" class="btn btn-primary btn-apply" :disabled="!canApply" @click="applyAccepted">
-          {{ applying ? 'Applying…' : 'Apply accepted changes to Draft' }}
+        <button type="button" class="btn btn-primary btn-apply" disabled title="Apply is temporarily unavailable" @click="applyAccepted">
+          Apply accepted changes to Draft
         </button>
+        <p class="ws-apply-disabled-note">
+          Apply is temporarily unavailable: a verified atomic database transaction for this write path does not exist yet, so no changes can be saved from this screen. Review and Generate are unaffected.
+        </p>
         <p v-if="applyError" class="ws-apply-error" role="alert">{{ applyError }}</p>
       </div>
     </section>
@@ -356,6 +362,7 @@ async function applyAccepted() {
 .btn-apply { font-weight: 600; }
 
 .ws-apply-error { font-size: var(--text-sm); color: #C0392B; background: #FDF0EE; border: 1px solid #F5C6C2; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); margin: 0; }
+.ws-apply-disabled-note { font-size: var(--text-xs); color: var(--color-ink-muted); max-width: 60ch; margin: 0; line-height: 1.5; }
 
 .ws-file-result-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--text-xs); color: var(--color-ink); }
 

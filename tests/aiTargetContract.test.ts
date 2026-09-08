@@ -75,7 +75,11 @@ function mockFetch(opts: {
 }
 
 function textBytes(s: string): ArrayBuffer {
-  return Buffer.from(s, 'utf-8').buffer as ArrayBuffer
+  // `Buffer.from(...).buffer` is the underlying pool ArrayBuffer, which for
+  // small strings can be larger than (and offset within) the actual bytes —
+  // slicing by byteOffset/byteLength is required to get exactly this string's bytes.
+  const buf = Buffer.from(s, 'utf-8')
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
 }
 
 function mockProvider(generateStructured: unknown): AiStructuredProvider {

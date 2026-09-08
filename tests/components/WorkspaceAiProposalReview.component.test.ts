@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 /**
- * PWS-AI-ENGINE-01R — real component-mounting behavior tests for
- * `WorkspaceAiProposalReview.vue`: actual clicks on Accept/Reject/Edit,
- * a real (mocked-network) Apply call whose body is inspected to confirm
- * only accepted rows are sent, and the apply-success emit. `$fetch` is
- * stubbed globally — no real network call happens.
+ * PWS-AI-ENGINE-01R2 — real component-mounting behavior tests for
+ * `WorkspaceAiProposalReview.vue`: actual clicks on Accept/Reject/Edit, and
+ * confirmation that Apply stays disabled and sends no request (Apply has no
+ * real atomic transaction behind it yet — see aiSpecificationApply.ts).
+ * `$fetch` is stubbed globally so a test would fail loudly if Apply ever
+ * did send a request.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -76,55 +77,30 @@ describe('WorkspaceAiProposalReview — real mounted component', () => {
     expect(wrapper.text()).toContain('1.0 mm')
   })
 
-  it('Apply is disabled in the DOM until at least one row is accepted', async () => {
+  // PWS-AI-ENGINE-01R2 — Apply has no real atomic transaction behind it yet
+  // (see aiSpecificationApply.ts), so the button is now permanently disabled
+  // regardless of accepted rows, no request is ever sent, and a visible note
+  // explains why. These tests replace the old enable/send/success/error
+  // Apply tests, which exercised a write path that no longer exists.
+  it('Apply stays disabled even after a row is accepted, and no request is ever sent', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('$fetch', fetchMock)
+
     const wrapper = mountReview()
     const applyButton = wrapper.findAll('button').find(b => b.text().includes('Apply accepted changes'))!
     expect((applyButton.element as HTMLButtonElement).disabled).toBe(true)
+
     const acceptButtons = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
     await acceptButtons[0].trigger('click')
-    expect((wrapper.findAll('button').find(b => b.text().includes('Apply accepted changes'))!.element as HTMLButtonElement).disabled).toBe(false)
+    expect(wrapper.text()).toContain('1 accepted')
+
+    expect((wrapper.findAll('button').find(b => b.text().includes('Apply accepted changes'))!.element as HTMLButtonElement).disabled).toBe(true)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('Apply sends ONLY the accepted rows in the request body — rejected/pending rows never appear', async () => {
-    let capturedBody: unknown
-    vi.stubGlobal('$fetch', vi.fn(async (_url: string, opts: { body: unknown }) => {
-      capturedBody = opts.body
-      return { message: '1 specification change was applied to Draft.' }
-    }))
-
+  it('shows a visible note explaining Apply is temporarily unavailable', () => {
     const wrapper = mountReview()
-    const acceptButtons = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
-    await acceptButtons[0].trigger('click') // accept only the FIRST item (Detection sensitivity)
-    const applyButton = wrapper.findAll('button').find(b => b.text().includes('Apply accepted changes'))!
-    await applyButton.trigger('click')
-    await wrapper.vm.$nextTick()
-
-    const changes = (capturedBody as { changes: Array<{ parameter?: string }> }).changes
-    expect(changes).toHaveLength(1)
-    expect(changes[0].parameter).toBe('Detection sensitivity (Fe)')
-  })
-
-  it('a successful Apply emits apply-success with the server\'s safe message', async () => {
-    vi.stubGlobal('$fetch', vi.fn(async () => ({ message: '1 specification change was applied to Draft.' })))
-    const wrapper = mountReview()
-    const acceptButtons = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
-    await acceptButtons[0].trigger('click')
-    const applyButton = wrapper.findAll('button').find(b => b.text().includes('Apply accepted changes'))!
-    await applyButton.trigger('click')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.emitted('apply-success')).toEqual([['1 specification change was applied to Draft.']])
-  })
-
-  it('a failed Apply emits apply-error with a safe message, never the raw thrown error', async () => {
-    vi.stubGlobal('$fetch', vi.fn(async () => { throw { data: { message: 'These changes could not be applied and have been rolled back. Nothing was saved.' } } }))
-    const wrapper = mountReview()
-    const acceptButtons = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
-    await acceptButtons[0].trigger('click')
-    const applyButton = wrapper.findAll('button').find(b => b.text().includes('Apply accepted changes'))!
-    await applyButton.trigger('click')
-    await wrapper.vm.$nextTick()
-    const emitted = wrapper.emitted('apply-error')
-    expect(emitted?.[emitted.length - 1]).toEqual(['These changes could not be applied and have been rolled back. Nothing was saved.'])
+    expect(wrapper.text()).toContain('Apply is temporarily unavailable')
   })
 
   it('an exact group+parameter match against an existing item suggests Update, with the current value visible', () => {
