@@ -3337,3 +3337,85 @@ Apply 仍保持前端 disabled + 服务端 503（真实链路复验通过）；�
 未启用 Apply、未恢复 saga、未实现 Directus transaction；未改 `docker-compose.yml`、Directus schema / 权限 / 迁移；未改生产 Node 版本；未改产品数据与 Media Library；未读取或修改 `.env`；未调用真实 DeepSeek/OpenAI；零费用；未部署；未创建 PR；**未 push master**。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-REVIEW-FIX-01-AUTO"任务中写入。*
+
+---
+
+## PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — CI 契约、AI-safe DTO、PDF 诚实停用（2026-09-09）
+
+**性质：** 修复 Codex 对 review 分支 `67ee57d` 的独立审查阻塞项。在 review 分支上新增一个提交，未 push master、未部署、未创建 PR。Apply 全程保持前端 disabled + 服务端 503。
+
+### 一、CI 与 Node 契约（真实修复，非声称）
+
+**上一轮"817 tests passed"不能作为可合并证据**——GitHub Actions 的两次实际 run 都失败在 `npm ci`：`Missing: unplugin@3.3.0 from lock file`。
+
+**根因（已复现）：** lockfile 由 npm 11（Node 24 自带）生成，而 CI 的 Node 20 自带 npm 10.8.2，两者对依赖树的记录方式不同。用真实 Node 20 的 npm 10 复现后，改为**用 npm 10 重新生成 lockfile**——未使用 `--force`、`--legacy-peer-deps`、`--ignore-engines`，也未手工篡改 lockfile。
+
+**Node 版本的诚实结论：** 仓库内**没有** Dockerfile、没有 Nuxt 应用的 compose service、没有 `.nvmrc`；`docker compose ps` 也确认**没有任何容器运行本 Nuxt 应用**。因此**部署 Node 版本无法由任何已提交配置或运行中服务证实**。"Node 20"是本项目工作遵循的约束，`20.20.2` 是这些检查**实际运行验证**的确切版本（CI 与本地一致），**这不是对生产环境的断言**，两者需在首次部署时对齐。CI 固定为 `20.20.2` 而非 `20` 别名，因为多个依赖要求 `>= 20.19.0`。
+
+**生产依赖真实兼容性（不用 warning 掩盖）：**
+
+| 依赖 | 问题 | 处置 |
+|---|---|---|
+| `openai@7` | 声明 `engines: node >=22` | **移除**。两个适配器改用原生 `fetch` + `AbortSignal.timeout(30s)`（单次请求、零重试、零 fallback），请求与响应结构不变 |
+| `sanitize-html@2.17.7` | 声明 `>=22.12.0` | 固定到 `2.17.0`（无 engines 声明，支持 Node 20） |
+| `pdfjs-dist` | 见第三节 | **移除**（PDF 停用） |
+| `nuxt` / `nitropack` / `vite` 等 | 要求 `^20.19.0` | Node 20.20.2 满足 |
+
+在真实 Node 20.20.2 上，`npm ci` → `vitest` → `vue-tsc` → `lint` → `nuxt build` **五项全部通过**。剩余的 EBADENGINE 警告仅来自构建期/开发期传递依赖（`@intlify/bundle-utils` 内嵌副本、`rollup-plugin-visualizer`、`js-beautify` 的 `nopt`/`abbrev`），**不是生产依赖**；尝试用 npm `overrides` 收敛时 npm 10 触发自身崩溃（`Cannot read properties of null (reading 'edgesOut')`），因此保持现状并如实记录——依据是这五项检查在 Node 20 上真实通过，而非"忽略警告"。
+
+### 二、AI Source Intake 数据边界（AI-safe DTO）
+
+**问题：** 该页此前直接读通用 media API，浏览器因此收到 `directus_files_id`（真实存储 UUID）、`filename_download`、`caption_en`、`alt_en` 等原始字段，Generate 还接收原始 `products_files.id` 回传。
+
+**处置：** 新增 `GET /api/admin/products/:id/ai/sources`，只返回 `sourceRef` / `displayName`（服务端 sanitize）/ `typeLabel` / `roleLabel` / `analyzable` / `unavailableReason` 六个字段；页面不再调用通用 `/media`。是否可分析与**具体原因由服务端判定**，浏览器不再从 MIME 自行推断。
+
+**sourceRef 的实现（含一次自查修正）：** 首版用 HMAC 签名 + base64url payload——浏览器实测发现**payload 可被直接 base64 解码，暴露管理员 user UUID 与关联行 id**：签名只防伪造、不防读取。已改为 **AES-256-GCM 加密**（每进程随机密钥、仅存于内存、不进配置也不进 `.env`），ref 为密文，绑定当前管理员 + 当前产品、30 分钟过期、任何篡改都会被认证标签拒绝。Generate 只接收 sourceRefs，服务端逐个重新校验；任一无效则**整个请求拒绝**，不分析"恰好通过的那部分"；引擎随后仍独立复核归属与 `enabled` 状态。
+
+**测试：** 新增 `tests/aiSourceRef.test.ts`（20 项，含"任何一段 base64 解码后都不含 id/UUID/JSON 结构"）与 DTO 端点测试（字段白名单、序列化结果零 UUID/零原始字段名、跨产品/跨管理员 ref 失效、`Cache-Control: private, no-store`）。浏览器实测确认响应中 UUID / `filename_download` / `directus_files_id` / caption / alt / `/assets/` **全部为 false**。
+
+### 三、PDF：本轮诚实停用
+
+**原因（如实）：** worker 的 `resourceLimits` 只约束 V8 堆，**不约束 ArrayBuffer/external 内存**——而解码后的 PDF 内容正是存在那里；且 `page.getTextContent()` 在字符上限生效之前就已完整物化整页内容。因此"真实内存保护"的说法不成立。
+
+**处置：** 不伪造安全支持，也不引入新解析服务。PDF 标记为"暂不支持"，从可选项、Generate、文本提取入口全部移除；删除 PDF worker、build trace 与 `pdfjs-dist` 依赖，并删除夸大的说明文字。**保留并验证 TXT / CSV / TSV**。恢复 PDF 只能通过真正的进程/容器级资源隔离方案单独排期。
+
+### 四、请求与下载边界
+
+- **chunked 超限现在返回真正的 413**：此前 `req.destroy()` 会让真实 HTTP/1.1 客户端收到 **ECONNRESET** 而非 413。改为暂停读取 → 正常写出 413 → `Connection: close`。新增 `tests/requestBodyLimit.test.ts`，**启动真实 `http` 服务器、用真实客户端请求**断言客户端确实看到 413 而非传输错误。
+- **不再声称"无效 Content-Length 一定 413"**：Node 的 HTTP 解析器会在任何路由/中间件之前拒绝它，客户端看到的是 400。测试与文档均如实区分。
+- **下载 deadline 不再被挂起的 cancel 阻塞**：`reader.cancel()` 改为不 await（挂起的传输会让它永不 settle），并新增 hanging-cancel 回归测试。
+- 产品隔离、无跨产品回显、无 provider fallback、无双发均保持。
+
+### 五、Review UI 状态
+
+- Specifications 首次加载失败、Retry 成功后，**每一行的匹配/重复/update/ambiguous 状态都会重算**（新增 `watch`），且已做出的 accept/reject/编辑决定被保留。
+- **同组同参数存在多个既有项时标记 ambiguous**，不再由 Map 覆盖后静默选中其一。
+- 离开 Proposal Review 时通过 `onBeforeRouteLeave` **清除未提交 session**，与页面上"离开会丢失"的提示一致。
+
+### 六、验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npm ci`（Node 20.20.2 / npm 10.8.2） | 成功 |
+| `npx vitest run` | **844/844 通过** |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功（Node 20.20.2） |
+| 浏览器 1440px / 375px | 无横向溢出，Console 零错误 |
+| AI Intake 网络响应 | UUID / filename_download / directus_files_id / caption / alt / `/assets/` **全部不存在**；`Cache-Control: private, no-store` |
+| Apply | 任意 body → **503** |
+| 伪造 sourceRef | 被拒绝，返回安全文案 |
+| 业务数据 | 零写入：产品 3 仍为原有 2 个 TEST 规格组（12 + 5 条）与 7 个关联文件 |
+
+**GitHub Actions 状态：本次提交推送后需由 Codex/用户在 Actions 页面确认实际结果；本文档不声称"CI 已绿"。**
+
+### Backlog（本轮范围外，仅记录）
+
+登录限流（login rate limit）的既有问题按施工单要求未在本轮修改，留待单独排期。
+
+### 明确未做
+
+未启用 Apply、未恢复 saga、未实现 Directus transaction；未改 `docker-compose.yml`/Dockerfile/生产运行时/Directus schema/权限/迁移；未改产品数据与 Media Library；未读取或修改 `.env`；未调用真实 DeepSeek/OpenAI；零费用；未部署；未创建 PR；**未 push master**；未移动或整理任何 `D:\` 目录。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-REVIEW-FIX-02-AUTO"任务中写入。*

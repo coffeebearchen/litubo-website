@@ -4,10 +4,12 @@ import { runProposalEngine } from '~/server/utils/aiProposalEngine'
 import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegistryDefault'
 import { specificationsTarget } from '~/server/utils/aiTargets/specificationsTarget'
 import { readJsonBodyWithByteLimit } from '~/server/utils/requestBodyLimit'
+import { resolveSourceRefs } from '~/server/utils/aiSourceRef'
+import { MAX_FILES_PER_REQUEST } from '~/server/utils/aiTextExtraction'
 
 /**
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — a legitimate body here is
- * `{ providerId, mediaIds: [at most 5 integers] }`, a few dozen bytes.
+ * `{ providerId, sourceRefs: [at most 5 opaque refs] }`, a few hundred bytes.
  *
  * The limit is enforced on bytes actually received, not on the declared
  * `Content-Length`: the previous version trusted that header and then called
@@ -21,26 +23,50 @@ export const MAX_GENERATE_BODY_BYTES = 4 * 1024
 
 interface GenerateBody {
   providerId?: unknown
-  mediaIds?: unknown
+  sourceRefs?: unknown
 }
 
 /**
  * PWS-AI-ENGINE-01R — "Analyze selected sources" for the `specifications`
  * Target. The only endpoint that calls an AI provider; it never writes
- * Specifications or any other product data. Body:
- * `{ providerId: 'deepseek' | 'openai', mediaIds: number[] }` — `mediaIds`
- * are this product's own `products_files.id` rows only, never a raw
- * Directus file UUID. Response never includes a file UUID, path, download
- * URL, locator, internal note, raw extracted text, or the provider's raw
- * response — only the validated structured proposal (or a short, safe
- * error) plus a per-file display-name-keyed read/unsupported/unreadable
- * summary.
+ * Specifications or any other product data.
+ *
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — the body carries `sourceRefs`, the
+ * opaque references minted by `ai/sources`, not raw ids. Each ref is
+ * re-verified here against the CURRENT administrator and the CURRENT product
+ * before it resolves to anything, so a ref from another product, another
+ * admin, or an expired session resolves to nothing and the whole request is
+ * refused. The engine then independently re-checks that each resolved row
+ * still belongs to this product and is still enabled — the ref is a handle,
+ * never a grant.
+ *
+ * The response never includes a file UUID, path, download URL, locator,
+ * internal note, raw extracted text, or the provider's raw response — only
+ * the validated structured proposal (or a short, safe error) plus a per-file
+ * summary keyed by sanitized display name.
  */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: 'Invalid product id' })
 
+  const productId = Number(id)
   const body = await readJsonBodyWithByteLimit<GenerateBody>(event, MAX_GENERATE_BODY_BYTES)
+
+  const adminUserId = event.context.adminUserId as string | undefined
+  if (!adminUserId) throw createError({ statusCode: 401, message: 'Not authenticated' })
+
+  // A ref that was not minted for this admin AND this product resolves to
+  // nothing; one bad ref refuses the whole request rather than silently
+  // analyzing the subset that happened to verify.
+  const mediaIds = resolveSourceRefs(body?.sourceRefs, { productId, adminUserId }, MAX_FILES_PER_REQUEST)
+  if (mediaIds === null) {
+    return {
+      ok: false,
+      error: 'This selection is no longer valid. Reload the page and choose the files again.',
+      fileResults: [],
+    }
+  }
+
   const config = useRuntimeConfig()
 
   const fetch = <T>(path: string, opts?: Record<string, unknown>) => adminFetch<T>(event, path, opts)
@@ -51,9 +77,9 @@ export default defineEventHandler(async (event) => {
   })
 
   const result = await runProposalEngine(fetch, registry, specificationsTarget, {
-    productId: Number(id),
+    productId,
     providerId: body?.providerId,
-    mediaIds: body?.mediaIds,
+    mediaIds,
   })
 
   if (!result.ok) {

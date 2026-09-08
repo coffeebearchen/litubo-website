@@ -8,16 +8,24 @@
  */
 
 const TEXT_SOURCE_MIME_TYPES = new Set([
-  'application/pdf',
   'text/csv',
   'text/tab-separated-values',
   'text/plain',
 ])
 
-/** Formerly supported (PWS-AI-ENGINE-01) but dropped this round — shown a distinct, honest reason, never lumped in with "never supported". See `server/utils/aiTextExtraction.ts` for why. */
+/**
+ * Formats that were supported once and are deliberately refused now, each with
+ * its own honest reason rather than "never supported".
+ *
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — PDF joined the deliberately-dropped list:
+ * its parser could not be given a real memory ceiling in-process, so it is
+ * refused with its own reason rather than supported unsafely. Mirrors
+ * `server/utils/aiTextExtraction.ts`.
+ */
 const FORMERLY_TEXT_SOURCE_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-excel',
+  'application/pdf',
 ])
 
 export function isTextSourceMime(mimeType: string | null): boolean {
@@ -34,7 +42,7 @@ export function isFormerlyTextSourceMime(mimeType: string | null): boolean {
 export const MAX_FILES_PER_REQUEST = 5
 
 /** Human-readable list of currently-supported text-source formats, for empty-state and help copy. */
-export const SUPPORTED_TEXT_SOURCE_FORMATS_LABEL = 'PDF (with extractable text), CSV, TSV, TXT'
+export const SUPPORTED_TEXT_SOURCE_FORMATS_LABEL = 'CSV, TSV, TXT'
 
 /** A filename this long is anomalous regardless of content. Mirrors the server's own ceiling. */
 const MAX_SAFE_DISPLAY_NAME_LENGTH = 120
@@ -42,7 +50,7 @@ const MAX_SAFE_DISPLAY_NAME_LENGTH = 120
 const UNSAFE_FILENAME_PATTERNS: RegExp[] = [
   /https?:\/\//i,
   /\bwww\./i,
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i,
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
   /[/\\]/,
   // eslint-disable-next-line no-control-regex
   /[\x00-\x1F\x7F]/,
@@ -68,6 +76,25 @@ export function safeSourceDisplayName(rawName: string | null | undefined): strin
   // URL or path to the person reading it, and must not pass ASCII patterns.
   if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(name.normalize('NFKC')))) return 'Source file'
   return name
+}
+
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — exactly what the browser receives per
+ * source file from `/api/admin/products/:id/ai/sources`. Mirrors the server's
+ * `AiIntakeSource`.
+ *
+ * Deliberately minimal: no Directus file UUID, no raw `filename_download`, no
+ * caption or alt text, no path, no URL. `sourceRef` is an opaque, signed,
+ * short-lived handle that only the server can resolve, and only for the admin
+ * and product it was minted for.
+ */
+export interface AiIntakeSource {
+  sourceRef: string
+  displayName: string
+  typeLabel: string
+  roleLabel: string
+  analyzable: boolean
+  unavailableReason: string | null
 }
 
 // ── Canonical proposal shape — mirrors the server's Zod-validated output ────

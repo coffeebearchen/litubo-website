@@ -41,7 +41,7 @@ describe('workspaceAiProposalReviewRoute', () => {
 
 describe('isTextSourceMime / isFormerlyTextSourceMime (client mirrors of the server allowlist)', () => {
   it('agrees with the server allowlist on the currently-supported types', () => {
-    for (const mime of ['application/pdf', 'text/csv', 'text/tab-separated-values', 'text/plain']) {
+    for (const mime of ['text/csv', 'text/tab-separated-values', 'text/plain']) {
       expect(isTextSourceMime(mime)).toBe(true)
     }
   })
@@ -55,19 +55,21 @@ describe('isTextSourceMime / isFormerlyTextSourceMime (client mirrors of the ser
   })
 })
 
-describe('AI Source Intake page — selected mediaIds only ever travel in the POST body', () => {
+describe('AI Source Intake page — opaque source refs only ever travel in the POST body', () => {
   const page = repoFile(SOURCE_INTAKE_PAGE)
 
-  it('the generate call sends mediaIds in the request body, never appended to a URL or route', () => {
+  it('the generate call sends opaque sourceRefs in the request body, never appended to a URL or route', () => {
     const analyzeStart = page.indexOf('async function analyze')
     const block = page.slice(analyzeStart, page.indexOf('} catch', analyzeStart))
-    expect(block).toContain('body: { providerId: selectedProviderId.value, mediaIds: [...selectedIds.value] }')
-    expect(block).not.toMatch(/mediaIds.*[?&]/)
+    expect(block).toContain('body: { providerId: selectedProviderId.value, sourceRefs: [...selectedRefs.value] }')
+    expect(block).not.toMatch(/sourceRefs.*[?&]/)
+    // The browser never holds a Directus id to send in the first place.
+    expect(block).not.toContain('mediaIds')
   })
 
-  it('never puts a selected id into router.push or a query object', () => {
-    expect(page).not.toMatch(/router\.push\([^)]*selectedIds/)
-    expect(page).not.toMatch(/query:\s*\{[^}]*selectedIds/)
+  it('never puts a selected ref into router.push or a query object', () => {
+    expect(page).not.toMatch(/router\.push\([^)]*selectedRefs/)
+    expect(page).not.toMatch(/query:\s*\{[^}]*selectedRefs/)
   })
 })
 

@@ -144,3 +144,83 @@ describe('WorkspaceAiProposalReview — real mounted component', () => {
     expect(wrapper.findAll('.ws-status-badge')).toHaveLength(2) // both rows rendered, under the single heading
   })
 })
+
+// ── PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — conflict state must be real ──
+
+function specGroup(title: string, items: Array<{ id: number, label: string, value: string }>) {
+  return {
+    id: 1, product_id: 3, title_en: title, title_es: null, title_pt: null,
+    description_en: null, enabled: true, sort: null,
+    items: items.map(i => ({
+      id: i.id, spec_group_id: 1, label_en: i.label, label_es: null, label_pt: null,
+      value_en: i.value, value_es: null, value_pt: null,
+      note_en: null, note_es: null, note_pt: null, sort: null, enabled: true,
+    })),
+  }
+}
+
+describe('WorkspaceAiProposalReview — duplicates inside one group are ambiguous, never auto-picked', () => {
+  it('two existing items with the same parameter in the SAME group are flagged ambiguous with no Update target', () => {
+    const wrapper = mountReview({
+      existingSpecGroups: [specGroup('Detection performance', [
+        { id: 10, label: 'Detection sensitivity (Fe)', value: '0.5 mm' },
+        { id: 11, label: 'Detection sensitivity (Fe)', value: '0.9 mm' },
+      ])] as never,
+    })
+
+    expect(wrapper.text()).toContain('Review required')
+    // Offered as an Add, because no single Update target can be chosen honestly.
+    const acceptButtons = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
+    expect(acceptButtons[0].text()).toBe('Accept as Add')
+    expect(wrapper.text()).toContain('2 items in this group')
+  })
+
+  it('a single existing item in the same group is still a clean Update target', () => {
+    const wrapper = mountReview({
+      existingSpecGroups: [specGroup('Detection performance', [
+        { id: 10, label: 'Detection sensitivity (Fe)', value: '0.5 mm' },
+      ])] as never,
+    })
+    const acceptButtons = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
+    expect(acceptButtons[0].text()).toBe('Accept as Update')
+  })
+})
+
+describe('WorkspaceAiProposalReview — a late specifications load recomputes every row', () => {
+  it('rows built with no existing specifications are re-evaluated when Retry supplies them', async () => {
+    // First load failed: the component starts with nothing to compare against.
+    const wrapper = mountReview({ existingSpecGroups: [] })
+    expect(wrapper.text()).not.toContain('Review required')
+    const before = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
+    expect(before[0].text()).toBe('Accept as Add')
+
+    // Retry succeeds and the conflicting specification arrives.
+    await wrapper.setProps({
+      existingSpecGroups: [specGroup('Detection performance', [
+        { id: 10, label: 'Detection sensitivity (Fe)', value: '0.5 mm' },
+      ])] as never,
+    })
+
+    expect(wrapper.text()).toContain('Review required')
+    expect(wrapper.text()).toContain('Current value: 0.5 mm')
+    const after = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
+    expect(after[0].text()).toBe('Accept as Update')
+  })
+
+  it('a decision already made is preserved when the comparison is refreshed', async () => {
+    const wrapper = mountReview({ existingSpecGroups: [] })
+    const acceptButtons = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
+    await acceptButtons[0].trigger('click')
+    expect(wrapper.text()).toContain('1 accepted')
+
+    await wrapper.setProps({
+      existingSpecGroups: [specGroup('Detection performance', [
+        { id: 10, label: 'Detection sensitivity (Fe)', value: '0.5 mm' },
+      ])] as never,
+    })
+
+    // The row's match state changed, but the reviewer's own decision did not.
+    expect(wrapper.text()).toContain('1 accepted')
+    expect(wrapper.text()).toContain('Review required')
+  })
+})

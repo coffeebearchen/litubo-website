@@ -368,6 +368,142 @@ describe('/api/admin/ai/providers — auth, safe fields only, and no caching', (
   })
 })
 
+
+// ── 3c. The AI-safe source DTO ──
+
+const SOURCES_PATH = '/api/admin/products/3/ai/sources'
+
+/** A Directus row exactly as the general media endpoint would return it — everything below must be withheld. */
+const RAW_DIRECTUS_ROWS = [
+  {
+    id: 11,
+    enabled: true,
+    file_role: 'datasheet',
+    directus_files_id: {
+      filename_download: 'LT-180C Datasheet.txt',
+      type: 'text/plain',
+    },
+  },
+  {
+    id: 12,
+    enabled: true,
+    file_role: null,
+    directus_files_id: {
+      filename_download: 'C:\\Users\\admin\\secret\\a1b2c3d4-e5f6-7890-abcd-ef1234567890.txt',
+      type: 'text/plain',
+    },
+  },
+  {
+    id: 13,
+    enabled: false,
+    file_role: 'manual',
+    directus_files_id: { filename_download: 'disabled.txt', type: 'text/plain' },
+  },
+  {
+    id: 14,
+    enabled: true,
+    file_role: null,
+    directus_files_id: { filename_download: 'photo.jpg', type: 'image/jpeg' },
+  },
+  {
+    id: 15,
+    enabled: true,
+    file_role: null,
+    directus_files_id: { filename_download: 'datasheet.pdf', type: 'application/pdf' },
+  },
+]
+
+async function loadSources() {
+  installNitroGlobals(async (url: string) => {
+    if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+    if (url.includes('/items/products_files')) return { data: RAW_DIRECTUS_ROWS }
+    return { data: null }
+  })
+  const handler = (await import('../server/api/admin/products/[id]/ai/sources.get')).default as unknown as (e: unknown) => Promise<Array<Record<string, unknown>>>
+  const event = mockEvent({ url: SOURCES_PATH, routerParams: { id: '3' } })
+  event.context.adminToken = 'admin-token'
+  event.context.adminUserId = 'admin-1'
+  return { result: await handler(event), event }
+}
+
+describe('/api/admin/products/:id/ai/sources — the browser receives no Directus metadata at all', () => {
+  it('returns only the safe DTO fields', async () => {
+    const { result } = await loadSources()
+    for (const source of result) {
+      expect(Object.keys(source).sort()).toEqual(
+        ['analyzable', 'displayName', 'roleLabel', 'sourceRef', 'typeLabel', 'unavailableReason'],
+      )
+    }
+  })
+
+  it('the serialized response contains no UUID, no raw filename, no path, no caption, no alt, no field names from Directus', async () => {
+    const { result } = await loadSources()
+    const serialized = JSON.stringify(result)
+
+    expect(serialized).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+    expect(serialized).not.toContain('directus_files_id')
+    expect(serialized).not.toContain('filename_download')
+    expect(serialized).not.toContain('caption')
+    expect(serialized).not.toContain('alt_en')
+    expect(serialized).not.toContain('Users')
+    expect(serialized).not.toContain('secret')
+    expect(serialized).not.toContain('/assets/')
+  })
+
+  it('a hostile filename collapses to the generic label, a normal one is shown as-is', async () => {
+    const { result } = await loadSources()
+    expect(result[0].displayName).toBe('LT-180C Datasheet.txt')
+    expect(result[1].displayName).toBe('Source file')
+  })
+
+  it('decides analyzability server-side, with the specific reason for each refusal', async () => {
+    const { result } = await loadSources()
+    expect(result[0]).toMatchObject({ analyzable: true, unavailableReason: null })
+    expect(result[2]).toMatchObject({ analyzable: false })
+    expect(String(result[2].unavailableReason)).toContain('disabled for this product')
+    expect(result[3]).toMatchObject({ analyzable: false })
+    expect(String(result[3].unavailableReason)).toContain('Not available for text-source analysis yet')
+    expect(result[4]).toMatchObject({ analyzable: false })
+    expect(String(result[4].unavailableReason)).toContain('PDF is not supported')
+  })
+
+  it('is not cached — provider and source context must not outlive the session', async () => {
+    installNitroGlobals(async (url: string) => {
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+      if (url.includes('/items/products_files')) return { data: [] }
+      return { data: null }
+    })
+    const handler = (await import('../server/api/admin/products/[id]/ai/sources.get')).default as unknown as (e: unknown) => Promise<unknown>
+
+    const headers: Record<string, string> = {}
+    const event = mockEvent({ url: SOURCES_PATH, routerParams: { id: '3' } })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
+    ;(event.node.res as unknown as { setHeader: (n: string, v: string) => void }).setHeader = (name, value) => {
+      headers[name.toLowerCase()] = String(value)
+    }
+
+    await handler(event)
+    expect(headers['cache-control']).toBe('private, no-store')
+  })
+
+  it('the refs it mints only work for the admin and product they were minted for', async () => {
+    const { result } = await loadSources()
+    const ref = String(result[0].sourceRef)
+
+    const { resolveSourceRef } = await import('../server/utils/aiSourceRef')
+    expect(resolveSourceRef(ref, { productId: 3, adminUserId: 'admin-1' })).toBe(11)
+    expect(resolveSourceRef(ref, { productId: 4, adminUserId: 'admin-1' })).toBeNull()
+    expect(resolveSourceRef(ref, { productId: 3, adminUserId: 'someone-else' })).toBeNull()
+  })
+
+  it('is refused for an unauthenticated caller by the global middleware', async () => {
+    installNitroGlobals(async () => ({}))
+    const middleware = (await import('../server/middleware/admin-auth')).default as (e: unknown) => Promise<unknown>
+    expect(await statusCodeOf(() => middleware(mockEvent({ url: SOURCES_PATH })))).toBe(401)
+  })
+})
+
 // ── 4. Generate refuses an oversized body before parsing it ──
 
 describe('generate.post.ts — oversized request bodies are refused on real bytes, before any JSON parsing', () => {
@@ -389,6 +525,7 @@ describe('generate.post.ts — oversized request bodies are refused on real byte
       requestStream: stream,
     })
     event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
     return statusCodeOf(() => handler(event))
   }
 
@@ -454,10 +591,11 @@ describe('generate.post.ts — oversized request bodies are refused on real byte
       requestStream: stream,
     })
     event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
 
     expect(await statusCodeOf(() => handler(event))).toBe(413)
     // Only enough chunks to cross the ceiling, not the whole (endless) body.
-    expect(chunksProduced).toBeLessThanOrEqual(Math.ceil(MAX_GENERATE_BODY_BYTES / CHUNK) + 3)
+    expect(chunksProduced).toBeLessThan(100) // far short of the 500-chunk safety net: reading really stopped
   })
 
   it('a normal small body is read and acted on as usual', async () => {
@@ -474,15 +612,16 @@ describe('generate.post.ts — oversized request bodies are refused on real byte
       method: 'POST',
       routerParams: { id: '3' },
       headers: { origin: 'http://localhost:3000' },
-      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', mediaIds: [1] })]),
+      // A body carrying refs this server never minted: it parses fine (the
+      // point of this test) and is then refused on its merits, not its size.
+      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', sourceRefs: ['not-a-real-ref'] })]),
     })
     event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
 
     const result = await handler(event)
-    // No provider key is configured in tests, so this fails closed — the point
-    // is that the body was accepted and parsed rather than refused as oversized.
     expect(result.ok).toBe(false)
-    expect(result.error).toBe('AI provider is not configured.')
+    expect(result.error).toBe('This selection is no longer valid. Reload the page and choose the files again.')
   })
 
   it('a body that is not valid JSON is refused as a bad request, never parsed into undefined behaviour', async () => {

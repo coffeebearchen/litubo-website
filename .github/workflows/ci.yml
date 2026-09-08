@@ -1,13 +1,23 @@
 name: CI
 
-# PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — verification pipeline pinned to the
-# production Node version.
+# PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — verification pipeline on an exact,
+# pinned Node 20 patch version.
 #
-# Node 20 is not a convenience here: the PDF engine is chosen specifically for
-# Node 20 support, and a dependency that quietly requires a newer runtime must
-# fail this pipeline rather than fail in production. `npm ci` is deliberate
-# too — it installs strictly from the lockfile, so a drifting lockfile is a
-# build failure instead of a silent version change.
+# On the Node version, stated honestly: this repository contains no Dockerfile,
+# no application service in `docker-compose.yml`, and no `.nvmrc`, and no
+# container runs this Nuxt application — so the deployed Node version is not
+# established by any committed configuration or running service. "Node 20" is
+# the constraint the project works to, and 20.20.2 is the exact version these
+# checks are actually run against, here and locally. It is not a claim about
+# production, and the two must be reconciled when the application is first
+# deployed.
+#
+# The version is pinned to a patch rather than the `20` alias because several
+# dependencies require `>= 20.19.0`; an older Node 20 fails to satisfy them.
+# `npm ci` is deliberate too: it installs strictly from the lockfile, so a
+# lockfile that drifts from `package.json` is a build failure rather than a
+# silent version change. (That is exactly what the first CI runs caught — a
+# lockfile written by npm 11 that npm 10 refused.)
 #
 # This workflow uses no secrets, calls no AI provider, contacts no Directus
 # instance, and deploys nothing. It only runs the same checks a developer runs
@@ -27,7 +37,7 @@ permissions:
 
 jobs:
   verify:
-    name: Tests, types, lint, build (Node 20)
+    name: Tests, types, lint, build (Node 20.20.2)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -35,10 +45,10 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
-      - name: Use Node 20 (the production runtime)
+      - name: Use the exact Node version these checks are verified against
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.20.2'
           cache: npm
 
       - name: Install dependencies from the lockfile

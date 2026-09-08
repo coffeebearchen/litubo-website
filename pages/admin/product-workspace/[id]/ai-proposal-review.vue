@@ -66,6 +66,17 @@ const applySuccessMessage = ref<string | null>(null)
 function clearProposal() {
   proposalSession.value = null
 }
+
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — leaving this screen discards the unsaved
+ * proposal, which is what the on-screen warning already promised. Previously
+ * the session survived in memory, so navigating away and back re-displayed a
+ * proposal the reviewer had walked away from — including any accept/reject
+ * decisions — as though it were still live.
+ */
+onBeforeRouteLeave(() => {
+  proposalSession.value = null
+})
 </script>
 
 <template>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { AdminProduct, ProductMedia } from '~/types/product-cms'
+import type { AdminProduct } from '~/types/product-cms'
 import { workspaceHeroUrl } from '~/utils/productWorkspace'
 import { workspaceMediaResourcesRoute, workspaceAiProposalReviewRoute } from '~/utils/productCentre'
-import { MAX_FILES_PER_REQUEST, type SpecificationProposal, type SourceFileOutcome } from '~/utils/aiProposal'
+import { MAX_FILES_PER_REQUEST, type AiIntakeSource, type SpecificationProposal, type SourceFileOutcome } from '~/utils/aiProposal'
 
 interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
 interface GenerateResponse {
@@ -19,41 +19,36 @@ const router = useRouter()
 const id = String(route.params.id)
 const productId = Number(id)
 
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — this screen reads its own AI-safe source
+ * list, not the general product media endpoint. The general endpoint answers
+ * with Directus file UUIDs, raw `filename_download`, captions and alt text;
+ * none of that is needed here, so none of it is sent to the browser. What
+ * arrives instead is a sanitized display name, plain labels, and an opaque
+ * `sourceRef` that only the server can resolve.
+ */
 const [
   { data: product, error: productError },
-  { data: mediaData, error: mediaFetchError },
+  { data: sourcesData, error: sourcesFetchError },
   { data: providersData, error: providersFetchError },
 ] = await Promise.all([
   useFetch<AdminProduct>(`/api/admin/products/${id}`),
-  useFetch<ProductMedia[]>(`/api/admin/products/${id}/media`),
+  useFetch<AiIntakeSource[]>(`/api/admin/products/${id}/ai/sources`),
   useFetch<AiProviderSummary[]>('/api/admin/ai/providers'),
 ])
 
-const linkedMedia = computed<ProductMedia[]>(() => mediaData.value ?? [])
-
-/**
- * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — a failed media request is tracked
- * separately from an empty list. Falling back to `[]` made a server error
- * render as "this product has no associated files yet", which is a different
- * (and false) statement about the product's data.
- */
-const mediaLoading = ref(false)
-const mediaError = ref(Boolean(mediaFetchError.value))
-
-async function retryMedia() {
-  mediaLoading.value = true
-  mediaError.value = false
-  try {
-    mediaData.value = await $fetch<ProductMedia[]>(`/api/admin/products/${id}/media`)
-  } catch {
-    mediaError.value = true
-  } finally {
-    mediaLoading.value = false
-  }
-}
+const sources = computed<AiIntakeSource[]>(() => sourcesData.value ?? [])
 const notFound = computed(() => Boolean(productError.value) || !product.value)
 const previewHref = computed(() => `/admin/products/${id}/preview`)
 const mediaResourcesHref = computed(() => workspaceMediaResourcesRoute(id))
+
+/**
+ * A failed source request is tracked separately from an empty list. Falling
+ * back to `[]` made a server error render as "this product has no associated
+ * files yet", which is a different (and false) statement about the product.
+ */
+const sourcesLoading = ref(false)
+const sourcesError = ref(Boolean(sourcesFetchError.value))
 
 const providers = computed<AiProviderSummary[]>(() => providersData.value ?? [])
 const providersLoading = ref(false)
@@ -63,6 +58,21 @@ const selectedProviderId = ref<string | null>(
   ?? providers.value.find((p: AiProviderSummary) => p.configured)?.id
   ?? null,
 )
+
+async function retrySources() {
+  sourcesLoading.value = true
+  sourcesError.value = false
+  try {
+    sourcesData.value = await $fetch<AiIntakeSource[]>(`/api/admin/products/${id}/ai/sources`)
+    // Refs are freshly minted by that response; a selection made against the
+    // previous list would be stale, so it is cleared rather than carried over.
+    selectedRefs.value = []
+  } catch {
+    sourcesError.value = true
+  } finally {
+    sourcesLoading.value = false
+  }
+}
 
 async function retryProviders() {
   providersLoading.value = true
@@ -80,20 +90,19 @@ async function retryProviders() {
 }
 
 /**
- * Selection is purely local UI state. Nothing here writes anything — the
- * only request this page can ever issue is the one explicit Analyze call
- * below, and even that never writes product data (it only reads text and
- * calls the AI provider).
+ * Selection is purely local UI state, held as opaque refs. Nothing here writes
+ * anything — the only request this page can ever issue is the one explicit
+ * Analyze call below, and even that never writes product data.
  */
-const selectedIds = ref<number[]>([])
+const selectedRefs = ref<string[]>([])
 
-function toggleSelection(mediaId: number) {
-  const idx = selectedIds.value.indexOf(mediaId)
+function toggleSelection(sourceRef: string) {
+  const idx = selectedRefs.value.indexOf(sourceRef)
   if (idx === -1) {
-    if (selectedIds.value.length >= MAX_FILES_PER_REQUEST) return
-    selectedIds.value.push(mediaId)
+    if (selectedRefs.value.length >= MAX_FILES_PER_REQUEST) return
+    selectedRefs.value.push(sourceRef)
   } else {
-    selectedIds.value.splice(idx, 1)
+    selectedRefs.value.splice(idx, 1)
   }
 }
 
@@ -114,7 +123,7 @@ async function analyze() {
   try {
     const result = await $fetch<GenerateResponse>(`/api/admin/products/${productId}/ai/specification-proposal/generate`, {
       method: 'POST',
-      body: { providerId: selectedProviderId.value, mediaIds: [...selectedIds.value] },
+      body: { providerId: selectedProviderId.value, sourceRefs: [...selectedRefs.value] },
     })
     lastFileResults.value = result.fileResults
     if (!result.ok || !result.proposal) {
@@ -159,14 +168,14 @@ async function analyze() {
     </template>
 
     <WorkspaceAiSourceIntake
-      :linked-media="linkedMedia"
-      :selected-ids="selectedIds"
+      :sources="sources"
+      :selected-refs="selectedRefs"
       :media-resources-href="mediaResourcesHref"
       :providers="providers"
       :providers-loading="providersLoading"
       :providers-error="providersError"
-      :media-error="mediaError"
-      :media-loading="mediaLoading"
+      :sources-error="sourcesError"
+      :sources-loading="sourcesLoading"
       :selected-provider-id="selectedProviderId"
       :analyzing="analyzing"
       :analyze-error="analyzeError"
@@ -175,7 +184,7 @@ async function analyze() {
       @update:selected-provider-id="selectedProviderId = $event"
       @analyze="analyze"
       @retry-providers="retryProviders"
-      @retry-media="retryMedia"
+      @retry-sources="retrySources"
     />
   </WorkspaceShell>
 </template>

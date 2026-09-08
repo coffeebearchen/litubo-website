@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { ProductSpecGroup, ProductSpecItem } from '~/types/product-cms'
 import type { SpecificationProposal, SourceFileOutcome } from '~/utils/aiProposal'
 
@@ -42,17 +42,25 @@ function normalize(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-/** Every existing item keyed by `group::parameter` (for a safe, unambiguous Update target)... */
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — every existing item grouped by
+ * `group::parameter`, keeping ALL matches rather than the last one written.
+ *
+ * The previous map overwrote duplicates, so when a product genuinely had two
+ * items with the same parameter name inside the same group, one was silently
+ * chosen as the Update target. Which one you got depended on iteration order.
+ * A duplicate inside one group is now `ambiguous` exactly like a duplicate
+ * across groups: the reviewer is told, and no target is guessed.
+ */
 const existingByGroupAndParam = computed(() => {
-  const map = new Map<string, { specItemId: number, value: string, groupTitle: string }>()
+  const map = new Map<string, Array<{ specItemId: number, value: string, groupTitle: string }>>()
   for (const group of props.existingSpecGroups) {
     for (const item of group.items ?? []) {
       if (!item.label_en) continue
-      map.set(`${normalize(group.title_en ?? '')}::${normalize(item.label_en)}`, {
-        specItemId: item.id,
-        value: item.value_en ?? '',
-        groupTitle: group.title_en ?? '',
-      })
+      const key = `${normalize(group.title_en ?? '')}::${normalize(item.label_en)}`
+      const list = map.get(key) ?? []
+      list.push({ specItemId: item.id, value: item.value_en ?? '', groupTitle: group.title_en ?? '' })
+      map.set(key, list)
     }
   }
   return map
@@ -93,47 +101,80 @@ const mergedGroups = computed(() => {
   return order.map(key => itemsByKey.get(key)!)
 })
 
-const rows = ref<ReviewRow[]>(
-  mergedGroups.value.flatMap((g, gi) =>
-    g.items.map((it, ii) => {
-      const exactKey = `${normalize(g.displayName)}::${normalize(it.parameter)}`
-      const exact = existingByGroupAndParam.value.get(exactKey)
-      const nameMatches = existingNameOccurrences.value.get(normalize(it.parameter)) ?? []
+interface MatchFields {
+  matchKind: ReviewMatchKind
+  matchedSpecItemId: number | null
+  matchedCurrentValue: string | null
+  matchedGroupTitle: string | null
+}
 
-      let matchKind: ReviewMatchKind = 'none'
-      let matchedSpecItemId: number | null = null
-      let matchedCurrentValue: string | null = null
-      let matchedGroupTitle: string | null = null
+/** Decides how one proposed row relates to the product's existing specifications. */
+function matchFor(groupName: string, parameter: string): MatchFields {
+  const exactMatches = existingByGroupAndParam.value.get(`${normalize(groupName)}::${normalize(parameter)}`) ?? []
+  const nameMatches = existingNameOccurrences.value.get(normalize(parameter)) ?? []
 
-      if (exact) {
-        matchKind = 'exact'
-        matchedSpecItemId = exact.specItemId
-        matchedCurrentValue = exact.value
-        matchedGroupTitle = exact.groupTitle
-      } else if (nameMatches.length > 0) {
-        matchKind = 'ambiguous'
-        matchedCurrentValue = nameMatches[0].value
-        matchedGroupTitle = nameMatches.length === 1 ? nameMatches[0].groupTitle : `${nameMatches.length} other groups`
-      }
+  // Exactly one item with this parameter in this group: a safe Update target.
+  if (exactMatches.length === 1) {
+    return {
+      matchKind: 'exact',
+      matchedSpecItemId: exactMatches[0].specItemId,
+      matchedCurrentValue: exactMatches[0].value,
+      matchedGroupTitle: exactMatches[0].groupTitle,
+    }
+  }
+  // More than one inside the same group — genuinely ambiguous, never guessed.
+  if (exactMatches.length > 1) {
+    return {
+      matchKind: 'ambiguous',
+      matchedSpecItemId: null,
+      matchedCurrentValue: exactMatches[0].value,
+      matchedGroupTitle: `${exactMatches.length} items in this group`,
+    }
+  }
+  // Same name, different group(s).
+  if (nameMatches.length > 0) {
+    return {
+      matchKind: 'ambiguous',
+      matchedSpecItemId: null,
+      matchedCurrentValue: nameMatches[0].value,
+      matchedGroupTitle: nameMatches.length === 1 ? nameMatches[0].groupTitle : `${nameMatches.length} other groups`,
+    }
+  }
+  return { matchKind: 'none', matchedSpecItemId: null, matchedCurrentValue: null, matchedGroupTitle: null }
+}
 
-      return {
-        key: `${gi}-${ii}`,
-        group: g.displayName,
-        parameter: it.parameter,
-        value: it.value,
-        note: it.note ?? '',
-        status: 'pending' as const,
-        editing: false,
-        draftValue: it.value,
-        draftNote: it.note ?? '',
-        matchKind,
-        matchedSpecItemId,
-        matchedCurrentValue,
-        matchedGroupTitle,
-      }
-    }),
-  ),
-)
+function buildRows(): ReviewRow[] {
+  return mergedGroups.value.flatMap((g, gi) =>
+    g.items.map((it, ii) => ({
+      key: `${gi}-${ii}`,
+      group: g.displayName,
+      parameter: it.parameter,
+      value: it.value,
+      note: it.note ?? '',
+      status: 'pending' as const,
+      editing: false,
+      draftValue: it.value,
+      draftNote: it.note ?? '',
+      ...matchFor(g.displayName, it.parameter),
+    })),
+  )
+}
+
+const rows = ref<ReviewRow[]>(buildRows())
+
+/**
+ * When the existing specifications arrive late — the first load failed and the
+ * reviewer pressed Retry — every row's match state has to be recomputed.
+ * Without this the rows keep the "no existing specifications" verdict they were
+ * built with, so a conflicting item silently reads as brand new. Accept/reject
+ * decisions and edits already made are preserved; only the comparison against
+ * the product is refreshed.
+ */
+watch(() => props.existingSpecGroups, () => {
+  for (const row of rows.value) {
+    Object.assign(row, matchFor(row.group, row.parameter))
+  }
+}, { deep: true })
 
 const unsupportedFiles = computed(() => props.fileResults.filter(f => f.status !== 'read'))
 const readFiles = computed(() => props.fileResults.filter(f => f.status === 'read'))

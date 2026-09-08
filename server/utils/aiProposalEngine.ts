@@ -164,7 +164,11 @@ async function downloadSourceBytes(fetch: FetchFn, fileUuid: string): Promise<Ar
       for (;;) {
         const next = await Promise.race([reader.read(), timedOut])
         if (next === DOWNLOAD_TIMED_OUT) {
-          await reader.cancel().catch(() => {})
+          // Deliberately NOT awaited: `cancel()` is itself a call into the
+          // transport, and a transport that has already stopped responding can
+          // leave it pending forever — which would make the deadline that just
+          // fired meaningless. Ask it to stop, then return.
+          void reader.cancel().catch(() => {})
           return null
         }
         const { done, value } = next
@@ -173,8 +177,9 @@ async function downloadSourceBytes(fetch: FetchFn, fileUuid: string): Promise<Ar
         received += value.byteLength
         if (received > MAX_FILE_BYTES) {
           // Stop the transfer rather than read on to discover how big it was.
+          // `cancel()` is not awaited for the same reason as above.
           controller.abort()
-          await reader.cancel().catch(() => {})
+          void reader.cancel().catch(() => {})
           return null
         }
         chunks.push(value)

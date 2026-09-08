@@ -1,45 +1,40 @@
 // @vitest-environment happy-dom
 /**
- * PWS-AI-ENGINE-01R — real component-mounting behavior tests for
- * `WorkspaceAiSourceIntake.vue`, using `@vue/test-utils` against the actual
- * mounted component (not `readFileSync` + string matching). This is a
- * purely presentational component (props/emits only, no Nuxt composable
- * calls), so it mounts directly without `@nuxt/test-utils`.
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — real component-mounting behavior tests
+ * for `WorkspaceAiSourceIntake.vue`, using `@vue/test-utils` against the
+ * actual mounted component (not `readFileSync` + string matching).
+ *
+ * The component now receives the AI-safe source DTO — an opaque `sourceRef`
+ * plus already-sanitized display fields — so these tests double as the proof
+ * that no Directus id, raw filename, caption or alt text is needed to render
+ * this screen.
  */
 
 import { describe, it, expect } from 'vitest'
 import { mount, type ComponentMountingOptions } from '@vue/test-utils'
 import WorkspaceAiSourceIntake from '../../components/admin/workspace/WorkspaceAiSourceIntake.vue'
-import type { ProductMedia } from '../../types/product-cms'
+import type { AiIntakeSource } from '../../utils/aiProposal'
 
-function media(overrides: Partial<ProductMedia> & { id: number }): ProductMedia {
+function source(overrides: Partial<AiIntakeSource> & { sourceRef: string }): AiIntakeSource {
   return {
-    products_id: 1,
-    directus_files_id: 'uuid',
-    file_role: null,
-    alt_en: null, alt_es: null, alt_pt: null,
-    caption_en: null, caption_es: null, caption_pt: null,
-    enabled: true,
-    language: null,
-    version_label: null,
-    sort: null,
-    file_date: null,
-    filename_download: 'file.txt',
-    type: 'text/plain',
-    width: null, height: null,
+    displayName: 'notes.txt',
+    typeLabel: 'Text',
+    roleLabel: 'Role not set',
+    analyzable: true,
+    unavailableReason: null,
     ...overrides,
-  } as ProductMedia
+  }
 }
 
 const BASE_PROPS = {
-  linkedMedia: [] as ProductMedia[],
-  selectedIds: [] as number[],
+  sources: [] as AiIntakeSource[],
+  selectedRefs: [] as string[],
   mediaResourcesHref: '/admin/product-workspace/1/media-resources',
   providers: [{ id: 'deepseek', label: 'DeepSeek', configured: true, isDefault: true }],
   providersLoading: false,
   providersError: false,
-  mediaError: false,
-  mediaLoading: false,
+  sourcesError: false,
+  sourcesLoading: false,
   selectedProviderId: 'deepseek',
   analyzing: false,
   analyzeError: null,
@@ -54,51 +49,78 @@ function mountIntake(props: ComponentMountingOptions<typeof WorkspaceAiSourceInt
 }
 
 describe('WorkspaceAiSourceIntake — real mounted component', () => {
-  it('clicking a text file\'s checkbox emits toggle with its id', async () => {
-    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [media({ id: 5, type: 'text/plain', filename_download: 'notes.txt' })] })
+  it('clicking an analyzable file\'s checkbox emits toggle with its opaque ref', async () => {
+    const wrapper = mountIntake({ ...BASE_PROPS, sources: [source({ sourceRef: 'ref-abc' })] })
     await wrapper.find('input[type="checkbox"]').setValue(true)
-    expect(wrapper.emitted('toggle')).toEqual([[5]])
+    expect(wrapper.emitted('toggle')).toEqual([['ref-abc']])
   })
 
-  it('an image file\'s checkbox is really disabled in the DOM — cannot be clicked into selection', () => {
-    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [media({ id: 6, type: 'image/jpeg', filename_download: 'photo.jpg' })] })
-    const checkbox = wrapper.find('input[type="checkbox"]')
-    expect((checkbox.element as HTMLInputElement).disabled).toBe(true)
-    expect(wrapper.text()).toContain('Not available for text-source analysis yet')
+  it('a non-analyzable file\'s checkbox is really disabled in the DOM, with the server\'s reason shown', () => {
+    const wrapper = mountIntake({
+      ...BASE_PROPS,
+      sources: [source({
+        sourceRef: 'ref-img',
+        displayName: 'photo.jpg',
+        typeLabel: 'Image',
+        analyzable: false,
+        unavailableReason: 'Not available for text-source analysis yet.',
+      })],
+    })
+    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).disabled).toBe(true)
+    expect(wrapper.text()).toContain('Not available for text-source analysis yet.')
   })
 
-  it('an Excel file shows the distinct "Excel files are not supported" reason, not the generic one', () => {
-    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [media({ id: 7, type: 'application/vnd.ms-excel', filename_download: 'sheet.xls' })] })
-    expect(wrapper.text()).toContain('Excel files are not supported for text-source analysis yet')
+  it('renders whatever specific reason the server supplied, rather than deriving one in the browser', () => {
+    const wrapper = mountIntake({
+      ...BASE_PROPS,
+      sources: [source({
+        sourceRef: 'ref-xls',
+        displayName: 'sheet.xls',
+        analyzable: false,
+        unavailableReason: 'Excel files are not supported for text-source analysis yet.',
+      })],
+    })
+    expect(wrapper.text()).toContain('Excel files are not supported for text-source analysis yet.')
+  })
+
+  it('a disabled association shows the disabled reason and cannot be selected', () => {
+    const wrapper = mountIntake({
+      ...BASE_PROPS,
+      sources: [source({
+        sourceRef: 'ref-disabled',
+        analyzable: false,
+        unavailableReason: 'This file is disabled for this product, so it cannot be analyzed. Enable it in Media & resources first.',
+      })],
+    })
+    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).disabled).toBe(true)
+    expect(wrapper.text()).toContain('This file is disabled for this product')
   })
 
   it('shows the live "N / 5 selected" counter', () => {
-    const wrapper = mountIntake({ ...BASE_PROPS, selectedIds: [1, 2] })
+    const wrapper = mountIntake({ ...BASE_PROPS, selectedRefs: ['a', 'b'] })
     expect(wrapper.text()).toContain('2 / 5 selected')
   })
 
   it('once 5 files are selected, an unselected file\'s checkbox becomes disabled (cap enforced in the DOM)', () => {
     const wrapper = mountIntake({
       ...BASE_PROPS,
-      linkedMedia: [media({ id: 99, type: 'text/plain' })],
-      selectedIds: [1, 2, 3, 4, 5],
+      sources: [source({ sourceRef: 'ref-6' })],
+      selectedRefs: ['a', 'b', 'c', 'd', 'e'],
     })
-    const checkbox = wrapper.find('input[type="checkbox"]')
-    expect((checkbox.element as HTMLInputElement).disabled).toBe(true)
+    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).disabled).toBe(true)
   })
 
   it('an already-selected file stays clickable (to deselect) even at the cap', () => {
     const wrapper = mountIntake({
       ...BASE_PROPS,
-      linkedMedia: [media({ id: 1, type: 'text/plain' })],
-      selectedIds: [1, 2, 3, 4, 5],
+      sources: [source({ sourceRef: 'a' })],
+      selectedRefs: ['a', 'b', 'c', 'd', 'e'],
     })
-    const checkbox = wrapper.find('input[type="checkbox"]')
-    expect((checkbox.element as HTMLInputElement).disabled).toBe(false)
+    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).disabled).toBe(false)
   })
 
   it('clicking "Analyze selected sources" emits analyze — only when enabled', async () => {
-    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [media({ id: 1, type: 'text/plain' })], selectedIds: [1] })
+    const wrapper = mountIntake({ ...BASE_PROPS, sources: [source({ sourceRef: 'a' })], selectedRefs: ['a'] })
     const button = wrapper.findAll('button').find(b => b.text().includes('Analyze selected sources'))!
     expect((button.element as HTMLButtonElement).disabled).toBe(false)
     await button.trigger('click')
@@ -108,8 +130,8 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
   it('Analyze is really disabled in the DOM when no provider is configured, even with a valid selection', () => {
     const wrapper = mountIntake({
       ...BASE_PROPS,
-      linkedMedia: [media({ id: 1, type: 'text/plain' })],
-      selectedIds: [1],
+      sources: [source({ sourceRef: 'a' })],
+      selectedRefs: ['a'],
       providers: [{ id: 'deepseek', label: 'DeepSeek', configured: false, isDefault: true }],
       selectedProviderId: null,
     })
@@ -127,41 +149,25 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
     expect(wrapper.emitted('retry-providers')).toHaveLength(1)
   })
 
-  it('a product with only image files shows the honest no-readable-sources explanation with supported formats and a link back to Media & resources', () => {
-    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [media({ id: 1, type: 'image/jpeg' }), media({ id: 2, type: 'image/png' })] })
-    expect(wrapper.text()).toContain('PDF')
+  it('a product with no analyzable files shows the honest explanation, the supported formats, and a link back to Media & resources', () => {
+    const wrapper = mountIntake({
+      ...BASE_PROPS,
+      sources: [
+        source({ sourceRef: 'a', typeLabel: 'Image', analyzable: false, unavailableReason: 'Not available for text-source analysis yet.' }),
+        source({ sourceRef: 'b', typeLabel: 'Image', analyzable: false, unavailableReason: 'Not available for text-source analysis yet.' }),
+      ],
+    })
     expect(wrapper.text()).toContain('CSV')
     expect(wrapper.text()).toContain('TXT')
+    // PDF is deliberately absent now — the copy must not advertise a format the server refuses.
+    expect(wrapper.text()).not.toContain('PDF (with extractable text)')
     expect(wrapper.find('a').exists()).toBe(true)
   })
 })
 
-// ── PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — the page must state its real state ──
-
-describe('WorkspaceAiSourceIntake — disabled associations and load failures are shown honestly', () => {
-  it('a disabled text file cannot be selected, and says why', () => {
-    const wrapper = mountIntake({
-      ...BASE_PROPS,
-      linkedMedia: [media({ id: 11, type: 'text/plain', filename_download: 'notes.txt', enabled: false })],
-    })
-
-    const checkbox = wrapper.find('input[type="checkbox"]')
-    expect((checkbox.element as HTMLInputElement).disabled).toBe(true)
-    expect(wrapper.text()).toContain('This file is disabled for this product')
-    // Not the generic format message — the reason shown is the real one.
-    expect(wrapper.text()).not.toContain('Not available for text-source analysis yet')
-  })
-
-  it('an enabled text file is still selectable', () => {
-    const wrapper = mountIntake({
-      ...BASE_PROPS,
-      linkedMedia: [media({ id: 12, type: 'text/plain', filename_download: 'notes.txt', enabled: true })],
-    })
-    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).disabled).toBe(false)
-  })
-
-  it('a failed media load shows an error and a Retry, never "this product has no associated files"', async () => {
-    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [], mediaError: true })
+describe('WorkspaceAiSourceIntake — load failures are shown honestly', () => {
+  it('a failed source load shows an error and a Retry, never "this product has no associated files"', async () => {
+    const wrapper = mountIntake({ ...BASE_PROPS, sources: [], sourcesError: true })
 
     expect(wrapper.text()).toContain('Could not load this product\'s files')
     expect(wrapper.text()).not.toContain('This product has no associated files yet')
@@ -169,17 +175,35 @@ describe('WorkspaceAiSourceIntake — disabled associations and load failures ar
 
     const retry = wrapper.findAll('button').find(b => b.text() === 'Retry')!
     await retry.trigger('click')
-    expect(wrapper.emitted('retry-media')).toHaveLength(1)
+    expect(wrapper.emitted('retry-sources')).toHaveLength(1)
   })
 
   it('a genuinely empty product still says so', () => {
-    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [], mediaError: false })
+    const wrapper = mountIntake({ ...BASE_PROPS, sources: [], sourcesError: false })
     expect(wrapper.text()).toContain('This product has no associated files yet')
   })
 
-  it('while media is loading it says loading, not empty', () => {
-    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [], mediaLoading: true })
+  it('while sources are loading it says loading, not empty', () => {
+    const wrapper = mountIntake({ ...BASE_PROPS, sources: [], sourcesLoading: true })
     expect(wrapper.text()).toContain('Loading this product\'s files…')
     expect(wrapper.text()).not.toContain('This product has no associated files yet')
+  })
+})
+
+describe('WorkspaceAiSourceIntake — nothing sensitive is required to render it', () => {
+  it('renders a full file card from the safe DTO alone — no id, filename, caption or alt is available to it', () => {
+    const wrapper = mountIntake({
+      ...BASE_PROPS,
+      sources: [source({ sourceRef: 'opaque-ref-1', displayName: 'Source file', typeLabel: 'Text', roleLabel: 'Datasheet' })],
+    })
+
+    const html = wrapper.html()
+    expect(html).toContain('Source file')
+    expect(html).toContain('Datasheet')
+    // The opaque ref is a value, never rendered as user-facing text.
+    expect(wrapper.text()).not.toContain('opaque-ref-1')
+    // Nothing resembling a Directus identifier can appear, because none is passed.
+    expect(html).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+    expect(html).not.toContain('directus_files_id')
   })
 })

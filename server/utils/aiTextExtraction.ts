@@ -1,14 +1,10 @@
-import { extractPdfTextInWorker } from './pdfExtractionWorker'
-
 /**
  * PWS-AI-ENGINE-01R — server-only, text-only source extraction.
  *
- * Supported this round, strictly enforced by `isSupportedTextSourceMime()`:
- * PDFs with extractable text, CSV, TSV, and TXT. XLS/XLSX are explicitly
- * NOT supported this round (see the note below) — everything else (images,
- * scanned/no-text PDFs, Word, video, archives, and any other format) is
- * refused, never faked. No OCR, no vision, no external file API is used
- * anywhere in this module.
+ * Supported, strictly enforced by `isSupportedTextSourceMime()`: CSV, TSV and
+ * TXT. Everything else — PDF (see below), XLS/XLSX, images, Word, video,
+ * archives — is refused, never faked. No OCR, no vision, no external file API
+ * is used anywhere in this module.
  *
  * XLS/XLSX removed: PWS-AI-ENGINE-01's `xlsx` (SheetJS) dependency could not
  * be safely required on Windows `nuxt dev` (its `.mjs` entry crashed every
@@ -23,19 +19,21 @@ import { extractPdfTextInWorker } from './pdfExtractionWorker'
  * bounded parser, XLS/XLSX is left unsupported until a safe, streaming-
  * capable replacement is found.
  *
- * PDF parsing uses `pdfjs-dist` (the legacy ESM build) directly, inside the
- * terminable worker in `pdfExtractionWorker.ts`. It replaced `unpdf`, which
- * declared `engines: { node: ">=22" }` while this project's production
- * runtime is Node 20; `pdfjs-dist@4.10.38` declares `>=20` and was verified
- * on a real Node 20.18.1 runtime. This is not a return to `pdf-parse`, whose
- * bundled legacy build crashed every route of this project's Windows
- * `nuxt dev` server through dynamic template-string `require()` — the engine
- * here is imported once, by explicit absolute path, inside the worker.
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — PDF is temporarily NOT supported, and
+ * the parser has been removed rather than left in place behind a caveat.
  *
- * PWS-AI-ENGINE-01R2-SAFETY-02 — the PDF parse itself no longer runs in this
- * process: it is delegated to a terminable worker thread (see
- * `pdfExtractionWorker.ts`), so `MAX_PROCESSING_MS` is enforced by really
- * stopping the parse rather than by abandoning a promise that keeps running.
+ * The previous implementation ran pdf.js in a `worker_threads` worker with
+ * `resourceLimits`, and this file claimed that bounded its memory. Review
+ * established that claim was wrong on two counts: `resourceLimits` bounds the
+ * V8 heap but not ArrayBuffer/external allocations, which is exactly where
+ * decoded PDF content lives, and `page.getTextContent()` fully materializes a
+ * page's content before any character limit can apply. A decompression-bomb
+ * PDF therefore had no real ceiling. Rather than ship a parser whose safety
+ * story does not hold, PDF is refused with an honest reason.
+ *
+ * Restoring PDF requires genuine process- or container-level resource
+ * isolation (an out-of-process parser with an OS-enforced memory cap), which
+ * is a separate, separately scheduled piece of work — not a flag flip here.
  *
  * File bytes and extracted text exist only for the lifetime of one request:
  * this module returns plain strings to its caller and keeps no cache, no
@@ -54,23 +52,24 @@ export const MAX_TOTAL_EXTRACTED_CHARS = 60_000
 /** Hard ceiling on the text extracted from any single file — enforced while parsing, not after. */
 export const MAX_PER_FILE_CHARS = 20_000
 
-/** A PDF is only ever read up to this many pages — later pages are never opened. */
-export const MAX_PDF_PAGES = 30
-
 /** A single file's extraction is aborted (safely, honestly) if it runs longer than this. */
 export const MAX_PROCESSING_MS = 10_000
 
 const SUPPORTED_MIME_TYPES = new Set([
-  'application/pdf',
   'text/csv',
   'text/tab-separated-values',
   'text/plain',
 ])
 
-/** MIME types this module used to support in PWS-AI-ENGINE-01 but no longer does — shown a distinct, honest reason, never lumped in with "never supported". */
-const FORMERLY_SUPPORTED_MIME_TYPES = new Set([
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-  'application/vnd.ms-excel', // .xls
+/**
+ * Formats this module used to support and deliberately stopped supporting.
+ * Each gets its own honest reason in the UI, never lumped in with "this file
+ * type was never supported".
+ */
+const TEMPORARILY_UNSUPPORTED_MIME_REASONS = new Map<string, string>([
+  ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Excel files are not supported for text-source analysis yet.'],
+  ['application/vnd.ms-excel', 'Excel files are not supported for text-source analysis yet.'],
+  ['application/pdf', 'PDF is not supported for text-source analysis yet — it needs an isolated parser with a real memory limit.'],
 ])
 
 export function isSupportedTextSourceMime(mimeType: string | null | undefined): boolean {
@@ -80,13 +79,17 @@ export function isSupportedTextSourceMime(mimeType: string | null | undefined): 
 
 /** True only for a format this module deliberately stopped supporting — used to show a distinct, honest UI reason. */
 export function isFormerlyUnsupportedTextSourceMime(mimeType: string | null | undefined): boolean {
-  if (!mimeType) return false
-  return FORMERLY_SUPPORTED_MIME_TYPES.has(mimeType.toLowerCase().split(';')[0].trim())
+  return temporarilyUnsupportedReason(mimeType) !== null
+}
+
+/** The specific, honest reason a deliberately-dropped format is refused, or null if this type was simply never supported. */
+export function temporarilyUnsupportedReason(mimeType: string | null | undefined): string | null {
+  if (!mimeType) return null
+  return TEMPORARILY_UNSUPPORTED_MIME_REASONS.get(mimeType.toLowerCase().split(';')[0].trim()) ?? null
 }
 
 function friendlyFileType(mimeType: string): string {
   const mime = mimeType.toLowerCase()
-  if (mime === 'application/pdf') return 'PDF'
   if (mime === 'text/csv') return 'CSV'
   if (mime === 'text/tab-separated-values') return 'TSV'
   if (mime === 'text/plain') return 'Text'
@@ -105,7 +108,7 @@ const MAX_SAFE_DISPLAY_NAME_LENGTH = 120
 const UNSAFE_FILENAME_PATTERNS: RegExp[] = [
   /https?:\/\//i, // URL
   /\bwww\./i, // bare www. URL
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i, // UUID
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i, // UUID, anywhere in the name — not only at a word boundary
   /[/\\]/, // any path separator — a real filename never legitimately contains one
   // eslint-disable-next-line no-control-regex
   /[\x00-\x1F\x7F]/, // control characters, including newlines/tabs a delimiter-injection or prompt-injection attempt would need
@@ -151,38 +154,20 @@ export function isFileSizeSafeToDownload(knownSizeBytes: number | null | undefin
 }
 
 /**
- * PWS-AI-ENGINE-01R2-SAFETY-02 — PDF parsing runs in a terminable worker
- * thread (`pdfExtractionWorker.ts`), not in this process. `MAX_PROCESSING_MS`
- * is enforced by actually terminating that thread, so a pathological PDF
- * cannot keep burning the server's JavaScript thread after the caller has
- * given up. Page and character limits are re-applied inside the worker
- * itself, not only here.
- */
-async function extractPdfText(bytes: ArrayBuffer, moduleEntry?: string): Promise<string> {
-  const outcome = await extractPdfTextInWorker(bytes, {
-    timeoutMs: MAX_PROCESSING_MS,
-    maxPages: MAX_PDF_PAGES,
-    maxChars: MAX_PER_FILE_CHARS,
-    maxBytes: MAX_FILE_BYTES,
-    moduleEntry,
-  })
-  if (!outcome.ok) throw new Error(outcome.reason)
-  return outcome.text
-}
-
-/**
  * Extracts plain text from one already-downloaded file's bytes. Never
- * throws — any failure (corrupt file, encrypted PDF, unreadable stream,
- * etc.) becomes a short, safe `{ ok: false, reason }` result naming only the
- * problem category, never an internal error message, stack trace, or any
- * fragment of the file's own content.
+ * throws — any failure (corrupt file, unreadable stream, etc.) becomes a
+ * short, safe `{ ok: false, reason }` result naming only the problem
+ * category, never an internal error message, stack trace, or any fragment of
+ * the file's own content.
+ *
+ * Only UTF-8 text formats are decoded here; there is no document parser in
+ * this process at all, which is what makes the per-file character ceiling
+ * meaningful rather than aspirational.
  */
 export async function extractTextFromFile(
   bytes: ArrayBuffer,
   mimeType: string | null | undefined,
   displayName: string,
-  /** Test-only: the module the PDF worker imports the engine from. Production always uses the real `pdfjs-dist`. */
-  pdfModuleEntry?: string,
 ): Promise<ExtractionResult> {
   if (bytes.byteLength === 0) {
     return { ok: false, reason: 'This file is empty.' }
@@ -190,8 +175,9 @@ export async function extractTextFromFile(
   if (bytes.byteLength > MAX_FILE_BYTES) {
     return { ok: false, reason: 'This file is too large to analyze.' }
   }
-  if (isFormerlyUnsupportedTextSourceMime(mimeType)) {
-    return { ok: false, reason: 'Excel files are not supported for text-source analysis yet.' }
+  const droppedFormatReason = temporarilyUnsupportedReason(mimeType)
+  if (droppedFormatReason) {
+    return { ok: false, reason: droppedFormatReason }
   }
   if (!isSupportedTextSourceMime(mimeType)) {
     return { ok: false, reason: 'This file type is not supported for text-source analysis yet.' }
@@ -201,19 +187,15 @@ export async function extractTextFromFile(
 
   let text = ''
   try {
-    if (mime === 'application/pdf') {
-      text = await extractPdfText(bytes, pdfModuleEntry)
-    } else {
-      // text/csv, text/tab-separated-values, text/plain
-      text = Buffer.from(bytes).toString('utf-8')
-    }
+    // text/csv, text/tab-separated-values, text/plain
+    text = Buffer.from(bytes).toString('utf-8')
   } catch {
     return { ok: false, reason: 'This file could not be read.' }
   }
 
   text = text.trim().slice(0, MAX_PER_FILE_CHARS)
   if (!text) {
-    return { ok: false, reason: 'No extractable text was found in this file (it may be a scanned or image-only document).' }
+    return { ok: false, reason: 'No extractable text was found in this file.' }
   }
 
   return {

@@ -1,27 +1,28 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ProductMedia } from '~/types/product-cms'
-import {
-  sourceFileTypeLabel,
-  fileRoleLabel,
-  aiIntakeFileDisplayName,
-  mediaReadableLabel,
-} from '~/utils/productWorkspace'
-import { isTextSourceMime, isFormerlyTextSourceMime, MAX_FILES_PER_REQUEST, SUPPORTED_TEXT_SOURCE_FORMATS_LABEL } from '~/utils/aiProposal'
+import { MAX_FILES_PER_REQUEST, SUPPORTED_TEXT_SOURCE_FORMATS_LABEL, type AiIntakeSource } from '~/utils/aiProposal'
 
 interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
 interface FileOutcome { displayName: string, status: 'read' | 'unsupported' | 'unreadable', reason?: string }
 
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — this component renders the AI-safe source
+ * DTO only. It has no access to Directus ids, raw filenames, captions or alt
+ * text, because the server never sends them here: each source arrives as an
+ * opaque `sourceRef` plus already-sanitized display fields, and the reason a
+ * file cannot be analyzed is decided server-side rather than re-derived from a
+ * MIME type in the browser.
+ */
 const props = defineProps<{
-  linkedMedia: ProductMedia[]
-  selectedIds: number[]
+  sources: AiIntakeSource[]
+  selectedRefs: string[]
   mediaResourcesHref: string
   providers: AiProviderSummary[]
   providersLoading: boolean
   providersError: boolean
-  /** True when the linked-media request itself failed — never conflated with "this product has no files". */
-  mediaError: boolean
-  mediaLoading: boolean
+  /** True when the source-list request itself failed — never conflated with "this product has no files". */
+  sourcesError: boolean
+  sourcesLoading: boolean
   selectedProviderId: string | null
   analyzing: boolean
   analyzeError: string | null
@@ -29,59 +30,36 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  toggle: [id: number]
+  toggle: [sourceRef: string]
   'update:selectedProviderId': [id: string]
   analyze: []
   'retry-providers': []
-  'retry-media': []
+  'retry-sources': []
 }>()
 
-const selectedSet = computed(() => new Set(props.selectedIds))
+const selectedSet = computed(() => new Set(props.selectedRefs))
 
-function isSelected(id: number): boolean {
-  return selectedSet.value.has(id)
+function isSelected(sourceRef: string): boolean {
+  return selectedSet.value.has(sourceRef)
 }
 
-/**
- * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — a disabled association is not analyzable.
- * The server only ever resolves rows with `enabled = true`, so offering a
- * disabled file as selectable meant the checkbox worked, Analyze ran, and the
- * file was silently dropped server-side with a generic reason. It is now
- * unselectable, with the actual reason shown on the card.
- */
-function isAnalyzable(m: ProductMedia): boolean {
-  return isTextSourceMime(m.type ?? null) && m.enabled === true
-}
-
-function isDisabledAssociation(m: ProductMedia): boolean {
-  return isTextSourceMime(m.type ?? null) && m.enabled !== true
-}
-
-function isFormerlySupported(m: ProductMedia): boolean {
-  return isFormerlyTextSourceMime(m.type ?? null)
-}
-
-const analyzableMedia = computed(() => props.linkedMedia.filter(isAnalyzable))
-const hasAnyAnalyzableMedia = computed(() => analyzableMedia.value.length > 0)
+const analyzableSources = computed(() => props.sources.filter(s => s.analyzable))
+const hasAnyAnalyzableSource = computed(() => analyzableSources.value.length > 0)
 
 const configuredProviders = computed(() => props.providers.filter(p => p.configured))
 const hasConfiguredProvider = computed(() => configuredProviders.value.length > 0)
 
-const atSelectionCap = computed(() => props.selectedIds.length >= MAX_FILES_PER_REQUEST)
+const atSelectionCap = computed(() => props.selectedRefs.length >= MAX_FILES_PER_REQUEST)
 
-/** A checkbox is disabled if the file isn't analyzable, OR the cap is reached and this file isn't already one of the selected ones. */
-function isCheckboxDisabled(m: ProductMedia): boolean {
-  if (!isAnalyzable(m)) return true
-  if (isSelected(m.id)) return false
+/** Disabled when the server says the file is not analyzable, OR the cap is reached and this file is not already selected. */
+function isCheckboxDisabled(source: AiIntakeSource): boolean {
+  if (!source.analyzable) return true
+  if (isSelected(source.sourceRef)) return false
   return atSelectionCap.value
 }
 
-const selectableCount = computed(() =>
-  props.linkedMedia.filter(m => isAnalyzable(m) && isSelected(m.id)).length,
-)
-
 const canAnalyze = computed(() =>
-  selectableCount.value > 0 && hasConfiguredProvider.value && !props.analyzing,
+  props.selectedRefs.length > 0 && hasConfiguredProvider.value && !props.analyzing,
 )
 </script>
 
@@ -91,15 +69,14 @@ const canAnalyze = computed(() =>
       Selecting a file never calls an AI model or writes anything. Only clicking "Analyze selected sources" below sends the selected text sources to the configured AI provider.
     </p>
 
-    <!-- ── 4-step flow indicator — Select sources is the current step ── -->
+    <!-- 4-step flow indicator - Select sources is the current step -->
     <ol class="ws-steps" aria-label="AI proposal workflow">
       <li class="ws-step ws-step--current"><span class="ws-step-index">1</span> Select sources</li>
       <li class="ws-step"><span class="ws-step-index">2</span> Analyze</li>
       <li class="ws-step"><span class="ws-step-index">3</span> Review proposals</li>
-      <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft</li>
+      <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft (temporarily unavailable)</li>
     </ol>
 
-    <!-- ── Provider status ── -->
     <section class="ws-card" aria-labelledby="ws-ai-provider-heading">
       <h2 id="ws-ai-provider-heading" class="ws-card-title">AI provider</h2>
       <p v-if="providersLoading" class="ws-empty">Loading provider status…</p>
@@ -125,62 +102,61 @@ const canAnalyze = computed(() =>
     <section class="ws-card" aria-labelledby="ws-ai-intake-heading">
       <div class="ws-card-header">
         <h2 id="ws-ai-intake-heading" class="ws-card-title">Select source files for this product</h2>
-        <span class="ws-selected-count">{{ selectedIds.length }} / {{ MAX_FILES_PER_REQUEST }} selected</span>
+        <span class="ws-selected-count">{{ selectedRefs.length }} / {{ MAX_FILES_PER_REQUEST }} selected</span>
       </div>
 
       <!--
         A failed request is never presented as "no files": that would tell an
-        editor their product is empty when in fact the server could not be
-        reached, and would hide files that do exist.
+        editor their product is empty when the server could not be reached,
+        and would hide files that do exist.
       -->
-      <p v-if="mediaLoading" class="ws-empty">Loading this product's files…</p>
+      <p v-if="sourcesLoading" class="ws-empty">Loading this product&apos;s files…</p>
 
-      <div v-else-if="mediaError" class="ws-provider-error" role="alert">
-        <p>Could not load this product's files. This is a loading error, not an empty product.</p>
-        <button type="button" class="ws-retry-btn" @click="emit('retry-media')">Retry</button>
+      <div v-else-if="sourcesError" class="ws-provider-error" role="alert">
+        <p>Could not load this product&apos;s files. This is a loading error, not an empty product.</p>
+        <button type="button" class="ws-retry-btn" @click="emit('retry-sources')">Retry</button>
       </div>
 
-      <p v-else-if="linkedMedia.length === 0" class="ws-empty">
+      <p v-else-if="sources.length === 0" class="ws-empty">
         This product has no associated files yet.
         <NuxtLink :to="mediaResourcesHref">Go to Media &amp; resources</NuxtLink> to associate one first.
       </p>
 
-      <p v-else-if="!hasAnyAnalyzableMedia" class="ws-empty ws-empty--no-readable">
-        None of this product's linked files can be analyzed as text yet — they may all be images, disabled for this product, or another unsupported format.
+      <p v-else-if="!hasAnyAnalyzableSource" class="ws-empty ws-empty--no-readable">
+        None of this product&apos;s linked files can be analyzed as text yet — they may all be images, disabled for this product, or another unsupported format.
         Supported formats: {{ SUPPORTED_TEXT_SOURCE_FORMATS_LABEL }}.
         <NuxtLink :to="mediaResourcesHref">Go to Media &amp; resources</NuxtLink> to link a readable file.
       </p>
 
-      <ul v-if="!mediaLoading && !mediaError && linkedMedia.length > 0" class="ws-file-grid" role="list">
-        <li v-for="m in linkedMedia" :key="m.id" class="ws-file-card" :class="{ 'ws-file-card--selected': isSelected(m.id) }">
-          <label class="ws-file-label" :class="{ 'ws-file-label--disabled': isCheckboxDisabled(m) }">
+      <ul v-if="!sourcesLoading && !sourcesError && sources.length > 0" class="ws-file-grid" role="list">
+        <li
+          v-for="source in sources"
+          :key="source.sourceRef"
+          class="ws-file-card"
+          :class="{ 'ws-file-card--selected': isSelected(source.sourceRef) }"
+        >
+          <label class="ws-file-label" :class="{ 'ws-file-label--disabled': isCheckboxDisabled(source) }">
             <input
               type="checkbox"
               class="ws-file-checkbox"
-              :disabled="isCheckboxDisabled(m)"
-              :checked="isSelected(m.id)"
-              @change="emit('toggle', m.id)"
+              :disabled="isCheckboxDisabled(source)"
+              :checked="isSelected(source.sourceRef)"
+              @change="emit('toggle', source.sourceRef)"
             >
-            <span class="ws-file-name">{{ aiIntakeFileDisplayName(m) }}</span>
+            <span class="ws-file-name">{{ source.displayName }}</span>
           </label>
           <dl class="ws-file-facts">
             <dt>Type</dt>
-            <dd>{{ sourceFileTypeLabel(m.type ?? null) }}</dd>
+            <dd>{{ source.typeLabel }}</dd>
             <dt>Role</dt>
-            <dd>{{ fileRoleLabel(m.file_role) }}</dd>
-            <dt>Status</dt>
-            <dd>{{ mediaReadableLabel(m.enabled) }}</dd>
+            <dd>{{ source.roleLabel }}</dd>
           </dl>
-          <p v-if="isFormerlySupported(m)" class="ws-file-unsupported">Excel files are not supported for text-source analysis yet</p>
-          <p v-else-if="isDisabledAssociation(m)" class="ws-file-unsupported">
-            This file is disabled for this product, so it cannot be analyzed. Enable it in Media &amp; resources first.
-          </p>
-          <p v-else-if="!isAnalyzable(m)" class="ws-file-unsupported">Not available for text-source analysis yet</p>
+          <p v-if="source.unavailableReason" class="ws-file-unsupported">{{ source.unavailableReason }}</p>
         </li>
       </ul>
 
       <div class="ws-analyze-row">
-        <p v-if="selectedIds.length > 0" class="ws-analyze-note">
+        <p v-if="selectedRefs.length > 0" class="ws-analyze-note">
           Selected text sources will be sent to the configured AI provider to create draft specification proposals. Nothing will be written or published.
         </p>
         <button

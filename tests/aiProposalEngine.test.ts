@@ -453,6 +453,47 @@ describe('runProposalEngine — asset downloads are bounded (PWS-AI-ENGINE-01R2-
     }
   }, 20_000)
 
+
+  it('a cancel() that never settles does not hold the deadline open', async () => {
+    vi.useFakeTimers()
+    try {
+      const base = mockFetch({
+        productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-stuck-cancel', filename_download: 'notes.txt', type: 'text/plain', filesize: SMALL_SIZE } }],
+      })
+      let cancelCalled = false
+      const stuckCancelFetch = (async <T>(path: string, opts?: Record<string, unknown>): Promise<T> => {
+        if (path.startsWith('/assets/')) {
+          return new ReadableStream<Uint8Array>({
+            start() {},
+            cancel() {
+              cancelCalled = true
+              // A transport that has stopped responding can leave cancel pending forever.
+              return new Promise<void>(() => {})
+            },
+          }) as T
+        }
+        return base<T>(path, opts)
+      }) as FetchFn
+
+      const promise = runProposalEngine(stuckCancelFetch, mockRegistry(), specificationsTarget, {
+        productId: 1, providerId: 'deepseek', mediaIds: [1],
+      })
+      await vi.advanceTimersByTimeAsync(MAX_ASSET_DOWNLOAD_MS + 100)
+
+      vi.useRealTimers()
+      // The decisive assertion: awaiting a hanging cancel would never resolve this.
+      const result = await promise
+
+      expect(cancelCalled).toBe(true)
+      expect(result.ok).toBe(false)
+      expect(result.fileResults).toEqual([
+        { displayName: 'notes.txt', status: 'unreadable', reason: 'This file could not be read.' },
+      ])
+    } finally {
+      vi.useRealTimers()
+    }
+  }, 20_000)
+
   it('an oversized response is aborted mid-stream — the remaining chunks are never pulled', async () => {
     const base = mockFetch({
       // Directus claims a small size…

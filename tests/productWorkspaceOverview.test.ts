@@ -1858,7 +1858,7 @@ describe('PWS-AI-01-FAST-01 reads only the current product\'s own already-associ
   it('fetches exactly the product record and its own media association list, nothing else', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
     expect(page).toContain('useFetch<AdminProduct>(`/api/admin/products/${id}`)')
-    expect(page).toContain('useFetch<ProductMedia[]>(`/api/admin/products/${id}/media`)')
+    expect(page).toContain('useFetch<AiIntakeSource[]>(`/api/admin/products/${id}/ai/sources`)')
     expect(page).not.toContain('/api/admin/media/files')
     expect(page).not.toContain('/api/admin/products/${id}/sources')
     expect(page).not.toContain('/api/admin/products/${id}/evidence')
@@ -1866,7 +1866,7 @@ describe('PWS-AI-01-FAST-01 reads only the current product\'s own already-associ
 
   it('the file grid is built by iterating the linkedMedia prop only — never a static or global list', () => {
     const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
-    expect(component).toContain('v-for="m in linkedMedia"')
+    expect(component).toContain('v-for="source in sources"')
     expect(component).not.toContain('/api/admin/media/files')
   })
 })
@@ -1895,10 +1895,10 @@ describe('PWS-AI-ENGINE-01 page load and selection stay local-only — Analyze i
     expect(topLevel).not.toMatch(WRITE_METHOD_RE)
   })
 
-  it('retryMedia() is a read-only re-fetch (GET, explicitly click-triggered) — never a write', () => {
+  it('retrySources() is a read-only re-fetch (GET, explicitly click-triggered) — never a write', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
-    const block = page.slice(page.indexOf('async function retryMedia'), page.indexOf('async function retryProviders'))
-    expect(block).toContain('$fetch<ProductMedia[]>')
+    const block = page.slice(page.indexOf('async function retrySources'), page.indexOf('async function retryProviders'))
+    expect(block).toContain('$fetch<AiIntakeSource[]>')
     expect(block).not.toMatch(WRITE_METHOD_RE)
   })
 
@@ -1926,7 +1926,7 @@ describe('PWS-AI-ENGINE-01 page load and selection stay local-only — Analyze i
     const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
     const block = page.slice(page.indexOf('function toggleSelection'), page.indexOf('const analyzing'))
     expect(block).not.toContain('$fetch')
-    expect(block).toContain('selectedIds.value')
+    expect(block).toContain('selectedRefs.value')
   })
 
   it('Analyze is a real, explicit request — POST to the generate endpoint, never a no-op boolean flip', () => {

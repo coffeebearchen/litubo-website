@@ -1,4 +1,3 @@
-import OpenAI from 'openai'
 import type { AiGenerationInput, TargetDefinition, TargetGenerationResult } from './aiTargetContract'
 import type { AiStructuredProvider } from './aiProviderRegistry'
 
@@ -10,9 +9,7 @@ import type { AiStructuredProvider } from './aiProviderRegistry'
  * prompt/schema.
  *
  * Uses DeepSeek's own documented Responses API (per
- * api-docs.deepseek.com/guides/responses_api, verified 2026-09-08): the
- * documented integration path is the official OpenAI Node/Python SDK,
- * pointed at DeepSeek's `base_url`, calling `client.responses.create()`.
+ * api-docs.deepseek.com/guides/responses_api, verified 2026-09-08).
  * DeepSeek's docs describe `text`/`format` support as "fully supported"
  * without OpenAI's `strict: true` guarantee language, so this adapter's
  * `text.format` object only ever sends the officially documented `type` /
@@ -20,11 +17,15 @@ import type { AiStructuredProvider } from './aiProviderRegistry'
  * remains the actual, provider-independent safety boundary regardless of
  * how closely DeepSeek follows the schema.
  *
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — the request is issued with native
+ * `fetch` rather than the `openai` SDK. The SDK declares
+ * `engines: { node: ">=22" }`, above this project's Node 20 target, and it was
+ * only ever used here as an HTTP client for a documented JSON endpoint. The
+ * request and response shapes are unchanged.
+ *
  * Remains a fully independent adapter file from the OpenAI provider module
  * (own config type, own default model caller, own error handling) — the two
- * files share no code and neither imports the other; they both use the
- * `openai` SDK only because that is DeepSeek's own documented way to reach
- * its Responses API.
+ * files share no code and neither imports the other.
  */
 
 const DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
@@ -60,8 +61,8 @@ const CALL_FAILED_ERROR = 'The AI provider could not generate a proposal right n
  * Zero automatic retries and a 30s request timeout. Two distinct mechanisms,
  * described accurately (PWS-AI-ENGINE-01R2-SAFETY-02):
  *
- *  - `timeout` on the SDK client aborts the underlying HTTP request itself,
- *    and `maxRetries: 0` means one attempt only — no retry, and this project
+ *  - `AbortSignal.timeout()` aborts the underlying HTTP request itself, and a
+ *    bare `fetch` performs exactly one attempt — no retry, and this project
  *    never falls back to the other provider.
  *  - `withCallDeadline()` below additionally bounds how long THIS FUNCTION's
  *    caller waits, covering an injected or future `callModel` that hangs
@@ -92,30 +93,60 @@ async function withCallDeadline<T>(work: Promise<T>): Promise<T | typeof DEADLIN
   }
 }
 
+/**
+ * Pulls the assistant's text out of a Responses API payload. The official SDK
+ * exposed this as a convenience `output_text` property computed client-side,
+ * so a native caller has to do the same walk: prefer the field when a provider
+ * sends it, otherwise concatenate the text parts of the output items.
+ */
+function readResponsesApiOutputText(payload: unknown): string {
+  const body = payload as {
+    output_text?: unknown
+    output?: Array<{ content?: Array<{ text?: unknown }> }>
+  }
+  if (typeof body.output_text === 'string') return body.output_text
+
+  const parts: string[] = []
+  for (const item of body.output ?? []) {
+    for (const chunk of item.content ?? []) {
+      if (typeof chunk.text === 'string') parts.push(chunk.text)
+    }
+  }
+  if (parts.length === 0) throw new Error('provider returned no text output')
+  return parts.join('')
+}
+
 async function defaultDeepSeekModelCaller(
   target: TargetDefinition<unknown>,
   input: AiGenerationInput,
   config: DeepSeekProviderConfig,
 ): Promise<unknown> {
-  const client = new OpenAI({ apiKey: config.apiKey, baseURL: DEEPSEEK_BASE_URL, timeout: REQUEST_TIMEOUT_MS, maxRetries: 0 })
-
-  const response = await client.responses.create({
-    model: config.model,
-    instructions: target.systemInstructions,
-    input: target.buildUserInput(input),
-    // DeepSeek's documented Responses API only specifies `type`, `name` and
-    // `schema` for json_schema structured output — `strict` is an OpenAI-only
-    // guarantee this adapter must not claim or depend on.
-    text: {
-      format: {
-        type: 'json_schema',
-        name: target.schemaName,
-        schema: target.jsonSchema,
-      },
+  const response = await fetch(`${DEEPSEEK_BASE_URL}/responses`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify({
+      model: config.model,
+      instructions: target.systemInstructions,
+      input: target.buildUserInput(input),
+      // DeepSeek's documented Responses API only specifies `type`, `name` and
+      // `schema` for json_schema structured output — `strict` is an OpenAI-only
+      // guarantee this adapter must not claim or depend on.
+      text: {
+        format: {
+          type: 'json_schema',
+          name: target.schemaName,
+          schema: target.jsonSchema,
+        },
+      },
+    }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 
-  return JSON.parse(response.output_text)
+  if (!response.ok) throw new Error(`provider responded ${response.status}`)
+  return JSON.parse(readResponsesApiOutputText(await response.json()))
 }
 
 /**

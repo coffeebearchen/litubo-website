@@ -1,11 +1,11 @@
 /**
- * PWS-AI-ENGINE-01R — text-only source extraction. These tests exercise the
- * real `unpdf` library against a real, freshly-generated, minimal PDF with
- * genuinely extractable text (not just a corrupt-input negative test) — no
- * network, no Directus, no mock provider involved. This is the "resource
- * can actually be read on the server" proof the preflight required, and the
- * exact library/approach that was separately verified not to crash this
- * project's real Windows `nuxt dev` server (see this task's final report).
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — text-only source extraction.
+ *
+ * PDF is deliberately no longer supported: its parser could not be given a
+ * real memory ceiling in-process, so it is refused with its own honest reason
+ * rather than parsed unsafely. These tests cover the formats that ARE
+ * supported (TXT, CSV, TSV) end to end, plus the refusal behaviour for every
+ * dropped format. No network, no Directus, no mock provider involved.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -20,7 +20,6 @@ import {
   MAX_FILE_BYTES,
   MAX_TOTAL_EXTRACTED_CHARS,
   MAX_PER_FILE_CHARS,
-  MAX_PDF_PAGES,
   MAX_PROCESSING_MS,
 } from '../server/utils/aiTextExtraction'
 
@@ -28,32 +27,9 @@ function toArrayBuffer(buffer: Buffer): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
 }
 
-/** A minimal, real, valid single-page PDF (PDF 1.4, no compression) containing genuinely extractable text — built by hand, not borrowed from a fixture file, so this test has no hidden external dependency. */
-function buildRealTestPdf(text: string): Buffer {
-  const content = `BT /F1 24 Tf 72 712 Td (${text}) Tj ET`
-  const objects: string[] = []
-  objects.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
-  objects.push('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n')
-  objects.push('3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n')
-  objects.push('4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n')
-  objects.push(`5 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`)
-
-  let pdf = '%PDF-1.4\n'
-  const offsets: number[] = [0]
-  for (const obj of objects) {
-    offsets.push(pdf.length)
-    pdf += obj
-  }
-  const xrefStart = pdf.length
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
-  for (let i = 1; i <= objects.length; i++) pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \n'
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`
-  return Buffer.from(pdf, 'latin1')
-}
-
 describe('isSupportedTextSourceMime — first-version allowlist', () => {
-  it('accepts exactly PDF, CSV, TSV, TXT', () => {
-    expect(isSupportedTextSourceMime('application/pdf')).toBe(true)
+  it('accepts exactly CSV, TSV, TXT — PDF is no longer in the allowlist', () => {
+    expect(isSupportedTextSourceMime('application/pdf')).toBe(false)
     expect(isSupportedTextSourceMime('text/csv')).toBe(true)
     expect(isSupportedTextSourceMime('text/tab-separated-values')).toBe(true)
     expect(isSupportedTextSourceMime('text/plain')).toBe(true)
@@ -81,7 +57,7 @@ describe('isFormerlyUnsupportedTextSourceMime — XLS/XLSX honestly dropped, not
   it('flags exactly the two Excel MIME types', () => {
     expect(isFormerlyUnsupportedTextSourceMime('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')).toBe(true)
     expect(isFormerlyUnsupportedTextSourceMime('application/vnd.ms-excel')).toBe(true)
-    expect(isFormerlyUnsupportedTextSourceMime('application/pdf')).toBe(false)
+    expect(isFormerlyUnsupportedTextSourceMime('application/pdf')).toBe(true)
     expect(isFormerlyUnsupportedTextSourceMime('image/jpeg')).toBe(false)
   })
 
@@ -156,22 +132,37 @@ describe('extractTextFromFile — CSV/TSV (real extraction, no mocking)', () => 
   })
 })
 
-describe('extractTextFromFile — PDF (real extraction via unpdf against a real, valid PDF, no mocking)', () => {
-  it('extracts genuine text from a real single-page PDF', async () => {
-    const pdfBuffer = buildRealTestPdf('Detection sensitivity \\(Fe\\): 0.8 mm')
-    const result = await extractTextFromFile(toArrayBuffer(pdfBuffer), 'application/pdf', 'datasheet.pdf')
-    expect(result.ok).toBe(true)
-    if (result.ok) {
-      expect(result.source.text).toContain('Detection sensitivity (Fe): 0.8 mm')
-      expect(result.source.fileType).toBe('PDF')
+describe('extractTextFromFile — PDF is refused with its own honest reason', () => {
+  it('a real PDF byte stream is refused, not parsed', async () => {
+    const bytes = toArrayBuffer(Buffer.from('%PDF-1.4 anything at all'))
+    const result = await extractTextFromFile(bytes, 'application/pdf', 'datasheet.pdf')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.reason).toContain('PDF is not supported for text-source analysis yet')
+      // Distinct from the generic "never supported" message and from Excel's.
+      expect(result.reason).not.toBe('This file type is not supported for text-source analysis yet.')
+      expect(result.reason).not.toContain('Excel')
     }
   })
 
-  it('a corrupt/non-PDF byte stream claiming to be application/pdf fails safely, never throws', async () => {
-    const bytes = toArrayBuffer(Buffer.from('not actually a pdf file'))
-    const result = await extractTextFromFile(bytes, 'application/pdf', 'fake.pdf')
+  it('the refusal reason explains that an isolated parser is what is missing', async () => {
+    const result = await extractTextFromFile(toArrayBuffer(Buffer.from('%PDF-1.4')), 'application/pdf', 'x.pdf')
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.reason).toBe('This file could not be read.')
+    if (!result.ok) expect(result.reason).toContain('memory limit')
+  })
+
+  it('no PDF parser is reachable from this module at all', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const source = readFileSync(resolve(process.cwd(), 'server/utils/aiTextExtraction.ts'), 'utf8')
+    const code = source
+      .split(/\r?\n/)
+      .filter(l => !l.trim().startsWith('*') && !l.trim().startsWith('//'))
+      .join('\n')
+    expect(code).not.toContain('pdfjs')
+    expect(code).not.toContain('pdfExtractionWorker')
+    expect(code).not.toContain('extractPdfText')
   })
 })
 
@@ -274,7 +265,6 @@ describe('PWS-AI-ENGINE-01R explicit, tested limits exist', () => {
     expect(MAX_FILE_BYTES).toBeGreaterThan(0)
     expect(MAX_TOTAL_EXTRACTED_CHARS).toBeGreaterThan(0)
     expect(MAX_PER_FILE_CHARS).toBeGreaterThan(0)
-    expect(MAX_PDF_PAGES).toBeGreaterThan(0)
     expect(MAX_PROCESSING_MS).toBeGreaterThan(0)
   })
 })

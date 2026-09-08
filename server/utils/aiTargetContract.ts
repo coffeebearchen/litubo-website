@@ -114,7 +114,10 @@ export function buildSourceMaterialBlock(sources: Array<{ displayName: string, t
 const UNSAFE_VALUE_PATTERNS: RegExp[] = [
   /https?:\/\//i, // URL
   /\bwww\./i, // bare www. URL
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i, // UUID
+  // A 36-character hex-and-dash run is never a coincidence, so it is matched
+  // anywhere in the value. The previous `\b` boundaries let a UUID hide by
+  // sitting flush against neighbouring letters ("…secreta1b2c3d4-…").
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i, // UUID
   /[/\\][\w.-]+[/\\][\w.-]+/, // filesystem-looking path (two-plus path segments)
   /\.(pdf|xlsx?|csv|tsv|txt|docx?)\b/i, // an echoed source file name/extension
   /\bpage\s+\d+\b/i, // a page-number locator

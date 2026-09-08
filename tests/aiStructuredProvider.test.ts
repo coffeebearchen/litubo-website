@@ -115,9 +115,9 @@ describe('createDeepSeekStructuredProvider — fail-closed, mock paths, and the 
     expect(formatBlock).not.toContain('strict')
   })
 
-  it('uses the documented Responses API (client.responses.create), not chat completions', () => {
+  it('uses the documented Responses API endpoint, not chat completions', () => {
     const source = repoFile('server/utils/deepseekStructuredProvider.ts')
-    expect(source).toContain('client.responses.create')
+    expect(source).toContain('`${DEEPSEEK_BASE_URL}/responses`')
     expect(source).not.toContain('/chat/completions')
   })
 
@@ -220,12 +220,19 @@ describe('adversarial: a provider that echoes the source material back verbatim'
 })
 
 describe('PWS-AI-ENGINE-01R2-SAFETY-01 — explicit request timeout and zero automatic retries', () => {
-  it('both adapters construct their client with a 30s timeout and maxRetries: 0', () => {
+  // PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — the `openai` SDK declared
+  // engines node >=22, above this project's Node 20 target, and was only ever
+  // an HTTP client here. Both adapters now issue the request with native
+  // `fetch`, which performs exactly one attempt, aborted at the deadline.
+  it('both adapters issue a single native fetch aborted at 30s, with no SDK and no retry loop', () => {
     for (const rel of ['server/utils/openaiStructuredProvider.ts', 'server/utils/deepseekStructuredProvider.ts']) {
       const source = repoFile(rel)
       expect(source).toContain('const REQUEST_TIMEOUT_MS = 30_000')
-      expect(source).toContain('timeout: REQUEST_TIMEOUT_MS')
-      expect(source).toContain('maxRetries: 0')
+      expect(source).toContain('AbortSignal.timeout(REQUEST_TIMEOUT_MS)')
+      expect(source).not.toContain("from 'openai'")
+      expect(source).not.toContain('new OpenAI(')
+      // One request per call: no retry loop around the fetch.
+      expect(source).not.toMatch(/for\s*\([^)]*attempt/i)
     }
   })
 
