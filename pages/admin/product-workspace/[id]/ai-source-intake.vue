@@ -2,7 +2,7 @@
 import type { AdminProduct, ProductMedia } from '~/types/product-cms'
 import { workspaceHeroUrl } from '~/utils/productWorkspace'
 import { workspaceMediaResourcesRoute, workspaceAiProposalReviewRoute } from '~/utils/productCentre'
-import type { SpecificationProposal, SourceFileOutcome } from '~/utils/aiProposal'
+import { MAX_FILES_PER_REQUEST, type SpecificationProposal, type SourceFileOutcome } from '~/utils/aiProposal'
 
 interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
 interface GenerateResponse {
@@ -22,7 +22,7 @@ const productId = Number(id)
 const [
   { data: product, error: productError },
   { data: mediaData },
-  { data: providersData },
+  { data: providersData, error: providersFetchError },
 ] = await Promise.all([
   useFetch<AdminProduct>(`/api/admin/products/${id}`),
   useFetch<ProductMedia[]>(`/api/admin/products/${id}/media`),
@@ -36,11 +36,27 @@ const mediaResourcesHref = computed(() => workspaceMediaResourcesRoute(id))
 
 const providers = computed<AiProviderSummary[]>(() => providersData.value ?? [])
 const providersLoading = ref(false)
+const providersError = ref(Boolean(providersFetchError.value))
 const selectedProviderId = ref<string | null>(
   providers.value.find((p: AiProviderSummary) => p.configured && p.isDefault)?.id
   ?? providers.value.find((p: AiProviderSummary) => p.configured)?.id
   ?? null,
 )
+
+async function retryProviders() {
+  providersLoading.value = true
+  providersError.value = false
+  try {
+    providersData.value = await $fetch<AiProviderSummary[]>('/api/admin/ai/providers')
+    selectedProviderId.value = providers.value.find((p: AiProviderSummary) => p.configured && p.isDefault)?.id
+      ?? providers.value.find((p: AiProviderSummary) => p.configured)?.id
+      ?? null
+  } catch {
+    providersError.value = true
+  } finally {
+    providersLoading.value = false
+  }
+}
 
 /**
  * Selection is purely local UI state. Nothing here writes anything — the
@@ -52,8 +68,12 @@ const selectedIds = ref<number[]>([])
 
 function toggleSelection(mediaId: number) {
   const idx = selectedIds.value.indexOf(mediaId)
-  if (idx === -1) selectedIds.value.push(mediaId)
-  else selectedIds.value.splice(idx, 1)
+  if (idx === -1) {
+    if (selectedIds.value.length >= MAX_FILES_PER_REQUEST) return
+    selectedIds.value.push(mediaId)
+  } else {
+    selectedIds.value.splice(idx, 1)
+  }
 }
 
 const analyzing = ref(false)
@@ -119,6 +139,7 @@ async function analyze() {
       :media-resources-href="mediaResourcesHref"
       :providers="providers"
       :providers-loading="providersLoading"
+      :providers-error="providersError"
       :selected-provider-id="selectedProviderId"
       :analyzing="analyzing"
       :analyze-error="analyzeError"
@@ -126,6 +147,7 @@ async function analyze() {
       @toggle="toggleSelection"
       @update:selected-provider-id="selectedProviderId = $event"
       @analyze="analyze"
+      @retry-providers="retryProviders"
     />
   </WorkspaceShell>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ProductMedia } from '~/types/product-cms'
 import {
   sourceFileTypeLabel,
@@ -6,7 +7,7 @@ import {
   aiIntakeFileDisplayName,
   mediaReadableLabel,
 } from '~/utils/productWorkspace'
-import { isTextSourceMime } from '~/utils/aiProposal'
+import { isTextSourceMime, isFormerlyTextSourceMime, MAX_FILES_PER_REQUEST, SUPPORTED_TEXT_SOURCE_FORMATS_LABEL } from '~/utils/aiProposal'
 
 interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
 interface FileOutcome { displayName: string, status: 'read' | 'unsupported' | 'unreadable', reason?: string }
@@ -17,6 +18,7 @@ const props = defineProps<{
   mediaResourcesHref: string
   providers: AiProviderSummary[]
   providersLoading: boolean
+  providersError: boolean
   selectedProviderId: string | null
   analyzing: boolean
   analyzeError: string | null
@@ -27,6 +29,7 @@ const emit = defineEmits<{
   toggle: [id: number]
   'update:selectedProviderId': [id: string]
   analyze: []
+  'retry-providers': []
 }>()
 
 const selectedSet = computed(() => new Set(props.selectedIds))
@@ -39,8 +42,24 @@ function isAnalyzable(m: ProductMedia): boolean {
   return isTextSourceMime(m.type ?? null)
 }
 
+function isFormerlySupported(m: ProductMedia): boolean {
+  return isFormerlyTextSourceMime(m.type ?? null)
+}
+
+const analyzableMedia = computed(() => props.linkedMedia.filter(isAnalyzable))
+const hasAnyAnalyzableMedia = computed(() => analyzableMedia.value.length > 0)
+
 const configuredProviders = computed(() => props.providers.filter(p => p.configured))
 const hasConfiguredProvider = computed(() => configuredProviders.value.length > 0)
+
+const atSelectionCap = computed(() => props.selectedIds.length >= MAX_FILES_PER_REQUEST)
+
+/** A checkbox is disabled if the file isn't analyzable, OR the cap is reached and this file isn't already one of the selected ones. */
+function isCheckboxDisabled(m: ProductMedia): boolean {
+  if (!isAnalyzable(m)) return true
+  if (isSelected(m.id)) return false
+  return atSelectionCap.value
+}
 
 const selectableCount = computed(() =>
   props.linkedMedia.filter(m => isAnalyzable(m) && isSelected(m.id)).length,
@@ -54,7 +73,7 @@ const canAnalyze = computed(() =>
 <template>
   <section class="ws-ai-intake" aria-labelledby="ws-ai-intake-heading">
     <p class="ws-scope-hint">
-      AI source selection only — nothing here calls an AI model, writes a product parameter, or publishes anything. Original files stay in Media Library.
+      Selecting a file never calls an AI model or writes anything. Only clicking "Analyze selected sources" below sends the selected text sources to the configured AI provider.
     </p>
 
     <!-- ── 4-step flow indicator — Select sources is the current step ── -->
@@ -69,6 +88,10 @@ const canAnalyze = computed(() =>
     <section class="ws-card" aria-labelledby="ws-ai-provider-heading">
       <h2 id="ws-ai-provider-heading" class="ws-card-title">AI provider</h2>
       <p v-if="providersLoading" class="ws-empty">Loading provider status…</p>
+      <div v-else-if="providersError" class="ws-provider-error">
+        <p>Could not read provider status.</p>
+        <button type="button" class="ws-retry-btn" @click="emit('retry-providers')">Retry</button>
+      </div>
       <p v-else-if="!hasConfiguredProvider" class="ws-provider-empty">AI provider is not configured.</p>
       <div v-else class="ws-provider-row">
         <label v-for="p in configuredProviders" :key="p.id" class="ws-provider-option">
@@ -87,7 +110,7 @@ const canAnalyze = computed(() =>
     <section class="ws-card" aria-labelledby="ws-ai-intake-heading">
       <div class="ws-card-header">
         <h2 id="ws-ai-intake-heading" class="ws-card-title">Select source files for this product</h2>
-        <span class="ws-selected-count">{{ selectedIds.length }} selected</span>
+        <span class="ws-selected-count">{{ selectedIds.length }} / {{ MAX_FILES_PER_REQUEST }} selected</span>
       </div>
 
       <p v-if="linkedMedia.length === 0" class="ws-empty">
@@ -95,13 +118,19 @@ const canAnalyze = computed(() =>
         <NuxtLink :to="mediaResourcesHref">Go to Media &amp; resources</NuxtLink> to associate one first.
       </p>
 
-      <ul v-else class="ws-file-grid" role="list">
+      <p v-else-if="!hasAnyAnalyzableMedia" class="ws-empty ws-empty--no-readable">
+        None of this product's linked files can be analyzed as text yet — they may all be images or another unsupported format.
+        Supported formats: {{ SUPPORTED_TEXT_SOURCE_FORMATS_LABEL }}.
+        <NuxtLink :to="mediaResourcesHref">Go to Media &amp; resources</NuxtLink> to link a readable file.
+      </p>
+
+      <ul v-if="linkedMedia.length > 0" class="ws-file-grid" role="list">
         <li v-for="m in linkedMedia" :key="m.id" class="ws-file-card" :class="{ 'ws-file-card--selected': isSelected(m.id) }">
-          <label class="ws-file-label" :class="{ 'ws-file-label--disabled': !isAnalyzable(m) }">
+          <label class="ws-file-label" :class="{ 'ws-file-label--disabled': isCheckboxDisabled(m) }">
             <input
               type="checkbox"
               class="ws-file-checkbox"
-              :disabled="!isAnalyzable(m)"
+              :disabled="isCheckboxDisabled(m)"
               :checked="isSelected(m.id)"
               @change="emit('toggle', m.id)"
             >
@@ -115,7 +144,8 @@ const canAnalyze = computed(() =>
             <dt>Status</dt>
             <dd>{{ mediaReadableLabel(m.enabled) }}</dd>
           </dl>
-          <p v-if="!isAnalyzable(m)" class="ws-file-unsupported">Not available for text-source analysis yet</p>
+          <p v-if="isFormerlySupported(m)" class="ws-file-unsupported">Excel files are not supported for text-source analysis yet</p>
+          <p v-else-if="!isAnalyzable(m)" class="ws-file-unsupported">Not available for text-source analysis yet</p>
         </li>
       </ul>
 
@@ -219,8 +249,9 @@ const canAnalyze = computed(() =>
   white-space: nowrap;
 }
 
-.ws-empty { font-size: var(--text-sm); color: var(--color-ink-muted); margin: 0; padding: var(--space-2) 0; }
+.ws-empty { font-size: var(--text-sm); color: var(--color-ink-muted); margin: 0; padding: var(--space-2) 0; line-height: 1.6; }
 .ws-empty a { color: var(--color-primary); }
+.ws-empty--no-readable { background: var(--color-surface-alt); border-radius: var(--radius-sm); padding: var(--space-3); }
 
 .ws-provider-empty {
   font-size: var(--text-sm);
@@ -229,6 +260,30 @@ const canAnalyze = computed(() =>
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
   margin: 0;
+}
+.ws-provider-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: #C0392B;
+  background: #FDF0EE;
+  border: 1px solid #F5C6C2;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+.ws-provider-error p { margin: 0; }
+.ws-retry-btn {
+  background: none;
+  border: 1px solid #C0392B;
+  color: #C0392B;
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 .ws-provider-row { display: flex; flex-wrap: wrap; gap: var(--space-4); }
 .ws-provider-option { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-ink); cursor: pointer; }
@@ -282,9 +337,10 @@ const canAnalyze = computed(() =>
 }
 .btn-primary { background: var(--color-primary); color: white; }
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-deep); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; background: var(--color-surface-alt); color: var(--color-ink-muted); }
 
-.btn-analyze { font-weight: 600; font-size: var(--text-base); padding: var(--space-3) var(--space-6); }
+.btn-analyze { font-weight: 700; font-size: var(--text-base); padding: var(--space-3) var(--space-6); box-shadow: 0 1px 2px rgba(15,92,75,0.25); }
+.btn-analyze:disabled { box-shadow: none; }
 
 .ws-analyze-error {
   font-size: var(--text-sm);

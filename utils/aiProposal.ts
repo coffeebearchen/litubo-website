@@ -9,17 +9,32 @@
 
 const TEXT_SOURCE_MIME_TYPES = new Set([
   'application/pdf',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel',
   'text/csv',
   'text/tab-separated-values',
   'text/plain',
+])
+
+/** Formerly supported (PWS-AI-ENGINE-01) but dropped this round — shown a distinct, honest reason, never lumped in with "never supported". See `server/utils/aiTextExtraction.ts` for why. */
+const FORMERLY_TEXT_SOURCE_MIME_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
 ])
 
 export function isTextSourceMime(mimeType: string | null): boolean {
   if (!mimeType) return false
   return TEXT_SOURCE_MIME_TYPES.has(mimeType.toLowerCase().split(';')[0].trim())
 }
+
+export function isFormerlyTextSourceMime(mimeType: string | null): boolean {
+  if (!mimeType) return false
+  return FORMERLY_TEXT_SOURCE_MIME_TYPES.has(mimeType.toLowerCase().split(';')[0].trim())
+}
+
+/** Mirrors `server/utils/aiTextExtraction.ts`'s `MAX_FILES_PER_REQUEST` for client-side display/gating only — the server independently re-enforces this. */
+export const MAX_FILES_PER_REQUEST = 5
+
+/** Human-readable list of currently-supported text-source formats, for empty-state and help copy. */
+export const SUPPORTED_TEXT_SOURCE_FORMATS_LABEL = 'PDF (with extractable text), CSV, TSV, TXT'
 
 // ── Canonical proposal shape — mirrors the server's Zod-validated output ────
 

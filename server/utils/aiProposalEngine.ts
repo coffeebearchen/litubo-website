@@ -1,17 +1,19 @@
 import {
   extractTextFromFile,
   isSupportedTextSourceMime,
+  isFormerlyUnsupportedTextSourceMime,
+  isFileSizeSafeToDownload,
   capTotalCharacters,
   MAX_FILES_PER_REQUEST,
   MAX_TOTAL_EXTRACTED_CHARS,
   type ExtractedSource,
 } from './aiTextExtraction'
-import { isAiProviderId, type AiProviderId, type AiProviderRegistry, type GenerateSpecificationProposalInput } from './aiProviderRegistry'
-import type { SpecificationProposal } from './aiSpecificationProposal'
+import { isAiProviderId, type AiProviderId, type AiProviderRegistry } from './aiProviderRegistry'
+import type { AiGenerationInput, TargetDefinition } from './aiTargetContract'
 import type { FetchFn } from './mediaLifecycle'
 
 /**
- * PWS-AI-ENGINE-01 — reusable server-side AI Proposal Engine.
+ * PWS-AI-ENGINE-01R — reusable server-side AI Proposal Engine, Target-neutral.
  *
  * Dependency-injected (`fetch: FetchFn`, `registry: AiProviderRegistry`) in
  * the same style as `mediaLifecycle.ts`/`productEvidenceLinks.ts`, so the
@@ -21,16 +23,19 @@ import type { FetchFn } from './mediaLifecycle'
  * fetch and a mock provider registry, without a real Nitro event or a real
  * network call anywhere in this module.
  *
- * Deliberately generic in shape even though only one Target —
- * `specifications` — is registered this round: a future Target would add
- * its own prompt-building + result shape here; the product/source/provider
- * plumbing below does not change.
+ * Genuinely Target-neutral: `runProposalEngine()` takes a `TargetDefinition<T>`
+ * as a parameter and never imports or references `specifications` (or any
+ * other Target) by name. See `tests/aiTargetContract.test.ts` for a
+ * purely test-only second Target proving this — that test never touches
+ * this file, `aiTextExtraction.ts`, or the provider registry.
  *
  * Nothing in this file ever returns a Directus file UUID, a storage path, a
  * download URL, a locator, an internal note, the raw extracted text, or a
- * provider's raw response to its caller — only the final validated
- * `SpecificationProposal` (or a short, safe error) and a per-file readable/
- * unsupported/unreadable summary keyed by display name.
+ * provider's raw response to its caller — only the final validated Target
+ * output (or a short, safe error) and a per-file readable/unsupported/
+ * unreadable summary keyed by display name. A media id that does not
+ * resolve to an enabled row of the current product is reported with a
+ * generic reason and never echoes the requested id back to the caller.
  */
 
 export type SourceFileStatus = 'read' | 'unsupported' | 'unreadable'
@@ -41,8 +46,8 @@ export interface SourceFileOutcome {
   reason?: string
 }
 
-export type ProposalEngineResult =
-  | { ok: true, proposal: SpecificationProposal, fileResults: SourceFileOutcome[] }
+export type ProposalEngineResult<TOutput> =
+  | { ok: true, output: TOutput, fileResults: SourceFileOutcome[] }
   | { ok: false, error: string, fileResults: SourceFileOutcome[] }
 
 interface ProductsFilesRow {
@@ -51,6 +56,7 @@ interface ProductsFilesRow {
     id: string
     filename_download: string | null
     type: string | null
+    filesize: number | string | null
   } | null
 }
 
@@ -64,8 +70,10 @@ async function assertProductExistsViaFetch(fetch: FetchFn, productId: number): P
 /**
  * Resolves the given `products_files` row ids (never a raw Directus file
  * UUID accepted from the client) to their linked file metadata, scoped
- * strictly to this product. Any id that does not belong to this product is
- * simply absent from the result — never leaked as "found but wrong owner".
+ * strictly to this product AND to rows the editor itself would treat as
+ * usable (`enabled = true`). Any id that does not belong to this product,
+ * or belongs to it but is disabled, is simply absent from the result —
+ * never leaked as "found but wrong owner/disabled".
  */
 async function resolveProductSourceFiles(
   fetch: FetchFn,
@@ -74,8 +82,8 @@ async function resolveProductSourceFiles(
 ): Promise<ProductsFilesRow[]> {
   const idsParam = mediaIds.join(',')
   const result = await fetch<{ data: ProductsFilesRow[] }>(
-    `/items/products_files?filter[products_id][_eq]=${productId}&filter[id][_in]=${idsParam}` +
-    '&fields=id,directus_files_id.id,directus_files_id.filename_download,directus_files_id.type' +
+    `/items/products_files?filter[products_id][_eq]=${productId}&filter[id][_in]=${idsParam}&filter[enabled][_eq]=true` +
+    '&fields=id,directus_files_id.id,directus_files_id.filename_download,directus_files_id.type,directus_files_id.filesize' +
     `&limit=${mediaIds.length}`,
   )
   return result.data ?? []
@@ -92,17 +100,20 @@ const NOT_FOUND_ERROR = 'Product not found.'
 const NOT_CONFIGURED_ERROR = 'AI provider is not configured.'
 const NO_SELECTION_ERROR = 'Select at least one source file to analyze.'
 const NO_READABLE_SOURCES_ERROR = 'None of the selected files could be read as text. Nothing was sent to the AI provider.'
+const NOT_ASSOCIATED_REASON = 'One of the selected files could not be used for this product.'
 
 /**
- * The single generation entry point for the `specifications` Target.
- * `mediaIds` are `products_files.id` values only — this function never
- * accepts, trusts, or forwards a raw Directus file UUID from the caller.
+ * The single generation entry point, for whichever `TargetDefinition` the
+ * caller supplies. `mediaIds` are `products_files.id` values only — this
+ * function never accepts, trusts, or forwards a raw Directus file UUID from
+ * the caller.
  */
-export async function runSpecificationProposalEngine(
+export async function runProposalEngine<TOutput>(
   fetch: FetchFn,
   registry: AiProviderRegistry,
+  target: TargetDefinition<TOutput>,
   params: { productId: number, providerId: unknown, mediaIds: unknown },
-): Promise<ProposalEngineResult> {
+): Promise<ProposalEngineResult<TOutput>> {
   const productExists = await assertProductExistsViaFetch(fetch, params.productId)
   if (!productExists) {
     return { ok: false, error: NOT_FOUND_ERROR, fileResults: [] }
@@ -143,18 +154,26 @@ export async function runSpecificationProposalEngine(
   for (const mediaId of mediaIds) {
     const row = rowById.get(mediaId)
     if (!row || !row.directus_files_id) {
-      fileResults.push({
-        displayName: `Selection #${mediaId}`,
-        status: 'unreadable',
-        reason: 'This file is not associated with this product.',
-      })
+      // Deliberately generic — never echoes the requested media id back to the caller.
+      fileResults.push({ displayName: 'Selected file', status: 'unreadable', reason: NOT_ASSOCIATED_REASON })
       continue
     }
     const displayName = row.directus_files_id.filename_download ?? 'Untitled file'
     const mime = row.directus_files_id.type
 
+    if (isFormerlyUnsupportedTextSourceMime(mime)) {
+      fileResults.push({ displayName, status: 'unsupported', reason: 'Excel files are not supported for text-source analysis yet.' })
+      continue
+    }
     if (!isSupportedTextSourceMime(mime)) {
       fileResults.push({ displayName, status: 'unsupported', reason: 'Not available for text-source analysis yet.' })
+      continue
+    }
+
+    // Trusted-metadata size pre-check — happens BEFORE any byte is downloaded.
+    const knownSize = row.directus_files_id.filesize == null ? null : Number(row.directus_files_id.filesize)
+    if (!isFileSizeSafeToDownload(knownSize)) {
+      fileResults.push({ displayName, status: 'unreadable', reason: 'This file is too large to analyze, or its size could not be confirmed.' })
       continue
     }
 
@@ -182,13 +201,13 @@ export async function runSpecificationProposalEngine(
   const cappedSources = capTotalCharacters(readableSources, MAX_TOTAL_EXTRACTED_CHARS)
   const productName = await fetchProductName(fetch, params.productId)
 
-  const input: GenerateSpecificationProposalInput = {
+  const input: AiGenerationInput = {
     productName,
     sourceFileSummaries: cappedSources.map(s => ({ displayName: s.displayName, fileType: s.fileType })),
     extractedSourceTexts: cappedSources.map(s => ({ displayName: s.displayName, text: s.text })),
   }
 
-  const result = await registry.generateSpecificationProposal(providerId, input)
+  const result = await registry.generateStructured(providerId, target, input)
   if (!result.ok) return { ok: false, error: result.error, fileResults }
-  return { ok: true, proposal: result.proposal, fileResults }
+  return { ok: true, output: result.output, fileResults }
 }

@@ -1,6 +1,8 @@
 import { getRouterParam, readBody, createError } from 'h3'
 import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
+import { updateSpecItem } from '~/server/utils/productSpecWriter'
 
+/** Delegates to the canonical writer (`productSpecWriter.ts`) — the same function the AI Apply endpoint uses to update an item. */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   const gid = getRouterParam(event, 'gid')
@@ -33,8 +35,7 @@ export default defineEventHandler(async (event) => {
   }
   if (Object.keys(payload).length === 0) throw createError({ statusCode: 400, message: '没有可更新的字段' })
 
-  const result = await adminFetch<{ data: unknown }>(event, `/items/product_spec_items/${iid}`, {
-    method: 'PATCH', body: payload,
-  })
-  return (result as { data: unknown }).data
+  const fetch = <T>(path: string, opts?: Record<string, unknown>) => adminFetch<T>(event, path, opts)
+  await updateSpecItem(fetch, Number(iid), payload)
+  return { id: Number(iid) }
 })

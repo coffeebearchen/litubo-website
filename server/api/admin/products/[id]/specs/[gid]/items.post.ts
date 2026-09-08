@@ -1,6 +1,8 @@
 import { getRouterParam, readBody, createError } from 'h3'
 import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
+import { createSpecItem } from '~/server/utils/productSpecWriter'
 
+/** Delegates to the canonical writer (`productSpecWriter.ts`) — the same function the AI Apply endpoint uses to create an item. */
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   const gid = getRouterParam(event, 'gid')
@@ -17,7 +19,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const payload = {
+  const fetch = <T>(path: string, opts?: Record<string, unknown>) => adminFetch<T>(event, path, opts)
+  const itemId = await createSpecItem(fetch, {
     spec_group_id: Number(gid),
     label_en: body.label_en ?? null,
     label_es: body.label_es ?? null,
@@ -30,10 +33,6 @@ export default defineEventHandler(async (event) => {
     note_pt: body.note_pt ?? null,
     sort: body.sort ?? null,
     enabled: body.enabled !== false,
-  }
-
-  const result = await adminFetch<{ data: unknown }>(event, '/items/product_spec_items', {
-    method: 'POST', body: payload,
   })
-  return (result as { data: unknown }).data
+  return { id: itemId }
 })

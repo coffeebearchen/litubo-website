@@ -80,8 +80,10 @@ function routeFor(key: string): string {
               :title="`${item.label} is not yet available`"
             >
               <WorkspaceNavIcon :module-key="item.key" />
-              <span class="ws-nav-item-label">{{ item.label }}</span>
-              <span class="ws-nav-item-note">Coming soon</span>
+              <span class="ws-nav-item-text">
+                <span class="ws-nav-item-label">{{ item.label }}</span>
+                <span class="ws-nav-item-note">Coming soon — {{ item.disabledReason ?? 'not built yet' }}</span>
+              </span>
             </button>
             <span
               v-else-if="item.key === activeKey"
@@ -221,8 +223,7 @@ function routeFor(key: string): string {
 
 .ws-nav-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: var(--space-2);
   width: 100%;
   min-height: 40px;
@@ -235,6 +236,15 @@ function routeFor(key: string): string {
   color: var(--color-ink);
   text-align: left;
   cursor: default;
+}
+
+.ws-nav-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-top: 2px;
 }
 
 .ws-nav-item--active {
@@ -250,20 +260,20 @@ function routeFor(key: string): string {
 }
 
 .ws-nav-item-label {
+  display: block;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.3;
+  padding-top: 2px;
 }
 
 .ws-nav-item-note {
+  display: block;
   font-size: 0.6875rem;
   color: var(--color-ink-muted);
-  background: rgba(0, 0, 0, 0.06);
-  border-radius: 999px;
-  padding: 1px 8px;
-  flex-shrink: 0;
+  line-height: 1.3;
 }
 
 /* Rail column narrows before it ever stacks, matching the Product Catalogue rail. */

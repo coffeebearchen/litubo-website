@@ -1,13 +1,12 @@
 import { createAiProviderRegistry, parseAiProviderId, type AiProviderRegistry } from './aiProviderRegistry'
-import { createOpenAiSpecificationProvider } from './openaiSpecificationProvider'
-import { createDeepSeekSpecificationProvider } from './deepseekSpecificationProvider'
+import { createOpenAiStructuredProvider } from './openaiStructuredProvider'
+import { createDeepSeekStructuredProvider } from './deepseekStructuredProvider'
 
 /**
- * PWS-AI-PROVIDER-02 — wires the real OpenAI and DeepSeek adapters into the
- * provider-neutral registry, for a future `server/api/**` endpoint to call
- * with real `useRuntimeConfig()` values. This module is the only place that
- * constructs both real adapters together; no PWS-AI-02 endpoint calls it
- * yet, so it is never exercised against a real network in this task.
+ * PWS-AI-ENGINE-01R — wires the real, Target-neutral OpenAI and DeepSeek
+ * adapters into the provider registry, for a `server/api/**` endpoint to
+ * call with real `useRuntimeConfig()` values and whichever `TargetDefinition`
+ * it needs for that request.
  *
  * Config is passed in as plain values (never `useRuntimeConfig()` called
  * directly inside this file), matching the existing `adminDirectusClient.ts`
@@ -24,8 +23,8 @@ export function createDefaultAiProviderRegistry(config: AiProviderRegistryConfig
   return createAiProviderRegistry({
     defaultProvider: parseAiProviderId(config.defaultProvider, 'deepseek'),
     providers: {
-      openai: createOpenAiSpecificationProvider(config.openai),
-      deepseek: createDeepSeekSpecificationProvider(config.deepseek),
+      openai: createOpenAiStructuredProvider(config.openai),
+      deepseek: createDeepSeekStructuredProvider(config.deepseek),
     },
   })
 }

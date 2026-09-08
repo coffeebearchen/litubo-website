@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AdminProduct } from '~/types/product-cms'
 import { WORKSPACE_READINESS_UNAVAILABLE, workspaceCategoryName, workspaceHeroUrl } from '~/utils/productWorkspace'
+import { workspaceAiSourceIntakeRoute } from '~/utils/productCentre'
 
 const props = defineProps<{
   product: AdminProduct
@@ -9,6 +10,7 @@ const props = defineProps<{
 
 const categoryName = computed(() => workspaceCategoryName(props.product, props.categories))
 const heroUrl = computed(() => workspaceHeroUrl(props.product))
+const aiSourceIntakeHref = computed(() => workspaceAiSourceIntakeRoute(props.product.id))
 </script>
 
 <template>
@@ -78,6 +80,19 @@ const heroUrl = computed(() => workspaceHeroUrl(props.product))
         <h2 id="ws-readiness-heading" class="ws-card-title">Readiness</h2>
         <p class="ws-card-hint">Content readiness for publishing.</p>
         <p class="ws-readiness-value">{{ WORKSPACE_READINESS_UNAVAILABLE }}</p>
+      </section>
+
+      <section class="ws-card ws-card--ai" aria-labelledby="ws-ai-heading">
+        <h2 id="ws-ai-heading" class="ws-card-title">AI-assisted specifications</h2>
+        <p class="ws-card-hint">
+          Turn already-linked, readable text sources into draft specification suggestions you review and accept one at a time.
+        </p>
+        <NuxtLink :to="aiSourceIntakeHref" class="ws-btn-ai ws-btn-full">
+          ✨ AI Fill Specifications
+        </NuxtLink>
+        <p class="ws-card-footnote">
+          Only opens AI Source Intake to select sources — nothing is written or published from here.
+        </p>
       </section>
     </div>
 
@@ -159,6 +174,25 @@ const heroUrl = computed(() => workspaceHeroUrl(props.product))
 
 .ws-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .ws-btn-full { width: 100%; margin-top: var(--space-4); box-sizing: border-box; }
+
+.ws-card--ai { border-color: var(--color-primary); background: rgba(15, 92, 75, 0.04); }
+
+.ws-btn-ai {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: var(--color-primary);
+  color: white;
+  cursor: pointer;
+  text-decoration: none;
+}
+.ws-btn-ai:hover { background: var(--color-primary-deep); }
 
 .ws-card-footnote {
   font-size: var(--text-xs);

@@ -1,67 +1,72 @@
-import * as XLSX from 'xlsx'
-// @ts-expect-error — pdf-parse@1.1.4 ships this legacy pdf.js UMD build with
-// no type declarations; it is imported directly (see the long comment below).
-import PDFJS from 'pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js'
+import { getDocumentProxy } from 'unpdf'
 
 /**
- * PWS-AI-ENGINE-01 — server-only, text-only source extraction.
+ * PWS-AI-ENGINE-01R — server-only, text-only source extraction.
  *
- * First-version scope, strictly enforced by `isSupportedTextSourceMime()`:
- * PDFs with extractable text, XLSX/XLS, CSV/TSV, and TXT. Everything else —
- * images, scanned/no-text PDFs, Word, video, archives, and any other format
- * — is refused, never faked. No OCR, no vision, no external file API is
- * used anywhere in this module.
+ * Supported this round, strictly enforced by `isSupportedTextSourceMime()`:
+ * PDFs with extractable text, CSV, TSV, and TXT. XLS/XLSX are explicitly
+ * NOT supported this round (see the note below) — everything else (images,
+ * scanned/no-text PDFs, Word, video, archives, and any other format) is
+ * refused, never faked. No OCR, no vision, no external file API is used
+ * anywhere in this module.
+ *
+ * XLS/XLSX removed: PWS-AI-ENGINE-01's `xlsx` (SheetJS) dependency could not
+ * be safely required on Windows `nuxt dev` (its `.mjs` entry crashed every
+ * SSR route with a Node ESM-loader error). `exceljs`'s streaming reader —
+ * the only alternative that could enforce sheet/row/cell limits *during*
+ * parsing rather than after a full in-memory load, as this task requires —
+ * was evaluated directly against a real, freshly-generated `.xlsx` file and
+ * threw (`Cannot read properties of undefined (reading 'sheets')`) due to a
+ * real, upstream ordering bug in its streaming ZIP-entry parser, not a
+ * configuration mistake on this project's part. Per this task's explicit
+ * instruction to honestly drop a format rather than ship a fake or unsafely
+ * bounded parser, XLS/XLSX is left unsupported until a safe, streaming-
+ * capable replacement is found.
+ *
+ * PDF parsing uses `unpdf` (github.com/unjs/unpdf), a serverless/edge-safe
+ * wrapper around `pdfjs-dist` with zero regular dependencies and a real
+ * `exports` map for both ESM and CJS resolution. It was chosen specifically
+ * because it does not perform the dynamic, template-string `require()` (or
+ * an unprefixed absolute-path `import()`) that made `pdf-parse`'s bundled
+ * legacy `pdfjs-dist` build crash every route of this project's real
+ * Windows `nuxt dev` server — verified fixed by starting a clean dev server
+ * and loading `/`, an authenticated admin page, and both AI Workspace routes
+ * (see this task's final report for the exact commands and results).
  *
  * File bytes and extracted text exist only for the lifetime of one request:
  * this module returns plain strings to its caller and keeps no cache, no
  * disk write, and no database write of its own.
- *
- * PDF parsing imports the bundled legacy `pdfjs-dist` build straight out of
- * `pdf-parse@1.1.4`'s package (a real, static, literal path — statically
- * analyzable by Vite/Rollup) instead of calling `pdf-parse`'s own thin
- * wrapper function. That wrapper resolves its own dependency with
- * `require(`./pdf.js/${version}/build/pdf.js`)` — a template-string
- * specifier neither esbuild's dep pre-bundler nor Nitro's/Vite's dev SSR
- * transform can statically resolve. Under this project's actual Windows dev
- * server it produced two different crashes across several mitigation
- * attempts (a Node ESM-loader rejection of an absolute Windows path passed
- * to `import()`, and later a silently exited Nitro worker thread) — all
- * tried and rejected before landing here; see this task's final report for
- * the full trail. Importing the same underlying legacy build directly, with
- * a literal path, sidesteps the dynamic `require()` entirely and was
- * verified working end-to-end in this project's real dev server. The
- * parsing logic below (disable the browser worker, load the document, walk
- * its pages, concatenate `getTextContent()` output) mirrors exactly what
- * `pdf-parse`'s own wrapper does — nothing new is added or changed in how a
- * PDF is read.
  */
-
-interface PDFJSLegacy {
-  version: string
-  disableWorker: boolean
-  getDocument: (data: Buffer) => Promise<{
-    numPages: number
-    getPage: (n: number) => Promise<{ getTextContent: (opts?: Record<string, unknown>) => Promise<{ items: Array<{ str: string, transform: number[] }> }> }>
-    destroy: () => void
-  }>
-}
 
 /** At most this many source files may be analyzed in a single Generate call. */
 export const MAX_FILES_PER_REQUEST = 5
 
-/** A single file larger than this is refused before any extraction is attempted. */
+/** A single file larger than this is refused before any download is attempted. */
 export const MAX_FILE_BYTES = 8 * 1024 * 1024 // 8 MB
 
 /** Hard ceiling on the combined extracted text sent to any provider in one call. */
 export const MAX_TOTAL_EXTRACTED_CHARS = 60_000
 
+/** Hard ceiling on the text extracted from any single file — enforced while parsing, not after. */
+export const MAX_PER_FILE_CHARS = 20_000
+
+/** A PDF is only ever read up to this many pages — later pages are never opened. */
+export const MAX_PDF_PAGES = 30
+
+/** A single file's extraction is aborted (safely, honestly) if it runs longer than this. */
+export const MAX_PROCESSING_MS = 10_000
+
 const SUPPORTED_MIME_TYPES = new Set([
   'application/pdf',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-  'application/vnd.ms-excel', // .xls
   'text/csv',
   'text/tab-separated-values',
   'text/plain',
+])
+
+/** MIME types this module used to support in PWS-AI-ENGINE-01 but no longer does — shown a distinct, honest reason, never lumped in with "never supported". */
+const FORMERLY_SUPPORTED_MIME_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'application/vnd.ms-excel', // .xls
 ])
 
 export function isSupportedTextSourceMime(mimeType: string | null | undefined): boolean {
@@ -69,10 +74,15 @@ export function isSupportedTextSourceMime(mimeType: string | null | undefined): 
   return SUPPORTED_MIME_TYPES.has(mimeType.toLowerCase().split(';')[0].trim())
 }
 
+/** True only for a format this module deliberately stopped supporting — used to show a distinct, honest UI reason. */
+export function isFormerlyUnsupportedTextSourceMime(mimeType: string | null | undefined): boolean {
+  if (!mimeType) return false
+  return FORMERLY_SUPPORTED_MIME_TYPES.has(mimeType.toLowerCase().split(';')[0].trim())
+}
+
 function friendlyFileType(mimeType: string): string {
   const mime = mimeType.toLowerCase()
   if (mime === 'application/pdf') return 'PDF'
-  if (mime.includes('spreadsheet') || mime.includes('ms-excel')) return 'Spreadsheet'
   if (mime === 'text/csv') return 'CSV'
   if (mime === 'text/tab-separated-values') return 'TSV'
   if (mime === 'text/plain') return 'Text'
@@ -89,7 +99,20 @@ export type ExtractionResult =
   | { ok: true, source: ExtractedSource }
   | { ok: false, reason: string }
 
-/** Mirrors `pdf-parse@1.1.4`'s own per-page text join: same-line items are concatenated, a new line otherwise. */
+/**
+ * Trusted, server-known file size check — must run BEFORE any byte of the
+ * file is downloaded. `knownSizeBytes` must come from Directus' own file
+ * metadata (`directus_files.filesize`), never from a client-supplied value.
+ * An unknown size (`null`/`undefined`) is rejected conservatively rather
+ * than allowed through on the hope it turns out small — this project must
+ * never download a full file just to find out it was too large.
+ */
+export function isFileSizeSafeToDownload(knownSizeBytes: number | null | undefined): boolean {
+  if (typeof knownSizeBytes !== 'number' || !Number.isFinite(knownSizeBytes) || knownSizeBytes < 0) return false
+  return knownSizeBytes <= MAX_FILE_BYTES
+}
+
+/** Mirrors pdf.js's own per-line-position text join: same-line items are concatenated, a new line otherwise. */
 function joinPageText(items: Array<{ str: string, transform: number[] }>): string {
   let lastY: number | undefined
   let text = ''
@@ -101,34 +124,34 @@ function joinPageText(items: Array<{ str: string, transform: number[] }>): strin
   return text
 }
 
-async function extractPdfText(buffer: Buffer): Promise<string> {
-  const pdfjs = PDFJS as PDFJSLegacy
-  pdfjs.disableWorker = true
-  const doc = await pdfjs.getDocument(buffer)
+/**
+ * Reads a PDF page by page, stopping the moment any limit is hit —
+ * `MAX_PDF_PAGES`, `MAX_PER_FILE_CHARS`, or `MAX_PROCESSING_MS` — rather
+ * than parsing the whole document and truncating the result afterwards.
+ * Later pages are simply never opened once a limit is reached.
+ */
+async function extractPdfText(bytes: Uint8Array): Promise<string> {
+  const doc = await getDocumentProxy(bytes)
+  const deadline = Date.now() + MAX_PROCESSING_MS
   try {
     let text = ''
-    for (let i = 1; i <= doc.numPages; i++) {
+    const pageCount = Math.min(doc.numPages, MAX_PDF_PAGES)
+    for (let i = 1; i <= pageCount; i++) {
+      if (Date.now() > deadline) break
+      if (text.length >= MAX_PER_FILE_CHARS) break
       const page = await doc.getPage(i)
-      const content = await page.getTextContent({ normalizeWhitespace: false, disableCombineTextItems: false })
-      text += '\n\n' + joinPageText(content.items)
+      const content = await page.getTextContent()
+      text += '\n\n' + joinPageText(content.items as Array<{ str: string, transform: number[] }>)
     }
     return text
   } finally {
-    doc.destroy()
+    await doc.cleanup()
   }
-}
-
-function extractSpreadsheetText(buffer: Buffer): string {
-  const workbook = XLSX.read(buffer, { type: 'buffer' })
-  return workbook.SheetNames
-    .map(name => XLSX.utils.sheet_to_csv(workbook.Sheets[name]))
-    .filter(text => text.trim().length > 0)
-    .join('\n\n')
 }
 
 /**
  * Extracts plain text from one already-downloaded file's bytes. Never
- * throws — any failure (corrupt file, encrypted PDF, unreadable workbook,
+ * throws — any failure (corrupt file, encrypted PDF, unreadable stream,
  * etc.) becomes a short, safe `{ ok: false, reason }` result naming only the
  * problem category, never an internal error message, stack trace, or any
  * fragment of the file's own content.
@@ -144,28 +167,28 @@ export async function extractTextFromFile(
   if (bytes.byteLength > MAX_FILE_BYTES) {
     return { ok: false, reason: 'This file is too large to analyze.' }
   }
+  if (isFormerlyUnsupportedTextSourceMime(mimeType)) {
+    return { ok: false, reason: 'Excel files are not supported for text-source analysis yet.' }
+  }
   if (!isSupportedTextSourceMime(mimeType)) {
     return { ok: false, reason: 'This file type is not supported for text-source analysis yet.' }
   }
 
   const mime = mimeType!.toLowerCase().split(';')[0].trim()
-  const buffer = Buffer.from(bytes)
 
   let text = ''
   try {
     if (mime === 'application/pdf') {
-      text = await extractPdfText(buffer)
-    } else if (mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || mime === 'application/vnd.ms-excel') {
-      text = extractSpreadsheetText(buffer)
+      text = await extractPdfText(new Uint8Array(bytes))
     } else {
       // text/csv, text/tab-separated-values, text/plain
-      text = buffer.toString('utf-8')
+      text = Buffer.from(bytes).toString('utf-8')
     }
   } catch {
     return { ok: false, reason: 'This file could not be read.' }
   }
 
-  text = text.trim()
+  text = text.trim().slice(0, MAX_PER_FILE_CHARS)
   if (!text) {
     return { ok: false, reason: 'No extractable text was found in this file (it may be a scanned or image-only document).' }
   }
@@ -180,6 +203,8 @@ export async function extractTextFromFile(
  * Caps the combined text across all readable sources to
  * `MAX_TOTAL_EXTRACTED_CHARS`, giving each source an equal share of the
  * budget rather than silently dropping later files. Pure function — no I/O.
+ * (Each source has already been independently capped to `MAX_PER_FILE_CHARS`
+ * during its own extraction — this is the second, combined-total cap.)
  */
 export function capTotalCharacters(sources: ExtractedSource[], maxTotal: number): ExtractedSource[] {
   if (sources.length === 0) return []

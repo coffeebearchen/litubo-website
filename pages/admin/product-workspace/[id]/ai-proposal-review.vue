@@ -72,24 +72,34 @@ function clearProposal() {
       />
     </template>
 
+    <!--
+      Kept OUTSIDE the hasActiveProposal branch on purpose: Apply success
+      clears the session (so re-applying the same proposal is impossible),
+      which would otherwise unmount WorkspaceAiProposalReview — and the
+      success message with it — the instant it appears. This banner stays
+      visible across that transition.
+    -->
+    <p v-if="applySuccessMessage" class="ws-apply-success-banner" role="status">{{ applySuccessMessage }}</p>
+
     <div v-if="!hasActiveProposal" class="ws-empty-proposal">
       <p class="ws-empty-proposal-text">No active proposal. Return to AI Source Intake.</p>
       <NuxtLink :to="sourceIntakeHref" class="btn btn-primary">Go to AI Source Intake</NuxtLink>
     </div>
 
-    <WorkspaceAiProposalReview
-      v-else
-      :product-id="productId"
-      :proposal="proposalSession!.proposal"
-      :file-results="proposalSession!.fileResults"
-      :existing-spec-groups="existingSpecGroups"
-      :applying="applying"
-      :apply-error="applyError"
-      :apply-success-message="applySuccessMessage"
-      @applying="applying = $event"
-      @apply-error="applyError = $event"
-      @apply-success="(msg: string) => { applySuccessMessage = msg; clearProposal() }"
-    />
+    <template v-else>
+      <p class="ws-refresh-warning">Refreshing this page or navigating away will lose this unsaved proposal.</p>
+      <WorkspaceAiProposalReview
+        :product-id="productId"
+        :proposal="proposalSession!.proposal"
+        :file-results="proposalSession!.fileResults"
+        :existing-spec-groups="existingSpecGroups"
+        :applying="applying"
+        :apply-error="applyError"
+        @applying="applying = $event"
+        @apply-error="applyError = $event"
+        @apply-success="(msg: string) => { applySuccessMessage = msg; clearProposal() }"
+      />
+    </template>
   </WorkspaceShell>
 </template>
 
@@ -132,4 +142,23 @@ function clearProposal() {
 }
 .btn-primary { background: var(--color-primary); color: white; }
 .btn-primary:hover { background: var(--color-primary-deep); }
+
+.ws-apply-success-banner {
+  font-size: var(--text-sm);
+  color: #1E6B4E;
+  background: #E3F3EC;
+  border: 1px solid #BFE3D2;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+
+.ws-refresh-warning {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-4);
+}
 </style>

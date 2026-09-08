@@ -205,13 +205,22 @@ describe('Overview field scope (source evidence)', () => {
     expect(source).toContain('product.status')
   })
 
-  it('never displays Assigned language, Tasks, sources, confidence or AI conclusions', () => {
+  it('never displays Assigned language, Tasks, sources, confidence, or a fabricated AI conclusion/score', () => {
+    // PWS-AI-ENGINE-01R §7.2 authorizes exactly one real, honest AI affordance here
+    // (the "AI Fill Specifications" CTA, which only navigates to AI Source Intake —
+    // never writes, never fabricates a result) — so this no longer bans the word "ai"
+    // outright; it still bans any fabricated readiness/confidence/task-assignment surface.
     const lower = source.toLowerCase()
     expect(lower).not.toContain('assigned language')
     expect(lower).not.toContain('task')
     expect(lower).not.toContain('confidence')
     expect(lower).not.toContain('source review')
-    expect(lower).not.toContain(' ai ')
+  })
+
+  it('the one AI affordance present is the honest, non-writing "AI Fill Specifications" CTA — never a fabricated AI conclusion or score', () => {
+    expect(source).toContain('AI Fill Specifications')
+    expect(source).toContain('workspaceAiSourceIntakeRoute')
+    expect(source).not.toMatch(/ai (confidence|score|conclusion|summary)/i)
   })
 
   it('shows a neutral empty state instead of a fabricated hero image', () => {
@@ -247,16 +256,28 @@ describe('Readiness — exact mandated text (Register §12.1i / PWS-DOR-02)', ()
   })
 })
 
-// ── 7. No AI affordance anywhere in the new UI ───────────────────────────────
+// ── 7. No UNAUTHORIZED AI affordance anywhere in the new UI ──────────────────
 
-describe('No AI surface in PWS-00 (source evidence)', () => {
-  it('no new file renders an AI Fill Workspace control or any AI hint', () => {
-    for (const file of NEW_FILES) {
+describe('No unauthorized AI surface in PWS-00 (source evidence)', () => {
+  // PWS-AI-ENGINE-01R §7.2 explicitly authorizes exactly one AI affordance in this
+  // module set — the "AI Fill Specifications" CTA in WorkspaceOverview.vue, which
+  // only navigates to AI Source Intake and never writes or fabricates a result.
+  // Every OTHER file here must still carry no AI surface at all.
+  const filesThatMustStayAiFree = NEW_FILES.filter(f => f !== 'components/admin/workspace/WorkspaceOverview.vue')
+
+  it('no file besides the authorized Overview CTA renders an AI Fill Workspace control or any AI hint', () => {
+    for (const file of filesThatMustStayAiFree) {
       const lower = repoFile(file).toLowerCase()
       expect(lower).not.toContain('ai fill')
       expect(lower).not.toContain('ai-fill')
       expect(lower).not.toContain('pws-ai')
     }
+  })
+
+  it('the one authorized AI affordance only navigates to AI Source Intake — it never calls $fetch or writes anything itself', () => {
+    const source = repoFile('components/admin/workspace/WorkspaceOverview.vue')
+    expect(source).not.toContain('$fetch')
+    expect(source).not.toMatch(/method:\s*['"](POST|PATCH|PUT|DELETE)['"]/)
   })
 })
 
@@ -1861,10 +1882,23 @@ describe('PWS-AI-01-FAST-01 reads only the current product\'s own already-associ
 describe('PWS-AI-ENGINE-01 page load and selection stay local-only — Analyze is the one deliberate exception', () => {
   const WRITE_METHOD_RE = /method:\s*['"](POST|PATCH|PUT|DELETE)['"]/g
 
-  it('the top-level data fetch is useFetch (GET) only — no $fetch before the Analyze handler is defined', () => {
+  it('the top-level (synchronous, page-load-time) data fetch is useFetch (GET) only — no $fetch runs on load', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    const topLevel = page.slice(0, page.indexOf('async function retryProviders'))
+    expect(topLevel).not.toContain('$fetch')
+    expect(topLevel).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('retryProviders() is a read-only re-fetch (GET, explicitly click-triggered) — never a write', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    const retryBlock = page.slice(page.indexOf('async function retryProviders'), page.indexOf('async function analyze'))
+    expect(retryBlock).toContain("$fetch<AiProviderSummary[]>('/api/admin/ai/providers')")
+    expect(retryBlock).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('no $fetch or write method appears anywhere before the Analyze handler is defined', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
     const beforeAnalyze = page.slice(0, page.indexOf('async function analyze'))
-    expect(beforeAnalyze).not.toContain('$fetch')
     expect(beforeAnalyze).not.toMatch(WRITE_METHOD_RE)
   })
 

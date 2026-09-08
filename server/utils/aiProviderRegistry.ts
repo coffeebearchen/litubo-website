@@ -1,25 +1,16 @@
-import type { SpecificationProposalResult } from './aiSpecificationProposal'
+import type { AiGenerationInput, TargetDefinition, TargetGenerationResult } from './aiTargetContract'
 
 /**
- * PWS-AI-PROVIDER-02 — provider-neutral registry on top of the OpenAI
- * foundation from PWS-AI-PLATFORM-01 (commit c1e03ce, unmodified in
- * substance). Adds a second, fully independent DeepSeek adapter
- * (`deepseekSpecificationProvider.ts`) alongside the existing OpenAI one
- * (`openaiSpecificationProvider.ts`) — each owns its own request format,
- * Structured Output / JSON-mode strategy, error handling and capability
- * boundary. Both still validate their raw response through the one
- * canonical `SpecificationProposalSchema` in `aiSpecificationProposal.ts`,
- * so the business layer only ever sees the same `SpecificationProposal`
- * shape, whichever provider ran.
- *
- * This file itself never imports either adapter — it is pure registry
- * logic, dependency-injected with whatever `AiSpecificationProvider`
- * instances the caller supplies. That keeps it fully testable with mocks
- * and, more importantly, keeps it structurally incapable of ever calling
- * more than one provider for the same request: `generateSpecificationProposal()`
- * below resolves exactly one provider by id and returns exactly what that
- * one call produces. There is no fallback branch, no retry-with-another-
- * provider path, and no loop over `AI_PROVIDER_IDS` anywhere in this file.
+ * PWS-AI-ENGINE-01R — provider-neutral, Target-neutral registry. Neither
+ * this file nor the two provider adapters (`openaiStructuredProvider.ts`,
+ * `deepseekStructuredProvider.ts`) import or reference `specifications` (or
+ * any other Target) by name — every call carries a `TargetDefinition` value
+ * supplied by the caller, so registering a new Target never requires
+ * touching this file. This keeps the single-provider, zero-fallback,
+ * zero-dual-dispatch guarantee from PWS-AI-PROVIDER-02 unchanged:
+ * `generateStructured()` resolves exactly one provider by id and returns
+ * exactly what that one call produces — no fallback branch, no
+ * retry-with-another-provider path, no loop over `AI_PROVIDER_IDS`.
  */
 
 export type AiProviderId = 'deepseek' | 'openai'
@@ -39,27 +30,13 @@ export function parseAiProviderId(raw: unknown, fallback: AiProviderId): AiProvi
   return isAiProviderId(raw) ? raw : fallback
 }
 
-/**
- * PWS-AI-ENGINE-01 — a Generate call's full input. `sourceFileSummaries` is a
- * non-sensitive scope description (file names/types only, never a UUID or a
- * path). `extractedSourceTexts` carries the actual server-extracted plain
- * text the model is meant to read — produced fresh per request by
- * `aiTextExtraction.ts`, never persisted, and never echoed back to the
- * browser by any endpoint. `contextNote` remains a separate, optional,
- * human-typed field — never raw file content.
- */
-export interface GenerateSpecificationProposalInput {
-  productName: string
-  sourceFileSummaries: Array<{ displayName: string, fileType: string }>
-  extractedSourceTexts: Array<{ displayName: string, text: string }>
-  /** Optional, human-approved free text the admin typed in — never raw file content. */
-  contextNote?: string
-}
-
-/** The one interface every provider adapter (OpenAI, DeepSeek, and any future one) implements. */
-export interface AiSpecificationProvider {
+/** The one interface every provider adapter (OpenAI, DeepSeek, and any future one) implements. Target-neutral. */
+export interface AiStructuredProvider {
   isConfigured(): boolean
-  generateSpecificationProposal(input: GenerateSpecificationProposalInput): Promise<SpecificationProposalResult>
+  generateStructured<TOutput>(
+    target: TargetDefinition<TOutput>,
+    input: AiGenerationInput,
+  ): Promise<TargetGenerationResult<TOutput>>
 }
 
 /** Safe summary only — never a key, model name, raw error, prompt, file content, or internal path. */
@@ -77,13 +54,14 @@ const PROVIDER_LABELS: Record<AiProviderId, string> = {
 const UNKNOWN_PROVIDER_ERROR = 'AI provider is not configured.'
 
 export interface AiProviderRegistry {
-  getProvider(providerId: AiProviderId): AiSpecificationProvider
+  getProvider(providerId: AiProviderId): AiStructuredProvider
   listConfiguredProviders(): AiProviderSummary[]
   getDefaultProvider(): AiProviderId
-  generateSpecificationProposal(
+  generateStructured<TOutput>(
     providerId: AiProviderId,
-    input: GenerateSpecificationProposalInput,
-  ): Promise<SpecificationProposalResult>
+    target: TargetDefinition<TOutput>,
+    input: AiGenerationInput,
+  ): Promise<TargetGenerationResult<TOutput>>
 }
 
 /**
@@ -93,9 +71,9 @@ export interface AiProviderRegistry {
  */
 export function createAiProviderRegistry(options: {
   defaultProvider: AiProviderId
-  providers: Record<AiProviderId, AiSpecificationProvider>
+  providers: Record<AiProviderId, AiStructuredProvider>
 }): AiProviderRegistry {
-  function getProvider(providerId: AiProviderId): AiSpecificationProvider {
+  function getProvider(providerId: AiProviderId): AiStructuredProvider {
     return options.providers[providerId]
   }
 
@@ -113,18 +91,20 @@ export function createAiProviderRegistry(options: {
 
   /**
    * The single generation entry point. A caller must explicitly name one
-   * provider id; this function never chooses one on the caller's behalf,
-   * never substitutes a different provider when the requested one fails or
-   * is unconfigured, and never invokes more than one adapter per call.
+   * provider id and one Target; this function never chooses either on the
+   * caller's behalf, never substitutes a different provider when the
+   * requested one fails or is unconfigured, and never invokes more than one
+   * adapter per call.
    */
-  async function generateSpecificationProposal(
+  async function generateStructured<TOutput>(
     providerId: AiProviderId,
-    input: GenerateSpecificationProposalInput,
-  ): Promise<SpecificationProposalResult> {
+    target: TargetDefinition<TOutput>,
+    input: AiGenerationInput,
+  ): Promise<TargetGenerationResult<TOutput>> {
     if (!isAiProviderId(providerId)) return { ok: false, error: UNKNOWN_PROVIDER_ERROR }
     const provider = getProvider(providerId)
-    return provider.generateSpecificationProposal(input)
+    return provider.generateStructured(target, input)
   }
 
-  return { getProvider, listConfiguredProviders, getDefaultProvider, generateSpecificationProposal }
+  return { getProvider, listConfiguredProviders, getDefaultProvider, generateStructured }
 }

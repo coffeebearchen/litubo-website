@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import type { ProductSpecGroup, ProductSpecItem } from '~/types/product-cms'
 import type { SpecificationProposal, SourceFileOutcome } from '~/utils/aiProposal'
 
 type SpecGroupWithItems = ProductSpecGroup & { items: ProductSpecItem[] }
+
+type ReviewMatchKind = 'none' | 'exact' | 'ambiguous'
 
 interface ReviewRow {
   key: string
@@ -14,6 +17,7 @@ interface ReviewRow {
   editing: boolean
   draftValue: string
   draftNote: string
+  matchKind: ReviewMatchKind
   matchedSpecItemId: number | null
   matchedCurrentValue: string | null
   matchedGroupTitle: string | null
@@ -26,7 +30,6 @@ const props = defineProps<{
   existingSpecGroups: SpecGroupWithItems[]
   applying: boolean
   applyError: string | null
-  applySuccessMessage: string | null
 }>()
 
 const emit = defineEmits<{
@@ -39,12 +42,13 @@ function normalize(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-const existingByName = computed(() => {
+/** Every existing item keyed by `group::parameter` (for a safe, unambiguous Update target)... */
+const existingByGroupAndParam = computed(() => {
   const map = new Map<string, { specItemId: number, value: string, groupTitle: string }>()
   for (const group of props.existingSpecGroups) {
     for (const item of group.items ?? []) {
       if (!item.label_en) continue
-      map.set(normalize(item.label_en), {
+      map.set(`${normalize(group.title_en ?? '')}::${normalize(item.label_en)}`, {
         specItemId: item.id,
         value: item.value_en ?? '',
         groupTitle: group.title_en ?? '',
@@ -54,13 +58,67 @@ const existingByName = computed(() => {
   return map
 })
 
+/** ...and, separately, how many existing items share a parameter name regardless of group — used only to flag "Review required", never to auto-pick an Update target. */
+const existingNameOccurrences = computed(() => {
+  const counts = new Map<string, Array<{ value: string, groupTitle: string }>>()
+  for (const group of props.existingSpecGroups) {
+    for (const item of group.items ?? []) {
+      if (!item.label_en) continue
+      const key = normalize(item.label_en)
+      const list = counts.get(key) ?? []
+      list.push({ value: item.value_en ?? '', groupTitle: group.title_en ?? '' })
+      counts.set(key, list)
+    }
+  }
+  return counts
+})
+
+/**
+ * `proposal.groups` may contain more than one group object with the same
+ * name (a model can return "Detection performance" twice) — merging by
+ * normalized name here means the template renders each group heading and
+ * every row exactly once, never duplicated.
+ */
+const mergedGroups = computed(() => {
+  const order: string[] = []
+  const itemsByKey = new Map<string, { displayName: string, items: Array<{ parameter: string, value: string, note?: string }> }>()
+  for (const g of props.proposal.groups) {
+    const key = normalize(g.group)
+    if (!itemsByKey.has(key)) {
+      itemsByKey.set(key, { displayName: g.group, items: [] })
+      order.push(key)
+    }
+    itemsByKey.get(key)!.items.push(...g.items)
+  }
+  return order.map(key => itemsByKey.get(key)!)
+})
+
 const rows = ref<ReviewRow[]>(
-  props.proposal.groups.flatMap((g, gi) =>
+  mergedGroups.value.flatMap((g, gi) =>
     g.items.map((it, ii) => {
-      const matched = existingByName.value.get(normalize(it.parameter)) ?? null
+      const exactKey = `${normalize(g.displayName)}::${normalize(it.parameter)}`
+      const exact = existingByGroupAndParam.value.get(exactKey)
+      const nameMatches = existingNameOccurrences.value.get(normalize(it.parameter)) ?? []
+
+      let matchKind: ReviewMatchKind = 'none'
+      let matchedSpecItemId: number | null = null
+      let matchedCurrentValue: string | null = null
+      let matchedGroupTitle: string | null = null
+
+      if (exact) {
+        matchKind = 'exact'
+        matchedSpecItemId = exact.specItemId
+        matchedCurrentValue = exact.value
+        matchedGroupTitle = exact.groupTitle
+      } else if (nameMatches.length > 0) {
+        matchKind = 'ambiguous'
+        matchedCurrentValue = nameMatches[0].value
+        matchedGroupTitle = nameMatches.length === 1 ? nameMatches[0].groupTitle : `${nameMatches.length} other groups`
+      }
+
       return {
         key: `${gi}-${ii}`,
-        group: g.group,
+        group: g.displayName,
         parameter: it.parameter,
         value: it.value,
         note: it.note ?? '',
@@ -68,9 +126,10 @@ const rows = ref<ReviewRow[]>(
         editing: false,
         draftValue: it.value,
         draftNote: it.note ?? '',
-        matchedSpecItemId: matched?.specItemId ?? null,
-        matchedCurrentValue: matched?.value ?? null,
-        matchedGroupTitle: matched?.groupTitle ?? null,
+        matchKind,
+        matchedSpecItemId,
+        matchedCurrentValue,
+        matchedGroupTitle,
       }
     }),
   ),
@@ -82,8 +141,8 @@ const readFiles = computed(() => props.fileResults.filter(f => f.status === 'rea
 const acceptedCount = computed(() => rows.value.filter((r: ReviewRow) => r.status === 'accepted').length)
 const canApply = computed(() => acceptedCount.value > 0 && !props.applying)
 
-function rowsForGroup(groupName: string): ReviewRow[] {
-  return rows.value.filter((r: ReviewRow) => r.group === groupName)
+function rowsForGroup(displayName: string): ReviewRow[] {
+  return rows.value.filter((r: ReviewRow) => r.group === displayName)
 }
 
 function acceptRow(row: ReviewRow) { row.status = 'accepted' }
@@ -155,8 +214,8 @@ async function applyAccepted() {
         Analyzed {{ readFiles.length }} source file{{ readFiles.length === 1 ? '' : 's' }}. Every item starts as Pending — nothing is accepted by default.
       </p>
 
-      <div v-for="(g, gi) in proposal.groups" :key="gi" class="ws-group">
-        <h3 class="ws-group-title">{{ g.group }}</h3>
+      <div v-for="g in mergedGroups" :key="g.displayName" class="ws-group">
+        <h3 class="ws-group-title">{{ g.displayName }}</h3>
         <div class="ws-table-wrap">
           <table class="ws-table">
             <thead>
@@ -168,18 +227,21 @@ async function applyAccepted() {
               </tr>
             </thead>
             <tbody>
-              <template v-for="row in rowsForGroup(g.group)" :key="row.key">
+              <template v-for="row in rowsForGroup(g.displayName)" :key="row.key">
                 <tr :class="{ 'ws-row--accepted': row.status === 'accepted', 'ws-row--rejected': row.status === 'rejected' }">
                   <td data-label="Parameter">
                     {{ row.parameter }}
-                    <span v-if="row.matchedSpecItemId" class="ws-review-required">Review required</span>
+                    <span v-if="row.matchKind !== 'none'" class="ws-review-required">Review required</span>
                   </td>
                   <td data-label="Proposed value">
                     <div v-if="!row.editing">
                       <div>{{ row.value }}</div>
                       <div v-if="row.note" class="ws-row-note">{{ row.note }}</div>
-                      <div v-if="row.matchedSpecItemId" class="ws-current-value">
+                      <div v-if="row.matchKind === 'exact'" class="ws-current-value">
                         Current value: {{ row.matchedCurrentValue || '—' }} ({{ row.matchedGroupTitle }})
+                      </div>
+                      <div v-else-if="row.matchKind === 'ambiguous'" class="ws-current-value ws-current-value--ambiguous">
+                        A specification named "{{ row.parameter }}" already exists in {{ row.matchedGroupTitle }} — this will be added as a new item, not merged automatically.
                       </div>
                     </div>
                     <div v-else class="ws-edit-form">
@@ -197,7 +259,7 @@ async function applyAccepted() {
                   <td data-label="Action" class="ws-row-actions">
                     <template v-if="!row.editing">
                       <button type="button" class="ws-action-btn" @click="acceptRow(row)">
-                        {{ row.matchedSpecItemId ? 'Accept as Update' : 'Accept as Add' }}
+                        {{ row.matchKind === 'exact' ? 'Accept as Update' : 'Accept as Add' }}
                       </button>
                       <button type="button" class="ws-action-btn" @click="rejectRow(row)">Reject</button>
                       <button type="button" class="ws-action-btn" @click="startEdit(row)">Edit</button>
@@ -215,7 +277,6 @@ async function applyAccepted() {
           {{ applying ? 'Applying…' : 'Apply accepted changes to Draft' }}
         </button>
         <p v-if="applyError" class="ws-apply-error" role="alert">{{ applyError }}</p>
-        <p v-if="applySuccessMessage" class="ws-apply-success" role="status">{{ applySuccessMessage }}</p>
       </div>
     </section>
   </section>
@@ -262,6 +323,7 @@ async function applyAccepted() {
 .ws-review-required { display: block; font-size: 0.6875rem; font-weight: 600; color: #A23B3B; margin-top: 2px; }
 .ws-row-note { font-size: var(--text-xs); color: var(--color-ink-muted); font-style: italic; }
 .ws-current-value { font-size: var(--text-xs); color: var(--color-ink-muted); margin-top: var(--space-1); }
+.ws-current-value--ambiguous { color: #A23B3B; }
 
 .ws-status-badge { display: inline-block; font-size: var(--text-xs); font-weight: 500; border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); text-transform: capitalize; }
 .ws-status-badge--pending { background: #FFF3CD; color: #856404; }
@@ -294,7 +356,6 @@ async function applyAccepted() {
 .btn-apply { font-weight: 600; }
 
 .ws-apply-error { font-size: var(--text-sm); color: #C0392B; background: #FDF0EE; border: 1px solid #F5C6C2; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); margin: 0; }
-.ws-apply-success { font-size: var(--text-sm); color: #1E6B4E; background: #E3F3EC; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); margin: 0; }
 
 .ws-file-result-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--text-xs); color: var(--color-ink); }
 

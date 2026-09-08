@@ -30,6 +30,8 @@ export interface WorkspaceModuleNavItem {
   group: WorkspaceModuleGroup
   /** Only a module with its own landed work order is enabled (`overview`, `page-content`, `sources-evidence`). */
   enabled: boolean
+  /** Shown visibly next to a disabled item's name (not hover-only) — every disabled item must have one. */
+  disabledReason?: string
 }
 
 /**
@@ -43,12 +45,12 @@ export const WORKSPACE_MODULE_NAV: WorkspaceModuleNavItem[] = [
   { key: 'page-content', label: 'Page content', group: 'PRODUCT RECORD', enabled: true },
   { key: 'specifications', label: 'Specifications', group: 'PRODUCT RECORD', enabled: true },
   { key: 'media-resources', label: 'Media & resources', group: 'PRODUCT RECORD', enabled: true },
-  { key: 'relations', label: 'Relations', group: 'PRODUCT RECORD', enabled: false },
-  { key: 'seo-locales', label: 'SEO & locales', group: 'PUBLISH & DISTRIBUTE', enabled: false },
-  { key: 'share-distribution', label: 'Share & distribution', group: 'PUBLISH & DISTRIBUTE', enabled: false },
+  { key: 'relations', label: 'Relations', group: 'PRODUCT RECORD', enabled: false, disabledReason: 'Not built yet' },
+  { key: 'seo-locales', label: 'SEO & locales', group: 'PUBLISH & DISTRIBUTE', enabled: false, disabledReason: 'Not built yet' },
+  { key: 'share-distribution', label: 'Share & distribution', group: 'PUBLISH & DISTRIBUTE', enabled: false, disabledReason: 'Not built yet' },
   { key: 'sources-evidence', label: 'Sources & evidence', group: 'CONTROL', enabled: true },
   { key: 'ai-source-intake', label: 'AI Source Intake', group: 'CONTROL', enabled: true },
-  { key: 'change-history', label: 'Change history', group: 'CONTROL', enabled: false },
+  { key: 'change-history', label: 'Change history', group: 'CONTROL', enabled: false, disabledReason: 'Not built yet' },
 ]
 
 export const WORKSPACE_MODULE_GROUPS: WorkspaceModuleGroup[] = [
