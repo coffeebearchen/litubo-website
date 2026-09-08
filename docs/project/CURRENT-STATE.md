@@ -2867,3 +2867,48 @@ SHA256SUMS.txt
 未创建 Directus 集合/字段/迁移/权限/审计/UI 页面；未创建持久测试产品；未新增图片/PDF/Excel/DOCX 上传、解析、OCR、Vision 或文件 API；未做批量多产品处理；未做自动 Apply/自动覆盖/自动发布；未把 API key、模型名、文件 UUID、原文或内部资料暴露到 UI/API；未部署；**PWS-AI-02（Generate/Review/Apply）仍未开始**。
 
 *最后更新：2026-09-08，由 Claude Code 在"PWS-AI-PROVIDER-02"任务中写入。*
+
+---
+
+## PWS-AI-PROVIDER-02-FIX-JSON-SCHEMA-01 — DeepSeek 改为 Responses API + json_schema（2026-09-08）
+
+**性质：** 对 `3dc4475`（PWS-AI-PROVIDER-02，多 Provider registry 已完成）的窄化收口修复。未 revert/reset/amend 任何既有提交；未重做 registry、OpenAI adapter、Settings 或 AI 页面；未开始 PWS-AI-02；未调用任何真实 API。
+
+**问题：** `deepseekSpecificationProvider.ts` 此前使用 DeepSeek Chat Completions 的 `response_format: { type: 'json_object' }`——只保证语法合法的 JSON，不保证结构，不满足"严格结构化规格建议"的要求。
+
+**开工核对：** 开工前确认 `master = origin/master = 3dc4475`（`git fetch --prune origin` + 双重 `rev-parse` 核对），五个受保护未跟踪路径未被触碰。
+
+**只读技术核实（先于编码完成）：** 通过 WebSearch + WebFetch 只读查阅 DeepSeek 官方文档站 `api-docs.deepseek.com`（含 `/guides/json_mode/` 与 `/guides/responses_api` 两页，核实时间 2026-09-08）确认：DeepSeek 确实提供文档化的 **Responses API**，官方文档原文："our API now supports the Responses API format, with the `base_url` being `https://api.deepseek.com`"；文档化的官方接入方式是把 **OpenAI 官方 SDK** 的 `base_url` 指向 DeepSeek，调用 `client.responses.create()`；文档并说明 `text` 参数的 `format` 字段"fully supported"，遵循 OpenAI Responses API 的结构。据此确认：新实现使用 OpenAI SDK + `baseURL` 覆盖来调用 DeepSeek 官方 Responses API，是文档规定的接入方式，不是"猜测未文档化字段"或"简化为复用 OpenAI adapter"。
+
+### 实现变更（仅 `deepseekSpecificationProvider.ts` 内部）
+
+| 项目 | 修复前 | 修复后 |
+|---|---|---|
+| 调用方式 | 原生 `fetch()` 直连 `https://api.deepseek.com/chat/completions` | `new OpenAI({ apiKey, baseURL: 'https://api.deepseek.com' }).responses.create(...)`——DeepSeek 官方文档规定的 Responses API 接入方式 |
+| 结构化输出 | `response_format: { type: 'json_object' }`（仅保证合法 JSON，不保证结构，靠 prompt 文字描述结构） | `text: { format: { type: 'json_schema', name: 'specification_proposal', schema: SPECIFICATION_PROPOSAL_JSON_SCHEMA, strict: true } }`——与 canonical `SpecificationProposal`（`groups[] → { group, items[] → { parameter, value, note? } }`）一一对应的 JSON Schema |
+| 超时处理 | 自建 `AbortController` + 30s 手动超时 | 交由 OpenAI SDK 自身处理；不改变每次调用最终仍经过统一 `try/catch → CALL_FAILED_ERROR` 的安全兜底 |
+| 第二道保护 | 未变 | **保留**：无论 DeepSeek 是否严格遵循 schema，响应仍必须通过 `aiSpecificationProposal.ts` 的 `parseSpecificationProposalResponse()`（Zod）校验，这是最终、权威的安全边界 |
+
+**架构独立性维持：** `deepseekSpecificationProvider.ts` 与 `openaiSpecificationProvider.ts` 依然是两个完全独立的文件——各自独立的 `Config` 类型（`DeepSeekProviderConfig` vs `SpecificationProposalProviderConfig`）、独立的工厂函数名、独立的 `SPECIFICATION_PROPOSAL_JSON_SCHEMA` 常量副本（未共享/未互相 import）、独立的 prompt 构造与错误处理；两者只是都遵照各自 provider 官方文档使用 OpenAI SDK 作为传输层，这是 DeepSeek 官方推荐的接入方式使然，不是把 DeepSeek 简化为 OpenAI adapter 的副本。
+
+**未改变：** `server/utils/aiProviderRegistry.ts` 的单一分发、零 fallback、零双发逻辑；`openaiSpecificationProvider.ts` 的任何行为；`server/utils/aiProviderRegistryDefault.ts`；`nuxt.config.ts`/`.env.example` 的配置位；任何产品、Specifications、Media、页面、Directus 或发布数据。
+
+### 更新的测试
+
+`tests/aiProviderRegistry.test.ts` 中"DeepSeek and OpenAI adapters are independently implemented"describe 段落已更新，新断言覆盖：DeepSeek 请求使用 `client.responses.create`（Responses API）而非 `/chat/completions`；请求含 `text.format.type = 'json_schema'`（不再是 `json_object`）；schema 含 `name: 'specification_proposal'` 及 `groups`/`parameter`/`value`/`note`；DeepSeek 使用自己独立的 `SPECIFICATION_PROPOSAL_JSON_SCHEMA` 常量（不 import OpenAI 文件）；两个 adapter 各自独立的 Config 类型与工厂函数名；既有的 fail-closed / mock 合法响应 / mock 非法结构 / mock 拒答 / mock 超时 / 零泄露测试全部保留并更新为验证新实现路径。既有的 registry 单一分发、零 fallback、零双发测试未改动。
+
+### 验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 604/604 通过（`tests/aiProviderRegistry.test.ts` 由 32 → 35 个用例；`tests/aiSpecificationProvider.test.ts` 23 个既有用例零修改通过） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告（Windows 正常） |
+| `npx nuxt build` | Build complete；`.output/public` 二次 `grep` 确认不含 `openai`/`deepseek` 字符串 |
+
+### 明确未做
+
+未 revert/reset/amend 任何既有提交；未重做 registry、OpenAI adapter、Settings 或 AI 页面；未调用真实 OpenAI/DeepSeek API；未产生费用；未新增 Directus schema/权限/UI；未触碰 Specifications、Media Library、Sources & evidence、Page Content、发布状态；未部署；**PWS-AI-02（Generate/Review/Apply）仍未开始**。
+
+*最后更新：2026-09-08，由 Claude Code 在"PWS-AI-PROVIDER-02-FIX-JSON-SCHEMA-01"任务中写入。*

@@ -1,11 +1,14 @@
 /**
- * PWS-AI-PROVIDER-02 — provider-neutral registry + independent DeepSeek adapter.
+ * PWS-AI-PROVIDER-02 (+ PWS-AI-PROVIDER-02-FIX-JSON-SCHEMA-01) —
+ * provider-neutral registry + independent DeepSeek adapter using DeepSeek's
+ * own documented Responses API.
  *
  * Every test uses mock adapters/model callers — none of them constructs a
- * real OpenAI or DeepSeek client, and none reaches the network. The real
- * `defaultDeepSeekModelCaller` (the only function that calls `fetch` against
- * `api.deepseek.com`) and `defaultOpenAiModelCaller` (the only function that
- * constructs an `OpenAI` client) are never exercised here.
+ * real client, and none reaches the network. The real
+ * `defaultDeepSeekModelCaller` and `defaultOpenAiModelCaller` (the only two
+ * functions that construct an `OpenAI` client — DeepSeek's own documented
+ * Responses API integration path is the OpenAI SDK pointed at DeepSeek's
+ * `base_url`) are never exercised here.
  */
 
 import { describe, it, expect, vi } from 'vitest'
@@ -265,30 +268,48 @@ describe('createDeepSeekSpecificationProvider — mock success and failure paths
   })
 })
 
-describe('DeepSeek and OpenAI adapters are independently implemented, not one reused as the other', () => {
-  it('the DeepSeek adapter is its own file and does not import the openai package', () => {
+describe('DeepSeek and OpenAI adapters are independently implemented files, each using its provider\'s own documented Responses API', () => {
+  it('the DeepSeek adapter uses the documented Responses API (client.responses.create), not Chat Completions', () => {
     const source = repoFile('server/utils/deepseekSpecificationProvider.ts')
-    expect(source).not.toContain("from 'openai'")
-    expect(source).not.toContain('new OpenAI(')
+    expect(source).toContain('client.responses.create')
+    expect(source).not.toContain('/chat/completions')
+    expect(source).not.toContain('response_format')
   })
 
-  it('the DeepSeek adapter calls its own endpoint via fetch, not the OpenAI SDK client', () => {
+  it('the DeepSeek adapter points the OpenAI SDK at DeepSeek\'s own documented base_url — this is DeepSeek\'s official documented integration path, not raw guessing', () => {
     const source = repoFile('server/utils/deepseekSpecificationProvider.ts')
     expect(source).toContain('api.deepseek.com')
-    expect(source).toContain('fetch(')
+    expect(source).toContain('baseURL')
   })
 
-  it('the OpenAI adapter still uses the OpenAI SDK and its own Structured Outputs schema — untouched by the DeepSeek addition', () => {
+  it('the OpenAI adapter still uses the OpenAI SDK and its own Structured Outputs schema — untouched by the DeepSeek fix', () => {
     const source = repoFile('server/utils/openaiSpecificationProvider.ts')
     expect(source).toContain("from 'openai'")
     expect(source).toContain('client.responses.create')
     expect(source).toContain('json_schema')
   })
 
-  it('the DeepSeek adapter uses its own capability-appropriate json_object mode, not a copy of OpenAI\'s json_schema config', () => {
+  it('the DeepSeek adapter uses text.format.type = json_schema, no longer json_object', () => {
     const source = repoFile('server/utils/deepseekSpecificationProvider.ts')
-    expect(source).toContain("type: 'json_object'")
-    expect(source).not.toContain('strict: true')
+    expect(source).toContain("type: 'json_schema'")
+    expect(source).not.toContain("type: 'json_object'")
+  })
+
+  it('the DeepSeek request declares a schema name and the canonical groups/parameter/value/note schema, matching the OpenAI adapter\'s contract', () => {
+    const source = repoFile('server/utils/deepseekSpecificationProvider.ts')
+    expect(source).toContain("name: 'specification_proposal'")
+    expect(source).toContain('groups')
+    expect(source).toContain('parameter')
+    expect(source).toContain('value')
+    expect(source).toContain('note')
+  })
+
+  it('the DeepSeek adapter keeps its own local JSON Schema constant — it does not import or share OpenAI\'s copy', () => {
+    const deepseek = repoFile('server/utils/deepseekSpecificationProvider.ts')
+    const openai = repoFile('server/utils/openaiSpecificationProvider.ts')
+    expect(deepseek).toContain('SPECIFICATION_PROPOSAL_JSON_SCHEMA')
+    expect(openai).toContain('SPECIFICATION_PROPOSAL_JSON_SCHEMA')
+    expect(deepseek).not.toContain("from './openaiSpecificationProvider'")
   })
 
   it('neither adapter file imports the other', () => {
@@ -296,6 +317,15 @@ describe('DeepSeek and OpenAI adapters are independently implemented, not one re
     const openai = repoFile('server/utils/openaiSpecificationProvider.ts')
     expect(deepseek).not.toContain('openaiSpecificationProvider')
     expect(openai).not.toContain('deepseekSpecificationProvider')
+  })
+
+  it('each adapter has its own independent config type and factory function name', () => {
+    const deepseek = repoFile('server/utils/deepseekSpecificationProvider.ts')
+    const openai = repoFile('server/utils/openaiSpecificationProvider.ts')
+    expect(deepseek).toContain('DeepSeekProviderConfig')
+    expect(deepseek).toContain('createDeepSeekSpecificationProvider')
+    expect(openai).toContain('SpecificationProposalProviderConfig')
+    expect(openai).toContain('createOpenAiSpecificationProvider')
   })
 
   it('both adapters validate through the one shared canonical schema module', () => {

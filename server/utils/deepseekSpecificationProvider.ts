@@ -1,19 +1,36 @@
+import OpenAI from 'openai'
 import { parseSpecificationProposalResponse, type SpecificationProposalResult } from './aiSpecificationProposal'
 import type { AiSpecificationProvider, GenerateSpecificationProposalInput } from './aiProviderRegistry'
 
 /**
- * PWS-AI-PROVIDER-02 — server-only DeepSeek provider adapter.
+ * PWS-AI-PROVIDER-02-FIX-JSON-SCHEMA-01 — server-only DeepSeek provider
+ * adapter, using DeepSeek's own documented Responses API.
  *
- * A fully independent adapter, not a thin re-skin of the OpenAI one: it
- * calls DeepSeek's own Chat Completions endpoint directly over `fetch` (no
- * shared HTTP client, no shared SDK), builds its own request body, and
- * handles its own capability boundary. DeepSeek's public API does not offer
- * the same strict `json_schema` Structured-Outputs mode the OpenAI adapter
- * uses — only a looser `json_object` mode that guarantees valid JSON but not
- * a specific shape — so this adapter compensates by spelling out the exact
- * required shape in the prompt text itself, and then relies on the same
- * `parseSpecificationProposalResponse()` used by every other provider as the
- * one place that actually decides whether the result is safe to trust.
+ * Per DeepSeek's official API docs (api-docs.deepseek.com/guides/responses_api,
+ * verified 2026-09-08): "our API now supports the Responses API format, with
+ * the base_url being https://api.deepseek.com" — the documented integration
+ * path is the official OpenAI Node/Python SDK, pointed at that base URL,
+ * calling `client.responses.create()`; the docs state the `text` parameter's
+ * `format` is "fully supported", following OpenAI's own Responses API
+ * structure. This adapter follows exactly that documented shape — it does
+ * not invent an undocumented raw endpoint or field.
+ *
+ * This remains a fully independent adapter file from the OpenAI provider
+ * module (own config type, own default model caller, own JSON Schema
+ * constant, own prompt construction, own error handling) — the two files
+ * share no code and neither imports the other. They both happen to use the
+ * `openai` SDK
+ * because DeepSeek's own documentation says that is the correct, documented
+ * way to reach its Responses API — not because this adapter was simplified
+ * into a copy of the OpenAI one.
+ *
+ * DeepSeek's Responses API does not offer the same strict-JSON-Schema
+ * guarantee for every field constraint OpenAI's newer models support (per
+ * the docs, `text`/`format` support is described only as "fully supported"
+ * without the same `strict: true` guarantee language OpenAI documents) — so
+ * the existing server-side Zod validation in `aiSpecificationProposal.ts`
+ * remains the second, authoritative safety boundary regardless of how well
+ * the model actually follows the schema.
  *
  * Text-only, first-version scope: this adapter only prepares a "text
  * material summary → structured specification proposal" call path. It does
@@ -25,6 +42,8 @@ import type { AiSpecificationProvider, GenerateSpecificationProposalInput } from
  * same server-only convention as the OpenAI adapter.
  */
 
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
+
 export interface DeepSeekProviderConfig {
   apiKey: string
   model: string
@@ -32,8 +51,8 @@ export interface DeepSeekProviderConfig {
 
 /**
  * Injected so automated tests can exercise every success/failure path with a
- * mock, without ever issuing a real `fetch` to DeepSeek. `defaultDeepSeekModelCaller`
- * below is the only implementation that does.
+ * mock, without ever constructing a real client or reaching the network.
+ * `defaultDeepSeekModelCaller` below is the only implementation that does.
  */
 export type DeepSeekModelCaller = (
   input: GenerateSpecificationProposalInput,
@@ -43,78 +62,85 @@ export type DeepSeekModelCaller = (
 const NOT_CONFIGURED_ERROR = 'AI provider is not configured.'
 const CALL_FAILED_ERROR = 'The AI provider could not generate a proposal right now.'
 
-const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
-const REQUEST_TIMEOUT_MS = 30_000
-
 /**
- * DeepSeek's `json_object` mode only guarantees syntactically valid JSON, so
- * the exact shape is spelled out here in plain text. `parseSpecificationProposalResponse()`
- * is the actual safety boundary regardless of how well the model follows this.
+ * The canonical specification-proposal shape, expressed as its own local
+ * JSON Schema literal for the DeepSeek Responses API call — kept separate
+ * from the OpenAI adapter's own copy so the two adapters remain independent
+ * and neither can drift the other by editing a shared constant.
  */
-const SHAPE_INSTRUCTIONS = `Respond with a single JSON object of exactly this shape, and nothing else:
-{"groups": [{"group": "<group name>", "items": [{"parameter": "<parameter name>", "value": "<value>", "note": "<optional short note>"}]}]}
-Every group must have at least one item. "note" may be omitted. Do not include any other field.`
+const SPECIFICATION_PROPOSAL_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    groups: {
+      type: 'array',
+      minItems: 1,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          group: { type: 'string' },
+          items: {
+            type: 'array',
+            minItems: 1,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                parameter: { type: 'string' },
+                value: { type: 'string' },
+                note: { type: 'string' },
+              },
+              required: ['parameter', 'value'],
+            },
+          },
+        },
+        required: ['group', 'items'],
+      },
+    },
+  },
+  required: ['groups'],
+} as const
 
 /**
- * The real network call — DeepSeek Chat Completions with `response_format:
- * { type: "json_object" }`. This function is a thin wire adapter only: it
- * does no validation of its own, because `parseSpecificationProposalResponse()`
- * is the single place that decides what is safe to trust, regardless of
- * what the API returns.
+ * The real network call — DeepSeek's documented Responses API, reached via
+ * the official OpenAI SDK pointed at DeepSeek's `base_url`, with
+ * `text.format.type: 'json_schema'` structured output. This function is a
+ * thin wire adapter only: it does no validation of its own, because
+ * `parseSpecificationProposalResponse()` is the single place that decides
+ * what is safe to trust, regardless of what the API returns.
  */
 async function defaultDeepSeekModelCaller(
   input: GenerateSpecificationProposalInput,
   config: DeepSeekProviderConfig,
 ): Promise<unknown> {
+  const client = new OpenAI({ apiKey: config.apiKey, baseURL: DEEPSEEK_BASE_URL })
+
   const fileList = input.sourceFileSummaries
     .map(f => `- ${f.displayName} (${f.fileType})`)
     .join('\n')
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-
-  let response: Response
-  try {
-    response = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey}`,
+  const response = await client.responses.create({
+    model: config.model,
+    instructions:
+      'You produce structured product specification proposals for internal review. '
+      + 'Only use the provided source materials. Never invent values you cannot support.',
+    input:
+      `Product: ${input.productName}\n`
+      + `Approved source materials (already associated with this product):\n${fileList}\n`
+      + (input.contextNote ? `Additional approved context: ${input.contextNote}\n` : '')
+      + 'Propose specification groups and parameters supported by these materials.',
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'specification_proposal',
+        schema: SPECIFICATION_PROPOSAL_JSON_SCHEMA,
+        strict: true,
       },
-      body: JSON.stringify({
-        model: config.model,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You produce structured product specification proposals for internal review. '
-              + 'Only use the provided source materials. Never invent values you cannot support.\n'
-              + SHAPE_INSTRUCTIONS,
-          },
-          {
-            role: 'user',
-            content:
-              `Product: ${input.productName}\n`
-              + `Approved source materials (already associated with this product):\n${fileList}\n`
-              + (input.contextNote ? `Additional approved context: ${input.contextNote}\n` : '')
-              + 'Propose specification groups and parameters supported by these materials.',
-          },
-        ],
-      }),
-    })
-  } finally {
-    clearTimeout(timer)
-  }
+    },
+  })
 
-  if (!response.ok) throw new Error(`DeepSeek request failed with status ${response.status}`)
-
-  const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
-  const content = body.choices?.[0]?.message?.content
-  if (!content) throw new Error('DeepSeek response had no message content')
-
-  return JSON.parse(content)
+  return JSON.parse(response.output_text)
 }
 
 /**
