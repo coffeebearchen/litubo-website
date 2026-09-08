@@ -33,6 +33,7 @@ import {
   workspaceSourcesEvidenceRoute,
   workspaceSpecificationsRoute,
   workspaceMediaResourcesRoute,
+  workspaceAiSourceIntakeRoute,
 } from '../utils/productCentre'
 import type { AdminProduct } from '../types/product-cms'
 
@@ -317,10 +318,10 @@ describe('Submit for review lives on Overview only, inside the Lifecycle card (s
 describe('Workspace module navigation (source evidence)', () => {
   const source = repoFile('components/admin/workspace/WorkspaceModuleNav.vue')
 
-  it('defines all nine PWS-00…PWS-08 addresses with only the five landed modules enabled', () => {
-    expect(WORKSPACE_MODULE_NAV).toHaveLength(9)
+  it('defines all ten PWS-00…PWS-08 + AI Source Intake addresses with only the six landed modules enabled', () => {
+    expect(WORKSPACE_MODULE_NAV).toHaveLength(10)
     const enabled = WORKSPACE_MODULE_NAV.filter(i => i.enabled).map(i => i.key)
-    expect(enabled).toEqual(['overview', 'page-content', 'specifications', 'media-resources', 'sources-evidence'])
+    expect(enabled).toEqual(['overview', 'page-content', 'specifications', 'media-resources', 'sources-evidence', 'ai-source-intake'])
   })
 
   it('groups modules under the three frozen headings', () => {
@@ -1767,5 +1768,200 @@ describe('PWS-SOURCES-LITE-POLISH-01 leaves the existing read-only Evidence regi
     const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
     expect(page).not.toContain(':save-state=')
     expect(page).not.toContain('@save=')
+  })
+})
+
+// ── PWS-AI-01-FAST-01 — AI Source Intake (selection only, explicitly authorized) ──
+//
+// The user explicitly authorized this narrowed first step of `AI-01`: an
+// admin may select which of the CURRENT product's own already-associated
+// Media Library files would scope a hypothetical future AI run. Nothing
+// here calls a model, writes a product parameter, creates a proposal, or
+// publishes anything — selection is purely local, ephemeral UI state.
+// PWS-AI-02 (Proposal Review) does not exist and is out of scope.
+
+const AI_INTAKE_FILES = [
+  'pages/admin/product-workspace/[id]/ai-source-intake.vue',
+  'components/admin/workspace/WorkspaceAiSourceIntake.vue',
+]
+
+describe('PWS-AI-01-FAST-01 module is enabled and routable', () => {
+  it('enables ai-source-intake without touching any other module flag', () => {
+    const byKey = Object.fromEntries(WORKSPACE_MODULE_NAV.map(i => [i.key, i.enabled]))
+    expect(byKey['ai-source-intake']).toBe(true)
+    expect(byKey.overview).toBe(true)
+    expect(byKey['page-content']).toBe(true)
+    expect(byKey.specifications).toBe(true)
+    expect(byKey['media-resources']).toBe(true)
+    expect(byKey['sources-evidence']).toBe(true)
+    for (const key of ['relations', 'seo-locales', 'share-distribution', 'change-history']) {
+      expect(byKey[key]).toBe(false)
+    }
+  })
+
+  it('workspaceAiSourceIntakeRoute builds the frozen route', () => {
+    expect(workspaceAiSourceIntakeRoute(42)).toBe('/admin/product-workspace/42/ai-source-intake')
+  })
+
+  it('the module nav links the enabled item with a real NuxtLink, using the shared icon set', () => {
+    const source = repoFile('components/admin/workspace/WorkspaceModuleNav.vue')
+    expect(source).toContain('workspaceAiSourceIntakeRoute')
+    const icon = repoFile('components/admin/workspace/WorkspaceNavIcon.vue')
+    expect(icon).toContain("moduleKey === 'ai-source-intake'")
+  })
+})
+
+describe('PWS-AI-01-FAST-01 page composition', () => {
+  it('mounts WorkspaceShell, WorkspaceModuleNav and WorkspaceAiSourceIntake', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    expect(page).toContain('<WorkspaceShell')
+    expect(page).toContain('<WorkspaceModuleNav')
+    expect(page).toContain('<WorkspaceAiSourceIntake')
+    expect(page).toContain('active-key="ai-source-intake"')
+  })
+
+  it('renders a "Product not found" empty state rather than a blank form', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    expect(page).toContain('Product not found')
+    expect(page).toContain('notFound')
+  })
+
+  it('does not pass a save-state or listen for a Save changes event — this page never writes', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    expect(page).not.toContain(':save-state=')
+    expect(page).not.toContain('@save=')
+  })
+})
+
+describe('PWS-AI-01-FAST-01 reads only the current product\'s own already-associated files — never cross-product', () => {
+  it('fetches exactly the product record and its own media association list, nothing else', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    expect(page).toContain('useFetch<AdminProduct>(`/api/admin/products/${id}`)')
+    expect(page).toContain('useFetch<ProductMedia[]>(`/api/admin/products/${id}/media`)')
+    expect(page).not.toContain('/api/admin/media/files')
+    expect(page).not.toContain('/api/admin/products/${id}/sources')
+    expect(page).not.toContain('/api/admin/products/${id}/evidence')
+  })
+
+  it('the file grid is built by iterating the linkedMedia prop only — never a static or global list', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
+    expect(component).toContain('v-for="m in linkedMedia"')
+    expect(component).not.toContain('/api/admin/media/files')
+  })
+})
+
+describe('PWS-AI-01-FAST-01 issues zero write requests — load, select/deselect, filter, and Continue are all local-only', () => {
+  const WRITE_METHOD_RE = /method:\s*['"](POST|PATCH|PUT|DELETE)['"]/g
+
+  it('the page never calls $fetch with a write method, or at all — every data access is useFetch (GET)', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    expect(page).not.toContain('$fetch')
+    expect(page).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('the presentational component never issues any fetch request', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
+    expect(component).not.toContain('$fetch')
+    expect(component).not.toContain('useFetch')
+    expect(component).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('toggling a selection only mutates a local ref array — it never emits a write or calls the server', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    const block = page.slice(page.indexOf('function toggleSelection'), page.indexOf('</script>'))
+    expect(block).not.toContain('$fetch')
+    expect(block).toContain('selectedIds.value')
+  })
+
+  it('Continue only flips a local boolean — it never calls an AI endpoint, $fetch, or navigates', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
+    const block = component.slice(component.indexOf('const continueClicked'), component.indexOf('</script>'))
+    expect(block).not.toContain('$fetch')
+    expect(block).not.toContain('navigateTo')
+    expect(component).not.toContain('/api/admin/ai')
+    expect(component.toLowerCase()).not.toContain('analyze')
+  })
+})
+
+describe('PWS-AI-01-FAST-01 Continue to proposal review is gated on a non-empty selection', () => {
+  it('the Continue button is disabled exactly when nothing is selected', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
+    expect(component).toContain(':disabled="selectedIds.length === 0"')
+  })
+
+  it('never renders any AI Fill Workspace, Analyze, or Apply proposals control — those belong to a later, unauthorized step', () => {
+    for (const file of AI_INTAKE_FILES) {
+      const lower = repoFile(file).toLowerCase()
+      expect(lower).not.toContain('ai fill workspace')
+      expect(lower).not.toContain('analyze sources')
+      expect(lower).not.toContain('apply approved')
+      expect(lower).not.toContain('pws-ai-02')
+    }
+  })
+})
+
+describe('PWS-AI-01-FAST-01 honest empty state directs to Media & resources, never fabricates a file', () => {
+  const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
+
+  it('shows an honest empty state with a link to Media & resources when nothing is associated yet', () => {
+    expect(component).toContain('This product has no associated files yet.')
+    expect(component).toContain('mediaResourcesHref')
+  })
+
+  it('never fabricates a real product\'s file name when the list is empty', () => {
+    expect(component).not.toContain('LT-180C')
+    expect(component).not.toContain('Datasheet.pdf')
+  })
+})
+
+describe('PWS-AI-01-FAST-01 never displays restricted or fabricated data', () => {
+  it('never renders a bare Directus file UUID, raw source text, locator, internal note, or download link', () => {
+    for (const file of AI_INTAKE_FILES) {
+      const source = repoFile(file)
+      expect(source).not.toContain('raw_excerpt')
+      expect(source).not.toContain('source_locator')
+      expect(source.toLowerCase()).not.toMatch(/>\s*download\s*</)
+      expect(source).not.toMatch(/<a\s[^>]*href/)
+    }
+  })
+
+  it('the display-name helper never falls back to any fragment of the file UUID', () => {
+    const util = repoFile('utils/productWorkspace.ts')
+    const block = util.slice(util.indexOf('export function aiIntakeFileDisplayName'), util.indexOf('export function mediaReadableLabel'))
+    expect(block).not.toContain('directus_files_id')
+  })
+
+  it('the template never interpolates directus_files_id directly', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
+    const template = component.slice(component.indexOf('<template>'), component.lastIndexOf('</template>'))
+    expect(template).not.toMatch(/\{\{\s*m\.directus_files_id\s*\}\}/)
+  })
+})
+
+describe('PWS-AI-01-FAST-01 has no AI, upload, publish, or lifecycle surface', () => {
+  it('no file renders an upload entry point or calls a publish/lifecycle endpoint', () => {
+    for (const file of AI_INTAKE_FILES) {
+      const lower = repoFile(file).toLowerCase()
+      expect(lower).not.toContain('<input type="file"')
+      expect(lower).not.toContain('/publish')
+      expect(lower).not.toContain("status: 'published'")
+      expect(lower).not.toContain('submit for review')
+    }
+  })
+})
+
+describe('PWS-AI-01-FAST-01 375px stacking, no horizontal overflow substitute', () => {
+  it('the 375px breakpoint stacks the file grid into a single column', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
+    const mobileBlock = component.slice(component.indexOf('max-width: 767px'))
+    expect(mobileBlock).toContain('grid-template-columns: 1fr')
+  })
+})
+
+describe('PWS-AI-01-FAST-01 is English-first and carries no Chinese', () => {
+  it('no file has visible or assistive Chinese in its template', () => {
+    for (const file of AI_INTAKE_FILES) {
+      expect(renderedMarkup(repoFile(file))).not.toMatch(/[一-鿿]/)
+    }
   })
 })

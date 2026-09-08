@@ -47,6 +47,7 @@ export const WORKSPACE_MODULE_NAV: WorkspaceModuleNavItem[] = [
   { key: 'seo-locales', label: 'SEO & locales', group: 'PUBLISH & DISTRIBUTE', enabled: false },
   { key: 'share-distribution', label: 'Share & distribution', group: 'PUBLISH & DISTRIBUTE', enabled: false },
   { key: 'sources-evidence', label: 'Sources & evidence', group: 'CONTROL', enabled: true },
+  { key: 'ai-source-intake', label: 'AI Source Intake', group: 'CONTROL', enabled: true },
   { key: 'change-history', label: 'Change history', group: 'CONTROL', enabled: false },
 ]
 
@@ -140,4 +141,18 @@ export function workspaceMediaThumbUrl(
 /** Product media (image-like) vs. Documents & access — split by the file's real MIME type, never by role or filename guesswork. */
 export function workspaceMediaIsImage(mimeType: string | null): boolean {
   return (mimeType ?? '').startsWith('image/')
+}
+
+/**
+ * PWS-AI-01-FAST-01 — honest display name for an AI Source Intake file card.
+ * Never falls back to any fragment of the Directus file UUID (stricter than
+ * the Sources & evidence picker's fallback, per this task's own boundary).
+ */
+export function aiIntakeFileDisplayName(m: { filename_download?: string | null, caption_en?: string | null, alt_en?: string | null }): string {
+  return m.filename_download || m.caption_en || m.alt_en || 'Untitled file'
+}
+
+/** Whether a product-media association is currently readable/available, in plain English — never a raw boolean. */
+export function mediaReadableLabel(enabled: boolean): string {
+  return enabled ? 'Enabled' : 'Disabled'
 }

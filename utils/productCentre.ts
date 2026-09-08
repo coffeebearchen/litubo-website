@@ -93,6 +93,15 @@ export function workspaceMediaResourcesRoute(id: number | string): string {
   return `/admin/product-workspace/${id}/media-resources`
 }
 
+/**
+ * PWS-AI-01-FAST-01 AI Source Intake route — explicitly authorized, narrowed
+ * first step of `AI-01` (source *selection* only; no analysis, no proposal
+ * generation, no PWS-AI-02). Same shell, sixth enabled tab.
+ */
+export function workspaceAiSourceIntakeRoute(id: number | string): string {
+  return `/admin/product-workspace/${id}/ai-source-intake`
+}
+
 export function categoryContextRoute(id: number | string): string {
   return `/admin/products/categories/${id}`
 }

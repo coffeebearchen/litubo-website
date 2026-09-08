@@ -6,6 +6,7 @@ import {
   workspaceSourcesEvidenceRoute,
   workspaceSpecificationsRoute,
   workspaceMediaResourcesRoute,
+  workspaceAiSourceIntakeRoute,
 } from '~/utils/productCentre'
 
 const props = defineProps<{
@@ -27,6 +28,7 @@ const ENABLED_ROUTES: Record<string, (id: number) => string> = {
   'sources-evidence': workspaceSourcesEvidenceRoute,
   specifications: workspaceSpecificationsRoute,
   'media-resources': workspaceMediaResourcesRoute,
+  'ai-source-intake': workspaceAiSourceIntakeRoute,
 }
 
 function routeFor(key: string): string {

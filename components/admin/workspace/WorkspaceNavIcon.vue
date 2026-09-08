@@ -46,6 +46,10 @@ defineProps<{
       <circle cx="12" cy="12" r="8.5" />
       <path d="M12 7.5V12l3 2" />
     </template>
+    <template v-else-if="moduleKey === 'ai-source-intake'">
+      <path d="M12 3.5l1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4-4.4-1.6 4.4-1.6L12 3.5Z" />
+      <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z" />
+    </template>
   </svg>
 </template>
 

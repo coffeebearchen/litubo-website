@@ -2674,3 +2674,58 @@ SHA256SUMS.txt
 | `docs/project/CURRENT-STATE.md`（修改） | 本记录 |
 
 *最后更新：2026-09-08，由 Claude Code 在"PWS-SOURCES-LITE-POLISH-01"任务中写入。*
+
+---
+
+## PWS-AI-01-FAST-01 — Product Workspace AI Source Intake（首个正式授权的 AI 步骤，2026-09-08）
+
+**性质：** 用户明确、正式授权实现 `PW-AI-01-SOURCE-INTAKE-D1440` 的一个大幅收窄子集——**仅"当前产品已关联文件的选择界面"**，不包含母版中的图片上传、拖拽上传、粘贴文本、四步进度条、"Analyze sources and create Draft proposals"等任何真正触发 AI 的能力。未调用任何外部模型、未读取/要求任何 API key、未新建 Directus schema、未写产品参数、未创建 proposal、未做 PWS-AI-02（Proposal Review 尚不存在）。
+
+**开工核对：** 开工前确认 `master = origin/master = a227973`（`git fetch --prune origin` + 双重 `rev-parse` 核对），五个受保护未跟踪路径未被触碰；完整只读查看 README + 全部 11 张 PNG 原尺寸，确认 `PW-AI-01-SOURCE-INTAKE-D1440` 与 `PW-AI-02-PROPOSAL-REVIEW-D1440` 内容与此前历次核查一致。Register 原将此母版标记为 `FUTURE-REFERENCE`（不构成实现授权）——本次是本任务用户在会话中对该特定、窄化范围的显式书面授权，不代表 Register 状态本身已变更，也不构成对完整 `AI-01`（含真实模型调用、批量导入、proposal 写入等）的授权。
+
+### 新增页面与路由
+
+`/admin/product-workspace/:id/ai-source-intake`（`workspaceAiSourceIntakeRoute()`），Workspace 导航 CONTROL 分组新增"AI Source Intake"项（`Sources & evidence` 与 `Change history` 之间），复用既有 Workspace Shell/Nav 视觉语言与图标体系。
+
+### 实现内容
+
+| 要求 | 实现 |
+|---|---|
+| 只读取当前产品已关联的 Media Library 文件 | 复用既有 `GET /api/admin/products/:id/media`（与 Media & resources 同一端点），未新增任何 API |
+| 安全字段展示 | 每张文件卡片仅显示：显示名称（`filename_download` → `caption_en` → `alt_en` → "Untitled file"，**绝不回退到 UUID 片段**）、类型（复用 `sourceFileTypeLabel`）、角色（复用 `fileRoleLabel`）、可读状态（新增 `mediaReadableLabel()`：Enabled/Disabled） |
+| 勾选/取消勾选 + 已选数量 | 纯本地 `selectedIds` 数组（`ref<number[]>`），复选框切换只调用本地 `toggleSelection()`，从不发起请求；卡片选中态高亮；顶部徽章实时显示"N selected" |
+| 诚实空态 | 当前产品无关联文件时提示"This product has no associated files yet."并给出指向 Media & resources 的真实链接 |
+| Continue to proposal review | 未选择任何文件时 `disabled`；点击（有选择时）只翻转一个本地布尔值，显示"The next step is not built yet in this Workspace. No model was called on any file, and nothing was written or published."——不调用任何端点、不导航、不写入 |
+| 零写请求 | 页面加载、勾选/取消、打开该页、点击 Continue 全程无 `$fetch`；页面脚本、展示组件均未出现任何 `POST/PATCH/PUT/DELETE` |
+| 当前产品隔离 | 唯一数据源是 `/api/admin/products/:id/media`（该端点本身已通过既有 `assertProductExists` + 按产品过滤，未跨产品） |
+| 敏感信息边界 | 未渲染 raw source text、locator、UUID（含 `directus_files_id` 片段）、internal note、下载链接、原文件预览或其他产品资料；模板从不直接插值 `m.directus_files_id` |
+
+### 明确未做
+
+未新建 Directus 集合/字段/迁移/权限/高审计；未修改 Media Library、Sources & evidence、Specifications、Page Content、旧编辑器或全局 Admin Shell；未创建测试产品，未留下测试关联；未调用任何模型、未写 AI job、未生成 proposal；未做 PWS-AI-02、Apply all、发布、SEO、Relations、History；未操作 Media Library Archive；未部署。
+
+### 新增/修改文件
+
+| 文件 | 作用 |
+|---|---|
+| `pages/admin/product-workspace/[id]/ai-source-intake.vue`（新建） | 页面：拉取产品 + 其媒体关联列表（均为 `useFetch` GET），维护本地 `selectedIds`，`toggleSelection()` 纯本地操作；无 `save-state`/`@save` |
+| `components/admin/workspace/WorkspaceAiSourceIntake.vue`（新建） | 纯展示组件：范围说明、文件网格（勾选框 + 安全字段）、已选计数、诚实空态、Continue 按钮（禁用逻辑 + 本地 `continueClicked` 提示），从不发起请求 |
+| `components/admin/workspace/WorkspaceModuleNav.vue`（修改） | 新增 `ai-source-intake` → `workspaceAiSourceIntakeRoute` 路由映射 |
+| `components/admin/workspace/WorkspaceNavIcon.vue`（修改） | 新增 `ai-source-intake` 图标分支（sparkle 图形，呼应母版 AI 视觉语言，非文字） |
+| `utils/productWorkspace.ts`（修改） | `WORKSPACE_MODULE_NAV` 新增 `ai-source-intake` 项（CONTROL 分组，enabled）；新增纯函数 `aiIntakeFileDisplayName()`、`mediaReadableLabel()` |
+| `utils/productCentre.ts`（修改） | 新增 `workspaceAiSourceIntakeRoute()` |
+| `tests/productWorkspaceOverview.test.ts`（修改） | 更新既有导航测试（9→10 项，5→6 启用）；新增 `PWS-AI-01-FAST-01` 测试段落，覆盖：导航启用、路由、页面组成、当前产品隔离（仅调用 `/media`，不碰 sources/evidence 端点）、零写（加载/勾选/Continue 均不发起请求）、Continue 禁用逻辑、无 AI Fill/Analyze/Apply 控件、诚实空态、无 UUID/敏感字段泄露、无上传/发布、375px 单列堆叠、英文无中文 |
+| `docs/project/CURRENT-STATE.md`（修改） | 本记录 |
+
+### 验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 546/546 通过（新增 `PWS-AI-01-FAST-01` 测试段落 24 个用例 + 1 项既有导航测试更新） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告（Windows 正常） |
+| `npx nuxt build` | Build complete |
+| 浏览器 1440px + 375px 核验（真实产品 ID=3，已登录会话） | 两个断点均 `scrollWidth === innerWidth`，无横向溢出；全新标签页 Console 零错误；页面正确显示 7 条真实已关联文件（安全字段：文件名/类型/角色/状态）；勾选一张卡片后计数变为"1 selected"、卡片高亮、Continue 按钮从禁用变为可点；勾选/取消勾选/点击 Continue 全程 Network 面板零 `POST/PATCH/PUT/DELETE`（仅背景 `auth/refresh` 会话续期）；点击 Continue 后仅显示本地提示文案，无任何新增请求；核验结束后 `GET /api/admin/products/3/media` 确认仍为 7 条，产品 3 无残留测试数据 |
+
+*最后更新：2026-09-08，由 Claude Code 在"PWS-AI-01-FAST-01"任务中写入。*
