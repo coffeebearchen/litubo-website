@@ -1,11 +1,15 @@
 import OpenAI from 'openai'
-import {
-  parseSpecificationProposalResponse,
-  type SpecificationProposalResult,
-} from './aiSpecificationProposal'
+import { parseSpecificationProposalResponse, type SpecificationProposalResult } from './aiSpecificationProposal'
+import type { AiSpecificationProvider, GenerateSpecificationProposalInput } from './aiProviderRegistry'
 
 /**
- * PWS-AI-PLATFORM-01 — server-only OpenAI provider foundation.
+ * PWS-AI-PLATFORM-01 — server-only OpenAI provider foundation (commit
+ * c1e03ce). PWS-AI-PROVIDER-02 generalized its two local types
+ * (`GenerateSpecificationProposalInput`, the provider interface) to the
+ * shared, provider-neutral `aiProviderRegistry.ts` — re-exported below so
+ * every existing import of this module keeps working unchanged — without
+ * touching this file's actual behavior, error strings, or fail-closed
+ * guarantee.
  *
  * This file is never imported by a `.vue` file, a `pages/`/`components/`
  * module, or anything else that ships to the browser — only by future
@@ -21,13 +25,7 @@ import {
  * repository until an operator sets real values in their own `.env`.
  */
 
-/** Non-sensitive scope description for a future Generate call — file names and types only, never raw content, a UUID, or a path. */
-export interface GenerateSpecificationProposalInput {
-  productName: string
-  sourceFileSummaries: Array<{ displayName: string, fileType: string }>
-  /** Optional, human-approved free text the admin typed in — never raw file content. */
-  contextNote?: string
-}
+export type { GenerateSpecificationProposalInput } from './aiProviderRegistry'
 
 export interface SpecificationProposalProviderConfig {
   apiKey: string
@@ -43,11 +41,6 @@ export type ModelCaller = (
   input: GenerateSpecificationProposalInput,
   config: SpecificationProposalProviderConfig,
 ) => Promise<unknown>
-
-export interface SpecificationProposalProvider {
-  isConfigured(): boolean
-  generateSpecificationProposal(input: GenerateSpecificationProposalInput): Promise<SpecificationProposalResult>
-}
 
 const NOT_CONFIGURED_ERROR = 'AI provider is not configured.'
 const CALL_FAILED_ERROR = 'The AI provider could not generate a proposal right now.'
@@ -142,7 +135,7 @@ async function defaultOpenAiModelCaller(
 export function createOpenAiSpecificationProvider(
   config: SpecificationProposalProviderConfig,
   callModel: ModelCaller = defaultOpenAiModelCaller,
-): SpecificationProposalProvider {
+): AiSpecificationProvider {
   function isConfigured(): boolean {
     return Boolean(config.apiKey.trim() && config.model.trim())
   }

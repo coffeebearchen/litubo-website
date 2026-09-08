@@ -2782,3 +2782,88 @@ SHA256SUMS.txt
 未创建 Directus 集合/字段/迁移/权限/审计/UI 页面；未创建持久测试产品；未新增文件上传/下载/预览/Archive；未做批量多产品处理；未做自动 Apply/自动覆盖/自动发布；未把 API key、模型名、文件 UUID、原文或内部资料暴露到 UI/API；未部署；未开始 PWS-AI-02 的 Generate/Review/Apply。
 
 *最后更新：2026-09-08，由 Claude Code 在"PWS-AI-PLATFORM-01"任务中写入。*
+
+---
+
+## PWS-AI-PROVIDER-02 — Provider-neutral Registry + DeepSeek Adapter（2026-09-08）
+
+**性质：** 对 `c1e03ce`（PWS-AI-PLATFORM-01，OpenAI-only foundation）的窄化架构扩展。`c1e03ce` 未被 revert/reset/amend——本次是在其基础上的新提交，其 OpenAI server-only、fail-closed、Zod 校验行为与既有 23 个 mock 测试全部原样保留并继续通过。用户已确认的长期决定：AI 必须支持多 Provider 可切换，第一期默认 **DeepSeek**，同时保留 OpenAI 可选；每次生成只能由用户明确选择一个已配置 Provider，严禁自动 fallback 或同一请求调用两家。
+
+**开工核对：** 开工前确认 `master = origin/master = c1e03ce`（`git fetch --prune origin` + 双重 `rev-parse` 核对），五个受保护未跟踪路径未被触碰。
+
+### 架构：Provider-neutral Registry
+
+`c1e03ce` 中 `openaiSpecificationProvider.ts` 本地定义的 `GenerateSpecificationProposalInput` 与 provider 接口，被提升为共享、provider 中立的 `server/utils/aiProviderRegistry.ts`；`openaiSpecificationProvider.ts` 改为从该文件导入并重导出这两个类型（旧的导入路径 `import { createOpenAiSpecificationProvider, type GenerateSpecificationProposalInput, type ModelCaller } from '.../openaiSpecificationProvider'` 完全不变，现有测试文件零修改即全部通过），其 `isConfigured()`/`generateSpecificationProposal()` 行为、错误文案、Zod 校验路径均未改动一行逻辑。
+
+| 能力 | 说明 |
+|---|---|
+| `AiProviderId` | `'deepseek' \| 'openai'` |
+| `isAiProviderId()` / `parseAiProviderId(raw, fallback)` | 严格枚举校验；任何非法输入（含空值、大小写变体、SQL 注入字符串等）一律安全回退，从不信任原始输入 |
+| `createAiProviderRegistry({ defaultProvider, providers })` | 纯注册表逻辑，`providers` 由调用方注入（测试全程注入 mock，从不构造真实 OpenAI/DeepSeek 实例） |
+| `getProvider(id)` / `listConfiguredProviders()` / `getDefaultProvider()` | `listConfiguredProviders()` 仅返回 `{ id, label, configured }`——绝不含 key、model、原始错误、prompt、文件内容或内部路径 |
+| `generateSpecificationProposal(providerId, input)` | **唯一生成入口**：按 `providerId` 精确解析到一个 provider 并调用其 `generateSpecificationProposal()`；函数体内无循环、无 `.map`/`.forEach`/`Promise.all`、无"失败后换一家再试"分支——已有专门测试断言源码中不存在跨 provider 的循环或 fallback 结构 |
+| `createDefaultAiProviderRegistry(config)`（`aiProviderRegistryDefault.ts`） | 为未来 `server/api/**` 端点准备的真实两 provider 接线工厂；配置以纯值传入（非直接调用 `useRuntimeConfig()`），本次未被任何页面/端点调用，测试只验证其在空配置下同样 fail-closed，从不触发真实网络 |
+
+### 两个完全独立的 Adapter
+
+| | OpenAI（`openaiSpecificationProvider.ts`，`c1e03ce` 既有，本次仅类型来源调整） | DeepSeek（`deepseekSpecificationProvider.ts`，新建） |
+|---|---|---|
+| 调用方式 | 官方 `openai` Node SDK，`client.responses.create()` | 原生 `fetch()` 直接调用 `https://api.deepseek.com/chat/completions`，**不使用 `openai` SDK** |
+| 结构化输出 | Responses API `text.format: { type: 'json_schema', strict: true }`——严格 JSON Schema 约束 | Chat Completions `response_format: { type: 'json_object' }`——仅保证合法 JSON，不保证结构；缺口通过在 prompt 中显式书写目标结构文字说明来补偿，这是两家能力边界的真实差异，不是简化 |
+| 超时/错误处理 | 依赖 SDK 自身错误处理，统一转换为安全短错误 | 自建 `AbortController` + 30s 超时、非 200 状态显式抛错，同样统一转换为安全短错误 |
+| 共同点 | 两者的原始响应都必须经过同一个 `server/utils/aiSpecificationProposal.ts` 的 `parseSpecificationProposalResponse()` 校验，业务层拿到的是同一个 `SpecificationProposal` 形状 |
+
+两份文件互不 `import` 对方（已有测试断言），DeepSeek adapter 也未产生对 `openai` 包的任何依赖。
+
+### 新增配置位（仅服务端可读，均为空值/安全默认）
+
+| 变量名 | 性质 | 说明 |
+|---|---|---|
+| `AI_DEFAULT_PROVIDER` | 非秘密 | `runtimeConfig.aiDefaultProvider`；只识别 `deepseek`/`openai`，其余（含未设置）经 `parseAiProviderId()` 安全回退为 `deepseek` |
+| `DEEPSEEK_API_KEY` | 秘密，仅本机/部署环境 `.env` | `runtimeConfig.deepseekApiKey` |
+| `DEEPSEEK_MODEL` | 非秘密、可配置 | `runtimeConfig.deepseekModel`；代码中从未硬编码任何最终模型名 |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | 沿用 `c1e03ce`，继续可用 | 未改动 |
+
+四者均在 `runtimeConfig` 的非 `public` 区块（已有测试逐一核实 `public` 块不含 `openai`/`deepseek` 字样）。`.env.example` 仅新增/扩展了对应的空值占位与说明注释，未读取/未修改真实 `.env`。
+
+### 明确边界（均已验证）
+
+- **零真实调用**：`defaultOpenAiModelCaller`（唯一构造 `OpenAI` 客户端的函数）与 `defaultDeepSeekModelCaller`（唯一发起 `fetch` 到 `api.deepseek.com` 的函数）均未在任何测试或本次操作中被执行——所有测试对两个 adapter 都注入了 mock `callModel`；
+- **零费用**：同上；
+- **零自动 fallback**：`generateSpecificationProposal(providerId, input)` 按 `providerId` 精确解析且仅调用该一个 provider；专项测试验证"请求 A 失败/未配置时，B 从未被调用"；
+- **零双发**：专项测试以 `vi.fn()` 分别监视两个 mock provider，验证单次调用只有一个 provider 的 `generateSpecificationProposal` 被触发（`toHaveBeenCalledTimes(1)` / `not.toHaveBeenCalled()`）；
+- **零产品数据写入**：未新增/修改任何 Directus 集合、字段、迁移、权限；未触碰 Specifications、Media Library、Sources & evidence、Page Content、发布状态；
+- **零敏感信息泄露**：未读取/打印/提交真实 `.env`；provider 与 registry 的任何返回值（成功/失败）均不含 apiKey/model/原始错误/prompt/文件内容/UUID/路径；`.output/public` 构建产物二次 `grep` 确认不含 `openai`/`deepseek` 字符串；
+- 未实现 Generate、Proposal Review、Apply、图片/PDF/Excel/DOCX 上传解析、OCR、Vision、文件 API、UI 页面；
+- 未部署。
+
+### 新增/修改文件
+
+| 文件 | 作用 |
+|---|---|
+| `server/utils/aiProviderRegistry.ts`（新建） | `AiProviderId`、`isAiProviderId`/`parseAiProviderId`、`AiSpecificationProvider`、`AiProviderSummary`、`createAiProviderRegistry()` |
+| `server/utils/deepseekSpecificationProvider.ts`（新建） | 独立 DeepSeek adapter：`createDeepSeekSpecificationProvider()`，原生 `fetch` 调用 + `json_object` 模式 + 30s 超时 |
+| `server/utils/aiProviderRegistryDefault.ts`（新建） | `createDefaultAiProviderRegistry(config)`：为未来端点接线两个真实 adapter，本次未被调用 |
+| `server/utils/openaiSpecificationProvider.ts`（修改） | 类型来源改为从 `aiProviderRegistry.ts` 导入/重导出；`isConfigured`/`generateSpecificationProposal` 行为、错误文案、Zod 校验路径均未变 |
+| `nuxt.config.ts`（修改） | 新增 `aiDefaultProvider`、`deepseekApiKey`、`deepseekModel`（均非 `public`） |
+| `.env.example`（修改） | 扩展 AI provider 区块：新增 `AI_DEFAULT_PROVIDER`（默认值 `deepseek`，非秘密）、`DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL`（空值占位） |
+| `package.json` / `package-lock.json` | 无新增依赖（DeepSeek adapter 使用原生 `fetch`，未安装额外 SDK） |
+| `tests/aiProviderRegistry.test.ts`（新建） | 32 个用例：枚举校验、默认 Provider、安全 listConfiguredProviders、单一 provider 精确分发（含"零双发"“零自动 fallback”专项断言）、DeepSeek fail-closed/mock 成功/mock 非法结构/mock 拒答/mock 超时、两 adapter 互不导入对方且各自独立实现、零泄露、`runtimeConfig`/`.env.example` 边界、客户端零引用 |
+| `tests/aiSpecificationProvider.test.ts` | 未修改，23 个既有用例全部原样通过 |
+| `docs/project/CURRENT-STATE.md`（修改） | 本记录 |
+
+### 验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 601/601 通过（含既有 23 个 OpenAI 用例零修改通过 + 新增 32 个 registry/DeepSeek 用例） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告（Windows 正常） |
+| `npx nuxt build` | Build complete；`.output/public` 二次 `grep` 确认不含 `openai`/`deepseek` 字符串 |
+
+### 明确未做
+
+未创建 Directus 集合/字段/迁移/权限/审计/UI 页面；未创建持久测试产品；未新增图片/PDF/Excel/DOCX 上传、解析、OCR、Vision 或文件 API；未做批量多产品处理；未做自动 Apply/自动覆盖/自动发布；未把 API key、模型名、文件 UUID、原文或内部资料暴露到 UI/API；未部署；**PWS-AI-02（Generate/Review/Apply）仍未开始**。
+
+*最后更新：2026-09-08，由 Claude Code 在"PWS-AI-PROVIDER-02"任务中写入。*

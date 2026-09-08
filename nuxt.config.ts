@@ -82,12 +82,18 @@ export default defineNuxtConfig({
     hubspotAccessToken: process.env.HUBSPOT_ACCESS_TOKEN ?? '',
     // Override API base for local mock testing only; always https://api.hubapi.com in production
     hubspotApiBase: process.env.HUBSPOT_API_BASE_URL ?? '',
-    // AI provider foundation (PWS-AI-PLATFORM-01) — server-side only, never runtimeConfig.public.
-    // OPENAI_API_KEY is a secret (local/deployment .env only). OPENAI_MODEL is non-secret and
-    // configurable — no model name is ever hardcoded in application code. Empty by default:
-    // isConfigured() on the provider fails closed until an operator sets both in their own .env.
+    // AI provider registry (PWS-AI-PLATFORM-01 + PWS-AI-PROVIDER-02) — server-side only,
+    // never runtimeConfig.public. *_API_KEY values are secrets (local/deployment .env only);
+    // *_MODEL values are non-secret and configurable — no model name is ever hardcoded in
+    // application code. All empty by default: each provider's isConfigured() fails closed
+    // until an operator sets both of its values in their own .env. AI_DEFAULT_PROVIDER picks
+    // which already-configured provider a future Generate call defaults to — 'deepseek' unless
+    // explicitly set to 'openai' (validated server-side by parseAiProviderId(), never trusted raw).
+    aiDefaultProvider: process.env.AI_DEFAULT_PROVIDER ?? 'deepseek',
     openaiApiKey: process.env.OPENAI_API_KEY ?? '',
     openaiModel: process.env.OPENAI_MODEL ?? '',
+    deepseekApiKey: process.env.DEEPSEEK_API_KEY ?? '',
+    deepseekModel: process.env.DEEPSEEK_MODEL ?? '',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://litubo.com',
       publishedLocales: ['en'],
