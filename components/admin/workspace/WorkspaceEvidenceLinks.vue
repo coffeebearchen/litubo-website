@@ -1,76 +1,81 @@
 <script setup lang="ts">
 import type { ProductMedia, ProductSpecGroup, ProductSpecItem, SourceReviewStatus } from '~/types/product-cms'
-import type { EvidenceAuditEntry } from '~/server/api/admin/products/[id]/evidence/audit.get'
+import type { EvidenceLinkSummary } from '~/server/api/admin/products/[id]/evidence/index.get'
 import { sourceReviewStatusLabel, sourceFileTypeLabel } from '~/utils/productWorkspace'
 
 type SpecGroupWithItems = ProductSpecGroup & { items: ProductSpecItem[] }
-
-/** Mirrors the page's EditableEvidenceLink shape. */
-interface EditableEvidenceLink {
-  id: number | null
-  spec_item_id: number
-  spec_item_label: string
-  spec_group_title: string
-  sourceFileId: string | null
-  source_name: string
-  source_type: string | null
-  review_status: SourceReviewStatus
-  archived: boolean
-  isNew: boolean
-  markedForDeletion: boolean
-  statusDirty: boolean
-  originalReviewStatus: SourceReviewStatus | null
-}
 
 const REVIEW_STATUSES: SourceReviewStatus[] = ['needs_review', 'confirmed', 'conflict', 'missing']
 
 const props = defineProps<{
   specGroups: SpecGroupWithItems[]
   linkedMedia: ProductMedia[]
-  links: EditableEvidenceLink[]
-  auditEntries: EvidenceAuditEntry[]
+  links: EvidenceLinkSummary[]
+  pending: boolean
 }>()
 
 const emit = defineEmits<{
-  'stage-link': [{ specItemId: number, sourceFileId: string }]
-  'update-status': [{ index: number, status: SourceReviewStatus }]
-  unstage: [index: number]
+  'link-evidence': [{ specItemId: number, sourceFileId: string, reviewStatus: SourceReviewStatus }]
+  'update-verification': [{ linkId: number, reviewStatus: SourceReviewStatus }]
+  'remove-evidence': [linkId: number]
 }>()
 
-const selectedIndex = ref<number | null>(null)
+// ── Selected row (display-only — shows only safe evidence fields and verification) ──
+const selectedId = ref<number | null>(null)
+const selectedItem = computed(() => props.links.find(l => l.id === selectedId.value) ?? null)
+
+function selectItem(id: number) {
+  selectedId.value = selectedId.value === id ? null : id
+}
+
+// ── Remove requires an explicit, in-place confirmation before it writes ──────
+const confirmingId = ref<number | null>(null)
+
+function askRemove(id: number) {
+  confirmingId.value = id
+}
+
+function cancelRemove() {
+  confirmingId.value = null
+}
+
+function confirmRemove(id: number) {
+  confirmingId.value = null
+  emit('remove-evidence', id)
+}
+
+// ── Record verification: a draft dropdown that only writes on explicit click ──
+const verifyDraftOpen = ref(false)
+const verifyDraftStatus = ref<SourceReviewStatus>('needs_review')
+
+function openVerifyDraft() {
+  if (!selectedItem.value) return
+  verifyDraftStatus.value = selectedItem.value.review_status ?? 'needs_review'
+  verifyDraftOpen.value = true
+}
+
+function cancelVerifyDraft() {
+  verifyDraftOpen.value = false
+}
+
+function confirmVerifyDraft() {
+  if (!selectedItem.value) return
+  emit('update-verification', { linkId: selectedItem.value.id, reviewStatus: verifyDraftStatus.value })
+  verifyDraftOpen.value = false
+}
+
+watch(selectedId, () => { verifyDraftOpen.value = false })
+
+// ── Link evidence picker — dropdowns never write; only the button does ──────
 const pickerOpen = ref(false)
 const pickerSpecItemId = ref<number | null>(null)
 const pickerSourceFileId = ref<string | null>(null)
-
-const selectedItem = computed(() => selectedIndex.value !== null ? props.links[selectedIndex.value] ?? null : null)
-
-const selectedAudit = computed(() => {
-  if (!selectedItem.value?.id) return []
-  return props.auditEntries.filter(a => a.evidence_link_id === selectedItem.value!.id)
-})
-
-function selectItem(index: number) {
-  selectedIndex.value = selectedIndex.value === index ? null : index
-}
-
-function unlinkRow(index: number) {
-  emit('unstage', index)
-  if (selectedIndex.value === index) selectedIndex.value = null
-}
-
-function unlinkSelected() {
-  if (selectedIndex.value === null) return
-  unlinkRow(selectedIndex.value)
-}
-
-function removeButtonLabel(link: EditableEvidenceLink): string {
-  if (link.isNew) return 'Discard'
-  return link.markedForDeletion ? 'Undo removal' : 'Remove evidence'
-}
+const pickerReviewStatus = ref<SourceReviewStatus>('needs_review')
 
 function openPicker() {
   pickerSpecItemId.value = props.specGroups[0]?.items[0]?.id ?? null
   pickerSourceFileId.value = props.linkedMedia[0]?.directus_files_id ?? null
+  pickerReviewStatus.value = 'needs_review'
   pickerOpen.value = true
 }
 
@@ -80,19 +85,16 @@ function closePicker() {
 
 function confirmPick() {
   if (pickerSpecItemId.value === null || !pickerSourceFileId.value) return
-  emit('stage-link', { specItemId: pickerSpecItemId.value, sourceFileId: pickerSourceFileId.value })
+  emit('link-evidence', {
+    specItemId: pickerSpecItemId.value,
+    sourceFileId: pickerSourceFileId.value,
+    reviewStatus: pickerReviewStatus.value,
+  })
   closePicker()
 }
 
 function sourceDisplayName(m: ProductMedia): string {
   return m.filename_download ?? m.directus_files_id?.slice(0, 8) ?? 'Untitled source'
-}
-
-function auditActionLabel(action: EvidenceAuditEntry['action']): string {
-  if (action === 'linked') return 'Evidence linked'
-  if (action === 'archived') return 'Evidence archived'
-  if (action === 'status_changed') return 'Review status changed'
-  return 'Updated'
 }
 </script>
 
@@ -101,14 +103,8 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
     <div class="ws-evidence-body">
       <div class="ws-evidence-main">
         <div class="ws-card-header">
-          <div>
-            <h2 id="ws-evidence-links-heading" class="ws-card-title">Specification evidence</h2>
-            <p class="ws-card-hint">
-              Link a specification parameter to a source already associated with this product, and record its
-              verification status. Only this product's own parameters and already-linked media may be chosen.
-            </p>
-          </div>
-          <button type="button" class="btn btn-primary" @click="openPicker">
+          <h2 id="ws-evidence-links-heading" class="ws-card-title">Specification evidence</h2>
+          <button type="button" class="btn btn-primary" :disabled="pending" @click="openPicker">
             + Link evidence
           </button>
         </div>
@@ -120,42 +116,38 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
             <thead>
               <tr>
                 <th scope="col">Specification</th>
-                <th scope="col">Cited source</th>
+                <th scope="col">Source</th>
                 <th scope="col">Verification</th>
-                <th scope="col" />
+                <th scope="col">Action</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="(link, index) in links"
-                :key="link.id ?? `new-${index}`"
+                v-for="link in links"
+                :key="link.id"
                 class="ws-evidence-row"
-                :class="{ 'ws-evidence-row--selected': selectedIndex === index, 'ws-evidence-row--pending-delete': link.markedForDeletion }"
-                @click="selectItem(index)"
+                :class="{ 'ws-evidence-row--selected': selectedId === link.id }"
+                @click="selectItem(link.id)"
               >
                 <td data-label="Specification" class="ws-spec-cell">
                   <span class="ws-spec-group">{{ link.spec_group_title }}</span>
                   <span class="ws-spec-label">{{ link.spec_item_label }}</span>
                 </td>
-                <td data-label="Cited source">{{ link.source_name }}</td>
+                <td data-label="Source">{{ link.source_name }}</td>
                 <td data-label="Verification">
-                  <span v-if="link.isNew" class="ws-pending ws-pending--new">New — not saved yet</span>
-                  <span v-else-if="link.markedForDeletion" class="ws-pending ws-pending--delete">Will be archived on Save</span>
-                  <select
-                    v-else
-                    class="ws-status-select"
-                    :class="`ws-status-select--${link.review_status}`"
-                    :value="link.review_status"
-                    @click.stop
-                    @change="emit('update-status', { index, status: ($event.target as HTMLSelectElement).value as SourceReviewStatus })"
-                  >
-                    <option v-for="s in REVIEW_STATUSES" :key="s" :value="s">{{ sourceReviewStatusLabel(s) }}</option>
-                  </select>
-                  <span v-if="link.statusDirty" class="ws-pending ws-pending--new">Staged</span>
+                  <span class="ws-status-badge" :class="`ws-status-badge--${link.review_status ?? 'needs_review'}`">
+                    {{ sourceReviewStatusLabel(link.review_status) }}
+                  </span>
                 </td>
-                <td data-label="" class="ws-evidence-actions">
-                  <button type="button" class="ws-remove-btn" @click.stop="unlinkRow(index)">
-                    {{ removeButtonLabel(link) }}
+                <td data-label="Action" class="ws-evidence-actions">
+                  <template v-if="confirmingId === link.id">
+                    <button type="button" class="ws-remove-btn ws-remove-btn--danger" :disabled="pending" @click.stop="confirmRemove(link.id)">
+                      Confirm remove
+                    </button>
+                    <button type="button" class="ws-remove-btn" @click.stop="cancelRemove">Cancel</button>
+                  </template>
+                  <button v-else type="button" class="ws-remove-btn" :disabled="pending" @click.stop="askRemove(link.id)">
+                    Remove
                   </button>
                 </td>
               </tr>
@@ -164,7 +156,7 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
         </div>
       </div>
 
-      <!-- ── Right rail: selected evidence ────────────────────────────────── -->
+      <!-- ── Right rail: selected evidence — safe metadata + Verification only ── -->
       <aside class="ws-detail">
         <h3 class="ws-detail-title">Selected evidence</h3>
 
@@ -182,36 +174,37 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
             <dd>{{ sourceReviewStatusLabel(selectedItem.review_status) }}</dd>
           </dl>
 
-          <p v-if="selectedItem.isNew" class="ws-pending ws-pending--new">New — not saved yet</p>
-          <p v-else-if="selectedItem.markedForDeletion" class="ws-pending ws-pending--delete">Will be archived on Save</p>
-
-          <button type="button" class="btn btn-secondary ws-detail-unlink" @click="unlinkSelected">
-            {{ removeButtonLabel(selectedItem) }}
+          <div v-if="verifyDraftOpen" class="ws-verify-draft">
+            <select v-model="verifyDraftStatus" class="ws-form-input">
+              <option v-for="s in REVIEW_STATUSES" :key="s" :value="s">{{ sourceReviewStatusLabel(s) }}</option>
+            </select>
+            <div class="ws-verify-draft-actions">
+              <button type="button" class="btn btn-primary" :disabled="pending" @click="confirmVerifyDraft">Update</button>
+              <button type="button" class="btn btn-secondary" @click="cancelVerifyDraft">Cancel</button>
+            </div>
+          </div>
+          <button v-else type="button" class="btn btn-secondary ws-detail-action" @click="openVerifyDraft">
+            Record verification
           </button>
 
-          <div class="ws-audit">
-            <p class="ws-audit-title">Evidence history</p>
-            <p v-if="selectedItem.isNew" class="ws-audit-empty">History appears here after this evidence link is saved.</p>
-            <p v-else-if="selectedAudit.length === 0" class="ws-audit-empty">No recorded activity yet.</p>
-            <ul v-else class="ws-audit-list">
-              <li v-for="entry in selectedAudit" :key="entry.id" class="ws-audit-entry">
-                <span class="ws-audit-action">{{ auditActionLabel(entry.action) }}</span>
-                <span v-if="entry.action === 'status_changed'" class="ws-audit-transition">
-                  {{ sourceReviewStatusLabel(entry.from_status) }} → {{ sourceReviewStatusLabel(entry.to_status) }}
-                </span>
-                <span class="ws-audit-meta">{{ entry.actor }} · {{ entry.at ? entry.at.slice(0, 10) : '—' }}</span>
-              </li>
-            </ul>
-          </div>
+          <template v-if="confirmingId === selectedItem.id">
+            <button type="button" class="btn ws-btn-danger ws-detail-action" :disabled="pending" @click="confirmRemove(selectedItem.id)">
+              Confirm remove
+            </button>
+            <button type="button" class="btn btn-secondary ws-detail-action" @click="cancelRemove">Cancel</button>
+          </template>
+          <button v-else type="button" class="btn btn-secondary ws-detail-action" :disabled="pending" @click="askRemove(selectedItem.id)">
+            Remove evidence
+          </button>
 
           <p class="ws-detail-lock">
-            🔒 Original evidence file lives in Media Library. Changes here are staged until Save.
+            🔒 Original evidence file lives in Media Library.
           </p>
         </div>
       </aside>
     </div>
 
-    <!-- ── Evidence picker ───────────────────────────────────────────────── -->
+    <!-- ── Link evidence picker ─────────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="pickerOpen" class="ws-picker-overlay" @click.self="closePicker">
         <div class="ws-picker-modal" role="dialog" aria-modal="true" aria-label="Link specification evidence">
@@ -221,8 +214,6 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
           </div>
 
           <div class="ws-picker-body">
-            <p class="ws-picker-note">Staging a link only prepares it here — nothing is sent until you click Save changes.</p>
-
             <div class="ws-form-group">
               <label class="ws-form-label" for="ws-picker-spec">Specification parameter</label>
               <select id="ws-picker-spec" v-model.number="pickerSpecItemId" class="ws-form-input">
@@ -249,14 +240,21 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
               </p>
             </div>
 
+            <div class="ws-form-group">
+              <label class="ws-form-label" for="ws-picker-verification">Verification</label>
+              <select id="ws-picker-verification" v-model="pickerReviewStatus" class="ws-form-input">
+                <option v-for="s in REVIEW_STATUSES" :key="s" :value="s">{{ sourceReviewStatusLabel(s) }}</option>
+              </select>
+            </div>
+
             <div class="ws-picker-actions">
               <button
                 type="button"
                 class="btn btn-primary"
-                :disabled="pickerSpecItemId === null || !pickerSourceFileId"
+                :disabled="pickerSpecItemId === null || !pickerSourceFileId || pending"
                 @click="confirmPick"
               >
-                Stage evidence
+                Link evidence
               </button>
               <button type="button" class="btn btn-secondary" @click="closePicker">Cancel</button>
             </div>
@@ -282,14 +280,13 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
 
 .ws-card-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   flex-wrap: wrap;
   margin-bottom: var(--space-4);
 }
-.ws-card-title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); margin: 0 0 var(--space-1); }
-.ws-card-hint { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; max-width: 60ch; }
+.ws-card-title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); margin: 0; }
 
 .ws-empty { font-size: var(--text-sm); color: var(--color-ink-muted); margin: 0; padding: var(--space-4) 0; }
 
@@ -312,29 +309,24 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
 .ws-evidence-row { cursor: pointer; }
 .ws-evidence-row:hover { background: var(--color-surface-alt); }
 .ws-evidence-row--selected { background: rgba(15,92,75,0.06); }
-.ws-evidence-row--pending-delete { opacity: 0.6; }
 
 .ws-spec-cell { display: flex; flex-direction: column; gap: 2px; }
 .ws-spec-group { font-size: 0.6875rem; color: var(--color-ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .ws-spec-label { font-weight: 500; }
 
-.ws-status-select {
-  border: 1px solid var(--color-line);
+.ws-status-badge {
+  display: inline-block;
+  font-size: var(--text-xs);
+  font-weight: 500;
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-2);
-  font-size: var(--text-xs);
-  background: var(--color-surface);
-  color: var(--color-ink);
+  white-space: nowrap;
 }
-.ws-status-select--confirmed { color: #1E6B4E; }
-.ws-status-select--conflict, .ws-status-select--missing { color: #A23B3B; }
-.ws-status-select--needs_review { color: #856404; }
+.ws-status-badge--confirmed { background: #E3F3EC; color: #1E6B4E; }
+.ws-status-badge--conflict, .ws-status-badge--missing { background: #FDEAEA; color: #A23B3B; }
+.ws-status-badge--needs_review { background: #FFF3CD; color: #856404; }
 
-.ws-pending { display: inline-block; font-size: 0.6875rem; font-weight: 500; margin-left: var(--space-2); }
-.ws-pending--new { color: #1E6B4E; }
-.ws-pending--delete { color: #A23B3B; }
-
-.ws-evidence-actions { white-space: nowrap; }
+.ws-evidence-actions { white-space: nowrap; display: flex; gap: var(--space-2); }
 .ws-remove-btn {
   background: none;
   border: 1px solid var(--color-line);
@@ -344,7 +336,9 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
   padding: var(--space-1) var(--space-2);
   cursor: pointer;
 }
-.ws-remove-btn:hover { border-color: #C0392B; color: #C0392B; background: #FDF0EE; }
+.ws-remove-btn:hover:not(:disabled) { border-color: #C0392B; color: #C0392B; background: #FDF0EE; }
+.ws-remove-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ws-remove-btn--danger { border-color: #C0392B; color: #C0392B; background: #FDF0EE; }
 
 .ws-detail {
   width: 280px;
@@ -365,16 +359,14 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
 .ws-detail-facts dt { color: var(--color-ink-muted); white-space: nowrap; }
 .ws-detail-facts dd { color: var(--color-ink); margin: 0; overflow-wrap: anywhere; }
 
-.ws-detail-unlink { width: 100%; margin: var(--space-2) 0; }
+.ws-detail-action { width: 100%; margin: var(--space-2) 0 0; }
 
-.ws-audit { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-line); }
-.ws-audit-title { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink-muted); margin: 0 0 var(--space-2); }
-.ws-audit-empty { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; }
-.ws-audit-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.ws-audit-entry { display: flex; flex-direction: column; font-size: var(--text-xs); }
-.ws-audit-action { font-weight: 600; color: var(--color-ink); }
-.ws-audit-transition { color: var(--color-ink-muted); }
-.ws-audit-meta { color: var(--color-ink-muted); font-size: 0.6875rem; }
+.ws-verify-draft { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }
+.ws-verify-draft-actions { display: flex; gap: var(--space-2); }
+.ws-verify-draft-actions .btn { flex: 1; }
+
+.ws-btn-danger { border-color: #C0392B; color: #C0392B; background: #FDF0EE; }
+.ws-btn-danger:hover:not(:disabled) { background: #F5C6C2; }
 
 .ws-detail-lock { font-size: 10px; color: var(--color-ink-muted); margin: var(--space-3) 0 0; line-height: 1.5; }
 
@@ -394,9 +386,10 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-deep); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-secondary { background: var(--color-surface); color: var(--color-ink); border-color: var(--color-line); }
-.btn-secondary:hover { background: var(--color-surface-alt); }
+.btn-secondary:hover:not(:disabled) { background: var(--color-surface-alt); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ── Evidence picker modal ── */
+/* ── Link evidence picker modal ── */
 .ws-picker-overlay {
   position: fixed;
   inset: 0;
@@ -439,7 +432,6 @@ function auditActionLabel(action: EvidenceAuditEntry['action']): string {
 .ws-picker-close:hover { background: var(--color-line); }
 
 .ws-picker-body { flex: 1; overflow-y: auto; padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
-.ws-picker-note { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; }
 
 .ws-form-group { display: flex; flex-direction: column; gap: var(--space-1); }
 .ws-form-label { font-size: var(--text-xs); font-weight: 600; color: var(--color-ink-muted); }

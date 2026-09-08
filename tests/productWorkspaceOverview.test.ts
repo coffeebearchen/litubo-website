@@ -1432,22 +1432,27 @@ describe('fileRoleLabel / workspaceMediaThumbUrl / workspaceMediaIsImage (pure h
   })
 })
 
-// ── PWS-07-WRITE-AUDIT-01 — writable Specifications evidence + audit ────────
+// ── PWS-SOURCES-LITE-POLISH-01 — Sources & evidence lite polish ─────────────
 //
-// An independent, explicitly authorized extension of the read-only PWS-07
-// page. Adds evidence linking (spec item ↔ already-linked media source ↔
-// review status) plus a read-only, append-only audit trail sourced from
-// Directus's own directus_activity/directus_revisions — never a custom
-// table. The existing read-only "Evidence register"
-// (WorkspaceSourcesEvidence.vue) is untouched; this only adds a new sibling
-// section to the same page.
+// A visual/interaction close-out of the writable Specifications evidence
+// surface added by PWS-07-WRITE-AUDIT-01. The user confirmed only a small
+// number of machine parameters are being entered and no higher-tier audit
+// UI is needed, so this task removed the batched dirty-state/Save model and
+// the on-screen audit-history panel, replacing them with three small,
+// explicit, immediate-write actions (Link evidence / Record verification /
+// Remove, the last gated behind an in-place confirmation) — never a write
+// on page load, row selection, opening/closing the picker, or a dropdown
+// change. No schema, endpoint or Directus-native audit data changed: every
+// write still goes through the exact same three endpoints PWS-07-WRITE-
+// AUDIT-01 introduced. The existing read-only "Evidence register"
+// (WorkspaceSourcesEvidence.vue) keeps its own describe blocks above.
 
 const EVIDENCE_FILES = [
   'pages/admin/product-workspace/[id]/sources-evidence.vue',
   'components/admin/workspace/WorkspaceEvidenceLinks.vue',
 ]
 
-describe('PWS-07-WRITE-AUDIT-01 reuses product_source_records, never a new evidence table (source evidence)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 reuses product_source_records, never a new evidence table (source evidence)', () => {
   it('the util module builds/parses a server-generated spec_item: fact_key — never accepts a client fact_key', () => {
     const util = repoFile('server/utils/productEvidenceLinks.ts')
     expect(util).toContain("export const EVIDENCE_FACT_KEY_PREFIX = 'spec_item:'")
@@ -1482,22 +1487,21 @@ describe('PWS-07-WRITE-AUDIT-01 reuses product_source_records, never a new evide
     expect(patchSource).not.toContain('...body')
   })
 
-  it('archiving an evidence link reuses the existing PWS-07 sources archive endpoint unmodified', () => {
+  it('removing an evidence link reuses the existing PWS-07 sources archive endpoint unmodified', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
-    expect(page).toContain('/sources/${link.id}/archive')
+    expect(page).toContain('/sources/${linkId}/archive')
     const archiveSource = repoFile('server/api/admin/products/[id]/sources/[sourceId]/archive.post.ts')
     expect(archiveSource).toContain('archived: true')
     expect(archiveSource).toContain('already archived')
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 cross-product objects are rejected, never leaked (source evidence)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 cross-product objects are rejected, never leaked (source evidence)', () => {
   it('every write endpoint calls assertProductExists before touching product_source_records', () => {
     for (const file of [
       'server/api/admin/products/[id]/evidence/index.get.ts',
       'server/api/admin/products/[id]/evidence/index.post.ts',
       'server/api/admin/products/[id]/evidence/[linkId].patch.ts',
-      'server/api/admin/products/[id]/evidence/audit.get.ts',
     ]) {
       expect(repoFile(file)).toContain('await assertProductExists(event, Number(id))')
     }
@@ -1517,7 +1521,7 @@ describe('PWS-07-WRITE-AUDIT-01 cross-product objects are rejected, never leaked
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 never hardcodes a specification vocabulary (source evidence)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 never hardcodes a specification vocabulary (source evidence)', () => {
   const component = repoFile('components/admin/workspace/WorkspaceEvidenceLinks.vue')
 
   it('the spec-item picker is built by iterating the product\'s own groups/items props, never a static option list', () => {
@@ -1532,79 +1536,136 @@ describe('PWS-07-WRITE-AUDIT-01 never hardcodes a specification vocabulary (sour
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 models evidence as local dirty state — zero writes until Save (source evidence)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 writes only on an explicit click — never on load, select, open/close or dropdown change (source evidence)', () => {
   const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
   const component = repoFile('components/admin/workspace/WorkspaceEvidenceLinks.vue')
   const WRITE_METHOD_RE = /method:\s*['"](POST|PATCH|PUT|DELETE)['"]/g
 
-  it('the presentational component never issues a write request itself', () => {
+  it('the presentational component never issues a write request itself — it only emits', () => {
     expect(component).not.toMatch(WRITE_METHOD_RE)
+    expect(component).toContain("'link-evidence'")
+    expect(component).toContain("'update-verification'")
+    expect(component).toContain("'remove-evidence'")
   })
 
   it('the top-level data fetch only ever calls useFetch (GET), never $fetch with a write method', () => {
-    const initialFetchBlock = page.slice(0, page.indexOf('function stageLink'))
+    const initialFetchBlock = page.slice(0, page.indexOf('async function linkEvidence'))
     const fetchCalls = initialFetchBlock.match(/useFetch[^\n]*/g) ?? []
     expect(fetchCalls.length).toBeGreaterThan(0)
     for (const call of fetchCalls) expect(call).not.toMatch(WRITE_METHOD_RE)
   })
 
-  it('stageLink, setStatus and unstage are all local-only — none of them call $fetch', () => {
-    const block = page.slice(page.indexOf('function stageLink'), page.indexOf('// ── Save'))
+  it('linkEvidence, updateVerification and removeEvidence are three separate immediate-write handlers, not a batched Save', () => {
+    expect(page).not.toContain('isDirty')
+    expect(page).not.toContain('handleSave')
+    expect(page).not.toContain('EditableEvidenceLink')
+    expect(page).toContain('async function linkEvidence(')
+    expect(page).toContain('async function updateVerification(')
+    expect(page).toContain('async function removeEvidence(')
+    expect(page.match(/method:\s*['"]POST['"]/g)?.length).toBe(2) // create + archive
+    expect(page).toMatch(/method:\s*['"]PATCH['"]/)
+  })
+
+  it('each write handler guards against a second concurrent write with the same pending flag', () => {
+    for (const fn of ['linkEvidence', 'updateVerification', 'removeEvidence']) {
+      const start = page.indexOf(`async function ${fn}(`)
+      const body = page.slice(start, page.indexOf('\n}', start))
+      expect(body).toContain('if (pending.value) return')
+    }
+  })
+
+  it('opening/closing the picker and changing its dropdowns never call an emit or $fetch — only confirmPick does', () => {
+    const block = component.slice(component.indexOf('function openPicker'), component.indexOf('function confirmPick'))
+    expect(block).not.toContain('emit(')
+    expect(block).not.toContain('$fetch')
+    const confirmBlock = component.slice(component.indexOf('function confirmPick'), component.indexOf('function sourceDisplayName'))
+    expect(confirmBlock).toContain("emit('link-evidence'")
+  })
+
+  it('selecting a row only sets local state — it never emits or writes', () => {
+    const block = component.slice(component.indexOf('function selectItem'), component.indexOf('function askRemove'))
+    expect(block).not.toContain('emit(')
     expect(block).not.toContain('$fetch')
   })
 
-  it('handleSave() is the only place that issues POST/PATCH, diffed per row (new → POST, status-dirty → PATCH, marked-for-deletion → archive POST)', () => {
-    const beforeSave = page.slice(0, page.indexOf('async function handleSave'))
-    expect(beforeSave).not.toMatch(WRITE_METHOD_RE)
-
-    const saveBlock = page.slice(page.indexOf('async function handleSave'), page.indexOf('</script>'))
-    expect(saveBlock).toMatch(/method:\s*['"]POST['"]/)
-    expect(saveBlock).toMatch(/method:\s*['"]PATCH['"]/)
+  it('Remove requires an explicit second confirmation click before it emits', () => {
+    expect(component).toContain('function askRemove')
+    expect(component).toContain('function confirmRemove')
+    expect(component).toContain('Confirm remove')
+    const askBlock = component.slice(component.indexOf('function askRemove'), component.indexOf('function cancelRemove'))
+    expect(askBlock).not.toContain('emit(')
+    const confirmBlock = component.slice(component.indexOf('function confirmRemove'), component.indexOf('// ── Record verification'))
+    expect(confirmBlock).toContain("emit('remove-evidence'")
   })
 
-  it('save only runs when there are staged changes and not already saving — matching the established PWS-01/02/03 guard', () => {
-    expect(page).toContain('if (!isDirty.value || saving.value) return')
-  })
-
-  it('isDirty is true exactly when a link is staged-new, staged-for-archive, or has a staged status change', () => {
-    expect(page).toContain('links.value.some((l: EditableEvidenceLink) => l.isNew || l.markedForDeletion || l.statusDirty)')
-  })
-
-  it('a review-status edit on an already-saved link is a local, reversible edit — not an immediate write', () => {
-    const block = page.slice(page.indexOf('function setStatus'), page.indexOf('function handleStageLink'))
-    expect(block).not.toContain('$fetch')
-    expect(block).toContain('link.review_status = status')
+  it('Record verification stages a local draft status and only writes when Update is clicked', () => {
+    const openBlock = component.slice(component.indexOf('function openVerifyDraft'), component.indexOf('function cancelVerifyDraft'))
+    expect(openBlock).not.toContain('emit(')
+    const confirmBlock = component.slice(component.indexOf('function confirmVerifyDraft'), component.indexOf('watch(selectedId'))
+    expect(confirmBlock).toContain("emit('update-verification'")
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 audit trail is append-only and server-generated (source evidence)', () => {
-  const auditSource = repoFile('server/api/admin/products/[id]/evidence/audit.get.ts')
-  const util = repoFile('server/utils/productEvidenceLinks.ts')
+describe('PWS-SOURCES-LITE-POLISH-01 shows no audit history, actor, timeline or revision (source evidence)', () => {
+  it('WorkspaceEvidenceLinks.vue no longer imports or renders EvidenceAuditEntry data', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceEvidenceLinks.vue')
+    expect(component).not.toContain('EvidenceAuditEntry')
+    expect(component).not.toContain('auditEntries')
+    expect(component).not.toContain('Evidence history')
+    expect(component.toLowerCase()).not.toContain('actor')
+    expect(component.toLowerCase()).not.toContain('revision')
+  })
 
-  it('the audit endpoint is a GET — it never writes, and no PATCH/DELETE audit endpoint exists', () => {
+  it('the page no longer fetches the audit endpoint', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
+    expect(page).not.toContain('evidence/audit')
+    expect(page).not.toContain('refreshAudit')
+  })
+
+  it('the existing Directus-native audit endpoint is left in place, untouched, for possible future use', () => {
+    const auditSource = repoFile('server/api/admin/products/[id]/evidence/audit.get.ts')
     expect(auditSource).not.toMatch(/method:\s*['"](POST|PATCH|PUT|DELETE)['"]/)
-    expect(auditSource).not.toContain('readBody')
-  })
-
-  it('audit entries are computed only from Directus-native activity/revisions data — actor, timestamp and action are never client-supplied', () => {
     expect(auditSource).toContain('/revisions?filter')
-    expect(auditSource).toContain('activity.action')
-    expect(auditSource).toContain('activity.timestamp')
-    expect(auditSource).toContain('activity.user.email')
-  })
-
-  it('this endpoint never POSTs/PATCHes a custom audit table — there is no product_workspace_audit_events write anywhere in the codebase', () => {
-    expect(auditSource).not.toContain('product_workspace_audit_events')
-    expect(util).not.toContain('product_workspace_audit_events')
-  })
-
-  it('never fabricates an actor identity — falls back to an honest "Unknown", never "Admin" or "System"', () => {
-    expect(util).toContain("return 'Unknown'")
-    expect(util.toLowerCase()).not.toMatch(/return 'admin'|return 'system'/)
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 never displays restricted or fabricated data (source evidence)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 merges the restricted/internal copy into one line, no duplicates (source evidence)', () => {
+  it('the page shows exactly one internal-workspace scope note, worded as specified', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
+    expect(page).toContain('Internal workspace')
+    expect(page).toContain('This information is never public.')
+  })
+
+  it('the old separate restricted badge, hint and footnote no longer exist on the read-only register', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceSourcesEvidence.vue')
+    expect(component).not.toContain('Restricted — not visible to customers')
+    expect(component).not.toContain('Record where product facts originate')
+    expect(component).not.toContain('exact source locations are restricted')
+  })
+
+  it('the evidence table card no longer repeats its own separate restricted hint', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceEvidenceLinks.vue')
+    expect(component).not.toContain('Link a specification parameter to a source already associated')
+  })
+})
+
+describe('PWS-SOURCES-LITE-POLISH-01 Specification evidence table matches the PW-VIS-08 column set (source evidence)', () => {
+  it('the header row is exactly Specification / Source / Verification / Action', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceEvidenceLinks.vue')
+    const theadBlock = component.slice(component.indexOf('<thead>'), component.indexOf('</thead>'))
+    const headers = [...theadBlock.matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map(m => m[1].trim()).filter(Boolean)
+    expect(headers).toEqual(['Specification', 'Source', 'Verification', 'Action'])
+  })
+
+  it('Verification is a static safe badge in the table, not a per-row dropdown that writes on change', () => {
+    const component = repoFile('components/admin/workspace/WorkspaceEvidenceLinks.vue')
+    const rowBlock = component.slice(component.indexOf('<tbody>'), component.indexOf('</tbody>'))
+    expect(rowBlock).not.toContain('<select')
+    expect(rowBlock).not.toContain('@change')
+  })
+})
+
+describe('PWS-SOURCES-LITE-POLISH-01 never displays restricted or fabricated data (source evidence)', () => {
   it('never renders raw source text, locator, internal note, download URL, or original-file preview link', () => {
     for (const file of EVIDENCE_FILES) {
       const source = repoFile(file)
@@ -1620,8 +1681,8 @@ describe('PWS-07-WRITE-AUDIT-01 never displays restricted or fabricated data (so
     expect(template).not.toMatch(/\{\{\s*(link|entry|m)\.(source_file_id|fact_key|note)\s*\}\}/)
   })
 
-  it('the GET endpoints never select raw_excerpt, source_locator or note from Directus', () => {
-    // Checks the actual field-selection strings sent to Directus, not the
+  it('the GET endpoint never selects raw_excerpt, source_locator or note from Directus', () => {
+    // Checks the actual field-selection string sent to Directus, not the
     // whole file — this endpoint's own safety-explaining comments legitimately
     // name these restricted fields to document that they are excluded.
     const listSource = repoFile('server/api/admin/products/[id]/evidence/index.get.ts')
@@ -1629,15 +1690,6 @@ describe('PWS-07-WRITE-AUDIT-01 never displays restricted or fabricated data (so
     expect(fieldsBlock).not.toContain('raw_excerpt')
     expect(fieldsBlock).not.toContain('source_locator')
     expect(fieldsBlock).not.toContain("'note'")
-
-    const auditSource = repoFile('server/api/admin/products/[id]/evidence/audit.get.ts')
-    const queryLines = auditSource.match(/`\/(items|revisions)[^`]*`/g) ?? []
-    expect(queryLines.length).toBeGreaterThan(0)
-    for (const line of queryLines) {
-      expect(line).not.toContain('raw_excerpt')
-      expect(line).not.toContain('source_locator')
-      expect(line).not.toContain('note')
-    }
   })
 
   it('the evidence POST response only ever echoes the new link\'s own id — never the file UUID or fact_key it received', () => {
@@ -1646,7 +1698,7 @@ describe('PWS-07-WRITE-AUDIT-01 never displays restricted or fabricated data (so
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 has no AI, upload, publish or lifecycle surface (source evidence)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 has no AI, upload, publish or lifecycle surface (source evidence)', () => {
   it('no evidence file renders an AI Fill Workspace control or any AI hint', () => {
     for (const file of EVIDENCE_FILES) {
       const lower = repoFile(file).toLowerCase()
@@ -1667,10 +1719,10 @@ describe('PWS-07-WRITE-AUDIT-01 has no AI, upload, publish or lifecycle surface 
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 honest empty states, no fabricated evidence rows (source evidence)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 honest empty states, no fabricated evidence rows (source evidence)', () => {
   const component = repoFile('components/admin/workspace/WorkspaceEvidenceLinks.vue')
 
-  it('shows an honest empty state when there is no evidence linked yet', () => {
+  it('shows an honest, compact empty state when there is no evidence linked yet', () => {
     expect(component).toContain('No specification evidence linked for this product yet.')
   })
 
@@ -1680,7 +1732,7 @@ describe('PWS-07-WRITE-AUDIT-01 honest empty states, no fabricated evidence rows
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 375px stacking, no horizontal overflow substitute (source evidence)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 375px stacking, no horizontal overflow substitute (source evidence)', () => {
   it('the 375px breakpoint stacks the evidence table into cards and the detail rail to full width', () => {
     const component = repoFile('components/admin/workspace/WorkspaceEvidenceLinks.vue')
     const mobileBlock = component.slice(component.indexOf('max-width: 767px'))
@@ -1690,7 +1742,7 @@ describe('PWS-07-WRITE-AUDIT-01 375px stacking, no horizontal overflow substitut
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 is English-first and carries no Chinese (source evidence)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 is English-first and carries no Chinese (source evidence)', () => {
   it('no evidence file has visible or assistive Chinese in its template', () => {
     for (const file of EVIDENCE_FILES) {
       expect(renderedMarkup(repoFile(file))).not.toMatch(/[一-鿿]/)
@@ -1698,22 +1750,22 @@ describe('PWS-07-WRITE-AUDIT-01 is English-first and carries no Chinese (source 
   })
 })
 
-describe('PWS-07-WRITE-AUDIT-01 leaves the existing read-only Evidence register untouched (regression guard)', () => {
+describe('PWS-SOURCES-LITE-POLISH-01 leaves the existing read-only Evidence register untouched apart from the merged copy (regression guard)', () => {
   it('WorkspaceSourcesEvidence.vue still renders no write request and no new props', () => {
     const source = repoFile('components/admin/workspace/WorkspaceSourcesEvidence.vue')
     expect(source).not.toMatch(/method:\s*['"](POST|PATCH|PUT|DELETE)['"]/)
     expect(source).toContain('defineProps<{\n  sources: SourceRecordSummary[]\n}>()')
   })
 
-  it('the page still mounts WorkspaceSourcesEvidence alongside the new WorkspaceEvidenceLinks, not in place of it', () => {
+  it('the page still mounts WorkspaceSourcesEvidence alongside WorkspaceEvidenceLinks, not in place of it', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
     expect(page).toContain('<WorkspaceSourcesEvidence :sources="sources" />')
     expect(page).toContain('<WorkspaceEvidenceLinks')
   })
 
-  it('the page passes a save-state and listens for the shared Save changes event, unlike the original read-only PWS-07 page', () => {
+  it('the page no longer passes a save-state or listens for a shared Save changes event — every write here is immediate and explicit', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/sources-evidence.vue')
-    expect(page).toContain(':save-state="saveState"')
-    expect(page).toContain('@save="handleSave"')
+    expect(page).not.toContain(':save-state=')
+    expect(page).not.toContain('@save=')
   })
 })

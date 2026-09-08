@@ -2607,3 +2607,70 @@ SHA256SUMS.txt
 未开始 PWS-AI-01/AI-02；未实现 AI 调用/自动提取/自动确认/自动填规格；未新增发布/审核流转/生命周期改动；未触碰全局 Media Library、Product Center、PWS-01/02/03；未新建 PWS-08 完整 History 页面；未新增上传/下载/文件复制/跨产品关联入口；未新增 Directus schema/迁移/权限；未修改/暂存/提交视觉资料；未部署；未强推；五个受保护未跟踪路径全程未被触碰。
 
 *最后更新：2026-09-07，由 Claude Code 在"PWS-07-WRITE-AUDIT-01"任务中写入。*
+
+---
+
+## PWS-SOURCES-LITE-POLISH-01 — Sources & evidence 轻量视觉/交互收口（2026-09-08）
+
+**背景：** 用户确认目前只是录入少量机器参数，不需要继续建设高等级审计。本次仅收口 `/admin/product-workspace/:id/sources-evidence` 一个页面，把 PWS-07-WRITE-AUDIT-01 引入的批量暂存+Save 模式与页面内审计历史面板，替换为更贴近 `PW-VIS-08-SOURCES-EVIDENCE-D1440` 母版的三个显式、即时写入动作。只读的 Evidence register（`WorkspaceSourcesEvidence.vue`）功能保持不变，仅合并了重复的 restricted/internal 文案。
+
+**开工核对：** 开工前确认 `master = origin/master = 4547a4e`（`git fetch --prune origin` + `rev-parse` 双重核对），五个受保护未跟踪路径未被触碰；完整只读查看 README + 全部 11 张 PNG 原尺寸，确认 `PW-VIS-08-SOURCES-EVIDENCE-D1440` 仍是本页唯一 PRIMARY 母版，无冲突。
+
+### 架构变更：从"批量暂存 + Save"改为"三个显式即时写入"
+
+不同于 PWS-01/02/03 的本地暂存+统一 Save 模式，本次按施工单要求把 Sources & evidence 改为：页面加载、选中一行、打开/关闭弹窗、下拉框选择本身都**不**发起任何请求；只有用户点击以下三个具体按钮才写入：
+
+| 动作 | 触发方式 | 写入端点（全部复用既有、未改动） |
+|---|---|---|
+| Link evidence | 弹窗内选定 Specification + Source + Verification 后点击"Link evidence"按钮 | `POST /api/admin/products/:id/evidence` |
+| Record verification | 右侧"Selected evidence"面板选定新状态后点击"Update"按钮 | `PATCH /api/admin/products/:id/evidence/:linkId` |
+| Remove | 表格行或详情栏点击"Remove"后，须再次点击"Confirm remove"二次确认才真正写入 | `POST /api/admin/products/:id/sources/:linkId/archive`（既有归档端点） |
+
+`WorkspaceShell` 不再传入 `save-state`，沿用组件默认值 `'unavailable'`（顶部"Save changes"按钮禁用），与 PWS-03 最初的即时写入版本、PWS-00 Overview 采用同一既定约定——本页面写入不通过顶部统一 Save 按钮。
+
+**零新增 Directus 集合/字段/权限/迁移**：完全复用 PWS-07-WRITE-AUDIT-01 已交付、已测试的三个端点（`evidence` GET/POST/PATCH、`sources/:id/archive`），未改动任何一行后端代码。
+
+### 页面调整（对齐母版）
+
+| 项目 | 改动 |
+|---|---|
+| 合并重复文案 | `WorkspaceSourcesEvidence.vue` 原有的"🔒 Restricted"徽章、说明段落、底部脚注三处文案，与 `WorkspaceEvidenceLinks.vue` 原有的卡片说明，合并为页面顶部一条："Internal workspace — Link a product parameter to an already associated source file. This information is never public." |
+| Evidence register 空态 | 空状态内边距从 `space-4` 收紧为 `space-2`（`ws-empty--compact`），避免大面积空白；有数据时维持原只读摘要表格 |
+| Specification evidence 表头 | 由 Specification / Cited source / Verification / (空) 改为 Specification / **Source** / Verification / **Action**，对齐母版 "Source citations" 区列名 |
+| Verification 列 | 由可写 `<select>`（原地即改）改为**只读徽章**，避免"下拉选择即写入" |
+| Action 列 | Remove 按钮点击后原地切换为"Confirm remove / Cancel"二次确认，不再是一次点击直接归档 |
+| Selected evidence 面板 | 移除"Evidence history"区块（不再显示 action/actor/timestamp 时间线），只保留 Specification/Source/File type/Verification 安全元数据；新增"Record verification"按钮（草稿下拉 + Update 按钮，二次点击才写入） |
+| Link evidence 弹窗 | 新增 Verification 下拉（此前只有 Specification + Source 两项），确认按钮文案由"Stage evidence"改为"Link evidence"；下拉变化本身不写入，只有点击按钮才 emit 写入事件 |
+
+### 明确未做
+
+- 未新增 Directus 集合、字段、迁移、权限或 retention；
+- 未删除既有 Directus `directus_activity`/`directus_revisions` 数据或 TEST ONLY fixture；`server/api/admin/products/[id]/evidence/audit.get.ts` 只读端点原样保留（未被任何页面调用，供未来可能需要时复用，未删除代码）；
+- 未新增或展示高等级审计（页面不再拉取、不再渲染 audit 时间线/actor/revision）；
+- 未修改 `mediaLifecycle.ts`、Archive、Media Library、Overview、Specifications、Page Content、全局 Admin Shell；
+- 未创建新的持久测试产品；
+- 未展示 raw source text、locator、UUID、`source_file_id`、internal note、路径、下载 URL、原文件预览或其他产品资料；
+- 未做 AI、发布、SEO、Relations、History。
+
+### 验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 524/524 通过（`tests/productWorkspaceOverview.test.ts` 213 个用例，含本次重写的 `PWS-SOURCES-LITE-POLISH-01` 测试段落，替换原 `PWS-07-WRITE-AUDIT-01` 批量暂存+审计相关用例） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告（Windows 正常） |
+| `npx nuxt build` | Build complete |
+| 浏览器 1440px / 375px 视觉核验 | **未完成** —— Docker 未运行（`docker compose ps` 报错找不到 Docker Desktop pipe，8055 端口未监听），Directus 后端不可达，无法登录 Admin 后台做真实核验。已就此向用户请示，用户选择"无偏好"；按本仓库既有先例（P1 ProductBasicForm、Admin English UI Phase A/B 等）处理：本地 commit 先行，浏览器视觉核验与视觉像素级确认留待下一次集中 Admin visual smoke test 完成，不重复要求用户登录 |
+
+### 新增/修改文件
+
+| 文件 | 作用 |
+|---|---|
+| `pages/admin/product-workspace/[id]/sources-evidence.vue`（修改） | 移除批量暂存模型（`EditableEvidenceLink`/`isDirty`/`handleSave`），改为三个独立即时写入函数 `linkEvidence()`/`updateVerification()`/`removeEvidence()`，共享一个 `pending` 守卫防止并发重复写入；移除 audit 数据获取；顶部新增合并后的单条说明文案 |
+| `components/admin/workspace/WorkspaceEvidenceLinks.vue`（重写） | 表格改为直接渲染 `EvidenceLinkSummary[]`（服务端已返回的真实数据，不再有本地 `isNew`/`markedForDeletion` 镜像状态）；Verification 列改为徽章；Remove 原地二次确认；新增"Record verification"草稿控件；弹窗新增 Verification 下拉；移除 audit 历史区块 |
+| `components/admin/workspace/WorkspaceSourcesEvidence.vue`（修改） | 移除重复的 restricted 徽章/说明/脚注三处文案；空态内边距收紧 |
+| `tests/productWorkspaceOverview.test.ts`（修改） | 用新的 `PWS-SOURCES-LITE-POLISH-01` 测试段落替换原 `PWS-07-WRITE-AUDIT-01` 批量暂存+审计相关段落，覆盖：零写加载/选择/开关弹窗/下拉；三个独立写入函数各自的并发守卫；Remove 二次确认；Record verification 草稿-确认模式；无审计展示；合并文案；表头列名；375px 堆叠；无中文；无 AI/上传/发布 |
+| `docs/project/CURRENT-STATE.md`（修改） | 本记录 |
+
+*最后更新：2026-09-08，由 Claude Code 在"PWS-SOURCES-LITE-POLISH-01"任务中写入。*

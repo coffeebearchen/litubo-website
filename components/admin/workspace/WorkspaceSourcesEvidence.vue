@@ -20,18 +20,10 @@ function statusClass(status: string | null): string {
 
 <template>
   <div class="ws-sources">
-    <div class="ws-sources-header">
-      <span class="ws-restricted-badge">🔒 Restricted — not visible to customers</span>
-    </div>
-    <p class="ws-sources-hint">
-      Record where product facts originate and how they were verified. Original files, internal
-      notes and exact source locations are never shown here or on the public site.
-    </p>
-
     <section class="ws-card" aria-labelledby="ws-evidence-heading">
       <h3 id="ws-evidence-heading" class="ws-card-title">Evidence register</h3>
 
-      <p v-if="sources.length === 0" class="ws-empty">
+      <p v-if="sources.length === 0" class="ws-empty ws-empty--compact">
         No sources recorded for this product yet.
       </p>
 
@@ -60,43 +52,11 @@ function statusClass(status: string | null): string {
         </table>
       </div>
     </section>
-
-    <p class="ws-sources-footnote">
-      Original evidence files, internal review notes and exact source locations are restricted to
-      authorized internal users and are never exposed by a product download or the public site.
-    </p>
   </div>
 </template>
 
 <style scoped>
 .ws-sources { display: flex; flex-direction: column; gap: var(--space-4); }
-
-.ws-sources-header {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-.ws-restricted-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--color-ink-muted);
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-line);
-  border-radius: 999px;
-  padding: var(--space-1) var(--space-3);
-}
-
-.ws-sources-hint {
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  margin: 0;
-  line-height: 1.55;
-  max-width: 68ch;
-}
 
 .ws-card {
   background: var(--color-surface);
@@ -118,6 +78,8 @@ function statusClass(status: string | null): string {
   margin: 0;
   padding: var(--space-4) 0;
 }
+
+.ws-empty--compact { padding: var(--space-2) 0; }
 
 .ws-table-wrap { overflow-x: auto; }
 
@@ -162,14 +124,6 @@ function statusClass(status: string | null): string {
 .ws-status--verified { background: #E3F3EC; color: #1E6B4E; }
 .ws-status--needs-review { background: #FDEAEA; color: #A23B3B; }
 .ws-status--pending { background: #FFF3CD; color: #856404; }
-
-.ws-sources-footnote {
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
-  margin: 0;
-  line-height: 1.5;
-  max-width: 68ch;
-}
 
 /* ── ≤767px: table becomes stacked cards, never a horizontally scrolling grid ── */
 @media (max-width: 767px) {
