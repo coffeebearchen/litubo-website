@@ -2960,12 +2960,17 @@ PDF（可抽取文字的）、XLSX/XLS、CSV/TSV、TXT。明确不支持：图�
 
 `pdf-parse`（内置旧版 `pdfjs-dist`）与 `xlsx` 一旦进入服务端模块图，会在本机 Windows + Node 的 `nuxt dev`（Vite SSR dev 管线）下触发所有路由（包括与 AI 无关的首页）500 崩溃，报错 `ERR_UNSUPPORTED_ESM_URL_SCHEME`（"Received protocol 'd:'"）。已尝试并验证排除的原因：pdf-parse 自身 `require(\`./pdf.js/${version}/build/pdf.js\`)` 的模板字符串动态 require（已改为直接静态路径 import 绕开，问题依旧）；xlsx.mjs 内一行已失效的 Flow 类型死注释被 esbuild 依赖预打包器的文本扫描误判为 `require('fs')`（已通过 `vite.optimizeDeps.exclude` 排除，问题依旧）；`nitro.externals.external` / `vite.ssr.external` 组合外置两个包后崩溃现象不变。定位到这是 Node 20+ 实验性 `require(esm)` 同步互操作与 Windows 盘符路径（`d:`）结合触发的运行时/加载器层问题，与本项目代码本身的正确性无关。生产构建（`npx nuxt build` → `.output/server/index.mjs`）已用 `nitro.externals.external: ['pdf-parse', 'xlsx']` 正确外置这两个包，构建产物经实际启动验证可正常提供服务（首页真实渲染成功）——**该限制只影响本机 `nuxt dev` 的开发体验，不影响将要交付/部署的生产构建**。
 
-### 浏览器验收现状（1440px / 375px）
+### 浏览器验收现状（1440px / 375px）—— 已补齐
 
-生产构建服务器已启动并确认首页可正常渲染，但 `/admin/*` 全部路由需要管理员登录后才可访问；本次浏览器验收在用户使用移动端客户端时中断——移动端预览面板当前只能显示静态截图，无法触摸操作登录表单完成输入。按照密码/凭证输入的硬性规则，Claude 不能代为在登录表单中输入账号密码。**用户已选择"稍后用电脑登录"**，因此 AI Source Intake / AI Proposal Review 两个页面在 1440px / 375px 下的实际登录态截图验收**尚未完成**，其余全部检查项（自动化测试、类型检查、lint、生产构建、生产服务器启动渲染）均已通过。此项验收将在用户下次用电脑登录后补齐。
+生产构建服务器（`node .output/server/index.mjs`）实际启动，用户用电脑登录管理员账号后，在同一登录会话下完成了以下验收（Claude 全程未代为输入账号密码）：
+
+- **AI Source Intake**（1440px + 375px）：四步指示器正确高亮第 1 步"Select sources"；本地 `.env` 未配置任何 AI provider 时诚实显示"AI provider is not configured."；TEST ONLY 测试产品（ID=3）已关联的 7 个文件均为图片，每张均正确显示"Not available for text-source analysis yet"且勾选框 `disabled=true`；"✨ Analyze selected sources"按钮在无可读来源、无 provider 配置下正确 `disabled=true`；375px 下 `document.documentElement.scrollWidth === clientWidth`（无横向溢出）。
+- **AI Proposal Review**（1440px + 375px）：无会话直接打开时精确显示"No active proposal. Return to AI Source Intake."并带回退链接；375px 下同样无横向溢出。
+- 两页面验收全程只做了导航、勾选框/按钮状态检查（`javascript_tool` 只读检查 `disabled`/`checked` 属性）与截图，**未点击真实的 Analyze/Apply，未产生任何业务写入，未调用任何真实外部 AI 接口**；`read_console_messages` 确认无因本次改动新增的 Console 错误（仅有登录前常规鉴权探测产生的 1 条 401，与登录后状态无关）。
+- 验证结束后已停止临时生产服务器进程，不留后台进程；因该测试产品本身没有可用的文字类来源文件，"选中可读文件 + provider 已配置 → Analyze 按钮启用"这条路径本次通过禁用状态的反向验证覆盖，未通过实际启用状态复现（如需要，未来可在测试产品下关联一个 TEST ONLY 文本类文件后单独复验，但施工单未要求新增/修改测试数据，本次未做）。
 
 ### 明确未做
 
 未使用图片/OCR/Vision/扫描文档处理（Target 范围本轮唯一为 `specifications`，图片来源卡片显示"Not available for text-source analysis yet"）；未调用真实 DeepSeek/OpenAI API；未新增测试产品、媒体关联或 Source & Evidence 数据；未新增第二个 AI Target；未触碰 Product Center、旧版编辑器、全局 Admin Shell、Page Content、FAQ、SEO、Relations、History；未部署；**未 push**，等待 Codex 审查报告。
 
-*最后更新：2026-09-08，由 Claude Code 在"PWS-AI-ENGINE-01"任务中写入；1440px/375px 登录态浏览器验收待用户电脑端登录后补齐。*
+*最后更新：2026-09-08，由 Claude Code 在"PWS-AI-ENGINE-01"任务中写入；1440px/375px 登录态浏览器验收已由用户电脑端登录后补齐并记录于本节。*
