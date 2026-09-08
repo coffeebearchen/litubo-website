@@ -82,6 +82,12 @@ export default defineNuxtConfig({
     hubspotAccessToken: process.env.HUBSPOT_ACCESS_TOKEN ?? '',
     // Override API base for local mock testing only; always https://api.hubapi.com in production
     hubspotApiBase: process.env.HUBSPOT_API_BASE_URL ?? '',
+    // AI provider foundation (PWS-AI-PLATFORM-01) — server-side only, never runtimeConfig.public.
+    // OPENAI_API_KEY is a secret (local/deployment .env only). OPENAI_MODEL is non-secret and
+    // configurable — no model name is ever hardcoded in application code. Empty by default:
+    // isConfigured() on the provider fails closed until an operator sets both in their own .env.
+    openaiApiKey: process.env.OPENAI_API_KEY ?? '',
+    openaiModel: process.env.OPENAI_MODEL ?? '',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://litubo.com',
       publishedLocales: ['en'],

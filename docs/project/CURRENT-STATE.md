@@ -2729,3 +2729,56 @@ SHA256SUMS.txt
 | 浏览器 1440px + 375px 核验（真实产品 ID=3，已登录会话） | 两个断点均 `scrollWidth === innerWidth`，无横向溢出；全新标签页 Console 零错误；页面正确显示 7 条真实已关联文件（安全字段：文件名/类型/角色/状态）；勾选一张卡片后计数变为"1 selected"、卡片高亮、Continue 按钮从禁用变为可点；勾选/取消勾选/点击 Continue 全程 Network 面板零 `POST/PATCH/PUT/DELETE`（仅背景 `auth/refresh` 会话续期）；点击 Continue 后仅显示本地提示文案，无任何新增请求；核验结束后 `GET /api/admin/products/3/media` 确认仍为 7 条，产品 3 无残留测试数据 |
 
 *最后更新：2026-09-08，由 Claude Code 在"PWS-AI-01-FAST-01"任务中写入。*
+
+---
+
+## PWS-AI-PLATFORM-01 — OpenAI Server Provider Foundation（2026-09-08）
+
+**背景：** 此前 PWS-AI-02-FAST-01 施工单执行时，只读技术核查确认仓库中**不存在任何已配置的服务端 AI provider**（无 AI SDK 依赖、无 `runtimeConfig` 中的 AI 字段、无 provider 调用代码），因此该任务在只读确认阶段即停止，未写任何代码。用户随后确认第一版 AI provider 选择 **OpenAI API**，并下达本任务：只建立可测试、可配置、严格服务端隔离的 provider 基础层，不实现 Generate/Review/Apply，不产生任何真实调用或费用。
+
+**开工核对：** 开工前确认 `master = origin/master = d0ec2e2`（`git fetch --prune origin` + 双重 `rev-parse` 核对），五个受保护未跟踪路径未被触碰。本模块无视觉页面改动，未触碰视觉包、Media Library、Sources & evidence、Specifications 或 PWS-AI-01 页面。
+
+### 新增配置位（仅服务端可读，均为空值默认）
+
+| 变量名 | 性质 | 用途 |
+|---|---|---|
+| `OPENAI_API_KEY` | 秘密，仅本机/部署环境 `.env` | OpenAI 认证密钥；`nuxt.config.ts` 的 `runtimeConfig.openaiApiKey`（**不在** `runtimeConfig.public` 内） |
+| `OPENAI_MODEL` | 非秘密、可配置 | 模型名称；`runtimeConfig.openaiModel`；代码中从未硬编码任何最终模型名 |
+
+`.env.example` 仅新增两行空值占位符（`OPENAI_API_KEY=`、`OPENAI_MODEL=`）与说明注释，未写入任何真实值，未查看/未修改真实 `.env`。
+
+### 新增依赖
+
+`openai`（官方 Node SDK，`^7.10.0`）、`zod`（`^4.5.4`，结构校验）——均为生产依赖，**仅在 `server/utils/` 中被导入**，未被任何 `pages/`/`components/` 文件引用；`npx nuxt build` 产物 `.output/public` 中不含 `openai` 字符串（已用 `grep` 二次核实，构建产物与自动化测试双重确认零客户端泄露）。
+
+### 新增文件
+
+| 文件 | 作用 |
+|---|---|
+| `server/utils/aiSpecificationProposal.ts`（新建） | 纯函数 + Zod schema：`SpecificationProposalSchema`（`groups[] → { group, items[] → { parameter, value, note? } }`）与 `parseSpecificationProposalResponse()`——校验任意已解析 JSON，非法结构一律返回安全短错误，合法结构会被 Zod 自动剥离任何未声明字段（无论模型返回什么，raw_excerpt/UUID/路径/内部 note/prompt 等都不可能进入返回值） |
+| `server/utils/openaiSpecificationProvider.ts`（新建） | `createOpenAiSpecificationProvider(config, callModel?)` 工厂：`isConfigured()`（key 与 model 均非空才为 true）、`generateSpecificationProposal(input)`（未配置时立即返回"AI provider is not configured."，从不构造 OpenAI 客户端；配置后通过可注入的 `callModel` 调用模型，异常统一转换为"The AI provider could not generate a proposal right now."）；默认 `callModel`（`defaultOpenAiModelCaller`）使用 Responses API + `text.format: { type: 'json_schema', strict: true }` 实现 Structured Outputs 调用路径，**本次未被任何测试或页面触发** |
+
+### 明确边界（均已验证）
+
+- 零真实 API 调用：所有自动化测试均注入 mock `callModel`，`defaultOpenAiModelCaller`（唯一导入 `openai` SDK 并发起网络请求的函数）从未在测试或本次浏览器/命令行操作中被执行；
+- 零费用：同上，不存在任何触发点；
+- 零产品数据写入：未新增/未修改任何 Directus 集合、字段、迁移、权限；未触碰 Specifications、Page Content、FAQ、发布状态；未创建测试产品；
+- 零敏感信息泄露：未读取/打印/提交真实 `.env`；未在代码、测试、`.env.example`、本记录中出现任何真实 key 值；provider 返回值（成功或失败）均不含 apiKey/model/原始响应/prompt/文件内容/UUID/路径；
+- 未实现 Generate、Proposal Review、Apply、文件上传、下载、预览、Archive、批量处理、自动发布或自动覆盖；
+- 未部署。
+
+### 验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 569/569 通过（新增 `tests/aiSpecificationProvider.test.ts` 23 个用例，覆盖：结构校验通过/拒绝/剥离多余字段、未配置 fail-closed、mock 合法响应、mock 非法结构、mock 拒答异常、mock 超时、零泄露 key/model、生产依赖检查、客户端零引用检查、`runtimeConfig.public` 不含 AI 字段、`.env.example` 仅空值占位） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告（Windows 正常） |
+| `npx nuxt build` | Build complete；`.output/public` 二次 `grep` 确认不含 `openai` 字符串 |
+
+### 明确未做
+
+未创建 Directus 集合/字段/迁移/权限/审计/UI 页面；未创建持久测试产品；未新增文件上传/下载/预览/Archive；未做批量多产品处理；未做自动 Apply/自动覆盖/自动发布；未把 API key、模型名、文件 UUID、原文或内部资料暴露到 UI/API；未部署；未开始 PWS-AI-02 的 Generate/Review/Apply。
+
+*最后更新：2026-09-08，由 Claude Code 在"PWS-AI-PLATFORM-01"任务中写入。*
