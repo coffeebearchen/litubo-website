@@ -6,6 +6,7 @@ import {
   type AiGenerationInput,
   type TargetDefinition,
   type TargetGenerationResult,
+  type TargetValidationContext,
 } from '../aiTargetContract'
 
 /**
@@ -43,6 +44,34 @@ export type SpecificationProposal = z.infer<typeof SpecificationProposalSchema>
 
 const MALFORMED_RESPONSE_ERROR = 'The AI provider returned a response that could not be safely used.'
 const NO_SAFE_ITEMS_ERROR = 'The AI provider\'s response did not contain any safely usable specification suggestions.'
+
+/**
+ * A model that regurgitates a long, contiguous run of the source material it
+ * was given (instead of extracting a short structured fact) matches none of
+ * `containsUnsafeSourceLeakage()`'s patterns — a copied sentence has no URL,
+ * UUID, path, or file extension in it. This is a second, independent check:
+ * any 80+ normalized-character window of an output string that also appears
+ * verbatim in the source material it was generated from is treated as an
+ * unsafe echo, regardless of surrounding text. A genuine short spec value
+ * ("0.8 mm", "IP65", "Stainless steel 304") is always far shorter than 80
+ * characters and is never affected.
+ */
+const MIN_UNSAFE_ECHO_LENGTH = 80
+
+function normalizeForEchoCheck(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+function containsLongSourceEcho(value: string, normalizedSourceMaterial: string): boolean {
+  if (!normalizedSourceMaterial) return false
+  const normalizedValue = normalizeForEchoCheck(value)
+  if (normalizedValue.length < MIN_UNSAFE_ECHO_LENGTH) return false
+  for (let start = 0; start + MIN_UNSAFE_ECHO_LENGTH <= normalizedValue.length; start++) {
+    const window = normalizedValue.slice(start, start + MIN_UNSAFE_ECHO_LENGTH)
+    if (normalizedSourceMaterial.includes(window)) return true
+  }
+  return false
+}
 
 const SPECIFICATION_PROPOSAL_JSON_SCHEMA = {
   type: 'object',
@@ -87,16 +116,19 @@ const SPECIFICATION_PROPOSAL_JSON_SCHEMA = {
  * with zero items is dropped entirely; a response left with zero groups
  * after scanning is a safe failure, never an empty-but-"successful" result.
  */
-function parseAndValidate(raw: unknown): TargetGenerationResult<SpecificationProposal> {
+function parseAndValidate(raw: unknown, context: TargetValidationContext): TargetGenerationResult<SpecificationProposal> {
   const structural = SpecificationProposalSchema.safeParse(raw)
   if (!structural.success) return { ok: false, error: MALFORMED_RESPONSE_ERROR }
+
+  const normalizedSourceMaterial = normalizeForEchoCheck(context.sourceMaterial)
+  const isUnsafe = (v: string) => containsUnsafeSourceLeakage(v) || containsLongSourceEcho(v, normalizedSourceMaterial)
 
   const safeGroups = structural.data.groups
     .map(g => ({
       group: g.group,
-      items: g.items.filter(it => !containsUnsafeSourceLeakage(it.parameter) && !containsUnsafeSourceLeakage(it.value)),
+      items: g.items.filter(it => !isUnsafe(it.parameter) && !isUnsafe(it.value)),
     }))
-    .filter(g => g.items.length > 0 && !containsUnsafeSourceLeakage(g.group))
+    .filter(g => g.items.length > 0 && !isUnsafe(g.group))
 
   if (safeGroups.length === 0) return { ok: false, error: NO_SAFE_ITEMS_ERROR }
 

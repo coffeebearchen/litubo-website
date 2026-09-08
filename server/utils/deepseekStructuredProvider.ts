@@ -56,12 +56,15 @@ const CALL_FAILED_ERROR = 'The AI provider could not generate a proposal right n
  * does no validation of its own, because `target.parseAndValidate()` is the
  * single place that decides what is safe to trust.
  */
+/** Zero automatic retries and a hard 30s timeout — this project never falls back to another provider or silently retries a slow/failed call. */
+const REQUEST_TIMEOUT_MS = 30_000
+
 async function defaultDeepSeekModelCaller(
   target: TargetDefinition<unknown>,
   input: AiGenerationInput,
   config: DeepSeekProviderConfig,
 ): Promise<unknown> {
-  const client = new OpenAI({ apiKey: config.apiKey, baseURL: DEEPSEEK_BASE_URL })
+  const client = new OpenAI({ apiKey: config.apiKey, baseURL: DEEPSEEK_BASE_URL, timeout: REQUEST_TIMEOUT_MS, maxRetries: 0 })
 
   const response = await client.responses.create({
     model: config.model,
@@ -108,7 +111,8 @@ export function createDeepSeekStructuredProvider(
       return { ok: false, error: CALL_FAILED_ERROR }
     }
 
-    return target.parseAndValidate(raw)
+    const sourceMaterial = input.extractedSourceTexts.map(s => s.text).join('\n\n')
+    return target.parseAndValidate(raw, { sourceMaterial })
   }
 
   return { isConfigured, generateStructured }

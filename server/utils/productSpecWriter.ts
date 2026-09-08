@@ -1,15 +1,23 @@
 import type { FetchFn } from './mediaLifecycle'
 
 /**
- * PWS-AI-ENGINE-01R — the single canonical, server-side Specifications
- * writer. Both the existing Specifications editor endpoints
- * (`server/api/admin/products/[id]/specs/**`) and the AI-assisted Apply
- * endpoint (`.../ai/specification-proposal/apply.post.ts`) call these same
- * functions to reach `product_spec_groups`/`product_spec_items` — there is
- * no longer a second, AI-only write path that duplicates this logic.
+ * PWS-AI-ENGINE-01R — the canonical, server-side Specifications writer used
+ * by three of the existing Specifications editor endpoints
+ * (`server/api/admin/products/[id]/specs/index.post.ts`,
+ * `.../specs/[gid]/items.post.ts`, `.../specs/[gid]/items/[iid].patch.ts`);
+ * the remaining editor endpoints (update-group, delete-group, delete-item)
+ * still call `adminFetch` inline and have not been converged here.
  * Dependency-injected (`FetchFn`), matching the established convention in
  * `mediaLifecycle.ts`/`aiProposalEngine.ts`, so every function here is
  * unit-testable with a mock Directus fetch.
+ *
+ * PWS-AI-ENGINE-01R2 — AI Apply does NOT currently use this writer. Its
+ * best-effort multi-request saga was removed and
+ * `.../ai/specification-proposal/apply.post.ts` now unconditionally returns
+ * 503, because no real single-transaction write path exists yet. When a
+ * Directus-side transactional command is eventually built, that command —
+ * not this REST-based writer — will be what AI Apply calls; these functions
+ * remain the editor's shared writer in the meantime.
  */
 
 export interface SpecGroupSummary {

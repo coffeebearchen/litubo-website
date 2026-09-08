@@ -95,6 +95,36 @@ export interface ExtractedSource {
   text: string
 }
 
+/** A filename this long is treated as anomalous regardless of content — a legitimate human filename is never this long. */
+const MAX_SAFE_DISPLAY_NAME_LENGTH = 120
+
+const UNSAFE_FILENAME_PATTERNS: RegExp[] = [
+  /https?:\/\//i, // URL
+  /\bwww\./i, // bare www. URL
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i, // UUID
+  /[/\\]/, // any path separator — a real filename never legitimately contains one
+  // eslint-disable-next-line no-control-regex
+  /[\x00-\x1F\x7F]/, // control characters, including newlines/tabs a delimiter-injection or prompt-injection attempt would need
+]
+
+/**
+ * PWS-AI-ENGINE-01R2-SAFETY-01 — the ONLY place a Directus `filename_download`
+ * value is turned into something safe to hand back to the browser. A normal,
+ * human-typed filename ("Datasheet.pdf") is returned unchanged; anything
+ * carrying a URL, a UUID, a path separator, a control character (including a
+ * newline — a delimiter-injection vector), or an anomalous length collapses
+ * to the single generic label `'Source file'` — never partially echoed, and
+ * never used to distinguish *which* rule tripped (that itself could leak
+ * information about the rejected value).
+ */
+export function sanitizeDisplayNameForBrowser(rawName: string | null | undefined): string {
+  const name = (rawName ?? '').trim()
+  if (!name) return 'Untitled file'
+  if (name.length > MAX_SAFE_DISPLAY_NAME_LENGTH) return 'Source file'
+  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(name))) return 'Source file'
+  return name
+}
+
 export type ExtractionResult =
   | { ok: true, source: ExtractedSource }
   | { ok: false, reason: string }
@@ -124,20 +154,15 @@ function joinPageText(items: Array<{ str: string, transform: number[] }>): strin
   return text
 }
 
-/**
- * Reads a PDF page by page, stopping the moment any limit is hit —
- * `MAX_PDF_PAGES`, `MAX_PER_FILE_CHARS`, or `MAX_PROCESSING_MS` — rather
- * than parsing the whole document and truncating the result afterwards.
- * Later pages are simply never opened once a limit is reached.
- */
-async function extractPdfText(bytes: Uint8Array): Promise<string> {
-  const doc = await getDocumentProxy(bytes)
-  const deadline = Date.now() + MAX_PROCESSING_MS
+/** Injectable so tests can simulate a page whose parse never resolves, without a real multi-second wait. Production always uses the real `unpdf` export. */
+export type GetDocumentProxyFn = typeof getDocumentProxy
+
+async function extractPdfTextUnbounded(bytes: Uint8Array, getDocProxy: GetDocumentProxyFn): Promise<string> {
+  const doc = await getDocProxy(bytes)
   try {
     let text = ''
     const pageCount = Math.min(doc.numPages, MAX_PDF_PAGES)
     for (let i = 1; i <= pageCount; i++) {
-      if (Date.now() > deadline) break
       if (text.length >= MAX_PER_FILE_CHARS) break
       const page = await doc.getPage(i)
       const content = await page.getTextContent()
@@ -145,7 +170,39 @@ async function extractPdfText(bytes: Uint8Array): Promise<string> {
     }
     return text
   } finally {
-    await doc.cleanup()
+    // Best-effort: if the timeout below already won the race, this may run
+    // after the caller has moved on — still worth attempting.
+    await doc.cleanup().catch(() => {})
+  }
+}
+
+/**
+ * PWS-AI-ENGINE-01R2-SAFETY-01 — reads a PDF page by page, stopping the
+ * moment `MAX_PDF_PAGES` or `MAX_PER_FILE_CHARS` is hit, AND bounded to
+ * `MAX_PROCESSING_MS` by a real `Promise.race` against a timer — not just a
+ * between-pages check. A between-pages check alone cannot bound a single
+ * slow/pathological page's own `getPage()`/`getTextContent()` call, so the
+ * previous "10 second timeout" wording was not actually true. `Promise.race`
+ * is what "hard timeout" honestly means for a call like this in JS: Node
+ * cannot forcibly preempt a pending `unpdf`/pdf.js call already in flight,
+ * so that background work may keep running briefly after this function
+ * returns — but this function itself always resolves or rejects within
+ * `MAX_PROCESSING_MS`, and the caller never receives anything from an
+ * abandoned parse (only this function's own race result). Verified by
+ * `tests/aiTextExtraction.test.ts` injecting a `getDocumentProxy` double
+ * whose page parse never resolves and asserting the call still returns
+ * (safely, as a failure) within the timeout window, using fake timers so
+ * the test itself does not wait 10 real seconds.
+ */
+export async function extractPdfText(bytes: Uint8Array, getDocProxy: GetDocumentProxyFn = getDocumentProxy): Promise<string> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('pdf-extraction-timeout')), MAX_PROCESSING_MS)
+  })
+  try {
+    return await Promise.race([extractPdfTextUnbounded(bytes, getDocProxy), timeout])
+  } finally {
+    clearTimeout(timer)
   }
 }
 

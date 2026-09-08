@@ -27,6 +27,20 @@ export type TargetGenerationResult<TOutput> =
   | { ok: false, error: string }
 
 /**
+ * PWS-AI-ENGINE-01R2-SAFETY-01 — passed to `parseAndValidate()` alongside the
+ * raw provider response so a Target can independently detect a model that
+ * echoed back a long run of the source material it was given (a data
+ * exfiltration/regurgitation failure mode Zod structural validation and the
+ * URL/UUID/path pattern scan cannot catch on their own, since a copied
+ * sentence from a legitimate document matches none of those patterns).
+ * `sourceMaterial` is the same raw extracted text the provider's prompt was
+ * built from — never anything the provider itself returned.
+ */
+export interface TargetValidationContext {
+  sourceMaterial: string
+}
+
+/**
  * Everything one AI Target contributes. The shared Engine and provider
  * registry only ever see this shape — a new Target is registered by
  * constructing one of these and handing it to `runProposalEngine()`, never
@@ -44,7 +58,7 @@ export interface TargetDefinition<TOutput> {
   /** Builds the user-turn / input text from the generation input — source material only, no execution of file content as instructions. */
   buildUserInput(input: AiGenerationInput): string
   /** The ONLY place an untrusted, already-JSON-parsed provider response is validated and safety-scanned before anything else touches it. Never throws. */
-  parseAndValidate(raw: unknown): TargetGenerationResult<TOutput>
+  parseAndValidate(raw: unknown, context: TargetValidationContext): TargetGenerationResult<TOutput>
 }
 
 /**
@@ -82,6 +96,7 @@ const UNSAFE_VALUE_PATTERNS: RegExp[] = [
   /[/\\][\w.-]+[/\\][\w.-]+/, // filesystem-looking path (two-plus path segments)
   /\.(pdf|xlsx?|csv|tsv|txt|docx?)\b/i, // an echoed source file name/extension
   /\bpage\s+\d+\b/i, // a page-number locator
+  /[\r\n]/, // a newline — a structured short field (group/parameter/value) is never legitimately multi-line
 ]
 
 /** True if `value` contains any pattern that must never reach product data from a model. */

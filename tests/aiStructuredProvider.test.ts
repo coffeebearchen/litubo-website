@@ -134,3 +134,89 @@ describe('createDeepSeekStructuredProvider — fail-closed, mock paths, and the 
     expect(openaiSource).not.toContain('deepseekStructuredProvider')
   })
 })
+
+// ── PWS-AI-ENGINE-01R2-SAFETY-01 ──
+
+/** A realistic paragraph of "confidential" source material, well over the 80-character echo threshold. */
+const CONFIDENTIAL_PARAGRAPH = 'Internal only: the XR-180C uses a proprietary balanced coil arrangement supplied under contract 7741 and must not be described publicly in any customer-facing document.'
+
+const ECHO_INPUT: AiGenerationInput = {
+  productName: 'LT-180C Free-Fall Metal Detector',
+  sourceFileSummaries: [{ displayName: 'Source 1', fileType: 'PDF' }],
+  extractedSourceTexts: [{ displayName: 'Source 1', text: CONFIDENTIAL_PARAGRAPH }],
+}
+
+describe('adversarial: a provider that echoes the source material back verbatim', () => {
+  it('OpenAI adapter — the echoed paragraph never reaches the caller; a safe error is returned instead', async () => {
+    const callModel: ModelCaller = vi.fn(async () => ({
+      groups: [{ group: 'Detection performance', items: [{ parameter: 'Design', value: CONFIDENTIAL_PARAGRAPH }] }],
+    }))
+    const provider = createOpenAiStructuredProvider({ apiKey: 'sk-x', model: 'gpt-x' }, callModel)
+
+    const result = await provider.generateStructured(specificationsTarget, ECHO_INPUT)
+
+    expect(result.ok).toBe(false)
+    expect(JSON.stringify(result)).not.toContain('proprietary balanced coil')
+    expect(JSON.stringify(result)).not.toContain('contract 7741')
+  })
+
+  it('DeepSeek adapter — same outcome; neither adapter can leak source material through a well-typed response', async () => {
+    const callModel: DeepSeekModelCaller = vi.fn(async () => ({
+      groups: [{ group: 'Detection performance', items: [{ parameter: 'Design', value: CONFIDENTIAL_PARAGRAPH }] }],
+    }))
+    const provider = createDeepSeekStructuredProvider({ apiKey: 'ds-x', model: 'deepseek-chat' }, callModel)
+
+    const result = await provider.generateStructured(specificationsTarget, ECHO_INPUT)
+
+    expect(result.ok).toBe(false)
+    expect(JSON.stringify(result)).not.toContain('proprietary balanced coil')
+  })
+
+  it('a genuinely short, legitimate spec value from the same call still passes through', async () => {
+    const callModel: ModelCaller = vi.fn(async () => ({
+      groups: [{
+        group: 'Detection performance',
+        items: [
+          { parameter: 'Detection sensitivity (Fe)', value: '0.8 mm' },
+          { parameter: 'Design', value: CONFIDENTIAL_PARAGRAPH },
+        ],
+      }],
+    }))
+    const provider = createOpenAiStructuredProvider({ apiKey: 'sk-x', model: 'gpt-x' }, callModel)
+
+    const result = await provider.generateStructured(specificationsTarget, ECHO_INPUT)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.output).toEqual({
+        groups: [{ group: 'Detection performance', items: [{ parameter: 'Detection sensitivity (Fe)', value: '0.8 mm' }] }],
+      })
+    }
+    expect(JSON.stringify(result)).not.toContain('proprietary balanced coil')
+  })
+
+  it('both adapters hand the source material to the Target for validation — the echo check cannot be skipped', () => {
+    for (const rel of ['server/utils/openaiStructuredProvider.ts', 'server/utils/deepseekStructuredProvider.ts']) {
+      const source = repoFile(rel)
+      expect(source).toContain('target.parseAndValidate(raw, { sourceMaterial })')
+    }
+  })
+})
+
+describe('PWS-AI-ENGINE-01R2-SAFETY-01 — explicit request timeout and zero automatic retries', () => {
+  it('both adapters construct their client with a 30s timeout and maxRetries: 0', () => {
+    for (const rel of ['server/utils/openaiStructuredProvider.ts', 'server/utils/deepseekStructuredProvider.ts']) {
+      const source = repoFile(rel)
+      expect(source).toContain('const REQUEST_TIMEOUT_MS = 30_000')
+      expect(source).toContain('timeout: REQUEST_TIMEOUT_MS')
+      expect(source).toContain('maxRetries: 0')
+    }
+  })
+
+  it('neither adapter contains a cross-provider fallback path', () => {
+    const openaiSource = repoFile('server/utils/openaiStructuredProvider.ts')
+    const deepseekSource = repoFile('server/utils/deepseekStructuredProvider.ts')
+    expect(openaiSource.toLowerCase()).not.toContain('fallback')
+    expect(deepseekSource.toLowerCase()).not.toContain('fallback')
+  })
+})

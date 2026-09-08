@@ -3128,3 +3128,74 @@ npm run dev -- --port 3200
 未实现事务性 Apply all（技术阻塞已如实报告，见第三节）；未修改 `docker-compose.yml` 或任何生产 Docker 基础设施；未开始 Content Center、Page Content AI、FAQ、SEO、Relations、History；未调用真实 DeepSeek/OpenAI API；未产生费用；未新增/修改任何测试产品或真实业务数据；未部署；**未 push**，等待 Codex 独立复审与用户明确授权。
 
 *最后更新：2026-09-08，由 Claude Code 在"PWS-AI-ENGINE-01R2"任务中写入。*
+
+---
+
+## PWS-AI-ENGINE-01R2-SAFETY-01 — GitHub 异机备份 + AI 资料泄露边界修复（2026-09-09）
+
+**性质：** 先完成用户已授权的 GitHub 异机代码备份，再修复 Codex 复审指出的两个 AI 资料泄露边界问题，并做请求/超时硬化。在 `6e39691` 之上新增一个本地提交，未 amend/reset/rebase 任何既有提交，未 push master。
+
+### 一、GitHub 备份分支（用户已授权，非 master 发布）
+
+`git fetch origin --prune` 后确认远端不存在目标分支，随后执行 `git push origin 6e39691:refs/heads/backup/pws-ai-engine-01r2-pre-review`，并用 `git ls-remote` 再次只读确认：
+
+| 项目 | 值 |
+|---|---|
+| 备份分支 | `backup/pws-ai-engine-01r2-pre-review` |
+| 远端指向 | `6e396919fc82882af74aa69db4271407ecb6bf0c` |
+| `origin/master` | `8f2e384`（**未改动**） |
+
+未 force push、未删除任何分支、未改远端 URL、未部署。
+
+### 二、A. 文件名边界 — 真实文件名不再进入 AI Prompt
+
+**根因：** `buildSourceMaterialBlock()` 把 `--- Source: ${displayName} ---` 直接写进 prompt，而 `displayName` 就是 Directus 的真实 `filename_download`。一个精心构造的文件名（含换行、`---` 分隔符、提示词）因此可以成为模型上下文的一部分，构成分隔符注入 / 提示词注入面。
+
+**修复（`aiProposalEngine.ts` + `aiTextExtraction.ts`）：** 把"给模型看的标签"和"给浏览器看的名字"彻底拆成两个变量：
+
+- **模型侧：** 一律使用服务端生成的中性位置标签 `Source 1` / `Source 2` …，**无论文件名看起来多安全，真实文件名都不再进入 prompt**。这在结构上消除了整个注入面，而不是依赖正则把危险文件名筛掉。
+- **浏览器侧：** 新增 `sanitizeDisplayNameForBrowser()`——正常人类文件名原样返回；含 URL / UUID / 路径分隔符 / 控制字符（含换行）/ 异常长度（>120 字符）的一律整体折叠为 `Source file`，绝不部分回显、也不区分是哪条规则命中（区分本身也会泄露信息）。该函数应用于 `fileResults` 的全部状态（read / unsupported / unreadable）。
+- Media & resources 已关联资料列表继续显示真实文件名（不同接口、不同上下文，未改动）。
+
+**回归测试（`tests/aiProposalEngine.test.ts` 新增 6 项 + `tests/aiTextExtraction.test.ts` 新增 7 项）：** 用一个同时包含 Windows 路径、URL、UUID、换行和 `IGNORE ALL PREVIOUS INSTRUCTIONS` 提示词的恶意文件名，验证：provider 实际收到的 `input` 序列化后不含任何危险原串且含 `Source 1`；`specificationsTarget.buildUserInput()` 真正生成的 prompt 文本同样不含危险原串、且分隔符为 `--- Source: Source 1 ---`；API 返回 JSON 中 `displayName` 为 `Source file`，不含 UUID / 路径 / URL / 原文件名任何片段；普通安全文件名仍原样返回给浏览器。
+
+### 三、B. 原始资料回显边界 — 长片段回显检测
+
+**根因：** `containsUnsafeSourceLeakage()` 只按 URL / UUID / 路径 / 扩展名 / 页码六类正则判断，而模型把资料正文整段抄回来时**不匹配其中任何一条**——一句从文档复制的正常句子没有 URL 也没有 UUID。
+
+**修复：**
+
+- `TargetDefinition.parseAndValidate(raw, context)` 新增第二个参数 `TargetValidationContext { sourceMaterial }`；两个 Provider 适配器都改为传入本次生成所用的原始资料正文（来自 prompt 输入，绝不是模型返回值）。
+- `specificationsTarget` 新增 `containsLongSourceEcho()`：把输出值与资料正文都做归一化（小写 + 空白折叠），对输出值做滑动窗口，只要**任意 80 字符连续片段**出现在资料正文中即整条剔除；被夹在其它文字中间也照样命中。
+- 共享正则表增加 `/[\r\n]/`——group / parameter / value 这类结构化短字段永远不应含换行或多段文本。
+- 全部建议被剔除时返回诚实的安全错误，绝不伪造"成功但空"的结果。
+
+**对抗测试（`tests/aiStructuredProvider.test.ts` 新增 5 项 + 新建 `tests/specificationsTarget.test.ts` 16 项）：** 模拟 provider 把一段 >80 字符的"机密"资料正文原样回显，验证 OpenAI 与 DeepSeek 两条适配器路径**浏览器都永远收不到该正文**（返回安全错误）；同一次响应里的 `0.8 mm` 等正常短值仍正常通过；`IP65`、`Stainless steel 304`、`220V` 等短值即使也出现在资料正文中同样不受影响。`tests/specificationsTarget.test.ts` 是本项目首个针对 `parseAndValidate()` 的专用测试文件（此前该函数只有间接覆盖）。
+
+### 四、C. 请求与超时硬化
+
+- **超长 `mediaIds` 提前拒绝：** `runProposalEngine()` 现在在 `Set`/`filter` **之前**先检查原始数组长度，超过 `MAX_FILES_PER_REQUEST` 立即拒绝，不再先对超大数组做去重/过滤再报错。
+- **Provider 超时与重试：** OpenAI 与 DeepSeek 适配器均显式改为 `new OpenAI({ ..., timeout: 30_000, maxRetries: 0 })`——30 秒硬超时、零自动重试；两个文件都不含任何 fallback 分支（测试断言）。
+- **PDF 超时改为真实可中止：** 原实现只在**每页之间**检查 `Date.now() > deadline`，无法约束单页 `getPage()`/`getTextContent()` 本身卡死，"10 秒硬超时"的说法当时并不成立。现改为真正的 `Promise.race`（解析 vs 定时器），并把 `extractPdfText()` 的 `getDocumentProxy` 改为可注入以便测试。诚实说明保留在代码注释中：Node 无法强制抢占已在飞行中的 pdf.js 调用，被放弃的解析可能在后台短暂继续，但**本函数本身必定在 `MAX_PROCESSING_MS` 内返回，调用方永远拿不到被放弃解析的任何内容**。测试用一个"页面解析永不 resolve"的注入替身 + fake timers 验证，不需要真实等待 10 秒。
+
+### 五、范围纪律（均已确认）
+
+Apply 仍保持前端 disabled + 服务端 503（真实链路复验通过）；未恢复 saga；未修改 `docker-compose.yml`；未挂载 Directus extension；未改产品数据、Media Library、Directus schema、权限或 `.env`；未做无关视觉重构（本次没有任何 `.vue` 文件改动）。同时更新了 `productSpecWriter.ts` 的过期注释——原文称"AI Apply 正在使用本 writer"，现改为如实说明：AI Apply 当前不使用它，未来的 transactional command 才会是 AI Apply 的调用对象；并补记了"六个编辑器端点中只有三个已收敛到本 writer"这一既有事实。
+
+### 六、验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 723/723 通过（较上一任务 686 增加 37 项安全回归/对抗测试） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告（Windows 正常） |
+| `npx nuxt build` | Build complete |
+| 干净普通 `npm run dev`（`--port 3400`，先清理 `.nuxt`）浏览器核验 | `/`、`/admin/product-workspace/3/ai-source-intake`、`/admin/product-workspace/3/ai-proposal-review` 全部真实渲染，Console 零错误 |
+| 真实服务端链路核验（已登录会话、零 mock、零 Key） | 10 万元素 `mediaIds` 数组 → 126ms 内返回 `You can analyze at most 5 files at a time.`，零文件解析、零 provider 调用；Apply → 仍为 503 |
+
+### 明确未做
+
+未调用真实 DeepSeek/OpenAI API（本机 provider 本就未配置 Key）；未产生任何费用；未读取、打印或修改 `.env` 与任何 Key；未实现 Directus transaction / Page Content / FAQ / SEO；未部署；**未 push master**（仅按授权推送了备份分支）。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-SAFETY-01"任务中写入。*

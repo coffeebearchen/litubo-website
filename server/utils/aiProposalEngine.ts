@@ -3,6 +3,7 @@ import {
   isSupportedTextSourceMime,
   isFormerlyUnsupportedTextSourceMime,
   isFileSizeSafeToDownload,
+  sanitizeDisplayNameForBrowser,
   capTotalCharacters,
   MAX_FILES_PER_REQUEST,
   MAX_TOTAL_EXTRACTED_CHARS,
@@ -33,9 +34,19 @@ import type { FetchFn } from './mediaLifecycle'
  * download URL, a locator, an internal note, the raw extracted text, or a
  * provider's raw response to its caller — only the final validated Target
  * output (or a short, safe error) and a per-file readable/unsupported/
- * unreadable summary keyed by display name. A media id that does not
- * resolve to an enabled row of the current product is reported with a
- * generic reason and never echoes the requested id back to the caller.
+ * unreadable summary keyed by a sanitized display name (see
+ * `sanitizeDisplayNameForBrowser()`). A media id that does not resolve to an
+ * enabled row of the current product is reported with a generic reason and
+ * never echoes the requested id back to the caller.
+ *
+ * PWS-AI-ENGINE-01R2-SAFETY-01 — the real Directus `filename_download` never
+ * reaches the AI provider at all, regardless of how safe it looks: every
+ * source handed to a Target's `buildUserInput()`/`buildSourceMaterialBlock()`
+ * is labeled with a neutral, server-generated position label ("Source 1",
+ * "Source 2", ...) instead, so a crafted filename can never act as a prompt
+ * instruction or a `--- Source: ... ---` delimiter-injection vector. The
+ * (separately sanitized) real name is only ever used for the browser-facing
+ * `fileResults` summary, never for anything sent to a model.
  */
 
 export type SourceFileStatus = 'read' | 'unsupported' | 'unreadable'
@@ -127,6 +138,12 @@ export async function runProposalEngine<TOutput>(
   if (!Array.isArray(params.mediaIds) || params.mediaIds.length === 0) {
     return { ok: false, error: NO_SELECTION_ERROR, fileResults: [] }
   }
+  // Reject an oversized raw array BEFORE any Set/filter work runs over it —
+  // a client sending an enormous mediaIds array must not spend server CPU
+  // deduping/filtering it first just to be told it was too long anyway.
+  if (params.mediaIds.length > MAX_FILES_PER_REQUEST) {
+    return { ok: false, error: `You can analyze at most ${MAX_FILES_PER_REQUEST} files at a time.`, fileResults: [] }
+  }
   const mediaIds = [...new Set(
     params.mediaIds.filter((v): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0),
   )]
@@ -150,6 +167,10 @@ export async function runProposalEngine<TOutput>(
 
   const fileResults: SourceFileOutcome[] = []
   const readableSources: ExtractedSource[] = []
+  // Assigned only to files that actually reach extraction — a neutral,
+  // positional label ("Source 1", "Source 2", ...) is what the AI provider
+  // sees in place of the real filename; see the module docstring above.
+  let promptSourceCounter = 0
 
   for (const mediaId of mediaIds) {
     const row = rowById.get(mediaId)
@@ -158,22 +179,25 @@ export async function runProposalEngine<TOutput>(
       fileResults.push({ displayName: 'Selected file', status: 'unreadable', reason: NOT_ASSOCIATED_REASON })
       continue
     }
-    const displayName = row.directus_files_id.filename_download ?? 'Untitled file'
+    // Browser-facing only — sanitized real name (or a generic fallback for
+    // anything anomalous). Never passed to `extractTextFromFile()` /
+    // the AI provider; see `promptLabel` below.
+    const browserDisplayName = sanitizeDisplayNameForBrowser(row.directus_files_id.filename_download)
     const mime = row.directus_files_id.type
 
     if (isFormerlyUnsupportedTextSourceMime(mime)) {
-      fileResults.push({ displayName, status: 'unsupported', reason: 'Excel files are not supported for text-source analysis yet.' })
+      fileResults.push({ displayName: browserDisplayName, status: 'unsupported', reason: 'Excel files are not supported for text-source analysis yet.' })
       continue
     }
     if (!isSupportedTextSourceMime(mime)) {
-      fileResults.push({ displayName, status: 'unsupported', reason: 'Not available for text-source analysis yet.' })
+      fileResults.push({ displayName: browserDisplayName, status: 'unsupported', reason: 'Not available for text-source analysis yet.' })
       continue
     }
 
     // Trusted-metadata size pre-check — happens BEFORE any byte is downloaded.
     const knownSize = row.directus_files_id.filesize == null ? null : Number(row.directus_files_id.filesize)
     if (!isFileSizeSafeToDownload(knownSize)) {
-      fileResults.push({ displayName, status: 'unreadable', reason: 'This file is too large to analyze, or its size could not be confirmed.' })
+      fileResults.push({ displayName: browserDisplayName, status: 'unreadable', reason: 'This file is too large to analyze, or its size could not be confirmed.' })
       continue
     }
 
@@ -181,16 +205,18 @@ export async function runProposalEngine<TOutput>(
     try {
       bytes = await fetch<ArrayBuffer>(`/assets/${row.directus_files_id.id}`, { responseType: 'arrayBuffer' })
     } catch {
-      fileResults.push({ displayName, status: 'unreadable', reason: 'This file could not be read.' })
+      fileResults.push({ displayName: browserDisplayName, status: 'unreadable', reason: 'This file could not be read.' })
       continue
     }
 
-    const extraction = await extractTextFromFile(bytes, mime, displayName)
+    promptSourceCounter += 1
+    const promptLabel = `Source ${promptSourceCounter}`
+    const extraction = await extractTextFromFile(bytes, mime, promptLabel)
     if (!extraction.ok) {
-      fileResults.push({ displayName, status: 'unreadable', reason: extraction.reason })
+      fileResults.push({ displayName: browserDisplayName, status: 'unreadable', reason: extraction.reason })
       continue
     }
-    fileResults.push({ displayName, status: 'read' })
+    fileResults.push({ displayName: browserDisplayName, status: 'read' })
     readableSources.push(extraction.source)
   }
 
