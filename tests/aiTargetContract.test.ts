@@ -68,7 +68,14 @@ function mockFetch(opts: {
     if (path.startsWith('/assets/')) {
       const uuid = path.slice('/assets/'.length)
       if (!(uuid in assets)) throw new Error('not found')
-      return assets[uuid] as T
+      // The engine streams assets; tests still author fixtures as byte buffers.
+      const bytes = new Uint8Array(assets[uuid])
+      return new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes)
+          controller.close()
+        },
+      }) as T
     }
     throw new Error(`Unexpected fetch path in test: ${path}`)
   }) as FetchFn

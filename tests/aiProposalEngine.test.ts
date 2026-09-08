@@ -66,10 +66,22 @@ function mockFetch(opts: {
       const uuid = path.slice('/assets/'.length)
       const entry = assets[uuid]
       if (entry === 'throw' || entry === undefined) throw new Error('asset fetch failed')
-      return entry as T
+      // The engine streams assets, so hand back a ReadableStream like the real
+      // client does; tests still author fixtures as plain byte buffers.
+      return streamOf(new Uint8Array(entry)) as T
     }
     throw new Error(`Unexpected fetch path in test: ${path}`)
   }) as FetchFn
+}
+
+/** A ReadableStream that yields the given bytes in one chunk. */
+function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes)
+      controller.close()
+    },
+  })
 }
 
 function textBytes(s: string): ArrayBuffer {
@@ -405,14 +417,19 @@ describe('runProposalEngine — a hostile filename never reaches the AI provider
 })
 
 describe('runProposalEngine — asset downloads are bounded (PWS-AI-ENGINE-01R2-SAFETY-02)', () => {
-  it('a stalled download is abandoned at the deadline and reported as unreadable, never hanging the request', async () => {
+  it('a stalled download is really aborted at the deadline — the AbortSignal fires, not just the caller giving up', async () => {
     vi.useFakeTimers()
     try {
       const base = mockFetch({
         productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-stall', filename_download: 'notes.txt', type: 'text/plain', filesize: SMALL_SIZE } }],
       })
+      let observedSignal: AbortSignal | undefined
       const stallingFetch = (async <T>(path: string, opts?: Record<string, unknown>): Promise<T> => {
-        if (path.startsWith('/assets/')) return new Promise<T>(() => { /* never settles */ })
+        if (path.startsWith('/assets/')) {
+          observedSignal = opts?.signal as AbortSignal
+          // A stream that never produces a chunk and never closes.
+          return new ReadableStream<Uint8Array>({ start() {} }) as T
+        }
         return base<T>(path, opts)
       }) as FetchFn
 
@@ -420,8 +437,13 @@ describe('runProposalEngine — asset downloads are bounded (PWS-AI-ENGINE-01R2-
         productId: 1, providerId: 'deepseek', mediaIds: [1],
       })
       await vi.advanceTimersByTimeAsync(MAX_ASSET_DOWNLOAD_MS + 100)
-      const result = await promise
 
+      // The request itself was cancelled, which is what stops the transfer.
+      expect(observedSignal?.aborted).toBe(true)
+
+      // Let the aborted read settle, then confirm the honest per-file outcome.
+      vi.useRealTimers()
+      const result = await promise
       expect(result.ok).toBe(false)
       expect(result.fileResults).toEqual([
         { displayName: 'notes.txt', status: 'unreadable', reason: 'This file could not be read.' },
@@ -429,18 +451,41 @@ describe('runProposalEngine — asset downloads are bounded (PWS-AI-ENGINE-01R2-
     } finally {
       vi.useRealTimers()
     }
-  })
+  }, 20_000)
 
-  it('a response larger than the byte ceiling is refused even when the metadata claimed it was small', async () => {
-    const oversized = new ArrayBuffer(MAX_FILE_BYTES + 1024)
-    const fetch = mockFetch({
+  it('an oversized response is aborted mid-stream — the remaining chunks are never pulled', async () => {
+    const base = mockFetch({
       // Directus claims a small size…
       productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-liar', filename_download: 'notes.txt', type: 'text/plain', filesize: SMALL_SIZE } }],
-      // …but actually returns far more bytes than that.
-      assetBytesByUuid: { 'uuid-liar': oversized },
     })
 
-    const result = await runProposalEngine(fetch, mockRegistry(), specificationsTarget, {
+    const CHUNK = 1024 * 1024 // 1 MB per pull
+    let chunksPulled = 0
+    let cancelled = false
+    let observedSignal: AbortSignal | undefined
+
+    const lyingFetch = (async <T>(path: string, opts?: Record<string, unknown>): Promise<T> => {
+      if (path.startsWith('/assets/')) {
+        observedSignal = opts?.signal as AbortSignal
+        // …but the body is effectively endless. A correct reader must stop it.
+        return new ReadableStream<Uint8Array>({
+          pull(controller) {
+            chunksPulled += 1
+            if (chunksPulled > 200) {
+              controller.close() // safety net so a broken reader fails the test rather than hanging
+              return
+            }
+            controller.enqueue(new Uint8Array(CHUNK))
+          },
+          cancel() {
+            cancelled = true
+          },
+        }) as T
+      }
+      return base<T>(path, opts)
+    }) as FetchFn
+
+    const result = await runProposalEngine(lyingFetch, mockRegistry(), specificationsTarget, {
       productId: 1, providerId: 'deepseek', mediaIds: [1],
     })
 
@@ -448,6 +493,32 @@ describe('runProposalEngine — asset downloads are bounded (PWS-AI-ENGINE-01R2-
     expect(result.fileResults).toEqual([
       { displayName: 'notes.txt', status: 'unreadable', reason: 'This file could not be read.' },
     ])
+    // Stopped as soon as the ceiling was crossed, rather than draining the body…
+    expect(chunksPulled).toBeLessThanOrEqual(Math.ceil(MAX_FILE_BYTES / CHUNK) + 2)
+    // …and the stop was a real cancellation, not just an abandoned promise.
+    expect(cancelled).toBe(true)
+    expect(observedSignal?.aborted).toBe(true)
+  }, 20_000)
+
+  it('asks for a stream rather than buffering the whole response before checking its size', async () => {
+    const base = mockFetch({
+      productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-txt', filename_download: 'notes.txt', type: 'text/plain', filesize: SMALL_SIZE } }],
+    })
+    let assetOptions: Record<string, unknown> | undefined
+    const recordingFetch = (async <T>(path: string, opts?: Record<string, unknown>): Promise<T> => {
+      if (path.startsWith('/assets/')) {
+        assetOptions = opts
+        return streamOf(new Uint8Array(Buffer.from('Detection sensitivity (Fe): 0.8 mm'))) as T
+      }
+      return base<T>(path, opts)
+    }) as FetchFn
+
+    await runProposalEngine(recordingFetch, mockRegistry(), specificationsTarget, {
+      productId: 1, providerId: 'deepseek', mediaIds: [1],
+    })
+
+    expect(assetOptions?.responseType).toBe('stream')
+    expect(assetOptions?.signal).toBeInstanceOf(AbortSignal)
   })
 
   it('the trusted-metadata check still runs first, so an oversized file is never downloaded at all', async () => {

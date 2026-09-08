@@ -261,6 +261,42 @@ describe('parseAndValidate — extended locator patterns', () => {
     expect(result).toEqual({ ok: false, error: NO_SAFE_ITEMS })
   })
 
+  // PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — these render as a URL/path to whoever
+  // reads the proposal, but share no characters with the ASCII the patterns
+  // look for, so matching raw text let every one of them through.
+  it.each([
+    ['a full-width URL', 'ｈｔｔｐｓ：／／evil.example／leak'],
+    ['a full-width scheme-less host', 'ｗｗｗ．evil．example'],
+    ['a full-width Windows path', 'Ｃ：＼secret＼notes.txt'],
+    ['a full-width POSIX path', '／etc／passwd／shadow'],
+    ['a full-width file extension', 'datasheet．ｐｄｆ'],
+    ['a full-width page locator', 'ｐａｇｅ １２'],
+  ])('rejects %s after NFKC normalization', (_label, unsafeValue) => {
+    const result = specificationsTarget.parseAndValidate(validProposal({ value: unsafeValue }), NO_CONTEXT)
+    expect(result).toEqual({ ok: false, error: NO_SAFE_ITEMS })
+  })
+
+  it.each([
+    ['U+200B zero width space', 'IP​65'],
+    ['U+2060 word joiner', 'IP⁠65'],
+    ['U+00AD soft hyphen', 'IP­65'],
+    ['U+FEFF byte order mark', 'IP﻿65'],
+    ['U+202E right-to-left override', 'IP‮65'],
+    ['U+2066 left-to-right isolate', 'IP⁦65'],
+    ['U+2069 pop directional isolate', 'IP⁩65'],
+    ['a C0 control character', 'IP65'],
+  ])('rejects a value containing %s', (_label, unsafeValue) => {
+    const result = specificationsTarget.parseAndValidate(validProposal({ value: unsafeValue }), NO_CONTEXT)
+    expect(result).toEqual({ ok: false, error: NO_SAFE_ITEMS })
+  })
+
+  it('a bidi override used to disguise a path is rejected on the raw value, before normalization could hide it', () => {
+    // Renders deceptively in a right-to-left run while still being a path.
+    const disguised = 'notes‮txt.exe\\secret\\'
+    const result = specificationsTarget.parseAndValidate(validProposal({ value: disguised }), NO_CONTEXT)
+    expect(result.ok).toBe(false)
+  })
+
   it('does not false-positive on ordinary specification values', () => {
     for (const value of ['0.8 mm', 'IP65', 'Stainless steel 304', '220V / 50Hz', '±0.5 g', '1200 x 800 x 1500 mm']) {
       const result = specificationsTarget.parseAndValidate(validProposal({ value }), NO_CONTEXT)

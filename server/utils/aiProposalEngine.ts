@@ -109,28 +109,89 @@ async function fetchProductName(fetch: FetchFn, productId: number): Promise<stri
 }
 
 /**
- * PWS-AI-ENGINE-01R2-SAFETY-02 — a single asset download may not run longer
- * than this. The trusted-metadata size check above still runs BEFORE any byte
- * is requested and remains the primary defence against an oversized file;
- * this deadline bounds the other failure mode that check cannot see — a
- * response that is slow, stalled, or endless — and the byte assertion after
- * it catches a server that returned more than its own metadata claimed.
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — a single asset download may not run
+ * longer than this. The trusted-metadata size check still runs BEFORE any
+ * byte is requested and remains the first line of defence; this deadline
+ * bounds what that check cannot see — a response that is slow, stalled, or
+ * endless.
  */
 export const MAX_ASSET_DOWNLOAD_MS = 15_000
 
+/**
+ * Streams an asset, counting bytes as they arrive and aborting the request
+ * the instant the ceiling is passed or the deadline expires.
+ *
+ * The previous version awaited a complete `arrayBuffer` and only then checked
+ * its length, so a server that ignored its own declared `filesize` could make
+ * this process buffer an arbitrarily large response before anything objected;
+ * the "deadline" likewise only stopped the caller waiting, while the transfer
+ * continued in the background. Now an `AbortController` cancels the HTTP
+ * request itself in both cases, and no more than `MAX_FILE_BYTES` is ever
+ * held. `tests/aiProposalEngine.test.ts` asserts the abort signal actually
+ * fires and that reading stops mid-stream rather than draining the source.
+ */
+const DOWNLOAD_TIMED_OUT = Symbol('asset-download-timed-out')
+
 async function downloadSourceBytes(fetch: FetchFn, fileUuid: string): Promise<ArrayBuffer | null> {
+  const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), MAX_ASSET_DOWNLOAD_MS)
+
+  // Resolves once, at the deadline. Raced against every await below so the
+  // deadline holds even if the transport ignores the abort signal — aborting
+  // a controller does not, on its own, settle a pending read.
+  const timedOut = new Promise<typeof DOWNLOAD_TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      resolve(DOWNLOAD_TIMED_OUT)
+    }, MAX_ASSET_DOWNLOAD_MS)
   })
+
   try {
-    const bytes = await Promise.race([
-      fetch<ArrayBuffer>(`/assets/${fileUuid}`, { responseType: 'arrayBuffer' }),
-      deadline,
+    const stream = await Promise.race([
+      fetch<ReadableStream<Uint8Array>>(`/assets/${fileUuid}`, {
+        responseType: 'stream',
+        signal: controller.signal,
+      }),
+      timedOut,
     ])
-    if (!bytes) return null
-    if (bytes.byteLength > MAX_FILE_BYTES) return null
-    return bytes
+    if (stream === DOWNLOAD_TIMED_OUT) return null
+    if (!stream || typeof stream.getReader !== 'function') return null
+
+    const reader = stream.getReader()
+    const chunks: Uint8Array[] = []
+    let received = 0
+    try {
+      for (;;) {
+        const next = await Promise.race([reader.read(), timedOut])
+        if (next === DOWNLOAD_TIMED_OUT) {
+          await reader.cancel().catch(() => {})
+          return null
+        }
+        const { done, value } = next
+        if (done) break
+        if (!value) continue
+        received += value.byteLength
+        if (received > MAX_FILE_BYTES) {
+          // Stop the transfer rather than read on to discover how big it was.
+          controller.abort()
+          await reader.cancel().catch(() => {})
+          return null
+        }
+        chunks.push(value)
+      }
+    } finally {
+      reader.releaseLock?.()
+    }
+
+    const merged = new Uint8Array(received)
+    let offset = 0
+    for (const chunk of chunks) {
+      merged.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return merged.buffer as ArrayBuffer
+  } catch {
+    return null
   } finally {
     clearTimeout(timer)
   }

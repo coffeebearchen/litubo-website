@@ -1,0 +1,57 @@
+name: CI
+
+# PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — verification pipeline pinned to the
+# production Node version.
+#
+# Node 20 is not a convenience here: the PDF engine is chosen specifically for
+# Node 20 support, and a dependency that quietly requires a newer runtime must
+# fail this pipeline rather than fail in production. `npm ci` is deliberate
+# too — it installs strictly from the lockfile, so a drifting lockfile is a
+# build failure instead of a silent version change.
+#
+# This workflow uses no secrets, calls no AI provider, contacts no Directus
+# instance, and deploys nothing. It only runs the same checks a developer runs
+# locally.
+
+on:
+  push:
+    branches:
+      - master
+      - 'review/**'
+      - 'backup/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Tests, types, lint, build (Node 20)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Use Node 20 (the production runtime)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies from the lockfile
+        run: npm ci
+
+      - name: Unit and integration tests
+        run: npx vitest run
+
+      - name: Type check
+        run: npx vue-tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Production build
+        run: npx nuxt build

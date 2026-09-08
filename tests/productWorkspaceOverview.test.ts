@@ -1884,9 +1884,22 @@ describe('PWS-AI-ENGINE-01 page load and selection stay local-only — Analyze i
 
   it('the top-level (synchronous, page-load-time) data fetch is useFetch (GET) only — no $fetch runs on load', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
-    const topLevel = page.slice(0, page.indexOf('async function retryProviders'))
+    // Everything before the first function declaration is what actually runs
+    // at page load. Slicing at one named handler broke as soon as another
+    // click-triggered handler was added ahead of it; the first `function` is
+    // the real boundary.
+    const firstFunctionAt = page.search(/\n(async )?function /)
+    expect(firstFunctionAt).toBeGreaterThan(-1)
+    const topLevel = page.slice(0, firstFunctionAt)
     expect(topLevel).not.toContain('$fetch')
     expect(topLevel).not.toMatch(WRITE_METHOD_RE)
+  })
+
+  it('retryMedia() is a read-only re-fetch (GET, explicitly click-triggered) — never a write', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    const block = page.slice(page.indexOf('async function retryMedia'), page.indexOf('async function retryProviders'))
+    expect(block).toContain('$fetch<ProductMedia[]>')
+    expect(block).not.toMatch(WRITE_METHOD_RE)
   })
 
   it('retryProviders() is a read-only re-fetch (GET, explicitly click-triggered) — never a write', () => {

@@ -23,15 +23,14 @@ import { extractPdfTextInWorker } from './pdfExtractionWorker'
  * bounded parser, XLS/XLSX is left unsupported until a safe, streaming-
  * capable replacement is found.
  *
- * PDF parsing uses `unpdf` (github.com/unjs/unpdf), a serverless/edge-safe
- * wrapper around `pdfjs-dist` with zero regular dependencies and a real
- * `exports` map for both ESM and CJS resolution. It was chosen specifically
- * because it does not perform the dynamic, template-string `require()` (or
- * an unprefixed absolute-path `import()`) that made `pdf-parse`'s bundled
- * legacy `pdfjs-dist` build crash every route of this project's real
- * Windows `nuxt dev` server — verified fixed by starting a clean dev server
- * and loading `/`, an authenticated admin page, and both AI Workspace routes
- * (see this task's final report for the exact commands and results).
+ * PDF parsing uses `pdfjs-dist` (the legacy ESM build) directly, inside the
+ * terminable worker in `pdfExtractionWorker.ts`. It replaced `unpdf`, which
+ * declared `engines: { node: ">=22" }` while this project's production
+ * runtime is Node 20; `pdfjs-dist@4.10.38` declares `>=20` and was verified
+ * on a real Node 20.18.1 runtime. This is not a return to `pdf-parse`, whose
+ * bundled legacy build crashed every route of this project's Windows
+ * `nuxt dev` server through dynamic template-string `require()` — the engine
+ * here is imported once, by explicit absolute path, inside the worker.
  *
  * PWS-AI-ENGINE-01R2-SAFETY-02 — the PDF parse itself no longer runs in this
  * process: it is delegated to a terminable worker thread (see
@@ -126,7 +125,11 @@ export function sanitizeDisplayNameForBrowser(rawName: string | null | undefined
   const name = (rawName ?? '').trim()
   if (!name) return 'Untitled file'
   if (name.length > MAX_SAFE_DISPLAY_NAME_LENGTH) return 'Source file'
-  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(name))) return 'Source file'
+  // Patterns are matched against the NFKC form so a full-width URL or path in
+  // a filename cannot slip past ASCII patterns, exactly as in
+  // `containsUnsafeSourceLeakage()`. The raw value is what gets displayed —
+  // normalization is only ever used to decide, never to rewrite a name.
+  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(name.normalize('NFKC')))) return 'Source file'
   return name
 }
 
@@ -178,7 +181,7 @@ export async function extractTextFromFile(
   bytes: ArrayBuffer,
   mimeType: string | null | undefined,
   displayName: string,
-  /** Test-only: the module the PDF worker imports `getDocumentProxy` from. Production always uses the real `unpdf`. */
+  /** Test-only: the module the PDF worker imports the engine from. Production always uses the real `pdfjs-dist`. */
   pdfModuleEntry?: string,
 ): Promise<ExtractionResult> {
   if (bytes.byteLength === 0) {

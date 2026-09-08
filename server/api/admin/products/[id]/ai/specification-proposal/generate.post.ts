@@ -1,19 +1,28 @@
-import { createError, getHeader, getRouterParam, readBody } from 'h3'
+import { createError, getRouterParam } from 'h3'
 import { adminFetch } from '~/server/utils/adminDirectusClient'
 import { runProposalEngine } from '~/server/utils/aiProposalEngine'
 import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegistryDefault'
 import { specificationsTarget } from '~/server/utils/aiTargets/specificationsTarget'
+import { readJsonBodyWithByteLimit } from '~/server/utils/requestBodyLimit'
 
 /**
- * PWS-AI-ENGINE-01R2-SAFETY-02 — a legitimate body here is
- * `{ providerId, mediaIds: [at most 5 integers] }`, a few dozen bytes. An
- * oversized body is refused from its declared `Content-Length` BEFORE
- * `readBody()` parses anything, so a huge payload is never buffered or parsed
- * just to be rejected later by the engine's array-length check. (A request
- * that declares no length — chunked transfer — cannot be judged before
- * reading; the engine's own limits remain the backstop for that case.)
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — a legitimate body here is
+ * `{ providerId, mediaIds: [at most 5 integers] }`, a few dozen bytes.
+ *
+ * The limit is enforced on bytes actually received, not on the declared
+ * `Content-Length`: the previous version trusted that header and then called
+ * `readBody()`, so a request that omitted it (chunked, HTTP/2), understated
+ * it, or sent garbage in it was fully buffered and parsed before its real
+ * size was ever checked. `readJsonBodyWithByteLimit()` counts bytes as they
+ * arrive and destroys the connection the moment the ceiling is passed, so
+ * JSON parsing only ever sees a body that already fits.
  */
 export const MAX_GENERATE_BODY_BYTES = 4 * 1024
+
+interface GenerateBody {
+  providerId?: unknown
+  mediaIds?: unknown
+}
 
 /**
  * PWS-AI-ENGINE-01R — "Analyze selected sources" for the `specifications`
@@ -31,12 +40,7 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: 'Invalid product id' })
 
-  const declaredLength = Number(getHeader(event, 'content-length') ?? '0')
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_GENERATE_BODY_BYTES) {
-    throw createError({ statusCode: 413, message: 'Request body is too large.' })
-  }
-
-  const body = await readBody(event)
+  const body = await readJsonBodyWithByteLimit<GenerateBody>(event, MAX_GENERATE_BODY_BYTES)
   const config = useRuntimeConfig()
 
   const fetch = <T>(path: string, opts?: Record<string, unknown>) => adminFetch<T>(event, path, opts)

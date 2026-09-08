@@ -125,12 +125,35 @@ const UNSAFE_VALUE_PATTERNS: RegExp[] = [
   /\b[\w-]+\.(?:com|net|org|io|co|cn|ru|info|biz|xyz|dev|app|cloud|site|online)\b/i, // bare domain with no scheme
   /\b[0-9a-f]{24,}\b/i, // a long hyphen-less hex id (a de-hyphenated UUID, storage key, or token)
   /\b[a-z]:[\\/]/i, // single-segment Windows path (C:\file.txt), which the two-segment pattern above misses
-  /[\p{Cf}\p{Cc}]/u, // zero-width/format/control characters (U+200B, U+2060, U+00AD, U+FEFF …) — pure evasion machinery
 ]
 
-/** True if `value` contains any pattern that must never reach product data from a model. */
+/**
+ * Zero-width, format, control and bidirectional-override characters. These are
+ * checked against the RAW value and are disqualifying in their own right: a
+ * structured specification field has no legitimate use for them, and they exist
+ * in an attack only to hide something. `\p{Cf}` covers U+200B, U+2060, U+00AD,
+ * U+FEFF and the bidi overrides (U+202A–U+202E, U+2066–U+2069); `\p{Cc}` covers
+ * C0/C1 controls.
+ */
+const INVISIBLE_CHARACTER_PATTERN = /[\p{Cf}\p{Cc}]/u
+
+/**
+ * True if `value` contains any pattern that must never reach product data from
+ * a model.
+ *
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — the pattern scan now runs on the NFKC
+ * normalization of the value, not the raw text. Matching raw text let
+ * compatibility forms walk straight through: `ｈｔｔｐｓ：／／host/x` and
+ * `Ｃ：＼secret＼notes.txt` render as a URL and a Windows path to any human
+ * reading the reviewed proposal, yet share no characters with the ASCII the
+ * patterns look for. NFKC folds those to their ASCII equivalents first. The
+ * invisible-character check deliberately runs BEFORE normalization, since
+ * normalization is exactly what would hide those characters from it.
+ */
 export function containsUnsafeSourceLeakage(value: string): boolean {
-  return UNSAFE_VALUE_PATTERNS.some(pattern => pattern.test(value))
+  if (INVISIBLE_CHARACTER_PATTERN.test(value)) return true
+  const normalized = value.normalize('NFKC')
+  return UNSAFE_VALUE_PATTERNS.some(pattern => pattern.test(normalized))
 }
 
 /**

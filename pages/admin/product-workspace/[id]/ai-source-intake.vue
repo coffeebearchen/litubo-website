@@ -21,7 +21,7 @@ const productId = Number(id)
 
 const [
   { data: product, error: productError },
-  { data: mediaData },
+  { data: mediaData, error: mediaFetchError },
   { data: providersData, error: providersFetchError },
 ] = await Promise.all([
   useFetch<AdminProduct>(`/api/admin/products/${id}`),
@@ -30,6 +30,27 @@ const [
 ])
 
 const linkedMedia = computed<ProductMedia[]>(() => mediaData.value ?? [])
+
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — a failed media request is tracked
+ * separately from an empty list. Falling back to `[]` made a server error
+ * render as "this product has no associated files yet", which is a different
+ * (and false) statement about the product's data.
+ */
+const mediaLoading = ref(false)
+const mediaError = ref(Boolean(mediaFetchError.value))
+
+async function retryMedia() {
+  mediaLoading.value = true
+  mediaError.value = false
+  try {
+    mediaData.value = await $fetch<ProductMedia[]>(`/api/admin/products/${id}/media`)
+  } catch {
+    mediaError.value = true
+  } finally {
+    mediaLoading.value = false
+  }
+}
 const notFound = computed(() => Boolean(productError.value) || !product.value)
 const previewHref = computed(() => `/admin/products/${id}/preview`)
 const mediaResourcesHref = computed(() => workspaceMediaResourcesRoute(id))
@@ -86,6 +107,10 @@ async function analyze() {
   analyzing.value = true
   analyzeError.value = null
   lastFileResults.value = []
+  // Discard any earlier proposal BEFORE the new run starts: if this analysis
+  // fails, the reviewer must not be left looking at the previous run's
+  // suggestions as though they were the new result.
+  proposalSession.value = null
   try {
     const result = await $fetch<GenerateResponse>(`/api/admin/products/${productId}/ai/specification-proposal/generate`, {
       method: 'POST',
@@ -140,6 +165,8 @@ async function analyze() {
       :providers="providers"
       :providers-loading="providersLoading"
       :providers-error="providersError"
+      :media-error="mediaError"
+      :media-loading="mediaLoading"
       :selected-provider-id="selectedProviderId"
       :analyzing="analyzing"
       :analyze-error="analyzeError"
@@ -148,6 +175,7 @@ async function analyze() {
       @update:selected-provider-id="selectedProviderId = $event"
       @analyze="analyze"
       @retry-providers="retryProviders"
+      @retry-media="retryMedia"
     />
   </WorkspaceShell>
 </template>

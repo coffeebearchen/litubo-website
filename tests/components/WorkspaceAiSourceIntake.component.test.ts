@@ -38,6 +38,8 @@ const BASE_PROPS = {
   providers: [{ id: 'deepseek', label: 'DeepSeek', configured: true, isDefault: true }],
   providersLoading: false,
   providersError: false,
+  mediaError: false,
+  mediaLoading: false,
   selectedProviderId: 'deepseek',
   analyzing: false,
   analyzeError: null,
@@ -131,5 +133,53 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
     expect(wrapper.text()).toContain('CSV')
     expect(wrapper.text()).toContain('TXT')
     expect(wrapper.find('a').exists()).toBe(true)
+  })
+})
+
+// ── PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — the page must state its real state ──
+
+describe('WorkspaceAiSourceIntake — disabled associations and load failures are shown honestly', () => {
+  it('a disabled text file cannot be selected, and says why', () => {
+    const wrapper = mountIntake({
+      ...BASE_PROPS,
+      linkedMedia: [media({ id: 11, type: 'text/plain', filename_download: 'notes.txt', enabled: false })],
+    })
+
+    const checkbox = wrapper.find('input[type="checkbox"]')
+    expect((checkbox.element as HTMLInputElement).disabled).toBe(true)
+    expect(wrapper.text()).toContain('This file is disabled for this product')
+    // Not the generic format message — the reason shown is the real one.
+    expect(wrapper.text()).not.toContain('Not available for text-source analysis yet')
+  })
+
+  it('an enabled text file is still selectable', () => {
+    const wrapper = mountIntake({
+      ...BASE_PROPS,
+      linkedMedia: [media({ id: 12, type: 'text/plain', filename_download: 'notes.txt', enabled: true })],
+    })
+    expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).disabled).toBe(false)
+  })
+
+  it('a failed media load shows an error and a Retry, never "this product has no associated files"', async () => {
+    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [], mediaError: true })
+
+    expect(wrapper.text()).toContain('Could not load this product\'s files')
+    expect(wrapper.text()).not.toContain('This product has no associated files yet')
+    expect(wrapper.text()).not.toContain('None of this product\'s linked files can be analyzed')
+
+    const retry = wrapper.findAll('button').find(b => b.text() === 'Retry')!
+    await retry.trigger('click')
+    expect(wrapper.emitted('retry-media')).toHaveLength(1)
+  })
+
+  it('a genuinely empty product still says so', () => {
+    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [], mediaError: false })
+    expect(wrapper.text()).toContain('This product has no associated files yet')
+  })
+
+  it('while media is loading it says loading, not empty', () => {
+    const wrapper = mountIntake({ ...BASE_PROPS, linkedMedia: [], mediaLoading: true })
+    expect(wrapper.text()).toContain('Loading this product\'s files…')
+    expect(wrapper.text()).not.toContain('This product has no associated files yet')
   })
 })

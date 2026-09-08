@@ -1,3 +1,34 @@
+import { createRequire } from 'node:module'
+import { join, dirname } from 'node:path'
+import { readdirSync } from 'node:fs'
+
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — the PDF engine is imported by absolute
+ * path inside a worker thread (`server/utils/pdfExtractionWorker.ts`), which
+ * the bundler's dependency tracer cannot see. Without this the package is
+ * simply absent from `.output/server/node_modules` and PDF extraction fails
+ * in production only — verified by building and inspecting the output, not
+ * assumed. Resolved here so a rename or version bump fails the build loudly
+ * instead of silently dropping the dependency.
+ *
+ * `pdf.worker.mjs` must be listed too. pdf.js loads it at runtime through its
+ * own dynamic import when setting up the Node "fake worker", so tracing
+ * `pdf.mjs` alone produced a build that failed with "Setting up fake worker
+ * failed: Cannot find module …/pdf.worker.mjs" — caught by running a real
+ * parse against the built output on Node 20, not by inspection.
+ */
+const pdfjsLegacyEntry = createRequire(import.meta.url).resolve('pdfjs-dist/legacy/build/pdf.mjs')
+const pdfjsLegacyWorker = join(dirname(pdfjsLegacyEntry), 'pdf.worker.mjs')
+/**
+ * Standard font data is plain data, loaded from disk by path at parse time.
+ * Without it pdf.js falls back to built-in metrics and logs a warning on every
+ * PDF that references a standard font; the extraction still succeeds, but the
+ * production build should behave the same as development.
+ */
+const pdfjsStandardFontsDir = join(dirname(dirname(dirname(pdfjsLegacyEntry))), 'standard_fonts')
+// The tracer takes files, not directories, so the font files are listed individually.
+const pdfjsStandardFonts = readdirSync(pdfjsStandardFontsDir).map(name => join(pdfjsStandardFontsDir, name))
+
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: false },
@@ -113,5 +144,8 @@ export default defineNuxtConfig({
 
   nitro: {
     compressPublicAssets: true,
+    externals: {
+      traceInclude: [pdfjsLegacyEntry, pdfjsLegacyWorker, ...pdfjsStandardFonts],
+    },
   },
 })

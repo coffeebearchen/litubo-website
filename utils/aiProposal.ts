@@ -64,7 +64,9 @@ export function safeSourceDisplayName(rawName: string | null | undefined): strin
   const name = (rawName ?? '').trim()
   if (!name) return 'Untitled file'
   if (name.length > MAX_SAFE_DISPLAY_NAME_LENGTH) return 'Source file'
-  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(name))) return 'Source file'
+  // NFKC before matching, mirroring the server: a full-width URL or path is a
+  // URL or path to the person reading it, and must not pass ASCII patterns.
+  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(name.normalize('NFKC')))) return 'Source file'
   return name
 }
 

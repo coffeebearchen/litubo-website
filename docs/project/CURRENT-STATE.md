@@ -3274,3 +3274,66 @@ Apply 仍保持前端 disabled + 服务端 503（真实链路复验通过）；�
 未启用 Apply、未恢复 saga、未实现 Directus transaction；未改 `docker-compose.yml`、Directus schema / 权限 / 迁移；未改产品数据与 Media Library；未读取或修改 `.env`；未调用真实 DeepSeek/OpenAI；零费用；未部署；**未 push master**。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-SAFETY-02"任务中写入。*
+
+---
+
+## PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — Node 20 对齐、真实取消、诚实页面状态与 CI（2026-09-09）
+
+**性质：** 对 `b6125f6` 的窄化修复，在 review 分支 `review/pws-ai-engine-01r2-safety-02` 上新增一个提交。未 push master、未部署、未创建 PR、未 reset/rebase/amend/force push。Apply 全程保持前端 disabled + 服务端 503。
+
+### 一、Node 20 与 PDF：换掉不兼容依赖，并在真实 Node 20 上验证
+
+**发现的真实问题：** `unpdf@1.8.1` 声明 `engines: { node: ">=22" }`，而生产运行时是 **Node 20**。用真实下载的 Node 20.18.1 实测，其文本抽取当时确实能跑通，但"声明的支持下限高于部署目标"是无人认领的风险——任何补丁版本开始使用 Node 22 API 都会在生产静默失效。
+
+**处置：** 移除 `unpdf`，改用 `pdfjs-dist@4.10.38`（声明 `engines: { node: ">=20" }`，正是 unpdf 内部包装的同一个引擎）。**不是**回到 `pdf-parse`/`xlsx`：那两个的问题是打包版里的动态模板字符串 `require()`，这里是在 worker 内按显式绝对路径一次性 import。`package.json` 同时新增 `engines: { node: ">=20" }`，把生产约束写进仓库。
+
+**PDF 隔离性（均有真实测试，不是文字断言）：** 可终止 worker（超时真正 `terminate()` 并等待 `exit`）、并发上限 2、**内存上限** `resourceLimits.maxOldGenerationSizeMb = 256`（已在 Node 20 上用真实分配器验证会被杀死）、**总超时含排队等待**（时钟从调用者发起时开始，而非拿到槽位时）。新增**单页巨量文本展开**回归测试：构造一份单页含约 4 万个文本块、超过 1MB 的真实 PDF，验证字符上限在**页内逐条累积时**生效——只在页与页之间检查是挡不住单页爆量的。
+
+**生产构建下连查两个只在生产出现的缺陷（都是靠实跑真实产物发现，不是靠推断）：**
+1. 动态 import 对打包器不可见，`pdfjs-dist` 根本没进 `.output/server/node_modules` → 加 `nitro.externals.traceInclude`。
+2. 加了主入口后仍失败：`Setting up fake worker failed: Cannot find module …/pdf.worker.mjs` —— pdf.js 在 Node 下会运行时动态 import 同目录的 `pdf.worker.mjs` → 一并加入 trace，并把 `standard_fonts` 目录下的字体文件逐个列入（traceInclude 只接受文件、不接受目录）。
+
+**最终实测（真实 `nuxt build` 产物 + 真实 Node 20.18.1）：** 引擎解析到 `.output/server/node_modules/pdfjs-dist/legacy/build/pdf.mjs`、字体存在、worker 内成功抽出预期文本、零警告。**结论：PDF 在 Node 20 下真实可用，无需降级为"暂不支持"。**
+
+### 二、Generate 请求体与资料下载：真正的字节上限与真正的取消
+
+- **请求体**：新增 `server/utils/requestBodyLimit.ts`，**按实际到达字节计数**并在越限瞬间 `destroy()` 连接，JSON 解析只会看到已通过上限的内容。旧实现信任 `Content-Length` 再 `readBody()`，有三个洞：缺失该头（chunked / HTTP2）、谎报为极小值、填非数字——**三种情况现在都是 413**，且都有测试；另有测试证明越限后不再继续读取剩余请求体。handler 已不含 `readBody`。
+- **资料下载**：改为 `responseType: 'stream'` + `AbortController`，**边收边计数**，越限立即 `abort()` + `reader.cancel()`；测试断言 abort 信号确实触发、stream 的 `cancel` 确实被调用、且只拉取了刚好越限的块数。写测试时发现并修掉一个真实缺陷：**仅 abort 并不会让已挂起的 `read()` 返回**，所以截止时间必须同时参与 read 循环的竞速，否则传输方忽略信号时仍会无限等待。下载前的可信元数据大小检查保持不变（有测试证明超限文件根本不发起 `/assets/` 请求）。
+
+### 三、资料泄露与 Unicode
+
+- 模式扫描改为**先 NFKC 归一化再匹配**：`ｈｔｔｐｓ：／／…`、`Ｃ：＼secret＼notes.txt`、`ｐａｇｅ １２` 这类全角写法对人眼就是 URL/路径/定位符，却与 ASCII 模式零字符重合，此前全部漏过。
+- 零宽/格式/控制/**双向**字符（U+200B、U+2060、U+00AD、U+FEFF、U+202A–202E、U+2066–2069）在**归一化之前**对原始值检查并直接拒绝——归一化恰恰会把它们抹掉。
+- 浏览器端文件名 sanitizer 同步做 NFKC，与服务端规则保持一致（已有逐条一致性测试）。
+- Provider 的 `'deadline-exceeded'` 字符串控制值改为 **Symbol**：模型返回的是任意数据，能被模型自己构造出来的哨兵就是可伪造的哨兵。
+
+### 四、页面真实状态
+
+- `enabled: false` 的文本资料**不可勾选**，并显示真实原因（此前可勾选，Analyze 后被服务端静默丢弃）。
+- 每次 Analyze **开始前**清空旧 proposal，新分析失败后不会再让审阅者看到上一轮的建议。
+- Media 与 Specifications 请求失败时显示错误与 **Retry**，不再伪装成"没有资料"或"没有冲突"——后者尤其危险：规格拉取失败若回落成空数组，每条建议都会显示为全新、无冲突。
+
+### 五、Provider 状态与 CI
+
+- `/api/admin/ai/providers` 返回 `Cache-Control: private, no-store`；新增测试覆盖未登录 401、非管理员 403、管理员只拿到 `id/label/configured/isDefault`（断言 payload 中不含 key、model 名或 raw config）。
+- 新增 `.github/workflows/ci.yml`，**固定 Node 20**，运行 `npm ci` → `npx vitest run` → `npx vue-tsc --noEmit` → `npm run lint` → `npx nuxt build`。不使用任何 secrets、不调用 AI、不部署。
+
+### 六、验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | **817/817 通过**（较上一任务 779 新增 38 项） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | Build complete |
+| 真实 Node 20.18.1 + 真实构建产物 PDF 抽取 | 通过（引擎、worker、字体齐备，文本正确） |
+| 浏览器 1440px / 375px | 均无横向溢出，Console 零错误 |
+| 真实链路（已登录、无 Key、零 mock） | Apply → 503；超长 body（无 Content-Length）→ 413；正常 Generate → `AI provider is not configured.`；providers 头为 `private, no-store` 且无 key/model 泄露 |
+| 业务数据 | 零写入：产品 3 仍为原有 2 个 TEST 规格组（12 + 5 条）与 7 个关联文件 |
+
+### 明确未做
+
+未启用 Apply、未恢复 saga、未实现 Directus transaction；未改 `docker-compose.yml`、Directus schema / 权限 / 迁移；未改生产 Node 版本；未改产品数据与 Media Library；未读取或修改 `.env`；未调用真实 DeepSeek/OpenAI；零费用；未部署；未创建 PR；**未 push master**。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-REVIEW-FIX-01-AUTO"任务中写入。*

@@ -13,7 +13,7 @@ const productId = Number(id)
 
 const [
   { data: product, error: productError },
-  { data: specsData },
+  { data: specsData, error: specsFetchError },
 ] = await Promise.all([
   useFetch<AdminProduct>(`/api/admin/products/${id}`),
   useFetch<SpecGroupWithItems[]>(`/api/admin/products/${id}/specs`),
@@ -23,6 +23,28 @@ const notFound = computed(() => Boolean(productError.value) || !product.value)
 const previewHref = computed(() => `/admin/products/${id}/preview`)
 const sourceIntakeHref = computed(() => workspaceAiSourceIntakeRoute(id))
 const existingSpecGroups = computed<SpecGroupWithItems[]>(() => specsData.value ?? [])
+
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — the existing specifications are what
+ * every "Review required" / duplicate warning on this screen is computed
+ * from. Falling back to `[]` when that request fails would silently present
+ * every proposed row as brand new and conflict-free, which is the most
+ * dangerous possible misreading. The failure is surfaced instead.
+ */
+const specsLoading = ref(false)
+const specsError = ref(Boolean(specsFetchError.value))
+
+async function retrySpecs() {
+  specsLoading.value = true
+  specsError.value = false
+  try {
+    specsData.value = await $fetch<SpecGroupWithItems[]>(`/api/admin/products/${id}/specs`)
+  } catch {
+    specsError.value = true
+  } finally {
+    specsLoading.value = false
+  }
+}
 
 const proposalSession = useAiProposalSession()
 
@@ -88,6 +110,23 @@ function clearProposal() {
 
     <template v-else>
       <p class="ws-refresh-warning">Refreshing this page or navigating away will lose this unsaved proposal.</p>
+
+      <!--
+        Shown above the proposal rather than replacing it: the suggestions are
+        still readable, but the reviewer is told plainly that the comparison
+        against existing specifications is missing, so an absent "Review
+        required" flag must not be read as "no conflict".
+      -->
+      <div v-if="specsError" class="ws-specs-error" role="alert">
+        <p>
+          Could not load this product's existing specifications, so proposals below are
+          <strong>not</strong> being checked against them. An item shown as new may already exist.
+        </p>
+        <button type="button" class="ws-retry-btn" :disabled="specsLoading" @click="retrySpecs">
+          {{ specsLoading ? 'Retrying…' : 'Retry' }}
+        </button>
+      </div>
+
       <WorkspaceAiProposalReview
         :product-id="productId"
         :proposal="proposalSession!.proposal"
@@ -161,4 +200,33 @@ function clearProposal() {
   padding: var(--space-2) var(--space-3);
   margin: 0 0 var(--space-4);
 }
+
+.ws-specs-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: #C0392B;
+  background: #FDF0EE;
+  border: 1px solid #F5C6C2;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+.ws-specs-error p { margin: 0; flex: 1 1 20ch; min-width: 0; }
+
+.ws-retry-btn {
+  background: var(--color-surface);
+  border: 1px solid #F5C6C2;
+  border-radius: var(--radius-sm);
+  color: #C0392B;
+  font-size: var(--text-sm);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.ws-retry-btn:hover:not(:disabled) { background: #FBE3E0; }
+.ws-retry-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

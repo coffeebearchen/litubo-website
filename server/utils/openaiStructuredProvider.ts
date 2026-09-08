@@ -60,10 +60,17 @@ const REQUEST_TIMEOUT_MS = 30_000
 
 const CALL_DEADLINE_MS = REQUEST_TIMEOUT_MS + 5_000
 
-async function withCallDeadline<T>(work: Promise<T>): Promise<T | 'deadline-exceeded'> {
+/**
+ * A unique Symbol, not a string: a model response is arbitrary provider data,
+ * and a sentinel a provider could itself return is a sentinel that can be
+ * spoofed. No JSON payload can ever equal this value.
+ */
+const DEADLINE_EXCEEDED = Symbol('provider-call-deadline-exceeded')
+
+async function withCallDeadline<T>(work: Promise<T>): Promise<T | typeof DEADLINE_EXCEEDED> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<'deadline-exceeded'>((resolve) => {
-    timer = setTimeout(() => resolve('deadline-exceeded'), CALL_DEADLINE_MS)
+  const deadline = new Promise<typeof DEADLINE_EXCEEDED>((resolve) => {
+    timer = setTimeout(() => resolve(DEADLINE_EXCEEDED), CALL_DEADLINE_MS)
   })
   try {
     return await Promise.race([work, deadline])
@@ -123,7 +130,7 @@ export function createOpenAiStructuredProvider(
     } catch {
       return { ok: false, error: CALL_FAILED_ERROR }
     }
-    if (raw === 'deadline-exceeded') return { ok: false, error: CALL_FAILED_ERROR }
+    if (raw === DEADLINE_EXCEEDED) return { ok: false, error: CALL_FAILED_ERROR }
 
     const sourceMaterial = input.extractedSourceTexts.map(s => s.text).join('\n\n')
     return target.parseAndValidate(raw, { sourceMaterial })

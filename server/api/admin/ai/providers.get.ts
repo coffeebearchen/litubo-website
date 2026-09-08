@@ -1,3 +1,4 @@
+import { setResponseHeader } from 'h3'
 import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegistryDefault'
 
 /**
@@ -9,8 +10,13 @@ import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegist
  * an API key, model name, environment variable name, raw error, prompt, or
  * file content. `useRuntimeConfig()` values are read here and nowhere else
  * in this response; only their *presence* (via `configured`) is exposed.
+ *
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — `private, no-store`: this describes one
+ * administrator's server configuration, so it must never be held by a shared
+ * cache or written to disk by the browser, and must not survive a sign-out.
  */
-export default defineEventHandler(() => {
+export default defineEventHandler((event) => {
+  setResponseHeader(event, 'Cache-Control', 'private, no-store')
   const config = useRuntimeConfig()
 
   const registry = createDefaultAiProviderRegistry({

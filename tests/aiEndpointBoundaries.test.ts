@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { Readable } from 'node:stream'
 import { runProposalEngine } from '../server/utils/aiProposalEngine'
 import { specificationsTarget } from '../server/utils/aiTargets/specificationsTarget'
 import type { FetchFn } from '../server/utils/mediaLifecycle'
@@ -27,26 +28,32 @@ interface MockEventOptions {
   headers?: Record<string, string>
   routerParams?: Record<string, string>
   body?: unknown
+  /** A real Node readable stream used as the request body, so byte-level body limits are exercised for real. */
+  requestStream?: Readable
 }
 
 /** A mock H3 event with enough of the real shape for h3's own helpers to work on it. */
 function mockEvent(opts: MockEventOptions) {
   const cookieHeader = Object.entries(opts.cookies ?? {}).map(([k, v]) => `${k}=${v}`).join('; ')
   const redirects: Array<{ location: string, status: number }> = []
+  // When a body stream is supplied, the request object IS that stream, with the
+  // IncomingMessage fields the handlers read layered on top — so `on('data')`,
+  // `destroy()` and backpressure all behave like a real request.
+  const req = Object.assign(opts.requestStream ?? new Readable({ read() { this.push(null) } }), {
+    url: opts.url,
+    method: opts.method ?? 'GET',
+    headers: {
+      host: 'localhost:3000',
+      ...(cookieHeader ? { cookie: cookieHeader } : {}),
+      ...(opts.headers ?? {}),
+    },
+  })
   const event = {
     // h3's own helpers read `event.path` / `event.method` alongside `node.req`.
     path: opts.url,
     method: opts.method ?? 'GET',
     node: {
-      req: {
-        url: opts.url,
-        method: opts.method ?? 'GET',
-        headers: {
-          host: 'localhost:3000',
-          ...(cookieHeader ? { cookie: cookieHeader } : {}),
-          ...(opts.headers ?? {}),
-        },
-      },
+      req,
       res: {
         setHeader: (name: string, value: string) => {
           if (name.toLowerCase() === 'location') redirects.push({ location: String(value), status: 302 })
@@ -294,35 +301,210 @@ describe('apply.post.ts — 503 for every request, with no write path reachable'
   })
 })
 
+// ── 3b. Provider status endpoint ──
+
+const PROVIDERS_PATH = '/api/admin/ai/providers'
+
+describe('/api/admin/ai/providers — auth, safe fields only, and no caching', () => {
+  it('is refused for an unauthenticated caller (401)', async () => {
+    installNitroGlobals(async () => ({}))
+    const middleware = (await import('../server/middleware/admin-auth')).default as (e: unknown) => Promise<unknown>
+    expect(await statusCodeOf(() => middleware(mockEvent({ url: PROVIDERS_PATH })))).toBe(401)
+    expect(fetchCalls).toHaveLength(0)
+  })
+
+  it('is refused for an authenticated non-administrator (403)', async () => {
+    installNitroGlobals(async (url: string) => {
+      if (url.includes('/users/me')) return { data: { id: 'u1', role: { name: 'nuxt-server' } } }
+      return {}
+    })
+    const middleware = (await import('../server/middleware/admin-auth')).default as (e: unknown) => Promise<unknown>
+    const status = await statusCodeOf(() => middleware(
+      mockEvent({ url: PROVIDERS_PATH, cookies: { admin_at: 'non-admin' } }),
+    ))
+    expect(status).toBe(403)
+  })
+
+  it('returns only id/label/configured/isDefault — never a key, model name, or raw config', async () => {
+    installNitroGlobals(async () => ({}))
+    vi.stubGlobal('useRuntimeConfig', () => ({
+      aiDefaultProvider: 'deepseek',
+      openaiApiKey: 'sk-SUPER-SECRET-OPENAI-KEY',
+      openaiModel: 'gpt-secret-model-name',
+      deepseekApiKey: 'ds-SUPER-SECRET-DEEPSEEK-KEY',
+      deepseekModel: 'deepseek-secret-model-name',
+    }))
+    const handler = (await import('../server/api/admin/ai/providers.get')).default as unknown as (e: unknown) => unknown
+
+    const event = mockEvent({ url: PROVIDERS_PATH })
+    const result = await handler(event) as Array<Record<string, unknown>>
+
+    expect(Array.isArray(result)).toBe(true)
+    for (const provider of result) {
+      expect(Object.keys(provider).sort()).toEqual(['configured', 'id', 'isDefault', 'label'])
+    }
+    // Configured is reported truthfully from the presence of a key…
+    expect(result.find(p => p.id === 'deepseek')?.configured).toBe(true)
+    // …but no secret or model name appears anywhere in the payload.
+    const serialized = JSON.stringify(result)
+    expect(serialized).not.toContain('SUPER-SECRET')
+    expect(serialized).not.toContain('secret-model-name')
+    expect(serialized).not.toContain('sk-')
+    expect(serialized).not.toContain('apiKey')
+  })
+
+  it('sets Cache-Control: private, no-store so provider status is never cached or persisted', async () => {
+    installNitroGlobals(async () => ({}))
+    const handler = (await import('../server/api/admin/ai/providers.get')).default as unknown as (e: unknown) => unknown
+
+    const headers: Record<string, string> = {}
+    const event = mockEvent({ url: PROVIDERS_PATH })
+    ;(event.node.res as unknown as { setHeader: (n: string, v: string) => void }).setHeader = (name, value) => {
+      headers[name.toLowerCase()] = String(value)
+    }
+
+    await handler(event)
+    expect(headers['cache-control']).toBe('private, no-store')
+  })
+})
+
 // ── 4. Generate refuses an oversized body before parsing it ──
 
-describe('generate.post.ts — oversized request bodies are refused before readBody', () => {
-  it('a declared Content-Length over the limit returns 413 without parsing or fetching anything', async () => {
+describe('generate.post.ts — oversized request bodies are refused on real bytes, before any JSON parsing', () => {
+  /**
+   * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — the old guard trusted `Content-Length`
+   * and then called `readBody()`. Each case below is a way past that guard,
+   * and each must now end in 413 with nothing parsed.
+   */
+  async function runGenerate(opts: { headers?: Record<string, string>, bodyChunks: Array<string | Buffer> }) {
     installNitroGlobals(async () => ({}))
     const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<unknown>
+
+    const stream = Readable.from(opts.bodyChunks)
+    const event = mockEvent({
+      url: GENERATE_PATH,
+      method: 'POST',
+      routerParams: { id: '3' },
+      headers: { origin: 'http://localhost:3000', ...(opts.headers ?? {}) },
+      requestStream: stream,
+    })
+    event.context.adminToken = 'admin-token'
+    return statusCodeOf(() => handler(event))
+  }
+
+  // Kept in lockstep with the handler by the parity test at the end of this block.
+  const MAX_GENERATE_BODY_BYTES = 4 * 1024
+  const OVERSIZED = 'x'.repeat(MAX_GENERATE_BODY_BYTES + 1024)
+
+  it('an honestly declared oversized Content-Length is refused', async () => {
+    const status = await runGenerate({
+      headers: { 'content-length': String(5 * 1024 * 1024) },
+      bodyChunks: ['{}'],
+    })
+    expect(status).toBe(413)
+    expect(fetchCalls).toHaveLength(0)
+  })
+
+  it('a MISSING Content-Length (chunked / HTTP2) with an oversized body is still refused', async () => {
+    const status = await runGenerate({ bodyChunks: [OVERSIZED] })
+    expect(status).toBe(413)
+    expect(fetchCalls).toHaveLength(0)
+  })
+
+  it('a FORGED Content-Length that understates a huge body is refused on the real bytes', async () => {
+    const status = await runGenerate({
+      headers: { 'content-length': '12' }, // lie
+      bodyChunks: [OVERSIZED],
+    })
+    expect(status).toBe(413)
+    expect(fetchCalls).toHaveLength(0)
+  })
+
+  it('an INVALID, non-numeric Content-Length with an oversized body is refused', async () => {
+    const status = await runGenerate({
+      headers: { 'content-length': 'not-a-number' },
+      bodyChunks: [OVERSIZED],
+    })
+    expect(status).toBe(413)
+    expect(fetchCalls).toHaveLength(0)
+  })
+
+  it('stops reading as soon as the ceiling is passed — the rest of the body is never consumed', async () => {
+    installNitroGlobals(async () => ({}))
+    const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<unknown>
+
+    const CHUNK = 1024
+    let chunksProduced = 0
+    const stream = new Readable({
+      read() {
+        chunksProduced += 1
+        if (chunksProduced > 500) {
+          this.push(null) // safety net: a broken reader fails the test instead of hanging
+          return
+        }
+        this.push('y'.repeat(CHUNK))
+      },
+    })
 
     const event = mockEvent({
       url: GENERATE_PATH,
       method: 'POST',
       routerParams: { id: '3' },
-      headers: { 'origin': 'http://localhost:3000', 'content-length': String(5 * 1024 * 1024) },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: stream,
     })
     event.context.adminToken = 'admin-token'
 
     expect(await statusCodeOf(() => handler(event))).toBe(413)
-    expect(fetchCalls).toHaveLength(0)
+    // Only enough chunks to cross the ceiling, not the whole (endless) body.
+    expect(chunksProduced).toBeLessThanOrEqual(Math.ceil(MAX_GENERATE_BODY_BYTES / CHUNK) + 3)
   })
 
-  it('the guard is applied before readBody in the handler source', async () => {
+  it('a normal small body is read and acted on as usual', async () => {
+    installNitroGlobals(async (url: string) => {
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+      if (url.includes('/items/products_files')) return { data: [] }
+      if (url.includes('/items/products/')) return { data: { name_en: 'Test product' } }
+      return { data: null }
+    })
+    const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<{ ok: boolean, error?: string }>
+
+    const event = mockEvent({
+      url: GENERATE_PATH,
+      method: 'POST',
+      routerParams: { id: '3' },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', mediaIds: [1] })]),
+    })
+    event.context.adminToken = 'admin-token'
+
+    const result = await handler(event)
+    // No provider key is configured in tests, so this fails closed — the point
+    // is that the body was accepted and parsed rather than refused as oversized.
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('AI provider is not configured.')
+  })
+
+  it('a body that is not valid JSON is refused as a bad request, never parsed into undefined behaviour', async () => {
+    const status = await runGenerate({ bodyChunks: ['{ this is not json'] })
+    expect(status).toBe(400)
+  })
+
+  it('the limit this suite exercises is the one the handler actually enforces', async () => {
+    installNitroGlobals(async () => ({}))
+    const mod = await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')
+    expect(mod.MAX_GENERATE_BODY_BYTES).toBe(MAX_GENERATE_BODY_BYTES)
+  })
+
+  it('the handler never calls readBody — the byte-limited reader is the only body path', async () => {
     const { readFileSync } = await import('node:fs')
     const { resolve } = await import('node:path')
     const source = readFileSync(
       resolve(process.cwd(), 'server/api/admin/products/[id]/ai/specification-proposal/generate.post.ts'),
       'utf8',
     )
-    const guardAt = source.indexOf('MAX_GENERATE_BODY_BYTES')
-    const readBodyAt = source.indexOf('await readBody(event)')
-    expect(guardAt).toBeGreaterThan(-1)
-    expect(readBodyAt).toBeGreaterThan(guardAt)
+    const code = source.split('\n').filter(line => !line.trim().startsWith('*') && !line.trim().startsWith('//')).join('\n')
+    expect(code).not.toMatch(/\breadBody\s*\(/)
+    expect(code).toContain('readJsonBodyWithByteLimit')
   })
 })

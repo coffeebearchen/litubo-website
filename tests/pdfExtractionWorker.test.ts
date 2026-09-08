@@ -1,29 +1,31 @@
 /**
- * PWS-AI-ENGINE-01R2-SAFETY-02 — proves the PDF timeout actually terminates
- * the parse rather than abandoning a promise that keeps running.
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — proves the PDF path is genuinely
+ * isolated: terminable, memory-capped, concurrency-capped, and bounded by a
+ * deadline that includes queue time.
  *
- * The decisive assertion is `getLivePdfWorkerCount() === 0` after a timeout:
- * the previous `Promise.race` implementation would have passed a "the call
- * returned an error in time" test while the runaway parse kept burning the
- * server's only JavaScript thread. A thread that has exited cannot.
+ * The decisive assertion throughout is `getLivePdfWorkerCount() === 0`: the
+ * old `Promise.race` implementation would have passed a "the call returned an
+ * error in time" test while the runaway parse kept burning the server's only
+ * JavaScript thread. A thread that has exited cannot.
  *
- * These tests use real worker threads (no mocking of worker_threads) with a
- * stand-in PDF module that busy-loops forever — a busy loop blocks the
- * worker's event loop entirely, so nothing short of real termination stops it.
+ * These tests use real worker threads and the real `pdfjs-dist` engine — the
+ * only stand-in is a fixture module that hangs on purpose, which is the one
+ * behaviour a real PDF cannot be relied upon to reproduce deterministically.
  */
 
 import { describe, it, expect } from 'vitest'
 import { fileURLToPath } from 'node:url'
-import { resolve } from 'node:path'
+import { createRequire } from 'node:module'
 import {
   extractPdfTextInWorker,
   getLivePdfWorkerCount,
   MAX_CONCURRENT_PDF_WORKERS,
+  PDF_WORKER_MEMORY_MB,
 } from '../server/utils/pdfExtractionWorker'
 import { extractTextFromFile, MAX_PDF_PAGES, MAX_PER_FILE_CHARS, MAX_FILE_BYTES } from '../server/utils/aiTextExtraction'
 
 const HANGING_MODULE = fileURLToPath(new URL('./fixtures/hangingPdfModule.mjs', import.meta.url))
-const REAL_UNPDF = resolve(process.cwd(), 'node_modules/unpdf/dist/index.mjs')
+const REAL_PDFJS = createRequire(import.meta.url).resolve('pdfjs-dist/legacy/build/pdf.mjs')
 
 const FAST_LIMITS = {
   timeoutMs: 700,
@@ -32,15 +34,27 @@ const FAST_LIMITS = {
   maxBytes: MAX_FILE_BYTES,
 }
 
-/** The same minimal, real, valid single-page PDF builder used in aiTextExtraction.test.ts. */
-function buildRealTestPdf(text: string): Buffer {
-  const content = `BT /F1 24 Tf 72 712 Td (${text}) Tj ET`
+/**
+ * A minimal, real, valid PDF. `pagesText` supplies one content stream per
+ * page, so a caller can build both an ordinary document and one whose single
+ * page expands to far more text than the per-file cap.
+ */
+function buildRealTestPdf(pagesText: string[]): Buffer {
   const objects: string[] = []
+  const pageCount = pagesText.length
+  const pageObjIds = pagesText.map((_, i) => 3 + i * 2)
+  const kids = pageObjIds.map(id => `${id} 0 R`).join(' ')
+
   objects.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n')
-  objects.push('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n')
-  objects.push('3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n')
-  objects.push('4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n')
-  objects.push(`5 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`)
+  objects.push(`2 0 obj\n<< /Type /Pages /Kids [${kids}] /Count ${pageCount} >>\nendobj\n`)
+  for (let i = 0; i < pageCount; i++) {
+    const pageId = pageObjIds[i]
+    const contentId = pageId + 1
+    objects.push(`${pageId} 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 ${3 + pageCount * 2} 0 R >> >> /MediaBox [0 0 612 792] /Contents ${contentId} 0 R >>\nendobj\n`)
+    const content = pagesText[i]
+    objects.push(`${contentId} 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`)
+  }
+  objects.push(`${3 + pageCount * 2} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`)
 
   let pdf = '%PDF-1.4\n'
   const offsets: number[] = [0]
@@ -53,6 +67,14 @@ function buildRealTestPdf(text: string): Buffer {
   for (let i = 1; i <= objects.length; i++) pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \n'
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`
   return Buffer.from(pdf, 'latin1')
+}
+
+/** One page whose content stream draws `lineCount` separate text runs — a single page that expands to a lot of text. */
+function hugeSinglePageContent(lineCount: number, chunk: string): string {
+  let stream = 'BT /F1 8 Tf 10 780 Td'
+  for (let i = 0; i < lineCount; i++) stream += ` (${chunk}) Tj 0 -1 Td`
+  stream += ' ET'
+  return stream
 }
 
 function toArrayBuffer(buffer: Buffer): ArrayBuffer {
@@ -103,33 +125,93 @@ describe('extractPdfTextInWorker — a parse that never finishes is really termi
     expect(peak).toBeLessThanOrEqual(MAX_CONCURRENT_PDF_WORKERS)
     expect(getLivePdfWorkerCount()).toBe(0)
   }, 40_000)
+
+  it('the total deadline covers queue time — a queued call cannot wait past its own budget', async () => {
+    const timeoutMs = 900
+    const started = Date.now()
+
+    // Saturate the pool and queue three more behind it. If the deadline only
+    // started once a slot freed up, the last callers would finish at roughly
+    // 3x the budget instead of within it.
+    const outcomes = await Promise.all(Array.from({ length: 6 }, () =>
+      extractPdfTextInWorker(toArrayBuffer(Buffer.from('%PDF-1.4 q')), {
+        ...FAST_LIMITS,
+        timeoutMs,
+        moduleEntry: HANGING_MODULE,
+      }),
+    ))
+    const elapsed = Date.now() - started
+
+    for (const outcome of outcomes) expect(outcome).toEqual({ ok: false, reason: 'timeout' })
+    // Everything resolves within roughly one budget, not one budget per queue wave.
+    expect(elapsed).toBeLessThan(timeoutMs * 2)
+    expect(getLivePdfWorkerCount()).toBe(0)
+  }, 40_000)
 })
 
 describe('extractPdfTextInWorker — normal parses still work through the worker', () => {
   it('extracts genuine text from a real PDF and exits its worker cleanly', async () => {
-    const outcome = await extractPdfTextInWorker(toArrayBuffer(buildRealTestPdf('Detection sensitivity \\(Fe\\): 0.8 mm')), {
-      timeoutMs: 15_000,
+    const pdf = buildRealTestPdf(['BT /F1 24 Tf 72 712 Td (Detection sensitivity \\(Fe\\): 0.8 mm) Tj ET'])
+    const outcome = await extractPdfTextInWorker(toArrayBuffer(pdf), {
+      timeoutMs: 20_000,
       maxPages: MAX_PDF_PAGES,
       maxChars: MAX_PER_FILE_CHARS,
       maxBytes: MAX_FILE_BYTES,
-      moduleEntry: REAL_UNPDF,
     })
 
     expect(outcome.ok).toBe(true)
     if (outcome.ok) expect(outcome.text).toContain('Detection sensitivity (Fe): 0.8 mm')
     expect(getLivePdfWorkerCount()).toBe(0)
-  }, 30_000)
+  }, 40_000)
 
   it('re-applies the byte ceiling inside the worker, not only in the caller', async () => {
     const outcome = await extractPdfTextInWorker(toArrayBuffer(Buffer.alloc(2048, 'a')), {
       ...FAST_LIMITS,
       timeoutMs: 5_000,
       maxBytes: 1024, // smaller than the payload
-      moduleEntry: REAL_UNPDF,
     })
     expect(outcome).toEqual({ ok: false, reason: 'failed' })
     expect(getLivePdfWorkerCount()).toBe(0)
   }, 20_000)
+
+  it('declares a real heap ceiling for the worker thread', () => {
+    expect(PDF_WORKER_MEMORY_MB).toBeGreaterThan(0)
+    expect(PDF_WORKER_MEMORY_MB).toBeLessThanOrEqual(512)
+  })
+})
+
+describe('extractPdfTextInWorker — a single page that expands to enormous text is capped during extraction', () => {
+  it('caps one huge page at maxChars instead of letting it blow past the whole-file budget', async () => {
+    // ~40k text runs on ONE page: stopping only between pages would return far
+    // more than the cap, because the page never ends before the budget does.
+    const chunk = 'LOREM IPSUM DOLOR SIT AMET CONSECTETUR'
+    const pdf = buildRealTestPdf([hugeSinglePageContent(40_000, chunk)])
+    expect(pdf.byteLength).toBeGreaterThan(1_000_000) // a genuinely large single page
+
+    const maxChars = 5_000
+    const outcome = await extractPdfTextInWorker(toArrayBuffer(pdf), {
+      timeoutMs: 60_000,
+      maxPages: MAX_PDF_PAGES,
+      maxChars,
+      maxBytes: MAX_FILE_BYTES,
+    })
+
+    expect(outcome.ok).toBe(true)
+    if (outcome.ok) {
+      expect(outcome.text.length).toBeLessThanOrEqual(maxChars)
+      expect(outcome.text).toContain('LOREM IPSUM')
+    }
+    expect(getLivePdfWorkerCount()).toBe(0)
+  }, 90_000)
+
+  it('the same document through extractTextFromFile also respects the per-file cap', async () => {
+    const pdf = buildRealTestPdf([hugeSinglePageContent(20_000, 'ALPHA BETA GAMMA DELTA EPSILON ZETA')])
+    const result = await extractTextFromFile(toArrayBuffer(pdf), 'application/pdf', 'Source 1')
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.source.text.length).toBeLessThanOrEqual(MAX_PER_FILE_CHARS)
+    expect(getLivePdfWorkerCount()).toBe(0)
+  }, 90_000)
 })
 
 describe('extractTextFromFile — the PDF path goes through the worker', () => {
@@ -144,4 +226,9 @@ describe('extractTextFromFile — the PDF path goes through the worker', () => {
     expect(result).toEqual({ ok: false, reason: 'This file could not be read.' })
     expect(getLivePdfWorkerCount()).toBe(0)
   }, 30_000)
+
+  it('the real engine entry resolves to pdfjs-dist, not to a package the production Node version does not support', () => {
+    expect(REAL_PDFJS).toContain('pdfjs-dist')
+    expect(REAL_PDFJS).not.toContain('unpdf')
+  })
 })

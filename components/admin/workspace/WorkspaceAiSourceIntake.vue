@@ -19,6 +19,9 @@ const props = defineProps<{
   providers: AiProviderSummary[]
   providersLoading: boolean
   providersError: boolean
+  /** True when the linked-media request itself failed — never conflated with "this product has no files". */
+  mediaError: boolean
+  mediaLoading: boolean
   selectedProviderId: string | null
   analyzing: boolean
   analyzeError: string | null
@@ -30,6 +33,7 @@ const emit = defineEmits<{
   'update:selectedProviderId': [id: string]
   analyze: []
   'retry-providers': []
+  'retry-media': []
 }>()
 
 const selectedSet = computed(() => new Set(props.selectedIds))
@@ -38,8 +42,19 @@ function isSelected(id: number): boolean {
   return selectedSet.value.has(id)
 }
 
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — a disabled association is not analyzable.
+ * The server only ever resolves rows with `enabled = true`, so offering a
+ * disabled file as selectable meant the checkbox worked, Analyze ran, and the
+ * file was silently dropped server-side with a generic reason. It is now
+ * unselectable, with the actual reason shown on the card.
+ */
 function isAnalyzable(m: ProductMedia): boolean {
-  return isTextSourceMime(m.type ?? null)
+  return isTextSourceMime(m.type ?? null) && m.enabled === true
+}
+
+function isDisabledAssociation(m: ProductMedia): boolean {
+  return isTextSourceMime(m.type ?? null) && m.enabled !== true
 }
 
 function isFormerlySupported(m: ProductMedia): boolean {
@@ -113,18 +128,30 @@ const canAnalyze = computed(() =>
         <span class="ws-selected-count">{{ selectedIds.length }} / {{ MAX_FILES_PER_REQUEST }} selected</span>
       </div>
 
-      <p v-if="linkedMedia.length === 0" class="ws-empty">
+      <!--
+        A failed request is never presented as "no files": that would tell an
+        editor their product is empty when in fact the server could not be
+        reached, and would hide files that do exist.
+      -->
+      <p v-if="mediaLoading" class="ws-empty">Loading this product's files…</p>
+
+      <div v-else-if="mediaError" class="ws-provider-error" role="alert">
+        <p>Could not load this product's files. This is a loading error, not an empty product.</p>
+        <button type="button" class="ws-retry-btn" @click="emit('retry-media')">Retry</button>
+      </div>
+
+      <p v-else-if="linkedMedia.length === 0" class="ws-empty">
         This product has no associated files yet.
         <NuxtLink :to="mediaResourcesHref">Go to Media &amp; resources</NuxtLink> to associate one first.
       </p>
 
       <p v-else-if="!hasAnyAnalyzableMedia" class="ws-empty ws-empty--no-readable">
-        None of this product's linked files can be analyzed as text yet — they may all be images or another unsupported format.
+        None of this product's linked files can be analyzed as text yet — they may all be images, disabled for this product, or another unsupported format.
         Supported formats: {{ SUPPORTED_TEXT_SOURCE_FORMATS_LABEL }}.
         <NuxtLink :to="mediaResourcesHref">Go to Media &amp; resources</NuxtLink> to link a readable file.
       </p>
 
-      <ul v-if="linkedMedia.length > 0" class="ws-file-grid" role="list">
+      <ul v-if="!mediaLoading && !mediaError && linkedMedia.length > 0" class="ws-file-grid" role="list">
         <li v-for="m in linkedMedia" :key="m.id" class="ws-file-card" :class="{ 'ws-file-card--selected': isSelected(m.id) }">
           <label class="ws-file-label" :class="{ 'ws-file-label--disabled': isCheckboxDisabled(m) }">
             <input
@@ -145,6 +172,9 @@ const canAnalyze = computed(() =>
             <dd>{{ mediaReadableLabel(m.enabled) }}</dd>
           </dl>
           <p v-if="isFormerlySupported(m)" class="ws-file-unsupported">Excel files are not supported for text-source analysis yet</p>
+          <p v-else-if="isDisabledAssociation(m)" class="ws-file-unsupported">
+            This file is disabled for this product, so it cannot be analyzed. Enable it in Media &amp; resources first.
+          </p>
           <p v-else-if="!isAnalyzable(m)" class="ws-file-unsupported">Not available for text-source analysis yet</p>
         </li>
       </ul>
