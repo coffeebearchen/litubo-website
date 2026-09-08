@@ -1850,16 +1850,25 @@ describe('PWS-AI-01-FAST-01 reads only the current product\'s own already-associ
   })
 })
 
-describe('PWS-AI-01-FAST-01 issues zero write requests — load, select/deselect, filter, and Continue are all local-only', () => {
+// PWS-AI-ENGINE-01 (2026-09-08) superseded the PWS-AI-01-FAST-01 "selection
+// only, zero-write, no-op Continue" design with a real Analyze → Review →
+// Apply flow — see tests/aiProposalEngine.test.ts, tests/aiTextExtraction.test.ts,
+// tests/aiSpecificationApply.test.ts and tests/aiSourceIntakeReview.test.ts for
+// full coverage of the new engine and UI. The two blocks below are updated in
+// place (not deleted) to keep asserting what is still true post-upgrade: page
+// load and toggling a selection remain local-only, and the one real write path
+// (Analyze) is the sole exception, exactly as intended.
+describe('PWS-AI-ENGINE-01 page load and selection stay local-only — Analyze is the one deliberate exception', () => {
   const WRITE_METHOD_RE = /method:\s*['"](POST|PATCH|PUT|DELETE)['"]/g
 
-  it('the page never calls $fetch with a write method, or at all — every data access is useFetch (GET)', () => {
+  it('the top-level data fetch is useFetch (GET) only — no $fetch before the Analyze handler is defined', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
-    expect(page).not.toContain('$fetch')
-    expect(page).not.toMatch(WRITE_METHOD_RE)
+    const beforeAnalyze = page.slice(0, page.indexOf('async function analyze'))
+    expect(beforeAnalyze).not.toContain('$fetch')
+    expect(beforeAnalyze).not.toMatch(WRITE_METHOD_RE)
   })
 
-  it('the presentational component never issues any fetch request', () => {
+  it('the presentational component never issues any fetch request itself — it only emits', () => {
     const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
     expect(component).not.toContain('$fetch')
     expect(component).not.toContain('useFetch')
@@ -1868,35 +1877,33 @@ describe('PWS-AI-01-FAST-01 issues zero write requests — load, select/deselect
 
   it('toggling a selection only mutates a local ref array — it never emits a write or calls the server', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
-    const block = page.slice(page.indexOf('function toggleSelection'), page.indexOf('</script>'))
+    const block = page.slice(page.indexOf('function toggleSelection'), page.indexOf('const analyzing'))
     expect(block).not.toContain('$fetch')
     expect(block).toContain('selectedIds.value')
   })
 
-  it('Continue only flips a local boolean — it never calls an AI endpoint, $fetch, or navigates', () => {
-    const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
-    const block = component.slice(component.indexOf('const continueClicked'), component.indexOf('</script>'))
-    expect(block).not.toContain('$fetch')
-    expect(block).not.toContain('navigateTo')
-    expect(component).not.toContain('/api/admin/ai')
-    expect(component.toLowerCase()).not.toContain('analyze')
+  it('Analyze is a real, explicit request — POST to the generate endpoint, never a no-op boolean flip', () => {
+    const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
+    const block = page.slice(page.indexOf('async function analyze'), page.indexOf('</script>'))
+    expect(block).toContain('/ai/specification-proposal/generate')
+    expect(block).toMatch(/method:\s*['"]POST['"]/)
   })
 })
 
-describe('PWS-AI-01-FAST-01 Continue to proposal review is gated on a non-empty selection', () => {
-  it('the Continue button is disabled exactly when nothing is selected', () => {
+describe('PWS-AI-ENGINE-01 Analyze is gated on a supported, selected file and a configured provider', () => {
+  it('Analyze is disabled unless canAnalyze is true (selection + configured provider)', () => {
     const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
-    expect(component).toContain(':disabled="selectedIds.length === 0"')
+    expect(component).toContain(':disabled="!canAnalyze"')
   })
 
-  it('never renders any AI Fill Workspace, Analyze, or Apply proposals control — those belong to a later, unauthorized step', () => {
+  it('renders the real, now-authorized Analyze control — the module has moved past selection-only', () => {
     for (const file of AI_INTAKE_FILES) {
       const lower = repoFile(file).toLowerCase()
       expect(lower).not.toContain('ai fill workspace')
-      expect(lower).not.toContain('analyze sources')
       expect(lower).not.toContain('apply approved')
-      expect(lower).not.toContain('pws-ai-02')
     }
+    const component = repoFile('components/admin/workspace/WorkspaceAiSourceIntake.vue')
+    expect(component).toContain('Analyze selected sources')
   })
 })
 

@@ -2912,3 +2912,60 @@ SHA256SUMS.txt
 未 revert/reset/amend 任何既有提交；未重做 registry、OpenAI adapter、Settings 或 AI 页面；未调用真实 OpenAI/DeepSeek API；未产生费用；未新增 Directus schema/权限/UI；未触碰 Specifications、Media Library、Sources & evidence、Page Content、发布状态；未部署；**PWS-AI-02（Generate/Review/Apply）仍未开始**。
 
 *最后更新：2026-09-08，由 Claude Code 在"PWS-AI-PROVIDER-02-FIX-JSON-SCHEMA-01"任务中写入。*
+
+---
+
+## PWS-AI-ENGINE-01 — 可复用 AI Proposal Engine + Specifications 首个落地目标（2026-09-08）
+
+**开工核对：** 开工前确认 `master = origin/master = 8f2e384`，五个受保护未跟踪路径未被触碰。
+
+**Preflight（先于编码完成）：** 确认可通过既有 `adminFetch()` + Directus `/assets/:uuid` 安全读取产品已关联文件的原始字节；确认存在可靠、无需外部服务的服务端文本抽取路径——PDF 用 `pdf-parse` 内置的 `pdfjs-dist`（legacy v1.10.100 build）、XLSX/XLS 用 `xlsx`（SheetJS）、CSV/TSV/TXT 直接按 UTF-8 解码。未发现"无法安全读取"的情况，因此未跳过任何步骤，正式开始编码。
+
+### 文本来源范围（本轮唯一支持范围）
+
+PDF（可抽取文字的）、XLSX/XLS、CSV/TSV、TXT。明确不支持：图片、扫描/无文字层 PDF、Word、视频、压缩包；未使用 DeepSeek/OpenAI 的文件上传/Files API、OCR 或 Vision。不可读文件按文件名给出安全提示，不伪造可读性；若所选文件全部不可读，直接返回诚实错误、不调用模型。
+
+**显式限制（均有测试覆盖）：** 单次最多 5 个文件（`MAX_FILES_PER_REQUEST`）；单文件最大 8MB（`MAX_FILE_BYTES`）；抽取文本合计上限 60,000 字符（`MAX_TOTAL_EXTRACTED_CHARS`，各文件按等份平分）。
+
+### 新增路由与文件
+
+- 服务端 Engine 与共享逻辑：`server/utils/aiTextExtraction.ts`（文本抽取）、`server/utils/aiProposalEngine.ts`（复用型 Proposal Engine，本轮注册唯一 Target：`specifications`）、`server/utils/aiSpecificationApply.ts`（Apply 请求的 Zod 校验 + 规格名归一化）；`aiProviderRegistry.ts`/`aiSpecificationProposal.ts`/两个 provider 文件为支持 Engine 做了必要的接口扩展（新增 `extractedSourceTexts` 字段、共享的越权免疫 system instructions），DeepSeek adapter 按施工单要求移除了 `strict: true`（只保留官方文档化的 `type`/`name`/`schema` 字段），OpenAI adapter 自身行为未变。
+- 新 API：`GET /api/admin/ai/providers`（只返回 `{id, label, configured, isDefault}`）、`POST /api/admin/products/:id/ai/specification-proposal/generate`（调用 Engine，不落库）、`POST /api/admin/products/:id/ai/specification-proposal/apply`（本次 AI 流程中唯一的写入端点）。
+- 新页面：`/admin/product-workspace/:id/ai-proposal-review`（新增，Accept/Reject/Edit 工作台）；`/admin/product-workspace/:id/ai-source-intake`（既有路由，改造为真实四步流程，移除旧的空动作"Continue to proposal review"）。
+- 客户端会话：`composables/useAiProposalSession.ts` 用 `useState()` 实现仅内存、刷新即清空的跨页 handoff，未新增任何 Directus 表/字段/权限/长期审计。
+
+### 真实用户路径
+
+当前产品 → 勾选已关联且可读的文字类来源 → 点击"✨ Analyze selected sources"（点击前显式提示"Selected text sources will be sent to the configured AI provider to create draft specification proposals. Nothing will be written or published.”）→ 服务端重新校验产品归属与来源归属、抽取文本、单一 provider 调用一次、Zod 校验结构 → 跳转 Review 页，按 Specifications group 分组展示，每条默认 Pending，用户逐条 Accept/Reject/Edit（同名参数标"Review required"并显示当前值+建议值，用户须显式选 Add 或 Update）→ 仅"Apply accepted changes to Draft"会写入，且只写入被显式接受的条目，复用既有 Specifications 写入 API，不触碰 Page Content/FAQ/SEO/Media/Evidence/发布状态，不自动提交审核或发布。Review 页刷新或直接打开且无有效会话时显示诚实空态："No active proposal. Return to AI Source Intake."。选中的来源 ID 只出现在 POST body 中，从不出现在 URL 或页面文本里。
+
+### Settings 页 AI 连接卡
+
+仅替换了"安全与 AI 连接"卡片内部的过期硬编码文案（原中文"未连接（Phase M5 规划中）"），改为英文、调用新的 `GET /api/admin/ai/providers` 显示真实 configured 状态；未新增/未展示任何密钥输入或凭证管理 UI；页面其余部分未动。
+
+### 零真实调用 / 零费用 / 零自动发布确认
+
+本任务全程未调用真实 DeepSeek/OpenAI API，未产生任何费用；Engine 未持久化 proposal；Apply 端点只写入被显式接受的 Specifications 条目，不存在自动覆盖、自动提交审核或自动发布路径；未读取/未输出任何 `.env` 值或密钥。
+
+### 验证结果
+
+| 检查项 | 结果 |
+|---|---|
+| `npx vitest run` | 697/697 通过（新增 `aiTextExtraction.test.ts` 17 项、`aiProposalEngine.test.ts` 14 项、`aiSpecificationApply.test.ts` 23 项、`aiSourceIntakeReview.test.ts` 39 项；`productWorkspaceOverview.test.ts` 中断言旧空动作行为的用例已改为断言新 Analyze 流程） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 仅 LF/CRLF 警告（Windows 正常，历次任务一致） |
+| `npx nuxt build` | Build complete；生产服务器（`node .output/server/index.mjs`）实际启动并正确渲染首页，确认可交付 |
+
+### 已知限制：Windows 开发服务器（`nuxt dev`）专属崩溃，不影响生产构建
+
+`pdf-parse`（内置旧版 `pdfjs-dist`）与 `xlsx` 一旦进入服务端模块图，会在本机 Windows + Node 的 `nuxt dev`（Vite SSR dev 管线）下触发所有路由（包括与 AI 无关的首页）500 崩溃，报错 `ERR_UNSUPPORTED_ESM_URL_SCHEME`（"Received protocol 'd:'"）。已尝试并验证排除的原因：pdf-parse 自身 `require(\`./pdf.js/${version}/build/pdf.js\`)` 的模板字符串动态 require（已改为直接静态路径 import 绕开，问题依旧）；xlsx.mjs 内一行已失效的 Flow 类型死注释被 esbuild 依赖预打包器的文本扫描误判为 `require('fs')`（已通过 `vite.optimizeDeps.exclude` 排除，问题依旧）；`nitro.externals.external` / `vite.ssr.external` 组合外置两个包后崩溃现象不变。定位到这是 Node 20+ 实验性 `require(esm)` 同步互操作与 Windows 盘符路径（`d:`）结合触发的运行时/加载器层问题，与本项目代码本身的正确性无关。生产构建（`npx nuxt build` → `.output/server/index.mjs`）已用 `nitro.externals.external: ['pdf-parse', 'xlsx']` 正确外置这两个包，构建产物经实际启动验证可正常提供服务（首页真实渲染成功）——**该限制只影响本机 `nuxt dev` 的开发体验，不影响将要交付/部署的生产构建**。
+
+### 浏览器验收现状（1440px / 375px）
+
+生产构建服务器已启动并确认首页可正常渲染，但 `/admin/*` 全部路由需要管理员登录后才可访问；本次浏览器验收在用户使用移动端客户端时中断——移动端预览面板当前只能显示静态截图，无法触摸操作登录表单完成输入。按照密码/凭证输入的硬性规则，Claude 不能代为在登录表单中输入账号密码。**用户已选择"稍后用电脑登录"**，因此 AI Source Intake / AI Proposal Review 两个页面在 1440px / 375px 下的实际登录态截图验收**尚未完成**，其余全部检查项（自动化测试、类型检查、lint、生产构建、生产服务器启动渲染）均已通过。此项验收将在用户下次用电脑登录后补齐。
+
+### 明确未做
+
+未使用图片/OCR/Vision/扫描文档处理（Target 范围本轮唯一为 `specifications`，图片来源卡片显示"Not available for text-source analysis yet"）；未调用真实 DeepSeek/OpenAI API；未新增测试产品、媒体关联或 Source & Evidence 数据；未新增第二个 AI Target；未触碰 Product Center、旧版编辑器、全局 Admin Shell、Page Content、FAQ、SEO、Relations、History；未部署；**未 push**，等待 Codex 审查报告。
+
+*最后更新：2026-09-08，由 Claude Code 在"PWS-AI-ENGINE-01"任务中写入；1440px/375px 登录态浏览器验收待用户电脑端登录后补齐。*

@@ -39,10 +39,19 @@ export function parseAiProviderId(raw: unknown, fallback: AiProviderId): AiProvi
   return isAiProviderId(raw) ? raw : fallback
 }
 
-/** Non-sensitive scope description for a Generate call — file names/types only, never raw content, a UUID, or a path. */
+/**
+ * PWS-AI-ENGINE-01 — a Generate call's full input. `sourceFileSummaries` is a
+ * non-sensitive scope description (file names/types only, never a UUID or a
+ * path). `extractedSourceTexts` carries the actual server-extracted plain
+ * text the model is meant to read — produced fresh per request by
+ * `aiTextExtraction.ts`, never persisted, and never echoed back to the
+ * browser by any endpoint. `contextNote` remains a separate, optional,
+ * human-typed field — never raw file content.
+ */
 export interface GenerateSpecificationProposalInput {
   productName: string
   sourceFileSummaries: Array<{ displayName: string, fileType: string }>
+  extractedSourceTexts: Array<{ displayName: string, text: string }>
   /** Optional, human-approved free text the admin typed in — never raw file content. */
   contextNote?: string
 }

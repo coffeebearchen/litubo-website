@@ -1,5 +1,10 @@
 import OpenAI from 'openai'
-import { parseSpecificationProposalResponse, type SpecificationProposalResult } from './aiSpecificationProposal'
+import {
+  parseSpecificationProposalResponse,
+  SPECIFICATION_PROPOSAL_SYSTEM_INSTRUCTIONS,
+  buildSourceMaterialBlock,
+  type SpecificationProposalResult,
+} from './aiSpecificationProposal'
 import type { AiSpecificationProvider, GenerateSpecificationProposalInput } from './aiProviderRegistry'
 
 /**
@@ -122,20 +127,23 @@ async function defaultDeepSeekModelCaller(
 
   const response = await client.responses.create({
     model: config.model,
-    instructions:
-      'You produce structured product specification proposals for internal review. '
-      + 'Only use the provided source materials. Never invent values you cannot support.',
+    instructions: SPECIFICATION_PROPOSAL_SYSTEM_INSTRUCTIONS,
     input:
       `Product: ${input.productName}\n`
       + `Approved source materials (already associated with this product):\n${fileList}\n`
       + (input.contextNote ? `Additional approved context: ${input.contextNote}\n` : '')
-      + 'Propose specification groups and parameters supported by these materials.',
+      + 'Propose specification groups and parameters supported by these materials.\n\n'
+      + buildSourceMaterialBlock(input.extractedSourceTexts),
+    // DeepSeek's documented Responses API only specifies `type`, `name` and
+    // `schema` for json_schema structured output — `strict` is an OpenAI-only
+    // guarantee this adapter must not claim or depend on (PWS-AI-ENGINE-01
+    // §4.3). The Zod validation in aiSpecificationProposal.ts is the actual
+    // safety boundary regardless of how strictly DeepSeek follows the schema.
     text: {
       format: {
         type: 'json_schema',
         name: 'specification_proposal',
         schema: SPECIFICATION_PROPOSAL_JSON_SCHEMA,
-        strict: true,
       },
     },
   })

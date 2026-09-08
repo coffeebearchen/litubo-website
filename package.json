@@ -18,13 +18,16 @@
     "nodemailer": "^9.1.1",
     "nuxt": "^3.16.0",
     "openai": "^7.10.0",
+    "pdf-parse": "^1.1.4",
     "sanitize-html": "^2.17.7",
+    "xlsx": "^0.18.5",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@nuxt/eslint": "^0.7.4",
     "@types/node": "^22.0.0",
     "@types/nodemailer": "^8.0.1",
+    "@types/pdf-parse": "^1.1.5",
     "typescript": "^5.7.0",
     "vitest": "^2.1.9",
     "vue-tsc": "^2.1.0"

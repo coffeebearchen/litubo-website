@@ -1,15 +1,21 @@
 import OpenAI from 'openai'
-import { parseSpecificationProposalResponse, type SpecificationProposalResult } from './aiSpecificationProposal'
+import {
+  parseSpecificationProposalResponse,
+  SPECIFICATION_PROPOSAL_SYSTEM_INSTRUCTIONS,
+  buildSourceMaterialBlock,
+  type SpecificationProposalResult,
+} from './aiSpecificationProposal'
 import type { AiSpecificationProvider, GenerateSpecificationProposalInput } from './aiProviderRegistry'
 
 /**
  * PWS-AI-PLATFORM-01 — server-only OpenAI provider foundation (commit
  * c1e03ce). PWS-AI-PROVIDER-02 generalized its two local types
  * (`GenerateSpecificationProposalInput`, the provider interface) to the
- * shared, provider-neutral `aiProviderRegistry.ts` — re-exported below so
- * every existing import of this module keeps working unchanged — without
- * touching this file's actual behavior, error strings, or fail-closed
- * guarantee.
+ * shared, provider-neutral `aiProviderRegistry.ts` — imported (not
+ * re-exported: Nitro's dev auto-import scanner flags a same-name type
+ * exported from two files as ambiguous) from there by anything that needs
+ * it, without touching this file's actual behavior, error strings, or
+ * fail-closed guarantee.
  *
  * This file is never imported by a `.vue` file, a `pages/`/`components/`
  * module, or anything else that ships to the browser — only by future
@@ -18,14 +24,11 @@ import type { AiSpecificationProvider, GenerateSpecificationProposalInput } from
  * by the caller and passed in as plain config, exactly like the existing
  * `directusToken`/`directusUrl` pattern in `adminDirectusClient.ts`.
  *
- * No Generate/Review/Apply UI exists yet, and this module's own
- * `generateSpecificationProposal()` is never called by this task's tests or
- * by any shipped page — `isConfigured()` fails closed whenever the key or
- * model is unset, which is the case for every automated test and for this
- * repository until an operator sets real values in their own `.env`.
+ * PWS-AI-ENGINE-01 is the first task that actually calls
+ * `generateSpecificationProposal()` from a real endpoint (via the shared
+ * Proposal Engine) — `isConfigured()` still fails closed whenever the key
+ * or model is unset, which remains the case for every automated test.
  */
-
-export type { GenerateSpecificationProposalInput } from './aiProviderRegistry'
 
 export interface SpecificationProposalProviderConfig {
   apiKey: string
@@ -101,9 +104,7 @@ async function defaultOpenAiModelCaller(
     input: [
       {
         role: 'system',
-        content:
-          'You produce structured product specification proposals for internal review. '
-          + 'Only use the provided source materials. Never invent values you cannot support.',
+        content: SPECIFICATION_PROPOSAL_SYSTEM_INSTRUCTIONS,
       },
       {
         role: 'user',
@@ -111,7 +112,8 @@ async function defaultOpenAiModelCaller(
           `Product: ${input.productName}\n`
           + `Approved source materials (already associated with this product):\n${fileList}\n`
           + (input.contextNote ? `Additional approved context: ${input.contextNote}\n` : '')
-          + 'Propose specification groups and parameters supported by these materials.',
+          + 'Propose specification groups and parameters supported by these materials.\n\n'
+          + buildSourceMaterialBlock(input.extractedSourceTexts),
       },
     ],
     text: {

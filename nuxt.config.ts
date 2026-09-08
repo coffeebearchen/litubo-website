@@ -113,5 +113,32 @@ export default defineNuxtConfig({
 
   nitro: {
     compressPublicAssets: true,
+    // PWS-AI-ENGINE-01: pdf-parse's bundled pdf.js build and xlsx's Node
+    // codepage fallback both contain `require(...)` text that Rollup's
+    // production bundler cannot safely inline (pdf-parse's is a template-
+    // string specifier it cannot statically resolve). Externalizing both
+    // makes Nitro `require()` them directly from node_modules at runtime
+    // instead. This covers the production (`nuxt build`) Rollup bundle.
+    externals: {
+      external: ['pdf-parse', 'xlsx'],
+    },
+  },
+
+  // `nitro.externals` only affects the production Rollup build — `nuxt dev`
+  // runs server code through Vite's own SSR dev pipeline. Vite's dependency
+  // pre-bundler (esbuild) uses a fast text scan (not a full parse) to find
+  // `require`/`import` calls, including inside comments — xlsx.mjs has one
+  // (`/*:: = require('fs'); */`, a dead Flow-type comment) that this scan
+  // still picks up, and pdf-parse's dynamic pdf.js loader hits the same
+  // class of problem. Both crashed every SSR route in this project's real
+  // dev server (not just an AI route) until excluded here; `ssr.external`
+  // additionally stops Vite from trying to transform them as ESM.
+  vite: {
+    optimizeDeps: {
+      exclude: ['pdf-parse', 'xlsx'],
+    },
+    ssr: {
+      external: ['pdf-parse', 'xlsx'],
+    },
   },
 })

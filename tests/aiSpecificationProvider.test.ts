@@ -17,11 +17,8 @@ import {
   parseSpecificationProposalResponse,
   SpecificationProposalSchema,
 } from '../server/utils/aiSpecificationProposal'
-import {
-  createOpenAiSpecificationProvider,
-  type GenerateSpecificationProposalInput,
-  type ModelCaller,
-} from '../server/utils/openaiSpecificationProvider'
+import { createOpenAiSpecificationProvider, type ModelCaller } from '../server/utils/openaiSpecificationProvider'
+import type { GenerateSpecificationProposalInput } from '../server/utils/aiProviderRegistry'
 
 const repoFile = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8')
 
@@ -30,6 +27,9 @@ const SAMPLE_INPUT: GenerateSpecificationProposalInput = {
   sourceFileSummaries: [
     { displayName: 'LT-180C Datasheet.pdf', fileType: 'PDF' },
     { displayName: 'Dimensional diagram.png', fileType: 'Image' },
+  ],
+  extractedSourceTexts: [
+    { displayName: 'LT-180C Datasheet.pdf', text: 'Detection sensitivity (Fe): 0.8 mm' },
   ],
 }
 

@@ -102,6 +102,17 @@ export function workspaceAiSourceIntakeRoute(id: number | string): string {
   return `/admin/product-workspace/${id}/ai-source-intake`
 }
 
+/**
+ * PWS-AI-ENGINE-01 AI Proposal Review route — reached only by completing
+ * AI Source Intake's Analyze step (its state is in-memory only, via
+ * `useAiProposalSession()`). Deliberately not listed in `WORKSPACE_MODULE_NAV`:
+ * opening this URL directly is a valid, well-defined state (an honest empty
+ * state), not a persistent browsable section.
+ */
+export function workspaceAiProposalReviewRoute(id: number | string): string {
+  return `/admin/product-workspace/${id}/ai-proposal-review`
+}
+
 export function categoryContextRoute(id: number | string): string {
   return `/admin/products/categories/${id}`
 }

@@ -1,19 +1,32 @@
 <script setup lang="ts">
 import type { AdminProduct, ProductMedia } from '~/types/product-cms'
 import { workspaceHeroUrl } from '~/utils/productWorkspace'
-import { workspaceMediaResourcesRoute } from '~/utils/productCentre'
+import { workspaceMediaResourcesRoute, workspaceAiProposalReviewRoute } from '~/utils/productCentre'
+import type { SpecificationProposal, SourceFileOutcome } from '~/utils/aiProposal'
+
+interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
+interface GenerateResponse {
+  ok: boolean
+  proposal?: SpecificationProposal
+  fileResults: SourceFileOutcome[]
+  error?: string
+}
 
 definePageMeta({ layout: 'admin' })
 
 const route = useRoute()
+const router = useRouter()
 const id = String(route.params.id)
+const productId = Number(id)
 
 const [
   { data: product, error: productError },
   { data: mediaData },
+  { data: providersData },
 ] = await Promise.all([
   useFetch<AdminProduct>(`/api/admin/products/${id}`),
   useFetch<ProductMedia[]>(`/api/admin/products/${id}/media`),
+  useFetch<AiProviderSummary[]>('/api/admin/ai/providers'),
 ])
 
 const linkedMedia = computed<ProductMedia[]>(() => mediaData.value ?? [])
@@ -21,9 +34,19 @@ const notFound = computed(() => Boolean(productError.value) || !product.value)
 const previewHref = computed(() => `/admin/products/${id}/preview`)
 const mediaResourcesHref = computed(() => workspaceMediaResourcesRoute(id))
 
+const providers = computed<AiProviderSummary[]>(() => providersData.value ?? [])
+const providersLoading = ref(false)
+const selectedProviderId = ref<string | null>(
+  providers.value.find((p: AiProviderSummary) => p.configured && p.isDefault)?.id
+  ?? providers.value.find((p: AiProviderSummary) => p.configured)?.id
+  ?? null,
+)
+
 /**
- * Selection is purely local UI state, scoping a hypothetical future AI run —
- * it is never sent anywhere. This page issues no write request of any kind.
+ * Selection is purely local UI state. Nothing here writes anything — the
+ * only request this page can ever issue is the one explicit Analyze call
+ * below, and even that never writes product data (it only reads text and
+ * calls the AI provider).
  */
 const selectedIds = ref<number[]>([])
 
@@ -31,6 +54,36 @@ function toggleSelection(mediaId: number) {
   const idx = selectedIds.value.indexOf(mediaId)
   if (idx === -1) selectedIds.value.push(mediaId)
   else selectedIds.value.splice(idx, 1)
+}
+
+const analyzing = ref(false)
+const analyzeError = ref<string | null>(null)
+const lastFileResults = ref<SourceFileOutcome[]>([])
+const proposalSession = useAiProposalSession()
+
+async function analyze() {
+  if (analyzing.value || !selectedProviderId.value) return
+  analyzing.value = true
+  analyzeError.value = null
+  lastFileResults.value = []
+  try {
+    const result = await $fetch<GenerateResponse>(`/api/admin/products/${productId}/ai/specification-proposal/generate`, {
+      method: 'POST',
+      body: { providerId: selectedProviderId.value, mediaIds: [...selectedIds.value] },
+    })
+    lastFileResults.value = result.fileResults
+    if (!result.ok || !result.proposal) {
+      analyzeError.value = result.error ?? 'Could not generate a proposal right now.'
+      return
+    }
+    proposalSession.value = { productId, proposal: result.proposal, fileResults: result.fileResults }
+    await router.push(workspaceAiProposalReviewRoute(id))
+  } catch (e: unknown) {
+    const fe = e as { data?: { error?: string, message?: string } }
+    analyzeError.value = fe.data?.error ?? fe.data?.message ?? 'Could not generate a proposal right now.'
+  } finally {
+    analyzing.value = false
+  }
 }
 </script>
 
@@ -64,7 +117,15 @@ function toggleSelection(mediaId: number) {
       :linked-media="linkedMedia"
       :selected-ids="selectedIds"
       :media-resources-href="mediaResourcesHref"
+      :providers="providers"
+      :providers-loading="providersLoading"
+      :selected-provider-id="selectedProviderId"
+      :analyzing="analyzing"
+      :analyze-error="analyzeError"
+      :file-results="lastFileResults"
       @toggle="toggleSelection"
+      @update:selected-provider-id="selectedProviderId = $event"
+      @analyze="analyze"
     />
   </WorkspaceShell>
 </template>

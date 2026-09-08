@@ -31,6 +31,7 @@ const repoFile = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf
 const SAMPLE_INPUT: GenerateSpecificationProposalInput = {
   productName: 'LT-180C Free-Fall Metal Detector',
   sourceFileSummaries: [{ displayName: 'LT-180C Datasheet.pdf', fileType: 'PDF' }],
+  extractedSourceTexts: [{ displayName: 'LT-180C Datasheet.pdf', text: 'Detection sensitivity (Fe): 0.8 mm' }],
 }
 
 const VALID_PROPOSAL = {

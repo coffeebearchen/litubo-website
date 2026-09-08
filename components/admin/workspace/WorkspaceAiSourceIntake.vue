@@ -6,15 +6,27 @@ import {
   aiIntakeFileDisplayName,
   mediaReadableLabel,
 } from '~/utils/productWorkspace'
+import { isTextSourceMime } from '~/utils/aiProposal'
+
+interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
+interface FileOutcome { displayName: string, status: 'read' | 'unsupported' | 'unreadable', reason?: string }
 
 const props = defineProps<{
   linkedMedia: ProductMedia[]
   selectedIds: number[]
   mediaResourcesHref: string
+  providers: AiProviderSummary[]
+  providersLoading: boolean
+  selectedProviderId: string | null
+  analyzing: boolean
+  analyzeError: string | null
+  fileResults: FileOutcome[]
 }>()
 
 const emit = defineEmits<{
   toggle: [id: number]
+  'update:selectedProviderId': [id: string]
+  analyze: []
 }>()
 
 const selectedSet = computed(() => new Set(props.selectedIds))
@@ -23,13 +35,20 @@ function isSelected(id: number): boolean {
   return selectedSet.value.has(id)
 }
 
-/**
- * A later proposal-review step does not exist yet, and this task is
- * explicitly scoped to source *selection* only — Continue never calls a
- * model, writes a product parameter, or navigates anywhere. Clicking it
- * while enabled only reveals an honest inline note; it stays fully local.
- */
-const continueClicked = ref(false)
+function isAnalyzable(m: ProductMedia): boolean {
+  return isTextSourceMime(m.type ?? null)
+}
+
+const configuredProviders = computed(() => props.providers.filter(p => p.configured))
+const hasConfiguredProvider = computed(() => configuredProviders.value.length > 0)
+
+const selectableCount = computed(() =>
+  props.linkedMedia.filter(m => isAnalyzable(m) && isSelected(m.id)).length,
+)
+
+const canAnalyze = computed(() =>
+  selectableCount.value > 0 && hasConfiguredProvider.value && !props.analyzing,
+)
 </script>
 
 <template>
@@ -37,6 +56,33 @@ const continueClicked = ref(false)
     <p class="ws-scope-hint">
       AI source selection only — nothing here calls an AI model, writes a product parameter, or publishes anything. Original files stay in Media Library.
     </p>
+
+    <!-- ── 4-step flow indicator — Select sources is the current step ── -->
+    <ol class="ws-steps" aria-label="AI proposal workflow">
+      <li class="ws-step ws-step--current"><span class="ws-step-index">1</span> Select sources</li>
+      <li class="ws-step"><span class="ws-step-index">2</span> Analyze</li>
+      <li class="ws-step"><span class="ws-step-index">3</span> Review proposals</li>
+      <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft</li>
+    </ol>
+
+    <!-- ── Provider status ── -->
+    <section class="ws-card" aria-labelledby="ws-ai-provider-heading">
+      <h2 id="ws-ai-provider-heading" class="ws-card-title">AI provider</h2>
+      <p v-if="providersLoading" class="ws-empty">Loading provider status…</p>
+      <p v-else-if="!hasConfiguredProvider" class="ws-provider-empty">AI provider is not configured.</p>
+      <div v-else class="ws-provider-row">
+        <label v-for="p in configuredProviders" :key="p.id" class="ws-provider-option">
+          <input
+            type="radio"
+            name="ws-ai-provider"
+            :value="p.id"
+            :checked="selectedProviderId === p.id"
+            @change="emit('update:selectedProviderId', p.id)"
+          >
+          {{ p.label }}<span v-if="p.isDefault" class="ws-provider-default"> (default)</span>
+        </label>
+      </div>
+    </section>
 
     <section class="ws-card" aria-labelledby="ws-ai-intake-heading">
       <div class="ws-card-header">
@@ -51,10 +97,11 @@ const continueClicked = ref(false)
 
       <ul v-else class="ws-file-grid" role="list">
         <li v-for="m in linkedMedia" :key="m.id" class="ws-file-card" :class="{ 'ws-file-card--selected': isSelected(m.id) }">
-          <label class="ws-file-label">
+          <label class="ws-file-label" :class="{ 'ws-file-label--disabled': !isAnalyzable(m) }">
             <input
               type="checkbox"
               class="ws-file-checkbox"
+              :disabled="!isAnalyzable(m)"
               :checked="isSelected(m.id)"
               @change="emit('toggle', m.id)"
             >
@@ -68,21 +115,28 @@ const continueClicked = ref(false)
             <dt>Status</dt>
             <dd>{{ mediaReadableLabel(m.enabled) }}</dd>
           </dl>
+          <p v-if="!isAnalyzable(m)" class="ws-file-unsupported">Not available for text-source analysis yet</p>
         </li>
       </ul>
 
-      <div class="ws-continue-row">
+      <div class="ws-analyze-row">
+        <p v-if="selectedIds.length > 0" class="ws-analyze-note">
+          Selected text sources will be sent to the configured AI provider to create draft specification proposals. Nothing will be written or published.
+        </p>
         <button
           type="button"
-          class="btn btn-primary"
-          :disabled="selectedIds.length === 0"
-          @click="continueClicked = true"
+          class="btn btn-primary btn-analyze"
+          :disabled="!canAnalyze"
+          @click="emit('analyze')"
         >
-          Continue to proposal review
+          {{ analyzing ? 'Analyzing…' : '✨ Analyze selected sources' }}
         </button>
-        <p v-if="continueClicked" class="ws-continue-note">
-          The next step is not built yet in this Workspace. No model was called on any file, and nothing was written or published.
-        </p>
+        <p v-if="analyzeError" class="ws-analyze-error" role="alert">{{ analyzeError }}</p>
+        <ul v-if="fileResults.some(f => f.status !== 'read')" class="ws-file-result-list">
+          <li v-for="(f, i) in fileResults.filter(r => r.status !== 'read')" :key="i" class="ws-file-result-item">
+            {{ f.displayName }}: {{ f.reason }}
+          </li>
+        </ul>
       </div>
     </section>
   </section>
@@ -98,6 +152,43 @@ const continueClicked = ref(false)
   line-height: 1.55;
   max-width: 72ch;
 }
+
+.ws-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ws-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+}
+.ws-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.ws-step--current {
+  color: var(--color-primary-deep);
+  font-weight: 600;
+  border-color: var(--color-primary);
+  background: rgba(15,92,75,0.06);
+}
+.ws-step--current .ws-step-index { background: var(--color-primary); color: white; }
 
 .ws-card {
   background: var(--color-surface);
@@ -115,7 +206,7 @@ const continueClicked = ref(false)
   margin-bottom: var(--space-4);
 }
 
-.ws-card-title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); margin: 0; }
+.ws-card-title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); margin: 0 0 var(--space-3); }
 
 .ws-selected-count {
   font-size: var(--text-xs);
@@ -130,6 +221,18 @@ const continueClicked = ref(false)
 
 .ws-empty { font-size: var(--text-sm); color: var(--color-ink-muted); margin: 0; padding: var(--space-2) 0; }
 .ws-empty a { color: var(--color-primary); }
+
+.ws-provider-empty {
+  font-size: var(--text-sm);
+  color: #856404;
+  background: #FFF3CD;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+.ws-provider-row { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.ws-provider-option { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-ink); cursor: pointer; }
+.ws-provider-default { color: var(--color-ink-muted); font-size: var(--text-xs); }
 
 .ws-file-grid {
   list-style: none;
@@ -152,6 +255,7 @@ const continueClicked = ref(false)
 .ws-file-card--selected { border-color: var(--color-primary); background: rgba(15,92,75,0.06); }
 
 .ws-file-label { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; }
+.ws-file-label--disabled { cursor: not-allowed; opacity: 0.6; }
 .ws-file-checkbox { flex-shrink: 0; width: 16px; height: 16px; }
 .ws-file-name { font-size: var(--text-sm); font-weight: 500; color: var(--color-ink); overflow-wrap: anywhere; }
 
@@ -159,7 +263,10 @@ const continueClicked = ref(false)
 .ws-file-facts dt { color: var(--color-ink-muted); white-space: nowrap; }
 .ws-file-facts dd { color: var(--color-ink); margin: 0; overflow-wrap: anywhere; }
 
-.ws-continue-row { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+.ws-file-unsupported { font-size: 0.6875rem; color: var(--color-ink-muted); font-style: italic; margin: 0; }
+
+.ws-analyze-row { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+.ws-analyze-note { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; max-width: 60ch; line-height: 1.5; }
 
 .btn {
   display: inline-flex;
@@ -177,16 +284,24 @@ const continueClicked = ref(false)
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-deep); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.ws-continue-note {
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
+.btn-analyze { font-weight: 600; font-size: var(--text-base); padding: var(--space-3) var(--space-6); }
+
+.ws-analyze-error {
+  font-size: var(--text-sm);
+  color: #C0392B;
+  background: #FDF0EE;
+  border: 1px solid #F5C6C2;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
   margin: 0;
-  max-width: 60ch;
-  line-height: 1.5;
 }
+
+.ws-file-result-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ws-file-result-item { font-size: var(--text-xs); color: var(--color-ink-muted); }
 
 /* ── ≤767px: single-column cards, never a compressed grid ── */
 @media (max-width: 767px) {
   .ws-file-grid { grid-template-columns: 1fr; }
+  .ws-steps { gap: var(--space-1); }
 }
 </style>

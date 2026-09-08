@@ -183,7 +183,33 @@ const availablePlatforms = computed(() =>
   SOCIAL_PLATFORMS.filter(p => !socialLinks.value.some((l: SiteSocialLink) => l.platform === p.value))
 )
 
+// ── PWS-AI-ENGINE-01 — AI connection card only ───────────────────────────────
+// Real, safe provider status via GET /api/admin/ai/providers — never a key,
+// model name, or env var name. Read-only; this card has no write action.
+interface AiProviderSummary { id: string; label: string; configured: boolean; isDefault: boolean }
+const aiProviders = ref<AiProviderSummary[]>([])
+const aiProvidersLoading = ref(true)
+const aiProvidersError = ref(false)
+
+async function loadAiProviders() {
+  aiProvidersLoading.value = true
+  aiProvidersError.value = false
+  try {
+    aiProviders.value = await $fetch<AiProviderSummary[]>('/api/admin/ai/providers')
+  } catch {
+    aiProvidersError.value = true
+  } finally {
+    aiProvidersLoading.value = false
+  }
+}
+
+const configuredAiProviders = computed(() => aiProviders.value.filter((p: AiProviderSummary) => p.configured))
+const configuredAiProvidersLabel = computed(() =>
+  configuredAiProviders.value.map((p: AiProviderSummary) => p.label + (p.isDefault ? ' (default)' : '')).join(', '),
+)
+
 onMounted(loadSettings)
+onMounted(loadAiProviders)
 </script>
 
 <template>
@@ -352,25 +378,30 @@ onMounted(loadSettings)
           </div>
         </div>
 
-        <!-- Section 3：安全与 AI 连接（只读） -->
+        <!-- Section 3: Security & AI connection (read-only) -->
         <div class="content-card">
-          <h2 class="card-title">安全与 AI 连接</h2>
+          <h2 class="card-title">Security &amp; AI connection</h2>
           <div class="readonly-section">
             <div class="readonly-row">
-              <span class="readonly-label">AI 集成状态</span>
-              <span class="readonly-value readonly-value--pending">未连接（Phase M5 规划中）</span>
+              <span class="readonly-label">AI provider status</span>
+              <span v-if="aiProvidersLoading" class="readonly-value readonly-value--muted">Loading…</span>
+              <span v-else-if="aiProvidersError" class="readonly-value readonly-value--muted">Could not load provider status.</span>
+              <span v-else-if="configuredAiProviders.length === 0" class="readonly-value readonly-value--pending">AI provider is not configured.</span>
+              <span v-else class="readonly-value readonly-value--ok">
+                {{ configuredAiProvidersLabel }}
+              </span>
             </div>
             <div class="readonly-row">
-              <span class="readonly-label">API 凭证</span>
-              <span class="readonly-value readonly-value--muted">在服务器 .env 文件中配置，不在此界面显示</span>
+              <span class="readonly-label">API credentials</span>
+              <span class="readonly-value readonly-value--muted">Configured on the server in the .env file — never shown here</span>
             </div>
             <div class="readonly-row">
-              <span class="readonly-label">管理员权限</span>
-              <span class="readonly-value readonly-value--ok">Administrator 角色（Directus 内置）</span>
+              <span class="readonly-label">Administrator access</span>
+              <span class="readonly-value readonly-value--ok">Administrator role (built into Directus)</span>
             </div>
           </div>
           <p class="form-hint" style="margin-top: var(--space-4);">
-            此区域为只读策略面板。凭证管理请通过服务器直接操作 .env 文件。AI 功能将在 Phase M5 独立授权后开放。
+            This is a read-only status panel. Credentials are managed directly on the server's .env file, never in this interface.
           </p>
         </div>
       </template>
