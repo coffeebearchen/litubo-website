@@ -675,3 +675,86 @@ describe('a reviewed proposal outlives the analysis reuse cache', () => {
     expect(claimApply(newest, BINDING, t0 + MAX_TRACKED_PROPOSALS + 200).ok).toBe(true)
   })
 })
+
+// ── PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01: one product, several documents ──
+
+/**
+ * The V1 workflow this whole feature exists for: one Draft, up to five of its
+ * own associated documents, ONE analysis, ONE proposal. Not one proposal per
+ * file.
+ */
+describe('one product with several sources produces a single analysis', () => {
+  const THREE_SOURCES = {
+    productsFilesRows: [row(1, 'uuid-a', 'LT-180C-spec.txt'), row(2, 'uuid-b', 'LT-180C-electrical.txt'), row(3, 'uuid-c', 'LT-180C-environment.txt')],
+    assetBytesByUuid: {
+      'uuid-a': textBytes('Detection sensitivity (Fe): 0.8 mm'),
+      'uuid-b': textBytes('Rated power: 0.45 kW'),
+      'uuid-c': textBytes('Protection class: IP54'),
+    },
+  }
+
+  it('three unique sources reach the provider in one call, as three blocks', async () => {
+    const generate = vi.fn(async (_providerId: unknown, _target: unknown, _input: unknown) => ({ ok: true as const, output: VALID_PROPOSAL }))
+
+    const result = await runProposalEngine(mockFetch(THREE_SOURCES), mockRegistry(generate), specificationsTarget, {
+      productId: 1, providerId: 'deepseek', mediaIds: [1, 2, 3],
+    })
+
+    // One analysis, not one per file.
+    expect(generate).toHaveBeenCalledTimes(1)
+
+    const input = generate.mock.calls[0][2] as unknown as {
+      extractedSourceTexts: Array<{ displayName: string, text: string }>
+      sourceFileSummaries: Array<{ displayName: string }>
+    }
+    expect(input.extractedSourceTexts).toHaveLength(3)
+    expect(input.extractedSourceTexts.map(s => s.displayName)).toEqual(['Source 1', 'Source 2', 'Source 3'])
+    // Each document's own content is present — nothing was dropped or merged away.
+    expect(input.extractedSourceTexts[0].text).toContain('0.8 mm')
+    expect(input.extractedSourceTexts[1].text).toContain('0.45 kW')
+    expect(input.extractedSourceTexts[2].text).toContain('IP54')
+
+    expect(result.ok).toBe(true)
+    expect(result.fileResults.filter(f => f.status === 'read')).toHaveLength(3)
+  })
+
+  it('a duplicate among several sources is excluded, and the rest still analyse together', async () => {
+    const generate = vi.fn(async (_providerId: unknown, _target: unknown, _input: unknown) => ({ ok: true as const, output: VALID_PROPOSAL }))
+    const shared = 'Detection sensitivity (Fe): 0.8 mm'
+
+    const result = await runProposalEngine(mockFetch({
+      productsFilesRows: [row(1, 'uuid-a', 'a.txt'), row(2, 'uuid-b', 'a-copy.txt'), row(3, 'uuid-c', 'c.txt')],
+      assetBytesByUuid: { 'uuid-a': textBytes(shared), 'uuid-b': textBytes(shared), 'uuid-c': textBytes('Rated power: 0.45 kW') },
+    }), mockRegistry(generate), specificationsTarget, { productId: 1, providerId: 'deepseek', mediaIds: [1, 2, 3] })
+
+    expect(generate).toHaveBeenCalledTimes(1)
+    const input = generate.mock.calls[0][2] as unknown as { extractedSourceTexts: Array<{ text: string }> }
+    expect(input.extractedSourceTexts).toHaveLength(2)
+
+    expect(result.fileResults.map(f => f.status)).toEqual(['read', 'duplicate', 'read'])
+  })
+
+  it('the same three sources chosen in a different order are the same analysis', async () => {
+    const generate = vi.fn(async (_providerId: unknown, _target: unknown, _input: unknown) => ({ ok: true as const, output: VALID_PROPOSAL }))
+
+    const forwards = await runProposalEngine(mockFetch(THREE_SOURCES), mockRegistry(generate), specificationsTarget, {
+      productId: 1, providerId: 'deepseek', mediaIds: [1, 2, 3],
+    })
+    const backwards = await runProposalEngine(mockFetch(THREE_SOURCES), mockRegistry(generate), specificationsTarget, {
+      productId: 1, providerId: 'deepseek', mediaIds: [3, 2, 1],
+    })
+
+    expect(forwards.ok && backwards.ok).toBe(true)
+    if (forwards.ok && backwards.ok) expect(backwards.fingerprint).toBe(forwards.fingerprint)
+  })
+
+  it('the shared engine stays Target-neutral — no specification vocabulary in it', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const source = readFileSync(resolve(process.cwd(), 'server/utils/aiProposalEngine.ts'), 'utf8')
+
+    for (const term of ['Power supply', 'IP rating', 'Aperture', 'LT-180C', 'conflict', 'candidateValues']) {
+      expect(source).not.toContain(term)
+    }
+  })
+})

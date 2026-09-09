@@ -127,8 +127,25 @@ export interface SpecificationProposalGroup {
   items: SpecificationProposalItem[]
 }
 
+/**
+ * PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01 — a parameter this product's approved
+ * documents disagree about. The model reports the disagreement and stops; the
+ * values are exactly what the sources said, and a person picks one.
+ *
+ * There is deliberately no provenance in V1 — no filename, page, confidence or
+ * ranking. "Which document is right" is a judgement, not a score.
+ */
+export interface SpecificationConflict {
+  group: string
+  parameter: string
+  /** At least two genuinely different values. One value is not a disagreement. */
+  candidateValues: string[]
+}
+
 export interface SpecificationProposal {
   groups: SpecificationProposalGroup[]
+  /** Absent when the sources agreed about everything they covered. */
+  conflicts?: SpecificationConflict[]
 }
 
 export interface SourceFileOutcome {

@@ -4384,3 +4384,111 @@ content dedupe、fingerprint、前端 analyzing lock、Generate single-flight、
 **0 次真实 Provider 调用、0 API 费用、0 Redis、0 数据库、0 新 collection**；未 push / merge master、未部署；未改本 P1 之外的任何行为。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-DUP-GUARD-01-MIN-01"任务中写入。*
+
+---
+
+## PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01 — 单品号多资料 AI V1（2026-09-09）
+
+**Reusable Core, LITUBO First.** 本模块只解决三个业务问题，未扩大到 PDF / Excel / OCR / 多品号 / Content Center。
+
+### 一、一个 Product Draft 可一次使用最多 5 份资料
+
+`MAX_FILES_PER_REQUEST = 5` **保持不变**，未提高数量。通用 Engine 本就支持多 source，本模块**未修改 `aiProposalEngine.ts`**，只补齐了真实逻辑的验证。
+
+实测（mock provider）：同一产品三份不同文本 → **provider 只被调用 1 次**，输入含三个 unique source block（`Source 1/2/3`，各自内容完整保留）→ 形成 **ONE Specification Proposal**，不是每份资料一个 proposal。
+
+### 二、内容去重继续工作（未重新实现）
+
+`DUP-GUARD-01` 的 content dedupe / fingerprint / reuse / proposalRef / Apply idempotency **全部保持原设计**。
+
+实测：A + A 的副本 + C → provider 只收到 2 个 unique source，`fileResults` 为 `read / duplicate / read`。资料点击顺序不同仍得到同一 fingerprint。
+
+### 三、多资料冲突：AI 不得偷偷挑一个当真
+
+产品自己的几份文档可能互相矛盾——一份说 220 V，另一份说 380 V。旧输出结构无法诚实表达这一点，模型唯一的选择就是挑一个当作普通提案，而那正是它绝不能做的事。
+
+**Specifications Target 最小结构扩展**（冲突能力留在 Target 内，通用 Engine 未被污染）：
+
+```jsonc
+{
+  "groups": [ /* 无冲突参数照常 */ ],
+  "conflicts": [
+    { "group": "Electrical", "parameter": "Power supply",
+      "candidateValues": ["220 V", "380 V"] }
+  ]
+}
+```
+
+服务端校验保持严格模式：Zod `.strict()`、JSON Schema structured output、总量有界（conflicts ≤ 20、candidateValues 2–6）、每个 group / parameter / candidate 继续走 leakage / unsafe pattern 扫描、echo 投影**新增冲突维度**（一段被拆散到候选值里的原文同样会被拦下）。
+
+**V1 不做 provenance**：`source` / `file` / `filename` / `page` / `location` / `reasoning` / `confidence` / `citation` / UUID / URL / path 任一出现即整份拒绝（`.strict()`）。「哪份文档是对的」是判断，不是分数。
+
+**至少两个 distinct 候选值**才算冲突：`220 V` 与 `220v` 只是格式差异，归一化后视为同一个值，不会浪费审核者的注意力。资料没写就 omit，绝不把「没有资料」包装成 conflict。
+
+`groups` 允许为空：全部参数都冲突时仍是一份**可审核**的 Proposal；但 groups 与 conflicts 同时为空仍是安全失败。
+
+### 四、冲突的人工决定流程
+
+Review 页面新增 **Source conflicts — Review required** 区域（沿用现有视觉系统，未重新设计页面）：参数名 + 分组 + 状态徽章，候选值为单选，操作为 `Use selected value` / `Reject`。
+
+- **未选择候选值时 `Use selected value` 禁用**，并提示 `Select a value to enable Use selected value.`
+- 选定后确认 → 该行转 `accepted`，所选值成为该行的 value
+- `Reject` → 不进入 Apply
+- **`Accept all safe` 永远不会碰到 source conflict**：`isSafeRow()` 对冲突行直接返回 false
+- source conflict **不计入 safe count**，计入 **Review required**
+
+实现上冲突行加入**同一个 `rows` 数组**并标记 `conflict: true`。这样既有的匹配检测（`matchFor()` 只依据 group + parameter，与 value 无关）、Apply payload 映射、accept/reject 状态机**全部原样适用**，**没有新增第二套匹配算法**——满足「若最终选择的候选对应现有 exact specification，继续走现有 Update 逻辑；若 existing match 本身 ambiguous，继续沿用现有 Review required 规则」。
+
+**未实现**：自动判断文件优先级、source priority engine、confidence / authority score、source ranking、newest-version resolver、provenance graph、evidence graph、rules engine。A=220V、B=380V 就是让人选，够了。
+
+### 五、本次 Source Summary
+
+Proposal Review 顶部新增 **Sources in this analysis**：逐份列出 ✓ Analyzed / = Duplicate excluded / ! Not analyzed，并给出三项计数。
+
+完全复用现有 `fileResults`（sanitized displayName + status + safe reason），**未新增任何 API**。有测试断言其 HTML 中不含 UUID、64 位 hash、`/assets/`、`directus_files_id`。
+
+### 六、Reusable Core, LITUBO First
+
+通用 Engine 继续负责 product scope / source resolution / text extraction / content dedupe / fingerprint / short-term reuse / provider dispatch / proposal lifecycle；Specifications Target 负责 schema / prompt / 冲突 / 校验；Review 与 Apply adapter 负责人工决定与写入映射。
+
+有测试断言 `aiProposalEngine.ts` 中**不出现** `Power supply`、`IP rating`、`Aperture`、`LT-180C`、`conflict`、`candidateValues` 等 Specifications 专属术语。**本模块未修改该文件。**
+
+### 七、D-022
+
+已登记（Confirmed）：LITUBO AI follows a "Reusable Core, LITUBO First" architecture…（全文见 `08-decision-log.md`）。未做 package 拆分、plugin system、microservice、通用 AI 平台或任何其他 Target。
+
+### 八、测试（新增 30 条，合计 1039）
+
+Target 冲突（一致仍是普通条目、真实分歧成为 conflict 且不同时出现在 groups、少于两个 distinct 值被丢弃、provenance 键整份拒绝、含 UUID/URL/路径的候选被剔除后冲突自然消失、普通提案与冲突共存、全冲突仍可审核、两者皆空仍失败、拆散到候选值的原文被 echo 扫描拦下、提示词确实要求不得自行决定）；多 source 引擎（三份一次调用、三个 block、去重后两个、顺序无关同 fingerprint、Engine 保持 Target-neutral）；Review UI（冲突独立区域、计入 Review required 不计入 safe、Accept all safe 不碰冲突、未选值不能接受、选值后可接受、Apply 只含人选值且不含未选值、Reject 不进 Apply、无冲突时批量审核行为不变）；Source Summary（逐项状态、计数 2/1/1、无标识符泄露）。
+
+### 九、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **1039 / 1039 通过**（28 文件，本次 +30） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功 |
+
+**浏览器（0 provider 调用，状态本地注入）：**
+
+| 断点 | 结果 |
+|---|---|
+| 1440px | 无横向溢出；Source Summary 计数 2 / 1 / 1；冲突区域独立可见（2 个冲突、4 个候选）；`Use selected value` 初始禁用；Console 零错误 |
+| 交互 | `Accept all safe` 后两个冲突仍 `pending`；选定候选后按钮启用；确认后转 `accepted`，Apply 变为 `Apply 2 accepted changes to Draft` |
+| 375px | 无横向溢出、无超宽元素；Summary 与冲突卡片均在视口内；单选 16px 且全部可点；Apply 在视口内；Console 零错误 |
+
+### 十、明确未做
+
+**0 multi-product · 0 PDF · 0 Excel · 0 OCR · 0 Vision · 0 real DeepSeek · 0 real OpenAI · 0 API cost · 0 Redis · 0 new DB table · 0 new Directus collection · 0 schema migration · 0 job queue · 0 auto Accept · 0 auto Apply · 0 auto Publish · 0 deployment · 0 master push/merge。**
+
+未做 Functions / FAQ / SEO / ALT Target；未改 provider、model、API key；未改 prompt（除冲突规则本身）；未修 GET references 403（P1）与 TAB-SEPARATED-VALUES（P2）；未再打磨 `MAX_TRACKED_PROPOSALS`。
+
+### 十一、下一步
+
+**必须再次单独授权。** 本模块只做到代码 + mock / deterministic 验收，**未进行任何真实 Provider 调用**。是否授权一次真实「单产品 + 2～3 Sources」DeepSeek Beta，由用户单独决定。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01"任务中写入。*

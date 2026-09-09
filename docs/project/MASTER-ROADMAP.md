@@ -6,7 +6,9 @@
 
 **J-2 技术性结构缺陷（组件解析、375px 桌面表格残留、分类详情路由不挂载）已解决。J-2 整体视觉验收（对照 VM1-ADM02-D1440/M375 的像素级 Codex/用户签收）仍待进行，不因本次修复自动通过。origin/master 提升：仍 BLOCKED。**
 
-**下一步：等待 Codex 安排 J-2 的像素级视觉签收，或发出下一份完整施工单。PW-00 Workspace Shell（J-3）、AI-01、IMP-01 及后续模块均未开始，且 PW-00 自身 DoR 未达成。**
+**下一步：等待 Codex 安排 J-2 的像素级视觉签收，或发出下一份完整施工单。IMP-01（批量导入）未开始。**
+
+**（2026-09-09 更新）** 上面这句关于 `AI-01` 的原始表述已不再成立：单产品 AI 工作流已经交付并在 TEST ONLY 产品上跑通——AI Source Intake、Proposal Review、Batch Review、Apply to Draft、重复/重放防护、多资料冲突人工裁决均已完成，详见 `CURRENT-STATE.md`。此处仅同步事实，不改变里程碑顺序与任何历史决策。
 
 **PW-GOV-01（2026-09-07）补充：Product Workspace 治理基线已完成——11 张桌面视觉母版已冻结并登记（Register §4.5/§4.6），`PWS-00`～`PWS-08` + `PWS-AI-01`/`PWS-AI-02` 命名空间已确立，child blueprint 状态升级为 `Approved governance baseline — controlled implementation remains gated`。这是纯文档治理：`PWS-00` 代码仍未获授权、仍未开始；J-2 视觉签收与 `origin/master` 状态不受此次影响，维持不变。**
 
@@ -29,7 +31,7 @@
 | M3 | 内容管理 + 询盘 + HubSpot + SEO | ✅ 已完成 | Phase 4–8 |
 | **M4** | **Product CMS Admin + 产品详情页（Phase 9A）** | **🔨 Charter V1.1 生效（J-1.1 完成），J-2 待施工** | **Phase 9A-1 / 9A-2 / Charter J 节** |
 | M4.5 | Admin CMS 母版对齐与结构施工（Charter J-2～J-6） | ⏳ J-1.1 完成，J-2 FD-001 视觉已确认，等 Codex 施工单 | Charter J-2 to J-6 |
-| M5 | AI 产品资料导入助手（Charter J-6/J-7，Phase 9B） | ⏳ 待单独授权 | Phase 9B |
+| M5 | AI 产品资料导入助手（Charter J-6/J-7，Phase 9B） | 🔨 单产品 AI 工作流已交付（详见 CURRENT-STATE）；批量导入仍待单独授权 | Phase 9B |
 | M6 | ES/PT 内容审校与发布 | ⏳ 待授权 | Phase 10 |
 | M7 | HubSpot 生产激活（Phase 7B） | ⏳ 待用户操作 | Phase 7B |
 | M8 | 生产部署 + Cloudflare DNS 切换 | ⏳ 待授权 | Phase 11 |

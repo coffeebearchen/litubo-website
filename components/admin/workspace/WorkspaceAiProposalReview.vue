@@ -24,6 +24,17 @@ interface ReviewRow {
   edited: boolean
   /** Checkbox state for the batch toolbar. Review state only — never persisted. */
   selected: boolean
+  /**
+   * PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01 — this row is a disagreement between
+   * the product's own source documents, not a proposal. It has no value until
+   * a person picks one, it is never swept up by a bulk action, and it renders
+   * in its own section rather than inside a proposal group.
+   */
+  conflict: boolean
+  /** The values the sources actually gave. Empty for an ordinary proposal row. */
+  candidateValues: string[]
+  /** The value the reviewer chose. Null until they choose; Accept is impossible while it is null. */
+  selectedCandidate: string | null
   draftValue: string
   draftNote: string
   matchKind: ReviewMatchKind
@@ -177,6 +188,9 @@ function buildRows(): ReviewRow[] {
       editing: false,
       edited: false,
       selected: false,
+      conflict: false,
+      candidateValues: [] as string[],
+      selectedCandidate: null as string | null,
       draftValue: it.value,
       draftNote: it.note ?? '',
       ...matchFor(g.displayName, it.parameter),
@@ -184,7 +198,40 @@ function buildRows(): ReviewRow[] {
   )
 }
 
-const rows = ref<ReviewRow[]>(buildRows())
+/**
+ * Conflict rows join the SAME `rows` array on purpose. Everything that already
+ * works — match detection against the product's existing specifications, the
+ * Apply payload mapping, the accept/reject state machine — then applies to
+ * them unchanged, and no second algorithm exists to disagree with the first.
+ * `matchFor()` keys on group and parameter, not on value, so it is correct
+ * before the reviewer has picked a candidate.
+ */
+function buildConflictRows(): ReviewRow[] {
+  return (props.proposal.conflicts ?? []).map((c, ci) => ({
+    key: `conflict-${ci}`,
+    group: c.group,
+    parameter: c.parameter,
+    value: '',
+    note: '',
+    status: 'pending' as const,
+    editing: false,
+    edited: false,
+    selected: false,
+    conflict: true,
+    candidateValues: [...c.candidateValues],
+    selectedCandidate: null,
+    // A conflict is resolved by choosing, not by typing, so the inline editor
+    // is never opened on one; these exist only to satisfy the shared row shape.
+    draftValue: '',
+    draftNote: '',
+    ...matchFor(c.group, c.parameter),
+  }))
+}
+
+const rows = ref<ReviewRow[]>([...buildRows(), ...buildConflictRows()])
+
+/** Rendered in their own section, above the proposal groups. */
+const conflictRows = computed(() => rows.value.filter((r: ReviewRow) => r.conflict))
 
 /**
  * When the existing specifications arrive late — the first load failed and the
@@ -207,6 +254,17 @@ watch(() => props.existingSpecGroups, () => {
  * files that genuinely could not be used.
  */
 const duplicateFiles = computed(() => props.fileResults.filter(f => f.status === 'duplicate'))
+
+/** Counts for the source summary, derived from the same AI-safe outcomes the notices use. */
+const analyzedCount = computed(() => props.fileResults.filter(f => f.status === 'read').length)
+const duplicateCount = computed(() => duplicateFiles.value.length)
+const notAnalyzedCount = computed(() => props.fileResults.filter(f => f.status !== 'read' && f.status !== 'duplicate').length)
+
+function sourceStatusLabel(file: SourceFileOutcome): string {
+  if (file.status === 'read') return 'Analyzed'
+  if (file.status === 'duplicate') return 'Duplicate excluded'
+  return file.reason ?? 'Not analyzed'
+}
 const unsupportedFiles = computed(() => props.fileResults.filter(f => f.status !== 'read' && f.status !== 'duplicate'))
 const readFiles = computed(() => props.fileResults.filter(f => f.status === 'read'))
 
@@ -234,7 +292,9 @@ const readFiles = computed(() => props.fileResults.filter(f => f.status === 'rea
  * "Accept all safe".
  */
 function isSafeRow(row: ReviewRow): boolean {
-  return row.matchKind === 'none' && !row.edited
+  // A source conflict is never safe: by definition the documents disagree and
+  // only a person can settle it.
+  return !row.conflict && row.matchKind === 'none' && !row.edited
 }
 
 const acceptedCount = computed(() => rows.value.filter((r: ReviewRow) => r.status === 'accepted').length)
@@ -246,7 +306,7 @@ const safePendingRows = computed(() => rows.value.filter((r: ReviewRow) => r.sta
 const safePendingCount = computed(() => safePendingRows.value.length)
 
 /** Counted regardless of review status: a conflicting row that has been accepted is still a row a person had to look at. */
-const reviewRequiredCount = computed(() => rows.value.filter((r: ReviewRow) => r.matchKind !== 'none').length)
+const reviewRequiredCount = computed(() => rows.value.filter((r: ReviewRow) => r.conflict || r.matchKind !== 'none').length)
 
 const selectedRows = computed(() => rows.value.filter((r: ReviewRow) => r.selected))
 const selectedCount = computed(() => selectedRows.value.length)
@@ -320,10 +380,24 @@ const canApply = computed(() =>
 )
 
 function rowsForGroup(displayName: string): ReviewRow[] {
-  return rows.value.filter((r: ReviewRow) => r.group === displayName)
+  // Conflicts have a group name too, but they belong to their own section.
+  return rows.value.filter((r: ReviewRow) => !r.conflict && r.group === displayName)
 }
 
 function acceptRow(row: ReviewRow) { row.status = 'accepted' }
+
+/** A conflict can only be accepted once a candidate has actually been chosen. */
+function canAcceptConflict(row: ReviewRow): boolean {
+  return row.selectedCandidate !== null && !partialApplyLocked.value && !props.alreadyApplied
+}
+
+function acceptConflict(row: ReviewRow) {
+  if (!canAcceptConflict(row)) return
+  // The chosen value becomes this row's value, so it flows into Apply through
+  // exactly the same path an ordinary accepted row does.
+  row.value = row.selectedCandidate as string
+  row.status = 'accepted'
+}
 function rejectRow(row: ReviewRow) { row.status = 'rejected' }
 
 function startEdit(row: ReviewRow) {
@@ -409,6 +483,74 @@ async function applyAccepted() {
       <ul class="ws-file-result-list">
         <li v-for="(f, i) in unsupportedFiles" :key="i">{{ f.displayName }}: {{ f.reason }}</li>
       </ul>
+    </section>
+
+    <!--
+      PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01 — what this analysis actually used.
+      Built entirely from the existing AI-safe fileResults: sanitized display
+      name, status and safe reason. No new endpoint, and nothing here can carry
+      a UUID, path, hash or raw content.
+    -->
+    <section class="ws-card ws-source-summary" aria-labelledby="ws-source-summary-heading">
+      <h3 id="ws-source-summary-heading" class="ws-card-title">Sources in this analysis</h3>
+      <ul class="ws-source-list" role="list">
+        <li v-for="(f, i) in fileResults" :key="i" class="ws-source-item" :class="`ws-source-item--${f.status}`">
+          <span class="ws-source-mark" aria-hidden="true">{{ f.status === 'read' ? '✓' : f.status === 'duplicate' ? '=' : '!' }}</span>
+          <span class="ws-source-body">
+            <span class="ws-source-name">{{ f.displayName }}</span>
+            <span class="ws-source-status">{{ sourceStatusLabel(f) }}</span>
+          </span>
+        </li>
+      </ul>
+      <dl class="ws-source-counts">
+        <div><dt>Analyzed</dt><dd>{{ analyzedCount }}</dd></div>
+        <div><dt>Duplicate excluded</dt><dd>{{ duplicateCount }}</dd></div>
+        <div><dt>Not analyzed</dt><dd>{{ notAnalyzedCount }}</dd></div>
+      </dl>
+    </section>
+
+    <!-- Where the product's own documents disagree. Never auto-resolved. -->
+    <section v-if="conflictRows.length > 0" class="ws-card ws-card--conflict" aria-labelledby="ws-conflicts-heading">
+      <h3 id="ws-conflicts-heading" class="ws-card-title">Source conflicts — Review required</h3>
+      <p class="ws-card-hint">
+        These sources give different values for the same parameter. Choose the correct value; nothing here is accepted automatically.
+      </p>
+
+      <div v-for="row in conflictRows" :key="row.key" class="ws-conflict" :class="{ 'ws-conflict--resolved': row.status === 'accepted', 'ws-conflict--rejected': row.status === 'rejected' }">
+        <div class="ws-conflict-head">
+          <span class="ws-conflict-parameter">{{ row.parameter }}</span>
+          <span class="ws-conflict-group">{{ row.group }}</span>
+          <span class="ws-status-badge" :class="`ws-status-badge--${row.status}`">{{ row.status }}</span>
+        </div>
+
+        <div class="ws-conflict-options">
+          <label v-for="(candidate, ci) in row.candidateValues" :key="ci" class="ws-conflict-option">
+            <input
+              v-model="row.selectedCandidate"
+              type="radio"
+              :name="`conflict-${row.key}`"
+              :value="candidate"
+              :disabled="row.status === 'accepted'"
+            >
+            <span>{{ candidate }}</span>
+          </label>
+        </div>
+
+        <div class="ws-conflict-actions">
+          <button
+            type="button"
+            class="btn btn-secondary btn-conflict"
+            :disabled="!canAcceptConflict(row)"
+            @click="acceptConflict(row)"
+          >
+            Use selected value
+          </button>
+          <button type="button" class="btn btn-secondary btn-conflict" @click="rejectRow(row)">Reject</button>
+          <span v-if="row.selectedCandidate === null && row.status === 'pending'" class="ws-conflict-hint">
+            Select a value to enable Use selected value.
+          </span>
+        </div>
+      </div>
     </section>
 
     <section class="ws-card" aria-labelledby="ws-ai-review-heading">
@@ -639,6 +781,40 @@ async function applyAccepted() {
 /* A duplicate is informational, not a failure — neutral surface, not the error surface. */
 .ws-card--duplicate { border-color: var(--color-line); background: var(--color-surface-alt); }
 
+/* ── PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01: source summary + conflicts ── */
+
+.ws-source-summary { display: flex; flex-direction: column; gap: var(--space-3); }
+.ws-source-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.ws-source-item { display: flex; align-items: flex-start; gap: var(--space-2); font-size: var(--text-sm); min-width: 0; }
+.ws-source-mark { flex-shrink: 0; width: 1.25em; font-weight: 700; color: var(--color-ink-muted); }
+.ws-source-item--read .ws-source-mark { color: var(--color-primary); }
+.ws-source-item--unsupported .ws-source-mark, .ws-source-item--unreadable .ws-source-mark { color: #A23B3B; }
+.ws-source-body { display: flex; flex-direction: column; min-width: 0; }
+.ws-source-name { color: var(--color-ink); overflow-wrap: anywhere; }
+.ws-source-status { font-size: var(--text-xs); color: var(--color-ink-muted); }
+
+.ws-source-counts { display: flex; flex-wrap: wrap; gap: var(--space-5); margin: 0; padding-top: var(--space-3); border-top: 1px solid var(--color-line); }
+.ws-source-counts > div { display: flex; align-items: baseline; gap: var(--space-2); }
+.ws-source-counts dt { font-size: var(--text-xs); color: var(--color-ink-muted); }
+.ws-source-counts dd { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
+
+.ws-card--conflict { border-color: #F0D9A8; background: #FFFCF5; }
+.ws-conflict { padding: var(--space-3) 0; border-top: 1px solid var(--color-line); }
+.ws-conflict:first-of-type { border-top: none; }
+.ws-conflict--resolved { opacity: 0.75; }
+.ws-conflict--rejected { opacity: 0.55; }
+
+.ws-conflict-head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-2); }
+.ws-conflict-parameter { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); overflow-wrap: anywhere; }
+.ws-conflict-group { font-size: var(--text-xs); color: var(--color-ink-muted); }
+
+.ws-conflict-options { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); }
+.ws-conflict-option { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-ink); cursor: pointer; min-height: 32px; }
+.ws-conflict-option input { width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; }
+
+.ws-conflict-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ws-conflict-hint { font-size: var(--text-xs); color: var(--color-ink-muted); }
+
 .ws-reused-notice, .ws-already-applied {
   margin: 0; font-size: var(--text-sm); line-height: 1.55; max-width: 72ch;
   border-radius: var(--radius-sm); padding: var(--space-3);
@@ -805,6 +981,9 @@ async function applyAccepted() {
   .ws-stat-value { font-size: var(--text-lg); }
   .ws-stat-label { font-size: 0.625rem; white-space: normal; line-height: 1.2; }
   .ws-batch-notice { max-width: none; }
+
+  .ws-source-counts { gap: var(--space-3); }
+  .ws-conflict-actions .btn-conflict { flex: 1 1 auto; }
 
   .ws-batch-toolbar { flex-direction: column; align-items: stretch; gap: var(--space-2); }
   .ws-batch-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }

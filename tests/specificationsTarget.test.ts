@@ -341,3 +341,151 @@ describe('parseAndValidate — proposal size ceilings', () => {
     expect(result.ok).toBe(true)
   })
 })
+
+// ── PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01: source conflicts ──
+
+/**
+ * One product's approved documents can disagree — one says the power supply is
+ * 220 V, another says 380 V. The old output shape had no way to say so, which
+ * left the model only one option: pick one and present it as an ordinary
+ * proposal. That is precisely the thing it must never do.
+ */
+describe('specificationsTarget — conflicting values between this product’s own sources', () => {
+  const context = { sourceMaterial: 'Rated power 0.45 kW. Protection class IP54.' }
+
+  it('agreement stays an ordinary proposal item', () => {
+    const result = specificationsTarget.parseAndValidate({
+      groups: [{ group: 'Electrical', items: [{ parameter: 'Power supply', value: '220 V' }] }],
+    }, context)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.output.groups[0].items[0]).toEqual({ parameter: 'Power supply', value: '220 V' })
+      expect(result.output.conflicts).toBeUndefined()
+    }
+  })
+
+  it('a genuine disagreement validates as a conflict, with both values preserved', () => {
+    const result = specificationsTarget.parseAndValidate({
+      groups: [{ group: 'Environmental', items: [{ parameter: 'Protection class', value: 'IP54' }] }],
+      conflicts: [{ group: 'Electrical', parameter: 'Power supply', candidateValues: ['220 V', '380 V'] }],
+    }, context)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.output.conflicts).toEqual([
+        { group: 'Electrical', parameter: 'Power supply', candidateValues: ['220 V', '380 V'] },
+      ])
+      // The conflicting parameter is NOT also sitting in groups as a decided value.
+      const proposedParameters = result.output.groups.flatMap(g => g.items.map(i => i.parameter))
+      expect(proposedParameters).not.toContain('Power supply')
+    }
+  })
+
+  it('fewer than two distinct values is not a disagreement and is dropped', () => {
+    // A single value cannot be a conflict — the schema refuses it outright.
+    const single = specificationsTarget.parseAndValidate({
+      groups: [{ group: 'Electrical', items: [{ parameter: 'Rated power', value: '0.45 kW' }] }],
+      conflicts: [{ group: 'Electrical', parameter: 'Power supply', candidateValues: ['220 V'] }],
+    }, context)
+    expect(single.ok).toBe(false)
+
+    // Two values that differ only in formatting are a formatting difference,
+    // not something worth a person's attention.
+    const formatting = specificationsTarget.parseAndValidate({
+      groups: [{ group: 'Electrical', items: [{ parameter: 'Rated power', value: '0.45 kW' }] }],
+      conflicts: [{ group: 'Electrical', parameter: 'Power supply', candidateValues: ['220 V', '220v'] }],
+    }, context)
+    expect(formatting.ok).toBe(true)
+    if (formatting.ok) expect(formatting.output.conflicts).toBeUndefined()
+  })
+
+  it.each([
+    ['a source key', { source: 'spec.txt' }],
+    ['a page key', { page: 7 }],
+    ['a confidence key', { confidence: 0.9 }],
+    ['a citation key', { citation: 'p.7' }],
+  ])('a conflict carrying %s is refused outright — no provenance in V1', (_label, extra) => {
+    const result = specificationsTarget.parseAndValidate({
+      groups: [{ group: 'Electrical', items: [{ parameter: 'Rated power', value: '0.45 kW' }] }],
+      conflicts: [{ group: 'Electrical', parameter: 'Power supply', candidateValues: ['220 V', '380 V'], ...extra }],
+    }, context)
+    expect(result.ok).toBe(false)
+  })
+
+  it.each([
+    ['a UUID', 'aaaabbbb-cccc-dddd-eeee-ffff00001111'],
+    ['a URL', 'https://example.com/spec.pdf'],
+    ['a file path', 'C:\\\\docs\\\\spec.txt'],
+  ])('a candidate value containing %s is stripped, and the conflict falls away with it', (_label, unsafe) => {
+    const result = specificationsTarget.parseAndValidate({
+      groups: [{ group: 'Electrical', items: [{ parameter: 'Rated power', value: '0.45 kW' }] }],
+      conflicts: [{ group: 'Electrical', parameter: 'Power supply', candidateValues: ['220 V', unsafe] }],
+    }, context)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      // One safe candidate is left, which is not a disagreement, so nothing is
+      // presented to the reviewer at all.
+      expect(result.output.conflicts).toBeUndefined()
+      expect(JSON.stringify(result.output)).not.toContain(unsafe)
+    }
+  })
+
+  it('ordinary proposals and conflicts coexist in one reviewable result', () => {
+    const result = specificationsTarget.parseAndValidate({
+      groups: [{ group: 'Environmental', items: [{ parameter: 'Protection class', value: 'IP54' }, { parameter: 'Operating temperature', value: '0–40 °C' }] }],
+      conflicts: [
+        { group: 'Electrical', parameter: 'Power supply', candidateValues: ['220 V', '380 V'] },
+        { group: 'Electrical', parameter: 'Rated power', candidateValues: ['0.45 kW', '0.75 kW'] },
+      ],
+    }, context)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.output.groups[0].items).toHaveLength(2)
+      expect(result.output.conflicts).toHaveLength(2)
+    }
+  })
+
+  it('a response that is nothing but conflicts is still reviewable', () => {
+    const result = specificationsTarget.parseAndValidate({
+      groups: [],
+      conflicts: [{ group: 'Electrical', parameter: 'Power supply', candidateValues: ['220 V', '380 V'] }],
+    }, context)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.output.groups).toEqual([])
+      expect(result.output.conflicts).toHaveLength(1)
+    }
+  })
+
+  it('a response with neither proposals nor conflicts is still a safe failure', () => {
+    const result = specificationsTarget.parseAndValidate({ groups: [] }, context)
+    expect(result.ok).toBe(false)
+  })
+
+  it('a long source passage split across candidate values is caught by the echo scan', () => {
+    const passage = 'The LT-180C free-fall metal detector uses a balanced coil arrangement supplied under contract 7741 and must not be described publicly.'
+    const half = Math.ceil(passage.length / 2)
+
+    const result = specificationsTarget.parseAndValidate({
+      groups: [{ group: 'Electrical', items: [{ parameter: 'Rated power', value: '0.45 kW' }] }],
+      conflicts: [{ group: 'Notes', parameter: 'Description', candidateValues: [passage.slice(0, half), passage.slice(half)] }],
+    }, { sourceMaterial: passage })
+
+    expect(result.ok).toBe(false)
+  })
+
+  it('the shipped instructions tell the model not to settle a disagreement itself', () => {
+    expect(specificationsTarget.systemInstructions).toContain('report the disagreement under conflicts')
+    const userInput = specificationsTarget.buildUserInput({
+      productName: 'LT-180C',
+      sourceFileSummaries: [{ displayName: 'a.txt', fileType: 'Text' }],
+      extractedSourceTexts: [{ displayName: 'Source 1', text: 'Power supply 220 V' }],
+    })
+    expect(userInput).toContain('DO NOT CHOOSE ONE')
+    expect(userInput).toContain('never guess')
+  })
+})

@@ -36,12 +36,38 @@ export const SpecificationProposalGroupSchema = z.object({
   items: z.array(SpecificationProposalItemSchema).min(1).max(100),
 }).strict()
 
+/**
+ * PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01 — one product's several approved
+ * documents can disagree. One says the power supply is 220 V, another says
+ * 380 V, and the old output shape had no way to say so: the model's only
+ * option was to pick one and present it as an ordinary proposal, which is
+ * exactly the thing it must never do.
+ *
+ * A conflict carries the parameter and the values the sources actually gave,
+ * and nothing else. There is deliberately no provenance in V1 — no filename,
+ * no page, no confidence, no ranking — because the answer to "which document
+ * is right" is a person, not a score.
+ */
+export const SpecificationConflictSchema = z.object({
+  group: z.string().trim().min(1).max(200),
+  parameter: z.string().trim().min(1).max(200),
+  /** At least two, because one value is not a disagreement. Bounded so a model cannot flood the screen. */
+  candidateValues: z.array(z.string().trim().min(1).max(500)).min(2).max(6),
+}).strict()
+
 export const SpecificationProposalSchema = z.object({
-  groups: z.array(SpecificationProposalGroupSchema).min(1).max(50),
+  /**
+   * May be empty when every parameter the sources agreed on was already
+   * present, or when the sources disagree about everything. A response with
+   * neither groups nor conflicts is still a failure — see `parseAndValidate`.
+   */
+  groups: z.array(SpecificationProposalGroupSchema).max(50),
+  conflicts: z.array(SpecificationConflictSchema).max(20).optional(),
 }).strict()
 
 export type SpecificationProposalItem = z.infer<typeof SpecificationProposalItemSchema>
 export type SpecificationProposalGroup = z.infer<typeof SpecificationProposalGroupSchema>
+export type SpecificationConflict = z.infer<typeof SpecificationConflictSchema>
 export type SpecificationProposal = z.infer<typeof SpecificationProposalSchema>
 
 const MALFORMED_RESPONSE_ERROR = 'The AI provider returned a response that could not be safely used.'
@@ -90,8 +116,14 @@ function containsLongSourceEcho(normalizedValue: string, sourceWindows: Set<stri
 }
 
 /** Every model-controlled string in the exact order the model emitted it. */
-function modelControlledStringsInOrder(groups: SpecificationProposal['groups']): string[] {
-  return groups.flatMap(g => [g.group, ...g.items.flatMap(it => [it.parameter, it.value])])
+function modelControlledStringsInOrder(
+  groups: SpecificationProposal['groups'],
+  conflicts: SpecificationConflict[] = [],
+): string[] {
+  return [
+    ...groups.flatMap(g => [g.group, ...g.items.flatMap(it => [it.parameter, it.value])]),
+    ...conflicts.flatMap(c => [c.group, c.parameter, ...c.candidateValues]),
+  ]
 }
 
 /**
@@ -103,13 +135,20 @@ function modelControlledStringsInOrder(groups: SpecificationProposal['groups']):
  * each field role also gets its own ordered projection, plus per-item
  * parameter+value pairs for a passage split across an item's two fields.
  */
-function echoProjections(groups: SpecificationProposal['groups']): string[] {
+function echoProjections(
+  groups: SpecificationProposal['groups'],
+  conflicts: SpecificationConflict[] = [],
+): string[] {
   return [
-    modelControlledStringsInOrder(groups).join(''),
+    modelControlledStringsInOrder(groups, conflicts).join(''),
     groups.flatMap(g => g.items.map(it => it.value)).join(''),
     groups.flatMap(g => g.items.map(it => it.parameter)).join(''),
     groups.map(g => g.group).join(''),
     groups.flatMap(g => g.items.map(it => it.parameter + it.value)).join(''),
+    // Conflicts get their own projections too: a passage split across
+    // candidate values would otherwise slip past every check above.
+    conflicts.flatMap(c => c.candidateValues).join(''),
+    conflicts.map(c => c.parameter).join(''),
   ]
 }
 
@@ -119,7 +158,6 @@ const SPECIFICATION_PROPOSAL_JSON_SCHEMA = {
   properties: {
     groups: {
       type: 'array',
-      minItems: 1,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -142,6 +180,19 @@ const SPECIFICATION_PROPOSAL_JSON_SCHEMA = {
         required: ['group', 'items'],
       },
     },
+    conflicts: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          group: { type: 'string' },
+          parameter: { type: 'string' },
+          candidateValues: { type: 'array', minItems: 2, items: { type: 'string' } },
+        },
+        required: ['group', 'parameter', 'candidateValues'],
+      },
+    },
   },
   required: ['groups'],
 } as const
@@ -161,10 +212,11 @@ function parseAndValidate(raw: unknown, context: TargetValidationContext): Targe
   if (!structural.success) return { ok: false, error: MALFORMED_RESPONSE_ERROR }
 
   const groups = structural.data.groups
-  const allStrings = modelControlledStringsInOrder(groups)
+  const rawConflicts = structural.data.conflicts ?? []
+  const allStrings = modelControlledStringsInOrder(groups, rawConflicts)
 
   // Size ceilings first — before any scanning runs over the response.
-  const totalItems = groups.reduce((n, g) => n + g.items.length, 0)
+  const totalItems = groups.reduce((n, g) => n + g.items.length, 0) + rawConflicts.length
   const totalChars = allStrings.reduce((n, s) => n + s.length, 0)
   if (totalItems > MAX_PROPOSAL_ITEMS || totalChars > MAX_PROPOSAL_TOTAL_CHARS) {
     return { ok: false, error: OVERSIZED_RESPONSE_ERROR }
@@ -175,7 +227,7 @@ function parseAndValidate(raw: unknown, context: TargetValidationContext): Targe
   const normalizedSourceMaterial = normalizeForLeakageComparison(context.sourceMaterial)
   if (normalizedSourceMaterial.length >= MIN_UNSAFE_ECHO_LENGTH) {
     const sourceWindows = buildSourceWindowSet(normalizedSourceMaterial)
-    for (const projection of echoProjections(groups)) {
+    for (const projection of echoProjections(groups, rawConflicts)) {
       if (containsLongSourceEcho(normalizeForLeakageComparison(projection), sourceWindows)) {
         return { ok: false, error: NO_SAFE_ITEMS_ERROR }
       }
@@ -190,9 +242,37 @@ function parseAndValidate(raw: unknown, context: TargetValidationContext): Targe
     }))
     .filter(g => g.items.length > 0 && !containsUnsafeSourceLeakage(g.group))
 
-  if (safeGroups.length === 0) return { ok: false, error: NO_SAFE_ITEMS_ERROR }
+  /**
+   * Conflicts get the same per-field scan, plus one rule of their own: a
+   * conflict needs at least two values that are genuinely different. A model
+   * reporting "220 V" against "220V" has found a formatting difference, not a
+   * disagreement, and sending that to a person to adjudicate wastes the
+   * attention this feature exists to protect. Candidates are compared after
+   * normalization; the values shown are the originals.
+   */
+  const safeConflicts = rawConflicts
+    .filter(c => !containsUnsafeSourceLeakage(c.group) && !containsUnsafeSourceLeakage(c.parameter))
+    .map(c => ({ ...c, candidateValues: c.candidateValues.filter(v => !containsUnsafeSourceLeakage(v)) }))
+    .filter(c => countDistinctCandidates(c.candidateValues) >= 2)
 
-  return { ok: true, output: { groups: safeGroups } }
+  // A response with neither usable proposals nor usable conflicts is a safe
+  // failure — never an empty result presented as a success. A response with
+  // conflicts but no ordinary groups IS reviewable, and must not fail here.
+  if (safeGroups.length === 0 && safeConflicts.length === 0) {
+    return { ok: false, error: NO_SAFE_ITEMS_ERROR }
+  }
+
+  return {
+    ok: true,
+    output: safeConflicts.length > 0
+      ? { groups: safeGroups, conflicts: safeConflicts }
+      : { groups: safeGroups },
+  }
+}
+
+/** Distinct after the same normalization the echo scan uses, so "220 V" and "220v" count once. */
+function countDistinctCandidates(values: string[]): number {
+  return new Set(values.map(v => normalizeForLeakageComparison(v))).size
 }
 
 function buildUserInput(input: AiGenerationInput): string {
@@ -205,7 +285,12 @@ function buildUserInput(input: AiGenerationInput): string {
     + `Approved source materials (already associated with this product):\n${fileList}\n`
     + (contextNote ? `Additional approved context: ${contextNote}\n` : '')
     + 'Propose specification groups and parameters supported by these materials. '
-    + 'Return only group, parameter and value for each item — do not include a note, source reference, or page number.\n\n'
+    + 'Return only group, parameter and value for each item — do not include a note, source reference, or page number.\n'
+    + 'If two or more of these materials give clearly incompatible values for the same parameter '
+    + '(for example 220 V against 380 V), DO NOT CHOOSE ONE. Leave that parameter out of groups and list it '
+    + 'under conflicts with the values the materials actually gave. A difference in formatting or spacing alone '
+    + '("220V" against "220 V") is not a conflict. If the materials simply do not state a value, omit the '
+    + 'parameter — never guess, and never present a missing value as a conflict.\n\n'
     + buildSourceMaterialBlock(input.extractedSourceTexts)
   )
 }
@@ -216,7 +301,8 @@ export const specificationsTarget: TargetDefinition<SpecificationProposal> = {
   jsonSchema: SPECIFICATION_PROPOSAL_JSON_SCHEMA,
   systemInstructions:
     UNTRUSTED_SOURCE_MATERIAL_PREAMBLE
-    + ' You produce structured product specification proposals for internal review, each with a group, a parameter name, and a value only — never a note, source citation, or locator.',
+    + ' You produce structured product specification proposals for internal review, each with a group, a parameter name, and a value only — never a note, source citation, or locator.'
+    + ' When the approved materials clearly disagree about a parameter, you report the disagreement under conflicts instead of settling it; a person decides.',
   buildUserInput,
   parseAndValidate,
 }

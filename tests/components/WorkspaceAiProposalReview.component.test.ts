@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import WorkspaceAiProposalReview from '../../components/admin/workspace/WorkspaceAiProposalReview.vue'
-import type { SpecificationProposal } from '../../utils/aiProposal'
+import type { SpecificationProposal, SourceFileOutcome } from '../../utils/aiProposal'
 
 const PROPOSAL: SpecificationProposal = {
   groups: [
@@ -29,7 +29,7 @@ const PROPOSAL: SpecificationProposal = {
 const BASE_PROPS = {
   productId: 3,
   proposal: PROPOSAL,
-  fileResults: [{ displayName: 'notes.txt', status: 'read' as const }],
+  fileResults: [{ displayName: 'notes.txt', status: 'read' }] as SourceFileOutcome[],
   existingSpecGroups: [],
   applying: false,
   applyError: null,
@@ -691,5 +691,152 @@ describe('PWS-AI-REVIEW-BATCH-01 — review state stays reversible', () => {
     expect(wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))).toHaveLength(13)
     expect(wrapper.findAll('button').filter(b => b.text() === 'Reject')).toHaveLength(13)
     expect(wrapper.findAll('button').filter(b => b.text() === 'Edit')).toHaveLength(13)
+  })
+})
+
+// ── PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01: conflicts and source summary in review ──
+
+const CONFLICT_PROPOSAL: SpecificationProposal = {
+  groups: [
+    { group: 'Environmental', items: [{ parameter: 'Protection class', value: 'IP54' }, { parameter: 'Operating temperature', value: '0–40 °C' }] },
+  ],
+  conflicts: [
+    { group: 'Electrical', parameter: 'Power supply', candidateValues: ['220 V', '380 V'] },
+  ],
+}
+
+const MIXED_FILE_RESULTS: SourceFileOutcome[] = [
+  { displayName: 'LT-180C-spec.txt', status: 'read' },
+  { displayName: 'LT-180C-electrical.txt', status: 'read' },
+  { displayName: 'LT-180C-spec-copy.txt', status: 'duplicate', reason: 'Duplicate content excluded from analysis.' },
+  { displayName: 'LT-180C-photo.jpg', status: 'unsupported', reason: 'Not available for text-source analysis yet.' },
+]
+
+function mountConflict(overrides: Partial<typeof BASE_PROPS> = {}) {
+  return mountReview({ proposal: CONFLICT_PROPOSAL, fileResults: MIXED_FILE_RESULTS, ...overrides })
+}
+
+const conflictCard = (wrapper: ReturnType<typeof mountReview>) => wrapper.find('.ws-card--conflict')
+const useSelectedButton = (wrapper: ReturnType<typeof mountReview>) =>
+  wrapper.findAll('button').find(b => b.text() === 'Use selected value')!
+
+describe('source conflicts are decided by a person, never by the model', () => {
+  it('a conflict is shown in its own Review required section', () => {
+    const wrapper = mountConflict()
+    expect(conflictCard(wrapper).exists()).toBe(true)
+    expect(conflictCard(wrapper).text()).toContain('Source conflicts')
+    expect(conflictCard(wrapper).text()).toContain('Power supply')
+    expect(conflictCard(wrapper).text()).toContain('220 V')
+    expect(conflictCard(wrapper).text()).toContain('380 V')
+  })
+
+  it('it counts as Review required, and never as safe pending', () => {
+    const wrapper = mountConflict()
+    // Two ordinary proposals plus one conflict.
+    expect(statOf(wrapper, 'safe')).toBe('2')
+    expect(statOf(wrapper, 'review')).toBe('1')
+  })
+
+  it('Accept all safe leaves the conflict alone', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('$fetch', fetchMock)
+
+    const wrapper = mountConflict()
+    await wrapper.findAll('button').find(b => b.text() === 'Accept all safe')!.trigger('click')
+
+    expect(statOf(wrapper, 'accepted')).toBe('2')
+    // The conflict is still waiting for a person.
+    expect(conflictCard(wrapper).find('.ws-status-badge').text()).toBe('pending')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('Use selected value is unavailable until a candidate is chosen', async () => {
+    const wrapper = mountConflict()
+    expect((useSelectedButton(wrapper).element as HTMLButtonElement).disabled).toBe(true)
+    expect(conflictCard(wrapper).text()).toContain('Select a value to enable')
+
+    await conflictCard(wrapper).findAll('input[type="radio"]')[0].setValue()
+    expect((useSelectedButton(wrapper).element as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('choosing a value and confirming it moves the conflict to accepted', async () => {
+    const wrapper = mountConflict()
+    await conflictCard(wrapper).findAll('input[type="radio"]')[1].setValue()
+    await useSelectedButton(wrapper).trigger('click')
+
+    expect(conflictCard(wrapper).find('.ws-status-badge').text()).toBe('accepted')
+    expect(statOf(wrapper, 'accepted')).toBe('1')
+  })
+
+  it('the Apply payload carries the value the person chose, and only that one', async () => {
+    const fetchMock = vi.fn(async (_url: string, _options?: { body?: { changes: Array<Record<string, unknown>> } }) => (
+      { ok: true, appliedCount: 1, totalCount: 1, partial: false, message: 'Applied 1 accepted change to Draft.' }
+    ))
+    vi.stubGlobal('$fetch', fetchMock)
+
+    const wrapper = mountConflict()
+    // Choose 380 V — the second candidate.
+    await conflictCard(wrapper).findAll('input[type="radio"]')[1].setValue()
+    await useSelectedButton(wrapper).trigger('click')
+    await applyButtonOf(wrapper).trigger('click')
+
+    const changes = fetchMock.mock.calls[0][1]!.body!.changes
+    expect(changes).toHaveLength(1)
+    expect(changes[0]).toMatchObject({ parameter: 'Power supply', value: '380 V' })
+    // The value the reviewer did not choose is nowhere in the request.
+    expect(JSON.stringify(changes)).not.toContain('220 V')
+  })
+
+  it('a rejected conflict never reaches Apply', async () => {
+    const fetchMock = vi.fn(async (_url: string, _options?: { body?: { changes: Array<Record<string, unknown>> } }) => (
+      { ok: true, appliedCount: 2, totalCount: 2, partial: false, message: 'Applied 2 accepted changes to Draft.' }
+    ))
+    vi.stubGlobal('$fetch', fetchMock)
+
+    const wrapper = mountConflict()
+    await conflictCard(wrapper).findAll('button').find(b => b.text() === 'Reject')!.trigger('click')
+    await wrapper.findAll('button').find(b => b.text() === 'Accept all safe')!.trigger('click')
+    await applyButtonOf(wrapper).trigger('click')
+
+    const changes = fetchMock.mock.calls[0][1]!.body!.changes
+    expect(changes).toHaveLength(2)
+    expect(JSON.stringify(changes)).not.toContain('Power supply')
+  })
+
+  it('ordinary batch review is unchanged when there are no conflicts at all', async () => {
+    const wrapper = mountReview()
+    expect(wrapper.find('.ws-card--conflict').exists()).toBe(false)
+    await wrapper.findAll('button').find(b => b.text() === 'Accept all safe')!.trigger('click')
+    expect(statOf(wrapper, 'accepted')).toBe('2')
+  })
+})
+
+describe('the source summary says what this analysis actually used', () => {
+  it('lists every source with its own status', () => {
+    const wrapper = mountConflict()
+    const summary = wrapper.find('.ws-source-summary')
+
+    expect(summary.text()).toContain('LT-180C-spec.txt')
+    expect(summary.text()).toContain('LT-180C-electrical.txt')
+    expect(summary.text()).toContain('LT-180C-spec-copy.txt')
+    expect(summary.text()).toContain('LT-180C-photo.jpg')
+    expect(summary.text()).toContain('Analyzed')
+    expect(summary.text()).toContain('Duplicate excluded')
+  })
+
+  it('counts analysed, duplicate-excluded and not-analysed correctly', () => {
+    const wrapper = mountConflict()
+    const values = wrapper.findAll('.ws-source-counts dd').map(d => d.text())
+    expect(values).toEqual(['2', '1', '1'])
+  })
+
+  it('carries no identifier, path, hash or raw content', () => {
+    const wrapper = mountConflict()
+    const summary = wrapper.find('.ws-source-summary').html()
+
+    expect(summary).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+    expect(summary).not.toMatch(/[0-9a-f]{64}/)
+    expect(summary).not.toContain('/assets/')
+    expect(summary).not.toContain('directus_files_id')
   })
 })
