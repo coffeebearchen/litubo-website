@@ -79,7 +79,14 @@ AI checkpoint `4bbc838...` 全程冻结。
 
 ---
 
-## ML-CLOUD-02 — File Operations + Duplicate Protection
+## ML-CLOUD-02 — File Operations + Duplicate Protection ✅ COMPLETED（2026-09-09）
+
+**成果：** File Rename（`filename_download`，UUID / storage object / MIME / 引用均不变）；Duplicate Warning（same folder + same normalized filename + same filesize，仅提醒，Cancel / Upload anyway 由人决定）；Batch Archive（复用单文件 Archive 的引用保护，逐文件判定与报告）。既有 File Move / Batch Move / Multi-select / Search / Filter 回归通过。
+
+**既有 `products_files` 403 已关闭，且不是权限问题：** 根因是我们自己的查询请求了 `products` 上不存在的 `name` 字段（该表只有 `name_en`），Directus 对「字段不存在」也返回 403。改用 `name_en` 后 References 与 Archive 恢复，**未改动任何 Directus 权限或 schema** —— 因此 Batch Archive 得以在本模块实现而非 deferred。
+
+**Duplicate 前置只读核对结论：** `directus_files` 共 27 列，**不存在** checksum / hash / digest / etag，故按施工单采用简单启发式，未新增 schema。
+
 
 ### 功能
 - Rename file

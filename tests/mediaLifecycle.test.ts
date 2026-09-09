@@ -31,8 +31,8 @@ describe('getFileReferences', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce({
         data: [
-          { id: 10, file_role: 'hero', products_id: { id: 3, name: 'Product Alpha' } },
-          { id: 11, file_role: 'gallery', products_id: { id: 3, name: 'Product Alpha' } },
+          { id: 10, file_role: 'hero', products_id: { id: 3, name_en: 'Product Alpha' } },
+          { id: 11, file_role: 'gallery', products_id: { id: 3, name_en: 'Product Alpha' } },
         ],
       })
       .mockResolvedValueOnce({ data: [], meta: { filter_count: 0 } }) // product_sections
@@ -52,7 +52,7 @@ describe('getFileReferences', () => {
   it('counts section references separately via junction IDs', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce({
-        data: [{ id: 42, file_role: 'brochure', products_id: { id: 5, name: 'Product Beta' } }],
+        data: [{ id: 42, file_role: 'brochure', products_id: { id: 5, name_en: 'Product Beta' } }],
       })
       .mockResolvedValueOnce({ data: [{ id: 99 }], meta: { filter_count: 1 } })
       .mockResolvedValueOnce({ data: [] }) // product_source_records

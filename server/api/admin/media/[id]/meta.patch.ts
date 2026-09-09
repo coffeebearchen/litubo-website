@@ -1,9 +1,11 @@
 import { getRouterParam, readBody, createError } from 'h3'
 import { adminFetch } from '~/server/utils/adminDirectusClient'
 import { resolveFolderRegistry, validateMoveFolder } from '~/server/utils/folderRegistry'
+import { normalizeFilename, findFilenameClash } from '~/server/utils/mediaFilename'
+import type { ExistingFile } from '~/server/utils/mediaFilename'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const ALLOWED_FIELDS = new Set(['title', 'description', 'folder'])
+const ALLOWED_FIELDS = new Set(['title', 'description', 'folder', 'filename_download'])
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
@@ -46,6 +48,49 @@ export default defineEventHandler(async (event) => {
     }
 
     payload.folder = folderUuid
+  }
+
+  /**
+   * ML-CLOUD-02 — File Rename.
+   *
+   * `filename_download` is the name a person sees and downloads; the file's
+   * UUID, its stored object (`filename_disk`), its MIME type and every
+   * Product / Content / AI Source reference are untouched, because none of
+   * them address a file by name. That is the whole reason a rename is safe
+   * here: it is a metadata edit on one row, not a copy and not a re-upload.
+   */
+  if ('filename_download' in body) {
+    const current = await adminFetch<{ data: { filename_download: string | null, folder: string | null } }>(
+      event, `/files/${id}?fields=filename_download,folder`,
+    )
+    const currentName = current.data?.filename_download ?? null
+
+    const named = normalizeFilename(body.filename_download, currentName)
+    if (!named.ok) {
+      throw createError({ statusCode: 422, message: `${named.code}: ${named.message}` })
+    }
+
+    // Compare against the folder the file will END UP in — a rename and a move
+    // can arrive in the same request, and the clash that matters is the one at
+    // the destination.
+    const destination = 'folder' in payload
+      ? (payload.folder as string | null)
+      : (current.data?.folder ?? null)
+
+    const siblings = await adminFetch<{ data: ExistingFile[] }>(
+      event,
+      `/files?${destination === null ? 'filter[folder][_null]=true' : `filter[folder][_eq]=${destination}`}`
+      + '&fields=id,filename_download,filesize&limit=500',
+    )
+    const clash = findFilenameClash(siblings.data ?? [], named.name, id)
+    if (clash) {
+      throw createError({
+        statusCode: 422,
+        message: `FILENAME_TAKEN: "${named.name}" already exists in this folder.`,
+      })
+    }
+
+    payload.filename_download = named.name
   }
 
   if (Object.keys(payload).length === 0) {

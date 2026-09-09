@@ -3,7 +3,8 @@
 export interface FileReference {
   product_id: number
   product_name: string
-  file_role: string
+  /** Nullable in the junction — a file can be attached to a product without a declared role. */
+  file_role: string | null
 }
 
 export interface ReferencesResult {
@@ -27,14 +28,24 @@ export type FetchFn = <T>(path: string, options?: Record<string, unknown>) => Pr
 
 interface JunctionRow {
   id: number
-  file_role: string
-  products_id: { id: number; name: string } | null
+  file_role: string | null
+  products_id: { id: number; name_en: string | null } | null
 }
 
+/**
+ * ML-CLOUD-02 — the product name field is `name_en`, not `name`.
+ *
+ * `products` has never had a bare `name` column; it carries `name_en` /
+ * `name_es` / `name_pt`. Directus answers a request for a field that does not
+ * exist with 403 Forbidden, the same status it uses for a field you may not
+ * read, so this looked for a long time like a `products_files` permission
+ * problem and was carried as a blocked P1 on that basis. It was our own query.
+ * Nothing about Directus permissions, roles or schema was changed to fix it.
+ */
 async function queryProductsFiles(fileUuid: string, fetch: FetchFn): Promise<JunctionRow[]> {
   const res = await fetch<{ data: JunctionRow[] }>(
     `/items/products_files?filter[directus_files_id][_eq]=${fileUuid}` +
-    `&fields=id,file_role,products_id.id,products_id.name&limit=500`,
+    `&fields=id,file_role,products_id.id,products_id.name_en&limit=500`,
   )
   return res.data ?? []
 }
@@ -50,7 +61,7 @@ async function querySectionCount(junctionIds: number[], fetch: FetchFn): Promise
 
 interface SourceRecordRow {
   id: number
-  product_id: { id: number; name: string } | null
+  product_id: { id: number; name_en: string | null } | null
 }
 
 // A file cited as evidence in an active (non-archived) source record is still
@@ -59,7 +70,7 @@ interface SourceRecordRow {
 async function querySourceRecords(fileUuid: string, fetch: FetchFn): Promise<SourceRecordRow[]> {
   const res = await fetch<{ data: SourceRecordRow[] }>(
     `/items/product_source_records?filter[source_file_id][_eq]=${fileUuid}` +
-    `&filter[archived][_eq]=false&fields=id,product_id.id,product_id.name&limit=500`,
+    `&filter[archived][_eq]=false&fields=id,product_id.id,product_id.name_en&limit=500`,
   )
   return res.data ?? []
 }
@@ -77,7 +88,7 @@ export async function getFileReferences(fileUuid: string, fetch: FetchFn): Promi
     seenProducts.add(row.products_id.id)
     references.push({
       product_id: row.products_id.id,
-      product_name: row.products_id.name ?? String(row.products_id.id),
+      product_name: row.products_id.name_en ?? String(row.products_id.id),
       file_role: row.file_role,
     })
   }
@@ -87,7 +98,7 @@ export async function getFileReferences(fileUuid: string, fetch: FetchFn): Promi
     seenProducts.add(row.product_id.id)
     references.push({
       product_id: row.product_id.id,
-      product_name: row.product_id.name ?? String(row.product_id.id),
+      product_name: row.product_id.name_en ?? String(row.product_id.id),
       file_role: 'source_evidence',
     })
   }

@@ -4725,6 +4725,8 @@ customer folder **继承其 zone 根的文件内容策略**，因此 `products/x
 
 **记录未修的既有 P1：** `products_files` 的 Directus 403 —— 它同时导致 `references` 与**文件归档**不可用。属 Directus 权限配置，本模块禁止改动。
 
+> **已于 ML-CLOUD-02 关闭（2026-09-09）。此处「属 Directus 权限配置」的判断是错的。** 根因是我们自己的查询请求了 `products` 上不存在的 `name` 字段（该表只有 `name_en` / `name_es` / `name_pt`），而 Directus 对「字段不存在」与「无权读取」一律返回 403，因此字段名错误长期伪装成权限故障。修复为改用 `name_en`，**未改动任何 Directus 权限或 schema**。详见下方 ML-CLOUD-02 第一节。
+
 *最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-01"任务中写入。*
 
 ---
@@ -4827,3 +4829,128 @@ xray / metal-detection / combination / checkweigher 及其下属文件夹**不�
 **0 AI 改动** · **0 Directus schema / DB 改动** · **0 Directus 权限改动** · **0 Provider 调用** · **0 API 费用** · **0 permanent delete** · **0 绕过 reference protection** · **0 push / merge / deploy** · `aa1c097` **未 amend**。
 
 *最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-01 FIX"任务中写入。*
+
+---
+
+## ML-CLOUD-02 — File Operations + Duplicate Warning（2026-09-09）
+
+**状态：COMPLETED。** File Rename、Duplicate Warning、Batch Archive 全部交付；既有 File Move / Batch Move / Multi-select / Search / Filter 回归通过。
+
+### 一、既有 `products_files` 403 —— 根因查明，不是权限问题
+
+此前长期记录为「Directus 权限拒绝 `products_files`，导致 References 与 Archive 不可用」的 P1，**根因实际在我们自己的查询里**：
+
+`server/utils/mediaLifecycle.ts` 向 Directus 请求 `products_id.name`，而 `products` 表**从来没有 `name` 列**，只有 `name_en` / `name_es` / `name_pt`（已只读核对 `information_schema`）。**Directus 对「字段不存在」与「字段无权读」一律返回 403 Forbidden**，因此这个字段名错误一直伪装成权限故障。
+
+修复：`products_id.name` → `products_id.name_en`，`product_id.name` → `product_id.name_en`（两处查询 + 两处取值）。
+
+**未改动任何 Directus permission / role / schema / DB。** 这一处修复同时解锁：
+
+- `/references` 端点（全部文件 200）
+- 单文件 Archive（此前对所有文件都不可用）
+- **Batch Archive**（因此本模块得以实现，而非 deferred）
+
+实测：未被引用文件 `total: 0 / can_archive: true`；被产品 3 引用的文件 `total: 1`，正确列出产品名，归档请求 **409「仍被 1 个引用使用」**。
+
+### 二、File Rename（真正的文件名，不是 Title）
+
+修改 `filename_download` —— 用户下载时看到的名字。经实测确认**不变**的内容：
+
+| 不变项 | 实测 |
+|---|---|
+| Media UUID | ✅ |
+| storage object（`filename_disk`） | ✅ |
+| MIME / `type` | ✅ |
+| folder | ✅ |
+| Product 引用 | ✅ 改名前后均 `total: 1`，同一产品 |
+
+**不复制文件、不重新上传。** 它只是同一行上的一次元数据写入 —— 之所以安全，正因为 Product / Content / Branding / AI Source 都不用文件名寻址。
+
+服务端校验（`server/utils/mediaFilename.ts`）：
+
+| 规则 | 错误码 |
+|---|---|
+| trim 后为空 | `FILENAME_EMPTY` |
+| 含 `/` 或 `\` | `FILENAME_SEPARATOR` |
+| 超过 255 字符 | `FILENAME_TOO_LONG` |
+| 同 folder 已有同名（不区分大小写） | `FILENAME_TAKEN` |
+
+**扩展名由服务端保留。** 字节与 MIME 都不动，若允许把 `datasheet.pdf` 改成 `datasheet.txt`，下载下来的文件就会自称是它不是的东西。改名同时移动时，重名检查针对**目标** folder。
+
+UI 中 `Filename` / `Title` / `Description` 三者分列且各有说明，不再让人以为改 Title 就是改文件名。
+
+### 三、Duplicate Warning
+
+**开工前只读核对（施工单强制前置）：** 直接查询 live schema，`directus_files` 共 27 列，**不存在** checksum / hash / digest / etag 任何一列。按施工单「如果没有，不要新增 schema」，采用简单启发式：
+
+```text
+same folder + same normalized filename（trim + 小写） + same filesize
+→ Possible duplicate
+```
+
+**它是提醒，不是判定**，措辞如实说明比较依据，不冒充内容寻址。UI 显示 New（文件名、大小）与 Existing（文件名、folder、大小），操作为 `Cancel duplicates` / `Upload anyway` / `Cancel all`。
+
+**不自动删除、不覆盖、不阻止上传。** 实测：`Upload anyway` 后原文件 UUID 不变，新文件是**另一个 UUID**，两份并存。
+
+**一个疑似重复不影响同批其他文件：** 检查在上传前一次性完成；`Cancel duplicates` 只丢弃被标记的那些，其余照常上传（实测：2 选 1 重复 → 跳过 1、上传 1）。
+
+**真实数据发现的一个隐患已修复：** Directus 把 `filesize`（bigint）序列化为**字符串**，`"8192" === 8192` 为 false —— 严格比较会让重复检测对真实 API **永远静默失效**，而所有用数字 fixture 的单元测试仍然全绿。已改为数值比较并补测试。
+
+### 四、Batch Archive
+
+新增 `POST /api/admin/media/batch-archive`，**复用与单文件 Archive 完全相同的 `getFileReferences` 保护**：逐文件判定、逐文件报告，一个拒绝不中断整批。
+
+结果分类：`archived` / `referenced`（被引用，保留不归档）/ `already-archived` / `not-found` / `failed`。
+
+**引用检查失败时不归档** —— 「查不到」不等于「没有引用」，这正是该保护存在的理由。
+
+实测（1440px UI）：混选「被产品 3 引用的文件 + 未被引用的测试文件」→ 提示 **`1 archived · 1 still referenced (kept)`**，被引用文件未归档且引用完好。Restore 回归通过。
+
+**不做物理删除**，全部写入 lifecycle collection，可恢复。
+
+### 五、References 403 的 UI 表达
+
+引用查询失败时**不显示 0**，而是显示：
+
+```text
+References unavailable — could not check what uses this file.
+Archiving is disabled until it can.
+```
+
+并禁用归档按钮。「查不到」与「没有」永远不能长得一样 —— 否则有人会照着屏幕归档一个正在被使用的文件。实测（注入 500）文案与禁用均正确。
+
+### 六、验证结果（真实 Node 22.22.2；系统默认 Node 24.14.0 未改动）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1148 / 1148 通过**（30 文件，本次 +50） |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+**1440px 真实验收（全部通过）：** File Rename · Title edit · Description edit · 单文件 Move · Duplicate warning · Upload anyway · Cancel duplicate · Multi-select · Batch Move · Batch Archive · Restore · File Details · Search · Filter。**全新标签页 console 零错误**（此前每张文件卡片都会打出的 `/references` 403 已消失），页面 `scrollWidth === clientWidth === 1440`，无横向溢出。
+
+**375px：** File Rename 可操作（输入框 343px）、Duplicate warning 三个按钮各 311px 全宽可点、Multi-select 可用、File Details 不溢出（右边界 375）、页面 `scrollWidth === clientWidth === 375`。修复了一处移动端布局缺陷：`.dup-col` 的 `flex: 1 1 200px` 在列方向变成 200px 高度基准，导致每个标签下出现 200px 空白，已改为 `flex: 0 0 auto`。
+
+### 七、遗留 TEST ONLY 测试资料
+
+**全部 6 个测试文件的文件名与 Title 均带 `TEST ONLY — NOT FOR PUBLICATION`，Unclassified 中为 0。** 复用既有 ML-CLOUD 测试目录，**未新建任何文件夹**。
+
+| 位置 | 文件 |
+|---|---|
+| `products/conveyor/ZZ-ML-CLOUD-01 TEST ONLY — NOT FOR PUBLICATION` | `ZZ-ML-CLOUD-01-AFTERFIX …`、`ZZ-ML-CLOUD-02-RENAMED …`、`ZZ-ML-CLOUD-01-VERIFY …` |
+| 同上 `/manuals` | `ZZ-ML-CLOUD-02-FRESH …`、`ZZ-ML-CLOUD-02-DUPLICATE-COPY …`（已归档） |
+| `products/xray` | `ZZ-ML-CLOUD-02 REFERENCED RENAME ….jpg`（TEST ONLY 产品 3 的资产，用于验证改名不破坏引用） |
+
+文件夹仍无法删除（**Folder Trash / Restore 仍为 P1 deferred**，需要新 schema 保存 trash state 与 original parent）。文件现已可归档。
+
+### 八、范围与边界
+
+**0 Directus permission 改动** · **0 schema / DB 改动** · **0 绕过 reference protection** · **0 物理删除** · **0 AI 改动**（checkpoint `4bbc838` 冻结未动）· **0 Provider 调用** · **0 API 费用** · **0 push / merge / deploy**。
+
+未实现（施工单明确排除）：Folder Trash / Restore、Drag & Drop（属 ML-CLOUD-03）、Upload Folder、Share、Storage quota、Version history、per-user permissions、Permanent Delete、AI auto-folder、Owner / Tags。
+
+**下一候选：`ML-CLOUD-03 — Drag & Drop + UX Polish`，NOT STARTED，WAITING FOR REVIEW AUTHORIZATION。**
+
+*最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-02"任务中写入。*

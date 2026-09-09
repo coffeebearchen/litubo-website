@@ -38,7 +38,11 @@ const errorMsg = ref('')
 const successMsg = ref('')
 
 const selectedFile = ref<MediaFile | null>(null)
-const editForm = ref({ title: '', description: '', folder: '' })
+// ML-CLOUD-02 — `filename` is the human-visible download name, a different
+// thing from `title`. Keeping them as separate fields here is the point: the
+// old panel let you edit a display title and left people believing they had
+// renamed the file.
+const editForm = ref({ filename: '', title: '', description: '', folder: '' })
 const editSaving = ref(false)
 
 // Upload state
@@ -47,10 +51,23 @@ const uploadErrors = ref<Array<{ filename: string; message: string }>>([])
 const uploadFolder = ref<string>('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
+// ML-CLOUD-02 — duplicate warning. `pendingFiles` holds the picked files while
+// the operator decides; `duplicates` is what the server recognised.
+interface DuplicateMatch {
+  filename: string
+  size: number
+  existing: Array<{ id: string; filename_download: string | null; filesize: number | null }>
+}
+const pendingFiles = ref<File[]>([])
+const duplicateMatches = ref<DuplicateMatch[]>([])
+const duplicateChecking = ref(false)
+
 // Multi-select
 const selectedIds = ref<Set<string>>(new Set())
 const batchMovingFolder = ref(false)
 const batchTargetFolder = ref('')
+const batchArchiving = ref(false)
+const batchArchiveConfirm = ref(false)
 
 // Lifecycle / archived filter
 const showArchivedView = ref(false)
@@ -65,11 +82,18 @@ interface RefsResult {
   section_count: number
   total: number
   can_archive: boolean
-  references: Array<{ product_id: number; product_name: string; file_role: string }>
+  references: Array<{ product_id: number; product_name: string; file_role: string | null }>
 }
 const detailRefs = ref<RefsResult | null>(null)
 const detailArchived = ref(false)
 const detailRefsLoading = ref(false)
+/**
+ * ML-CLOUD-02 — set when the reference lookup itself failed. "We could not
+ * find out" and "there are none" must never render the same way: showing a
+ * confident zero for a call that errored is how a referenced asset gets
+ * archived by someone who trusted the screen.
+ */
+const detailRefsUnavailable = ref(false)
 const archiveConfirm = ref(false)
 const restoreConfirm = ref(false)
 const lifecycleWorking = ref(false)
@@ -375,6 +399,57 @@ function toggleSelect(id: string, evt: Event) {
 function clearSelection() {
   selectedIds.value = new Set()
   batchTargetFolder.value = ''
+  batchArchiveConfirm.value = false
+}
+
+/**
+ * ML-CLOUD-02 — archive the selection, one reference check per file.
+ *
+ * The server judges each file with the same protection single-file Archive
+ * uses, so a referenced file is skipped rather than archived and the rest of
+ * the batch still goes through. The summary below reports exactly what
+ * happened to each group instead of a single "done".
+ */
+async function batchArchiveSelected() {
+  if (selectedIds.value.size === 0) return
+  batchArchiving.value = true
+  batchArchiveConfirm.value = false
+  errorMsg.value = ''
+  try {
+    const res = await $fetch<{
+      archived: number
+      skipped: number
+      results: Array<{ id: string; outcome: string; message?: string }>
+    }>('/api/admin/media/batch-archive', {
+      method: 'POST',
+      body: { file_ids: [...selectedIds.value] },
+    })
+
+    const referenced = res.results.filter(r => r.outcome === 'referenced').length
+    const already = res.results.filter(r => r.outcome === 'already-archived').length
+    const failed = res.results.filter(r => r.outcome === 'failed' || r.outcome === 'not-found').length
+
+    const parts = [`${res.archived} archived`]
+    if (referenced > 0) parts.push(`${referenced} still referenced (kept)`)
+    if (already > 0) parts.push(`${already} already archived`)
+    if (failed > 0) parts.push(`${failed} failed`)
+    const summary = parts.join(' · ')
+
+    if (failed > 0) errorMsg.value = summary
+    else {
+      successMsg.value = summary
+      setTimeout(() => (successMsg.value = ''), 5000)
+    }
+
+    clearSelection()
+    await loadArchivedIds()
+    await loadFiles(true)
+  } catch (e: unknown) {
+    const fe = e as { data?: { message?: string } }
+    errorMsg.value = fe.data?.message ?? 'Batch archive failed'
+  } finally {
+    batchArchiving.value = false
+  }
 }
 
 async function batchMoveToFolder() {
@@ -406,6 +481,7 @@ async function batchMoveToFolder() {
 async function openFile(f: MediaFile) {
   selectedFile.value = f
   editForm.value = {
+    filename: f.filename_download ?? f.filename_disk ?? '',
     title: f.title ?? '',
     description: f.description ?? '',
     // Keep actual folder UUID — dropdown will show blank if it's a legacy folder,
@@ -429,11 +505,13 @@ function closeDetail() {
 
 async function loadDetailRefs(uuid: string) {
   detailRefsLoading.value = true
+  detailRefsUnavailable.value = false
   try {
     const res = await $fetch<RefsResult>(`/api/admin/media/${uuid}/references`)
     detailRefs.value = res
   } catch {
     detailRefs.value = null
+    detailRefsUnavailable.value = true
   } finally {
     detailRefsLoading.value = false
   }
@@ -487,6 +565,12 @@ async function saveMetadata() {
   errorMsg.value = ''
   try {
     const payload: Record<string, unknown> = {}
+    // ML-CLOUD-02 — a real rename of the downloadable filename. The server
+    // keeps the extension and refuses a name already used in this folder.
+    const currentFilename = selectedFile.value.filename_download ?? selectedFile.value.filename_disk ?? ''
+    if (editForm.value.filename.trim() !== currentFilename) {
+      payload.filename_download = editForm.value.filename
+    }
     if (editForm.value.title !== (selectedFile.value.title ?? '')) {
       payload.title = editForm.value.title
     }
@@ -528,47 +612,107 @@ function triggerUpload() {
   fileInputRef.value?.click()
 }
 
+/**
+ * ML-CLOUD-02 — check for possible duplicates before uploading anything.
+ *
+ * The check runs first and covers the whole selection, so the operator makes
+ * one decision instead of being interrupted mid-batch. Nothing is uploaded
+ * until they answer, and answering "cancel" drops only the flagged files —
+ * one suspected duplicate never blocks the rest of the batch.
+ */
 async function onFilesSelected(evt: Event) {
   const input = evt.target as HTMLInputElement
   const fileList = input.files
   if (!fileList || fileList.length === 0) return
 
-  uploading.value = true
+  const picked = Array.from(fileList)
+  input.value = ''
   uploadErrors.value = []
   errorMsg.value = ''
+  duplicateMatches.value = []
 
-  const uploadPromises: Promise<void>[] = []
-  const allErrors: Array<{ filename: string; message: string }> = []
-
-  for (let i = 0; i < fileList.length; i++) {
-    const file = fileList[i]
-    uploadPromises.push(
-      (async () => {
-        const fd = new FormData()
-        fd.append('file', file, file.name)
-        // Server enforces folder policy; pass folder UUID if selected
-        if (uploadFolder.value) fd.append('folder', uploadFolder.value)
-        try {
-          const res = await $fetch<{ uploaded: unknown[]; errors: Array<{ filename: string; message: string }> }>(
-            '/api/admin/media/upload',
-            { method: 'POST', body: fd },
-          )
-          if (res.errors?.length) allErrors.push(...res.errors)
-        } catch (e: unknown) {
-          const fe = e as { data?: { message?: string } }
-          allErrors.push({ filename: file.name, message: fe.data?.message ?? 'Upload failed' })
-        }
-      })(),
-    )
+  duplicateChecking.value = true
+  try {
+    const res = await $fetch<{ duplicates: DuplicateMatch[] }>('/api/admin/media/duplicate-check', {
+      method: 'POST',
+      body: {
+        folder: uploadFolder.value || null,
+        candidates: picked.map(f => ({ filename: f.name, size: f.size })),
+      },
+    })
+    duplicateMatches.value = res.duplicates ?? []
+  } catch {
+    // A failed check must not block uploading — it is a convenience, not a gate.
+    duplicateMatches.value = []
+  } finally {
+    duplicateChecking.value = false
   }
 
-  await Promise.all(uploadPromises)
+  if (duplicateMatches.value.length > 0) {
+    pendingFiles.value = picked
+    return
+  }
+  await uploadFiles(picked)
+}
+
+/** Names the duplicate check flagged, lowercased for comparison. */
+const duplicateNames = computed(
+  () => new Set(duplicateMatches.value.map((d: DuplicateMatch) => d.filename.trim().toLowerCase())),
+)
+
+/** Upload everything that was not flagged, and drop the flagged ones. */
+function skipDuplicates() {
+  const keep = pendingFiles.value.filter((f: File) => !duplicateNames.value.has(f.name.trim().toLowerCase()))
+  const skipped = pendingFiles.value.length - keep.length
+  pendingFiles.value = []
+  duplicateMatches.value = []
+  if (keep.length > 0) {
+    uploadFiles(keep)
+  } else {
+    successMsg.value = `${skipped} duplicate file(s) skipped — nothing uploaded`
+    setTimeout(() => (successMsg.value = ''), 4000)
+  }
+}
+
+/** Upload the whole selection, duplicates included, because the operator said so. */
+function uploadAnyway() {
+  const all = pendingFiles.value
+  pendingFiles.value = []
+  duplicateMatches.value = []
+  if (all.length > 0) uploadFiles(all)
+}
+
+function cancelUploadSelection() {
+  pendingFiles.value = []
+  duplicateMatches.value = []
+}
+
+async function uploadFiles(picked: File[]) {
+  uploading.value = true
+  const allErrors: Array<{ filename: string; message: string }> = []
+
+  await Promise.all(picked.map(async (file) => {
+    const fd = new FormData()
+    fd.append('file', file, file.name)
+    // Server enforces folder policy; pass folder UUID if selected
+    if (uploadFolder.value) fd.append('folder', uploadFolder.value)
+    try {
+      const res = await $fetch<{ uploaded: unknown[]; errors: Array<{ filename: string; message: string }> }>(
+        '/api/admin/media/upload',
+        { method: 'POST', body: fd },
+      )
+      if (res.errors?.length) allErrors.push(...res.errors)
+    } catch (e: unknown) {
+      const fe = e as { data?: { message?: string } }
+      allErrors.push({ filename: file.name, message: fe.data?.message ?? 'Upload failed' })
+    }
+  }))
+
   uploading.value = false
   uploadErrors.value = allErrors
-  input.value = ''
 
-  if (allErrors.length < fileList.length) {
-    const okCount = fileList.length - allErrors.length
+  if (allErrors.length < picked.length) {
+    const okCount = picked.length - allErrors.length
     successMsg.value = `${okCount} file(s) uploaded successfully`
     setTimeout(() => (successMsg.value = ''), 4000)
     await loadFiles(true)
@@ -660,6 +804,19 @@ const selectedFileFolderIsLegacy = computed(() => {
           <button class="btn-batch-move" :disabled="batchMovingFolder || !batchTargetFolder" @click="batchMoveToFolder">
             {{ batchMovingFolder ? 'Moving…' : 'Move' }}
           </button>
+          <!-- ML-CLOUD-02 — Archive is recoverable; referenced files are kept, not archived. -->
+          <template v-if="!batchArchiveConfirm">
+            <button class="btn-batch-archive" :disabled="batchArchiving" @click="batchArchiveConfirm = true">
+              Archive
+            </button>
+          </template>
+          <template v-else>
+            <span class="batch-confirm-msg">Archive {{ selectedIds.size }} file(s)? Referenced files are kept.</span>
+            <button class="btn-batch-archive-confirm" :disabled="batchArchiving" @click="batchArchiveSelected">
+              {{ batchArchiving ? 'Archiving…' : 'Confirm' }}
+            </button>
+            <button class="btn-cancel-sel" @click="batchArchiveConfirm = false">Cancel</button>
+          </template>
           <button class="btn-cancel-sel" @click="clearSelection">Deselect all</button>
         </template>
 
@@ -671,8 +828,8 @@ const selectedFileFolderIsLegacy = computed(() => {
               {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
             </option>
           </select>
-          <button class="btn-upload" :disabled="uploading" @click="triggerUpload">
-            {{ uploading ? 'Uploading…' : 'Upload files' }}
+          <button class="btn-upload" :disabled="uploading || duplicateChecking" @click="triggerUpload">
+            {{ uploading ? 'Uploading…' : duplicateChecking ? 'Checking…' : 'Upload files' }}
           </button>
         </template>
         <input
@@ -683,6 +840,51 @@ const selectedFileFolderIsLegacy = computed(() => {
           class="hidden-input"
           @change="onFilesSelected"
         >
+      </div>
+    </div>
+
+    <!--
+      ML-CLOUD-02 — possible-duplicate warning.
+
+      Shown before anything is uploaded. It states what it compared (name and
+      size in this folder) so nobody reads it as a content check, and it never
+      decides: the operator skips the duplicates or uploads them anyway.
+    -->
+    <div v-if="duplicateMatches.length > 0" class="ml-dup-panel">
+      <p class="dup-panel-title">
+        Possible duplicate{{ duplicateMatches.length > 1 ? 's' : '' }}
+        in {{ uploadFolder ? folderPath(uploadFolder) : 'Needs Classification' }}
+      </p>
+      <p class="dup-panel-note">Same filename and same size as a file already here. Nothing has been uploaded yet.</p>
+
+      <ul class="dup-list">
+        <li v-for="dup in duplicateMatches" :key="dup.filename" class="dup-item">
+          <div class="dup-col">
+            <span class="dup-col-label">New</span>
+            <span class="dup-name">{{ dup.filename }}</span>
+            <span class="dup-meta">{{ formatSize(dup.size) }}</span>
+          </div>
+          <div class="dup-col">
+            <span class="dup-col-label">Existing</span>
+            <span v-for="hit in dup.existing" :key="hit.id" class="dup-existing">
+              <span class="dup-name">{{ hit.filename_download }}</span>
+              <span class="dup-meta">
+                {{ uploadFolder ? folderPath(uploadFolder) : 'Needs Classification' }} · {{ formatSize(hit.filesize) }}
+              </span>
+            </span>
+          </div>
+        </li>
+      </ul>
+
+      <p class="dup-panel-note">
+        {{ pendingFiles.length - duplicateMatches.length }} other file(s) in this selection are not duplicates
+        and will upload either way.
+      </p>
+
+      <div class="dup-actions">
+        <button class="btn-dup-skip" :disabled="uploading" @click="skipDuplicates">Cancel duplicates</button>
+        <button class="btn-dup-anyway" :disabled="uploading" @click="uploadAnyway">Upload anyway</button>
+        <button class="btn-cancel-sel" :disabled="uploading" @click="cancelUploadSelection">Cancel all</button>
       </div>
     </div>
 
@@ -922,7 +1124,7 @@ const selectedFileFolderIsLegacy = computed(() => {
         <!-- File facts (read-only) — single source of truth from selectedFile -->
         <dl class="detail-info">
           <dt>Filename</dt>
-          <dd>{{ selectedFile.filename_download ?? selectedFile.filename_disk ?? '—' }}</dd>
+          <dd class="detail-filename">{{ selectedFile.filename_download ?? selectedFile.filename_disk ?? '—' }}</dd>
           <dt>Format</dt>
           <dd>{{ selectedFile.type ?? '—' }}</dd>
           <template v-if="selectedFile.width && selectedFile.height">
@@ -959,10 +1161,17 @@ const selectedFileFolderIsLegacy = computed(() => {
               <p class="refs-note">ALT / caption / file_role are set in product or content references and cannot be edited here</p>
               <ul v-if="detailRefs.references.length" class="refs-list">
                 <li v-for="ref in detailRefs.references" :key="`${ref.product_id}-${ref.file_role}`">
-                  {{ ref.product_name }} · <code>{{ ref.file_role }}</code>
+                  {{ ref.product_name }} · <code>{{ ref.file_role ?? 'media' }}</code>
                 </li>
               </ul>
             </template>
+          </div>
+          <!--
+            Not "0 references". The lookup failed, and saying nothing was found
+            would invite someone to archive a file that is in use.
+          -->
+          <div v-else-if="detailRefsUnavailable" class="refs-unavailable">
+            References unavailable — could not check what uses this file. Archiving is disabled until it can.
           </div>
           <div v-else class="lifecycle-loading">Reference information unavailable</div>
 
@@ -1013,9 +1222,29 @@ const selectedFileFolderIsLegacy = computed(() => {
             This file is in a legacy folder (read only). Move it to an approved folder.
           </div>
 
+          <!--
+            ML-CLOUD-02 — Filename, Title and Description are three different
+            things and the panel says so. Filename is what downloads; Title is
+            what the CMS displays; Description is internal.
+          -->
+          <div class="field-row">
+            <label class="field-label">Filename</label>
+            <input
+              v-model="editForm.filename"
+              type="text"
+              class="field-input"
+              placeholder="File name for download"
+              maxlength="255"
+            >
+            <p class="field-hint">
+              The name people download. The file keeps its ID, its content and its format —
+              product and AI references are unaffected. The extension is kept.
+            </p>
+          </div>
           <div class="field-row">
             <label class="field-label">Title</label>
             <input v-model="editForm.title" type="text" class="field-input" placeholder="Display title" maxlength="255">
+            <p class="field-hint">Display name used by the CMS. Not the filename.</p>
           </div>
           <div class="field-row">
             <label class="field-label">Internal description</label>
@@ -1613,6 +1842,78 @@ const selectedFileFolderIsLegacy = computed(() => {
   background: white; cursor: pointer;
 }
 .btn-cancel-sel:hover { background: var(--color-line); }
+.btn-cancel-sel:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── ML-CLOUD-02: batch archive ── */
+.btn-batch-archive,
+.btn-batch-archive-confirm {
+  height: 36px; padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.btn-batch-archive {
+  background: white; color: #8a4b08; border: 1px solid #d9a26a;
+}
+.btn-batch-archive:hover:not(:disabled) { background: #fdf3e7; }
+.btn-batch-archive-confirm {
+  background: #8a4b08; color: white; border: 1px solid transparent;
+}
+.btn-batch-archive-confirm:hover:not(:disabled) { background: #6d3b06; }
+.btn-batch-archive:disabled,
+.btn-batch-archive-confirm:disabled { opacity: 0.55; cursor: not-allowed; }
+.batch-confirm-msg { font-size: var(--text-xs); color: #8a4b08; }
+
+/* ── ML-CLOUD-02: duplicate warning ── */
+.ml-dup-panel {
+  margin: var(--space-3) var(--space-6) 0;
+  padding: var(--space-3);
+  background: #fdf6ec;
+  border: 1px solid #d9a26a;
+  border-radius: var(--radius-md);
+}
+.dup-panel-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm); font-weight: 600; color: #8a4b08;
+  overflow-wrap: anywhere;
+}
+.dup-panel-note {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs); color: var(--color-ink-muted);
+}
+.dup-list { list-style: none; margin: 0 0 var(--space-2); padding: 0; }
+.dup-item {
+  display: flex; gap: var(--space-4); flex-wrap: wrap;
+  padding: var(--space-2) 0;
+  border-top: 1px solid #eddcc4;
+}
+.dup-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 200px; }
+.dup-col-label {
+  font-size: var(--text-xs); font-weight: 600; color: var(--color-ink-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.dup-existing { display: flex; flex-direction: column; gap: 2px; }
+.dup-name { font-size: var(--text-sm); color: var(--color-ink); overflow-wrap: anywhere; }
+.dup-meta { font-size: var(--text-xs); color: var(--color-ink-muted); overflow-wrap: anywhere; }
+.dup-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.btn-dup-skip,
+.btn-dup-anyway {
+  height: 36px; padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.btn-dup-skip { background: var(--color-primary-deep); color: white; border: 1px solid transparent; }
+.btn-dup-skip:hover:not(:disabled) { background: var(--color-primary); }
+.btn-dup-anyway { background: white; color: #8a4b08; border: 1px solid #d9a26a; }
+.btn-dup-anyway:hover:not(:disabled) { background: #fdf3e7; }
+.btn-dup-skip:disabled, .btn-dup-anyway:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* References that could not be checked must not read like "none". */
+.refs-unavailable {
+  font-size: var(--text-xs); color: #8a4b08;
+  background: #fdf6ec; border: 1px solid #d9a26a;
+  border-radius: var(--radius-sm); padding: var(--space-2);
+}
+.detail-filename { overflow-wrap: anywhere; }
 
 /* ── Responsive helpers ── */
 .desktop-only { }
@@ -1771,5 +2072,18 @@ const selectedFileFolderIsLegacy = computed(() => {
   .folder-panel-row { flex-direction: column; align-items: stretch; }
   .folder-panel-input { flex: 1 1 auto; }
   .btn-folder-action { flex: 1 1 auto; }
+
+  /* ML-CLOUD-02 — the duplicate decision has to be reachable on a phone. */
+  .ml-dup-panel { margin-left: var(--space-4); margin-right: var(--space-4); }
+  /*
+    Once the row stacks, `flex: 1 1 200px` is a 200px basis in the COLUMN
+    direction — a 200px-tall blank block under each label. Height here is
+    whatever the text needs.
+  */
+  .dup-item { flex-direction: column; gap: var(--space-2); }
+  .dup-col { flex: 0 0 auto; }
+  .dup-actions { flex-direction: column; align-items: stretch; }
+  .btn-dup-skip, .btn-dup-anyway { width: 100%; }
+  .batch-confirm-msg { flex: 1 1 100%; }
 }
 </style>
