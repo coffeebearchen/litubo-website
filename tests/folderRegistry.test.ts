@@ -475,6 +475,9 @@ const TREE = [
   { id: 'f-lt180c', name: 'LT-180C', parent: 'f-xray' },
   { id: 'f-manuals', name: 'manuals', parent: 'f-lt180c' },
   { id: 'f-photos', name: 'photos', parent: 'f-lt180c' },
+  // A second declared zone, so cross-zone moves have somewhere to be refused to.
+  { id: 'f-conveyor', name: 'conveyor', parent: 'f-products' },
+  { id: 'f-belts', name: 'belts', parent: 'f-conveyor' },
   { id: 'f-techdocs', name: 'technical-docs', parent: 'f-products' },
   { id: 'f-resources', name: 'resources', parent: null },
   { id: 'f-downloads', name: 'downloads', parent: 'f-resources' },
@@ -682,6 +685,58 @@ describe('moving a folder', () => {
     const result = validateFolderMove(withClash, 'f-manuals', 'f-photos')
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.code).toBe('FOLDER_NAME_TAKEN')
+  })
+})
+
+/**
+ * D-023 — a customer folder organises inside the product category it was filed
+ * under. Crossing to another declared zone keeps every UUID valid while
+ * silently re-filing everything underneath, so the server refuses it.
+ */
+describe('a folder stays inside its own declared zone', () => {
+  it('moves within the zone, one level up', () => {
+    // products/xray/LT-180C/manuals → products/xray/LT-180C
+    expect(validateFolderMove(reg(), 'f-manuals', 'f-lt180c').ok).toBe(true)
+  })
+
+  it('moves within the zone, between two nested folders', () => {
+    // products/xray/LT-180C/manuals → products/xray/LT-180C/photos
+    expect(validateFolderMove(reg(), 'f-manuals', 'f-photos').ok).toBe(true)
+  })
+
+  it('moves back to its own zone root', () => {
+    // products/xray/LT-180C → products/xray
+    expect(validateFolderMove(reg(), 'f-lt180c', 'f-xray').ok).toBe(true)
+  })
+
+  it.each([
+    ['xray → conveyor', 'f-lt180c', 'f-conveyor'],
+    ['conveyor → xray', 'f-belts', 'f-xray'],
+    ['a nested xray folder → a nested conveyor folder', 'f-manuals', 'f-belts'],
+  ])('refuses %s', (_label, folder, target) => {
+    const result = validateFolderMove(reg(), folder, target)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_ZONE_MISMATCH')
+  })
+
+  it('names the zone the folder is confined to, so the operator knows why', () => {
+    const result = validateFolderMove(reg(), 'f-lt180c', 'f-conveyor')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('products/xray')
+  })
+
+  it('reports the zone a folder belongs to, counting a zone root as its own zone', () => {
+    expect(at('products/xray').zone_root).toBe('products/xray')
+    expect(at('products/xray/LT-180C/manuals').zone_root).toBe('products/xray')
+    expect(at('products/conveyor/belts').zone_root).toBe('products/conveyor')
+  })
+
+  it.each([
+    ['a system container', 'products'],
+    ['a frozen legacy folder', 'products/technical-docs'],
+    ['a path outside every zone', 'stray-folder'],
+  ])('%s belongs to no zone', (_label, path) => {
+    expect(at(path).zone_root).toBeNull()
   })
 })
 

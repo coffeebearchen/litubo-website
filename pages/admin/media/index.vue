@@ -122,6 +122,8 @@ type FlatFolder = {
   /** ML-CLOUD-01 — may the folder itself be renamed/moved. Separate from the file-content flags above. */
   management: FolderNode['management']
   can_create_children: boolean
+  full_path: string
+  zone_root: string | null
 }
 function flattenFolders(nodes: FolderNode[], depth = 0): FlatFolder[] {
   const result: FlatFolder[] = []
@@ -135,6 +137,8 @@ function flattenFolders(nodes: FolderNode[], depth = 0): FlatFolder[] {
       allow_move_target: n.allow_move_target,
       management: n.management,
       can_create_children: n.can_create_children,
+      full_path: n.full_path,
+      zone_root: n.zone_root,
     })
     result.push(...flattenFolders(n.children, depth + 1))
   }
@@ -259,12 +263,24 @@ const currentFolder = computed<FlatFolder | null>(() => {
   return flatFolders.value.find((f: FlatFolder) => f.id === id) ?? null
 })
 
-/** Folders a customer folder may be moved into — anywhere that can hold customer folders. */
-const folderMoveTargets = computed(() =>
-  flatFolders.value.filter((f: FlatFolder) =>
-    f.can_create_children && f.id !== currentFolder.value?.id,
-  ),
-)
+/**
+ * Folders the current folder may be moved into: somewhere that can hold
+ * customer folders, inside the same declared zone (D-023), and neither the
+ * folder itself nor one of its own descendants.
+ *
+ * The server refuses all three anyway. Listing them here would only offer the
+ * operator a destination that is guaranteed to fail.
+ */
+const folderMoveTargets = computed(() => {
+  const current = currentFolder.value
+  if (!current) return []
+  return flatFolders.value.filter((f: FlatFolder) =>
+    f.can_create_children
+    && f.zone_root === current.zone_root
+    && f.id !== current.id
+    && !f.full_path.startsWith(`${current.full_path}/`),
+  )
+})
 
 const canCreateFolderHere = computed(() => currentFolder.value?.can_create_children === true)
 const canManageCurrentFolder = computed(() => currentFolder.value?.management === 'customer-managed')

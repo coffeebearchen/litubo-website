@@ -18,6 +18,8 @@ export interface FolderNode {
   management: FolderManagement
   /** True when a customer may create folders inside this one. */
   can_create_children: boolean
+  /** The declared customer zone this folder belongs to, so the browser can offer same-zone move targets only. */
+  zone_root: string | null
   children: FolderNode[]
 }
 
@@ -46,6 +48,7 @@ export default defineEventHandler(async (event) => {
       allow_move_target: entry?.allow_move_target ?? false,
       management: entry?.management ?? 'locked',
       can_create_children: entry ? folderCanHoldCustomerFolders(entry) : false,
+      zone_root: entry?.zone_root ?? null,
       children: [],
     })
   }

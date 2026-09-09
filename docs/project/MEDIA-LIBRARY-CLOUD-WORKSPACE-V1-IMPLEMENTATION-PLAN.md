@@ -53,7 +53,7 @@ AI checkpoint `4bbc838...` 全程冻结。
 ### 功能
 - New folder
 - Rename customer folder
-- Move customer folder
+- Move customer folder —— **只能在其所属的 declared customer zone 内移动**（D-023）；跨 zone → 422 `FOLDER_ZONE_MISMATCH`
 - Move customer folder to Trash / Archive（如果现有 Directus 能安全实现）
 - Protected System Folder 拒绝 Rename / Move / Archive
 - Folder path UI

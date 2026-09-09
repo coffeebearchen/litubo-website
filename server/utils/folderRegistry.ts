@@ -37,6 +37,12 @@ export interface FolderEntry {
   allow_move_target: boolean
   /** Whether the folder itself may be managed. Separate dimension from the three fields above. */
   management: FolderManagement
+  /**
+   * The declared customer zone this folder belongs to, or null. A zone root
+   * belongs to its own zone. Used to keep a customer folder inside the product
+   * category it was filed under (D-023).
+   */
+  zone_root: string | null
 }
 
 // ── Frozen policy map (full_path → PolicyState) ───────────────────────────────
@@ -91,6 +97,18 @@ const CUSTOMER_MANAGEABLE_ROOTS: readonly string[] = [
  */
 function customerZoneRootOf(fullPath: string): string | null {
   return CUSTOMER_MANAGEABLE_ROOTS.find(root => fullPath.startsWith(`${root}/`)) ?? null
+}
+
+/**
+ * The zone a path BELONGS to, counting a zone root as belonging to its own
+ * zone. `customerZoneRootOf` deliberately excludes the root, because the root
+ * is protected and only its descendants are customer-managed. Membership is a
+ * different question: `products/xray` is a legal destination for a folder
+ * already filed under `products/xray`.
+ */
+function zoneOf(fullPath: string): string | null {
+  if (CUSTOMER_MANAGEABLE_ROOTS.includes(fullPath)) return fullPath
+  return customerZoneRootOf(fullPath)
 }
 
 // ── Pure builder (injectable for unit tests) ──────────────────────────────────
@@ -161,6 +179,7 @@ export function buildFolderRegistry(
       allow_upload: policy_state === 'active-canonical',
       allow_move_target: policy_state === 'active-canonical',
       management,
+      zone_root: zoneOf(full_path),
     }
   })
 
@@ -458,9 +477,10 @@ function parentUuidOf(registry: FolderEntry[], entry: FolderEntry): string | nul
 /**
  * May this folder move under that parent?
  *
- * The three ways this goes wrong are all refused: moving a folder into itself,
- * into one of its own descendants (which would detach the subtree from the
- * tree entirely), and out of the customer zone into somewhere protected.
+ * The ways this goes wrong are all refused: moving a folder into itself, into
+ * one of its own descendants (which would detach the subtree from the tree
+ * entirely), out of the customer zone into somewhere protected, and across
+ * from one declared zone into another.
  */
 export function validateFolderMove(
   registry: FolderEntry[],
@@ -503,6 +523,27 @@ export function validateFolderMove(
       ok: false,
       code: 'FOLDER_ZONE_DISALLOWED',
       message: `Folders cannot be moved into "${target.full_path}".`,
+    }
+  }
+
+  /**
+   * D-023 — a customer folder organises inside its own zone, and moving it to
+   * another declared zone is refused. The zone is the product category the
+   * assets underneath it are filed under, so a folder that hops between zones
+   * silently re-files everything in it while every UUID stays valid — the kind
+   * of change nobody would notice until the wrong category shows the wrong
+   * datasheets.
+   *
+   * Both sides are known non-null by the time we get here: the source is
+   * customer-managed, which means it sits under a zone, and the destination
+   * passed `folderCanHoldCustomerFolders`, which means it is a zone root or
+   * inside one. So a plain comparison cannot pass by matching two nulls.
+   */
+  if (target.zone_root !== entry.zone_root) {
+    return {
+      ok: false,
+      code: 'FOLDER_ZONE_MISMATCH',
+      message: `"${entry.full_path}" can only be moved within "${entry.zone_root}".`,
     }
   }
 

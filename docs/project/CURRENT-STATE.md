@@ -4697,7 +4697,7 @@ customer folder **继承其 zone 根的文件内容策略**，因此 `products/x
 | **系统目录 `products/xray` 改名** | **422 `FOLDER_PROTECTED`** |
 | **移入自身后代** | **422 `FOLDER_MOVE_INTO_DESCENDANT`** |
 | 移入自身 | 422 |
-| 跨 zone 移动（xray → conveyor） | 200，子树整体跟随，路径正确 |
+| 跨 zone 移动（xray → conveyor） | 200，子树整体跟随 —— **这是一个缺陷**，与 D-023 不符，已由下方 ML-CLOUD-01 FIX 修复为 422 |
 | 上传到 customer folder（修复后） | 200，文件确实落入该文件夹 |
 
 **UI 权限分层实测：** customer folder → `New folder / Rename / Move`；zone 根 `products/xray` → 仅 `New folder`；非 zone 系统目录 `home` → 无动作 + `System folder` 提示。
@@ -4713,10 +4713,7 @@ customer folder **继承其 zone 根的文件内容策略**，因此 `products/x
 
 遗留项：
 
-| 类型 | 标识 |
-|---|---|
-| 文件夹 | `products/conveyor/ZZ-ML-CLOUD-01-RENAMED` 及其子目录 `manuals` |
-| 文件 | `ZZ-ML-CLOUD-01-VERIFY.txt`、`ZZ-ML-CLOUD-01-CONTROL.txt`（均 Unclassified）、`ZZ-ML-CLOUD-01-AFTERFIX.txt`（在测试文件夹内） |
+遗留项的**最终标识见下方 ML-CLOUD-01 FIX 第三节** —— 已按项目规则用受支持的 Rename / Title / Move 操作统一打上 `TEST ONLY — NOT FOR PUBLICATION`。
 
 如需清除，请在 Directus 后台直接删除。我未绕过受支持路径去写 Directus。
 
@@ -4729,3 +4726,104 @@ customer folder **继承其 zone 根的文件内容策略**，因此 `products/x
 **记录未修的既有 P1：** `products_files` 的 Directus 403 —— 它同时导致 `references` 与**文件归档**不可用。属 Directus 权限配置，本模块禁止改动。
 
 *最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-01"任务中写入。*
+
+---
+
+## ML-CLOUD-01 FIX — 客户文件夹不得跨 zone 移动（2026-09-09）
+
+**状态：PASS AFTER MINIMAL FIX。** 范围限于收口，未重新设计模块。
+
+### 一、修复的缺陷
+
+ML-CLOUD-01 首轮验收记录 `products/xray → products/conveyor` 的跨 zone Move 返回 **200**。这与 D-023 不符：customer-managed folder 只能在其所属的 declared customer-manageable zone 内移动。
+
+原实现只检查了目的地**能不能装客户文件夹**，没有检查**是不是同一个 zone**。所有五个类目根都能装，于是任意两个 zone 之间可以互相搬。
+
+zone 是这批资产所属的**产品类目**。跨 zone 搬一个文件夹，所有 UUID 依然有效、所有引用依然解析得到，但目录下每一个资产都被悄悄改了归类 —— 直到某个类目页显示了别的类目的资料才会被发现。
+
+### 二、实现
+
+`FolderEntry` 新增 `zone_root`：该文件夹**所属**的 declared zone，其中 zone 根算作属于自己的 zone。这与既有的 `customerZoneRootOf()`（严格后代，用于文件策略继承）是两个不同的问题，因此是两个函数：
+
+| 路径 | `zone_root` |
+|---|---|
+| `products/xray` | `products/xray` |
+| `products/xray/LT-180C/manuals` | `products/xray` |
+| `products` | `null` |
+| `products/technical-docs`（legacy） | `null` |
+| zone 外任意路径 | `null` |
+
+`validateFolderMove` 在既有检查之后增加一条不变式：
+
+```text
+target.zone_root !== entry.zone_root  →  422 FOLDER_ZONE_MISMATCH
+```
+
+两侧到这一步都已保证非 null（source 是 customer-managed，必在某 zone 内；target 已通过 `folderCanHoldCustomerFolders`，必是 zone 根或 zone 内），因此不存在「两个 null 相等」而放行的路径。
+
+**未建设**任何权限系统 —— 只有这一条 same-zone 不变式。
+
+### 三、前端
+
+`/api/admin/media/folders` 每个节点返回 `zone_root`，Move 目的地下拉只列出**合法目的地**：同 zone、非自身、非自身后代。
+
+实测（1440px 登录态）：
+
+| 当前文件夹 | Move 目的地下拉内容 |
+|---|---|
+| `products/conveyor/ZZ-ML-CLOUD-01 TEST ONLY…` | 仅 `conveyor` |
+| `…/ZZ-ML-CLOUD-01 TEST ONLY…/manuals` | `conveyor`、`ZZ-ML-CLOUD-01 TEST ONLY…` |
+
+xray / metal-detection / combination / checkweigher 及其下属文件夹**不再出现**在 conveyor 区文件夹的目的地列表中。前端只是不让人选一个注定失败的位置；**服务端仍是最终安全边界**。
+
+### 四、遗留 TEST ONLY 测试资料（最终标识）
+
+按项目规则，测试资料必须带 `TEST ONLY — NOT FOR PUBLICATION`。已用**受支持路径**（Folder Rename / File Title / File Move）完成标注与归拢，未改 Directus 权限、未绕过 API、未永久删除：
+
+| 类型 | 最终标识 |
+|---|---|
+| 文件夹 | `products/conveyor/ZZ-ML-CLOUD-01 TEST ONLY — NOT FOR PUBLICATION` |
+| 子文件夹 | 同上 `/manuals` |
+| 文件 | `ZZ-ML-CLOUD-01-VERIFY.txt` → Title `ZZ-ML-CLOUD-01-VERIFY — TEST ONLY — NOT FOR PUBLICATION`，已移入上述测试文件夹 |
+| 文件 | `ZZ-ML-CLOUD-01-CONTROL.txt` → Title `ZZ-ML-CLOUD-01-CONTROL — TEST ONLY — NOT FOR PUBLICATION`，已移入上述测试文件夹 |
+| 文件 | `ZZ-ML-CLOUD-01-AFTERFIX.txt` → Title `ZZ-ML-CLOUD-01-AFTERFIX — TEST ONLY — NOT FOR PUBLICATION`，位于 `/manuals` |
+
+**Unclassified 中已无本模块遗留测试文件（实测 0 个）。** 文件夹本身仍无法删除（Folder Trash P1 deferred），文件仍无法归档（既有 `products_files` 403，已在本文件上文记录，本轮不修）。
+
+### 五、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1098 / 1098 通过**（28 文件，本次 +11） |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | exit 0 |
+| `npm run build` | 成功 |
+
+**红灯验证：** 临时移除 same-zone 检查后，4 条新测试全部失败（`refuses xray → conveyor`、`refuses conveyor → xray`、嵌套跨 zone、错误信息含 zone 名）；恢复后全绿。
+
+**真实 Directus API 实测：**
+
+| 场景 | 结果 |
+|---|---|
+| 同 zone 上移 `manuals` → `products/conveyor`（zone 根） | **200**，路径 `products/conveyor/manuals` |
+| 同 zone 嵌套移回 `manuals` → 测试文件夹 | **200**，路径正确还原 |
+| 跨 zone `ZZ-ML-CLOUD-01…`(conveyor) → `products/xray` | **422 `FOLDER_ZONE_MISMATCH`** |
+| 跨 zone `manuals`(conveyor) → `products/xray` | **422 `FOLDER_ZONE_MISMATCH`** |
+| protected：移动 `products/xray` 本身 | 422 `FOLDER_PROTECTED` |
+| frozen：移入 `products/technical-docs` | 422 `FOLDER_ZONE_DISALLOWED` |
+| container：移入 `products` | 422 `FOLDER_ZONE_DISALLOWED` |
+| 移入自身 | 422 `FOLDER_MOVE_INTO_SELF` |
+| 移入自身后代 | 422 `FOLDER_MOVE_INTO_DESCENDANT` |
+
+`xray → conveyor` 方向的拒绝由单元测试覆盖（两个方向都测）；API 层实测的是其**逆向** `conveyor → xray`，因为 xray 区内当前没有客户文件夹，而新建一个只为测试会留下无法删除的残留数据。
+
+**断点：** 1440px 与 375px 页面 `scrollWidth === clientWidth`，**无横向溢出**；375px Move 面板可操作（下拉 311px、确认键未选目的地时正确禁用）。Console 唯一的错误是 `/references` 的 **403**，即既有 `products_files` 权限 P1，与本次修复无关。
+
+1440px 因预览面板实际只有 800×500，截图会被缩放到不可读，故 1440 采用 DOM 实测而非截图 —— 此处如实说明，不以缩略图充当验收证据。
+
+### 六、边界
+
+**0 AI 改动** · **0 Directus schema / DB 改动** · **0 Directus 权限改动** · **0 Provider 调用** · **0 API 费用** · **0 permanent delete** · **0 绕过 reference protection** · **0 push / merge / deploy** · `aa1c097` **未 amend**。
+
+*最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-01 FIX"任务中写入。*
