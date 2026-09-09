@@ -3671,3 +3671,111 @@ Current single product Draft
 未修改业务代码、测试、`package.json`、`package-lock.json`、CI、`.nvmrc`、Docker、Directus schema/迁移/权限、`.env`；未读取或输出任何凭证；未填写 AI Key；未调用真实 DeepSeek / OpenAI；零费用；未启用 Apply；未恢复 PDF；未开始 Page Content / FAQ / SEO AI；未开始 `PWS-AI-APPLY-DRAFT-01`；未部署；未 push / merge master；未删除任何历史治理记录；未新建第二份 Charter；未移动 `D:\` 目录；未处理 npm audit；未顺手修复其他 backlog。
 
 *最后更新：2026-09-09，由 Claude Code 在"FD-004-GOV-01"任务中写入。*
+
+---
+
+## PWS-AI-APPLY-DRAFT-01 — 人工确认的 AI Specifications 写入当前产品 Draft（2026-09-09）
+
+**状态：已完成并通过全部验收。** 第一个单产品 AI 闭环自此跑通：选择资料 → AI 提议 → 人工 Accept / Edit / Reject → **Apply 到同一产品 Draft**。
+
+### 一、Apply 的实际写入规则
+
+`apply.post.ts` 的执行顺序是刻意的，每一道在写入之前的拒绝都保证**零写入**：
+
+```text
+产品 ID 合法 → 产品存在 → status 必须为 draft → 请求体 Schema 校验 → 整批 preflight → 才开始写
+```
+
+**只写两类内容：**
+
+| 动作 | 写什么 | 明确不写 |
+|---|---|---|
+| `update` | 仅 `value_en`、`note_en` | label、group、sort、enabled、locale、product status |
+| `add` | 新建 `product_spec_items`；目标组不存在时先建 `product_spec_groups` | 其他一切 |
+
+**没有 delete、没有发布、没有状态变更、没有媒体/来源/SEO/页面内容写入，也不调用任何 AI provider。** 同一批次内多个 add 指向同一个新组时，该组只创建一次（组 ID 按 normalized 名称缓存复用）。
+
+复用既有的 `server/utils/productSpecWriter.ts`——**AI 写入的行与手工编辑的行，是同一批函数写出来的同一批行**，没有第二套 Specifications writer。
+
+### 二、Draft-only 证明
+
+status 检查发生在**读取请求体之前**：非 draft 产品连 body 都不会被解析。自动化测试逐一覆盖 `review` / `published` / `archived` 三种状态，断言 409 且写入集合为空；另有一条专门测试「published 产品 + 畸形 body」仍返回 409，证明顺序确实如此。浏览器实测中产品 3 全程保持 `draft`。
+
+### 三、accepted-only 证明
+
+请求体由 `rows.filter(status === 'accepted')` 构造，Pending 与 Rejected 不进入 body。组件测试真实挂载组件、真实点击（第 1 行 Accept、第 2 行 Reject），断言 `$fetch` 收到的 `changes` 只有 1 条且正是被 Accept 的那条。0 accepted 时按钮 disabled 且点击不发请求。
+
+### 四、cross-product 拒绝证明
+
+`update` 的 `specItemId` 由浏览器提供，因此服务端从该条目自身的 spec group **重新推导** `product_id`。不属于当前产品（或条目不存在）时整批拒绝 409，**零写入**——不存在"前面几条合法就先写了"的情况。单元层与 endpoint 层各有一条测试断言此行为与空写入集合。
+
+同理，若当前产品已存在两个 normalized 同名的规格组，add 没有唯一正确目标，preflight 直接 409 且零写入——不替用户猜。
+
+### 五、部分失败行为
+
+按请求顺序写入，**第一个真实写入失败即停止**，其后的 change 一律不执行。**不做补偿 rollback、不做 revert 链**——那正是这个端点当初被停用的原因（旧实现把 best-effort 补偿说成事务，而补偿本身失败会被静默吞掉）。
+
+返回真实计数：
+
+```json
+{ "ok": false, "appliedCount": 2, "totalCount": 4, "partial": true,
+  "message": "Applied 2 of 4 accepted changes before a save error. Review Specifications before starting a new AI proposal." }
+```
+
+首条即失败时 `appliedCount: 0`、`partial: false`。前端收到 partial 后进入**终止状态**：Apply 锁死、显示服务端返回的真实文案、提示去 Specifications 核对、要继续则从 AI Source Intake 重新发起——避免对同一 proposal 二次 Apply 造成重复 Add。
+
+在 FD-004 下，部分应用是**可人工修正的 Draft 状态**，不是不可恢复的数据破坏；真正错的从来是"声称"，不是"缺少数据库事务"。
+
+### 六、375px 横向溢出修复（本次发现并修复）
+
+浏览器验收发现 Proposal Review 在 375px 横向溢出 443px vs 375px，连 `.admin-topbar` 都被撑宽。逐层量测定位到根因在本组件：移动端块把 `td` 改为 `display: block`，取消了行内三个操作按钮赖以堆叠的 flex column，而基础规则的 `white-space: nowrap` 把三个按钮钉在一条**无法换行**的行上——表格 min-content 因此达到 385px，外层 Workspace 列按内容取宽，整页随之超出视口。
+
+修复是本组件样式内的一行 `.ws-row-actions { white-space: normal; }`：表格 min-content 由 385 降至 155，`.ws-main` 回到 343，溢出消失，按钮换行后仍是 46px 触控高度、全部在视口内。`/specifications`、`/sources-evidence` 等未触碰页面在 375px 本就不溢出，已实测确认此问题不影响它们。
+
+### 七、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **891 / 891 通过**（26 文件；较上轮 +25） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功 |
+
+### 八、浏览器真实验收（TEST ONLY 产品 3，登录态）
+
+| 项 | 结果 |
+|---|---|
+| 1440px | 无横向溢出；Console 零错误 |
+| 375px | 无横向溢出（修复后）；Console 零错误；按钮 46px 触控高度、全部在视口内 |
+| Accept / Edit / Reject | 正常；精确匹配显示 `Accept as Update`，新条目显示 `Accept as Add` |
+| 0 accepted | Apply **disabled**，点击不发请求 |
+| accepted > 0 | Apply **enabled**，按钮显示真实数量（`Apply 3 accepted changes to Draft`） |
+| Specifications 加载失败 | proposal 仍可审阅、可 Accept，但 Apply **disabled** 并说明原因 |
+| **真实 Apply** | 成功：`Applied 3 accepted changes to Draft.`，proposal 随即清空（无法重复 Apply） |
+
+**真实写入 GET 复核（三条路径各一）：**
+
+1. **update** — 条目 3 `Protection Grade`：`IP65` → `IP66 (TEST ONLY — APPLY PROBE)`，note `null` → `TEST ONLY probe`；label 与所属组未变；
+2. **add 到既有组** — 组 1 由 12 条变为 13 条（新条目 19）；
+3. **add 需新建组** — 新建组 5 `TEST ONLY — Apply Probe Group` 并写入条目 20。
+
+产品全程保持 `draft`，组 2 未被触碰。
+
+**恢复结果：** 用既有编辑器端点还原（PATCH 条目 3 回 `IP65`/`null`，删除条目 19、条目 20 与组 5，四步均 200），二次 GET **逐字段比对基线：零差异、零多余组、零多余条目**，产品仍为 `draft`。未清理任何 Activity Log。
+
+**零真实 AI 调用**：Proposal Review 状态由浏览器内存中注入的 synthetic TEST ONLY proposal 建立，未新增任何 dev route，未提交任何测试代码进仓库。
+
+### 九、明确未做
+
+未 push / merge master、未部署；未新增 Directus custom extension、PostgreSQL 事务架构、Redis、distributed lock、新 collection、schema migration、权限变更、新 audit table、rollback saga；未删除 Specifications、未修改 product lifecycle、未写入 Published、未自动发布、未自动 Generate；未调用真实 DeepSeek / OpenAI、未填写任何 API Key、零费用；未恢复 PDF、未做 Excel / Page Content AI / FAQ AI / SEO AI / bulk import；未执行 npm audit fix；未处理登录限流 backlog；未做视觉重设计；未移动或整理任何 `D:\` 目录。
+
+**GitHub Actions 状态：本次推送后需在 Actions 页面确认实际结果。本文档不声称"CI 已绿"。**
+
+### 十、下一步
+
+**First single-product AI beta。** 但**尚未授权真实 API Key 与真实收费 provider**——真实 Beta 需要 Codex 单独发出施工单并由用户明确授权。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-APPLY-DRAFT-01"任务中写入。*

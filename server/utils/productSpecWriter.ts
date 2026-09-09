@@ -11,13 +11,12 @@ import type { FetchFn } from './mediaLifecycle'
  * `mediaLifecycle.ts`/`aiProposalEngine.ts`, so every function here is
  * unit-testable with a mock Directus fetch.
  *
- * PWS-AI-ENGINE-01R2 — AI Apply does NOT currently use this writer. Its
- * best-effort multi-request saga was removed and
- * `.../ai/specification-proposal/apply.post.ts` now unconditionally returns
- * 503, because no real single-transaction write path exists yet. When a
- * Directus-side transactional command is eventually built, that command —
- * not this REST-based writer — will be what AI Apply calls; these functions
- * remain the editor's shared writer in the meantime.
+ * PWS-AI-APPLY-DRAFT-01 — AI Apply now goes through this same writer, on
+ * purpose. `server/utils/aiSpecificationApply.ts` preflights a whole accepted
+ * batch and then calls `getSpecItemOwnership` / `createSpecGroup` /
+ * `createSpecItem` / `updateSpecItem` here, exactly as the manual editor does,
+ * so AI-applied rows and hand-typed rows are the same rows written the same
+ * way. There is deliberately no second Specifications writer.
  */
 
 export interface SpecGroupSummary {

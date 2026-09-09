@@ -30,6 +30,13 @@ const props = defineProps<{
   existingSpecGroups: SpecGroupWithItems[]
   applying: boolean
   applyError: string | null
+  /**
+   * False while the product's existing specifications could not be loaded.
+   * Apply stays unavailable then: without knowing what the product already
+   * has, an Update target cannot be trusted and an Add cannot be told apart
+   * from a duplicate. Reviewing the proposal is still allowed.
+   */
+  comparisonReady: boolean
 }>()
 
 const emit = defineEmits<{
@@ -180,10 +187,24 @@ const unsupportedFiles = computed(() => props.fileResults.filter(f => f.status !
 const readFiles = computed(() => props.fileResults.filter(f => f.status === 'read'))
 
 const acceptedCount = computed(() => rows.value.filter((r: ReviewRow) => r.status === 'accepted').length)
-// PWS-AI-ENGINE-01R2 — Apply is disabled: no real atomic transaction exists
-// yet for this write path (see aiSpecificationApply.ts), so the button stays
-// disabled regardless of how many rows are accepted. Review still works.
-const canApply = computed(() => false)
+
+/**
+ * PWS-AI-APPLY-DRAFT-01 — a batch that stopped part-way through locks this
+ * screen. Re-sending the same proposal after a partial apply would re-add
+ * every row that already landed, so the reviewer is sent to Specifications to
+ * look at the real state and, if they still want the rest, to start a fresh
+ * proposal from Source Intake. This is a terminal state for this proposal, not
+ * a retry prompt.
+ */
+const partialApplyMessage = ref<string | null>(null)
+const partialApplyLocked = computed(() => partialApplyMessage.value !== null)
+
+const canApply = computed(() =>
+  acceptedCount.value > 0
+  && !props.applying
+  && props.comparisonReady
+  && !partialApplyLocked.value,
+)
 
 function rowsForGroup(displayName: string): ReviewRow[] {
   return rows.value.filter((r: ReviewRow) => r.group === displayName)
@@ -215,11 +236,24 @@ async function applyAccepted() {
         ? { action: 'update' as const, specItemId: r.matchedSpecItemId, value: r.value, note: r.note || undefined }
         : { action: 'add' as const, group: r.group, parameter: r.parameter, value: r.value, note: r.note || undefined },
       )
-    const result = await $fetch<{ message: string }>(
+    const result = await $fetch<{
+      ok: boolean
+      appliedCount: number
+      totalCount: number
+      partial: boolean
+      message: string
+    }>(
       `/api/admin/products/${props.productId}/ai/specification-proposal/apply`,
       { method: 'POST', body: { changes } },
     )
-    emit('apply-success', result.message)
+    if (result.ok) {
+      emit('apply-success', result.message)
+      return
+    }
+    // Some or none of the batch landed. Report the server's real count and
+    // lock this proposal rather than inviting a second Apply that would
+    // duplicate whatever already saved.
+    partialApplyMessage.value = result.message
   } catch (e: unknown) {
     const fe = e as { data?: { message?: string } }
     emit('apply-error', fe.data?.message ?? 'Could not apply these changes right now.')
@@ -239,7 +273,7 @@ async function applyAccepted() {
       <li class="ws-step"><span class="ws-step-index">1</span> Select sources</li>
       <li class="ws-step"><span class="ws-step-index">2</span> Analyze</li>
       <li class="ws-step ws-step--current"><span class="ws-step-index">3</span> Review proposals</li>
-      <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft (temporarily unavailable)</li>
+      <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft</li>
     </ol>
 
     <section v-if="unsupportedFiles.length > 0" class="ws-card ws-card--notice">
@@ -317,12 +351,33 @@ async function applyAccepted() {
       </div>
 
       <div class="ws-apply-row">
-        <button type="button" class="btn btn-primary btn-apply" disabled title="Apply is temporarily unavailable" @click="applyAccepted">
-          Apply accepted changes to Draft
+        <button
+          type="button"
+          class="btn btn-primary btn-apply"
+          :disabled="!canApply"
+          @click="applyAccepted"
+        >
+          {{ applying
+            ? 'Applying…'
+            : acceptedCount > 0
+              ? `Apply ${acceptedCount} accepted change${acceptedCount === 1 ? '' : 's'} to Draft`
+              : 'Apply accepted changes to Draft' }}
         </button>
-        <p class="ws-apply-disabled-note">
-          Apply is temporarily unavailable: a verified atomic database transaction for this write path does not exist yet, so no changes can be saved from this screen. Review and Generate are unaffected.
+
+        <p v-if="partialApplyLocked" class="ws-apply-partial" role="alert">
+          {{ partialApplyMessage }}
+          Open Specifications to check what was saved. To apply the rest, start a new proposal from AI Source Intake.
         </p>
+        <p v-else-if="!comparisonReady" class="ws-apply-disabled-note">
+          Apply is unavailable until this product's existing specifications load — without them a proposed item cannot be told apart from one that already exists.
+        </p>
+        <p v-else-if="acceptedCount === 0" class="ws-apply-disabled-note">
+          Only changes you explicitly accepted will be written to this product Draft. Accept at least one item to enable Apply.
+        </p>
+        <p v-else class="ws-apply-disabled-note">
+          Only changes you explicitly accepted will be written to this product Draft.
+        </p>
+
         <p v-if="applyError" class="ws-apply-error" role="alert">{{ applyError }}</p>
       </div>
     </section>
@@ -404,6 +459,7 @@ async function applyAccepted() {
 
 .ws-apply-error { font-size: var(--text-sm); color: #C0392B; background: #FDF0EE; border: 1px solid #F5C6C2; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); margin: 0; }
 .ws-apply-disabled-note { font-size: var(--text-xs); color: var(--color-ink-muted); max-width: 60ch; margin: 0; line-height: 1.5; }
+.ws-apply-partial { font-size: var(--text-sm); color: #8A5A00; background: #FFF7E6; border: 1px solid #F0D9A8; border-radius: var(--radius-sm); padding: var(--space-3); margin: 0; max-width: 72ch; line-height: 1.55; }
 
 .ws-file-result-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--text-xs); color: var(--color-ink); }
 
@@ -419,6 +475,18 @@ async function applyAccepted() {
     content: attr(data-label); display: block; font-size: 0.625rem; font-weight: 600;
     letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-ink-muted); margin-bottom: 2px;
   }
+
+  /*
+   * PWS-AI-APPLY-DRAFT-01 — the `display: block` above cancels the flex column
+   * the row's three action buttons rely on to stack, and the base rule's
+   * `white-space: nowrap` then pinned all three onto one unwrappable line. That
+   * gave the table a min-content of 385px, which the surrounding Workspace
+   * column sizes itself to — so the whole admin page, topbar included, rendered
+   * wider than a 375px viewport and scrolled sideways. Letting the buttons wrap
+   * drops the table's min-content to 155px and the overflow with it.
+   */
+  .ws-row-actions { white-space: normal; }
+
   .ws-steps { gap: var(--space-1); }
 }
 </style>

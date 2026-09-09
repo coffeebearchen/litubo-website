@@ -154,6 +154,7 @@ onBeforeRouteLeave(() => {
         :proposal="proposalSession!.proposal"
         :file-results="proposalSession!.fileResults"
         :existing-spec-groups="existingSpecGroups"
+        :comparison-ready="!specsError"
         :applying="applying"
         :apply-error="applyError"
         @applying="applying = $event"

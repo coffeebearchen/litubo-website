@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 /**
- * PWS-AI-ENGINE-01R2 — real component-mounting behavior tests for
- * `WorkspaceAiProposalReview.vue`: actual clicks on Accept/Reject/Edit, and
- * confirmation that Apply stays disabled and sends no request (Apply has no
- * real atomic transaction behind it yet — see aiSpecificationApply.ts).
- * `$fetch` is stubbed globally so a test would fail loudly if Apply ever
- * did send a request.
+ * PWS-AI-APPLY-DRAFT-01 — real component-mounting behaviour tests for
+ * `WorkspaceAiProposalReview.vue`: actual clicks on Accept / Reject / Edit,
+ * and the Apply gate now that Apply really writes.
+ *
+ * `$fetch` is stubbed globally, so what the component sends is asserted
+ * directly — in particular that only accepted rows ever reach the request
+ * body, and that nothing is sent at all while Apply is disabled.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -32,6 +33,15 @@ const BASE_PROPS = {
   existingSpecGroups: [],
   applying: false,
   applyError: null,
+  comparisonReady: true,
+}
+
+const applyButtonOf = (wrapper: ReturnType<typeof mountReview>) =>
+  wrapper.findAll('button').find(b => b.text().includes('Apply') && b.text().includes('Draft'))!
+
+const acceptFirstRow = async (wrapper: ReturnType<typeof mountReview>) => {
+  const acceptButtons = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
+  await acceptButtons[0].trigger('click')
 }
 
 function mountReview(props: Partial<typeof BASE_PROPS> = {}) {
@@ -77,30 +87,104 @@ describe('WorkspaceAiProposalReview — real mounted component', () => {
     expect(wrapper.text()).toContain('1.0 mm')
   })
 
-  // PWS-AI-ENGINE-01R2 — Apply has no real atomic transaction behind it yet
-  // (see aiSpecificationApply.ts), so the button is now permanently disabled
-  // regardless of accepted rows, no request is ever sent, and a visible note
-  // explains why. These tests replace the old enable/send/success/error
-  // Apply tests, which exercised a write path that no longer exists.
-  it('Apply stays disabled even after a row is accepted, and no request is ever sent', async () => {
+  // ── PWS-AI-APPLY-DRAFT-01: the Apply gate ──
+
+  it('Apply is disabled with nothing accepted, and sends no request if clicked anyway', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('$fetch', fetchMock)
 
     const wrapper = mountReview()
-    const applyButton = wrapper.findAll('button').find(b => b.text().includes('Apply accepted changes'))!
-    expect((applyButton.element as HTMLButtonElement).disabled).toBe(true)
+    const button = applyButtonOf(wrapper)
+    expect((button.element as HTMLButtonElement).disabled).toBe(true)
 
-    const acceptButtons = wrapper.findAll('button').filter(b => b.text().startsWith('Accept as'))
-    await acceptButtons[0].trigger('click')
-    expect(wrapper.text()).toContain('1 accepted')
-
-    expect((wrapper.findAll('button').find(b => b.text().includes('Apply accepted changes'))!.element as HTMLButtonElement).disabled).toBe(true)
+    await button.trigger('click')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('shows a visible note explaining Apply is temporarily unavailable', () => {
+  it('Apply becomes enabled once at least one row is accepted, and names the count', async () => {
     const wrapper = mountReview()
-    expect(wrapper.text()).toContain('Apply is temporarily unavailable')
+    await acceptFirstRow(wrapper)
+
+    const button = applyButtonOf(wrapper)
+    expect((button.element as HTMLButtonElement).disabled).toBe(false)
+    expect(button.text()).toBe('Apply 1 accepted change to Draft')
+  })
+
+  it('Apply stays disabled when the existing specifications could not be loaded', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('$fetch', fetchMock)
+
+    const wrapper = mountReview({ comparisonReady: false })
+    await acceptFirstRow(wrapper)
+
+    expect((applyButtonOf(wrapper).element as HTMLButtonElement).disabled).toBe(true)
+    expect(wrapper.text()).toContain("Apply is unavailable until this product's existing specifications load")
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('sends ONLY accepted rows — pending and rejected never reach the request body', async () => {
+    const fetchMock = vi.fn(async (_url: string, _options?: { body?: { changes: Array<Record<string, unknown>> } }) => (
+      { ok: true, appliedCount: 1, totalCount: 1, partial: false, message: 'Applied 1 accepted change to Draft.' }
+    ))
+    vi.stubGlobal('$fetch', fetchMock)
+
+    const wrapper = mountReview()
+    const buttons = wrapper.findAll('button')
+    // Row 1 accepted, row 2 rejected. (The proposal has exactly two rows.)
+    await buttons.filter(b => b.text().startsWith('Accept as'))[0].trigger('click')
+    await wrapper.findAll('button').filter(b => b.text() === 'Reject')[1].trigger('click')
+
+    await applyButtonOf(wrapper).trigger('click')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const body = fetchMock.mock.calls[0][1]!.body!
+    expect(body.changes).toHaveLength(1)
+    expect(body.changes[0]).toMatchObject({ action: 'add', parameter: 'Detection sensitivity (Fe)' })
+  })
+
+  it('a fully successful apply emits the server message as apply-success', async () => {
+    vi.stubGlobal('$fetch', vi.fn(async () => ({
+      ok: true, appliedCount: 1, totalCount: 1, partial: false, message: 'Applied 1 accepted change to Draft.',
+    })))
+
+    const wrapper = mountReview()
+    await acceptFirstRow(wrapper)
+    await applyButtonOf(wrapper).trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('apply-success')?.[0]).toEqual(['Applied 1 accepted change to Draft.'])
+  })
+
+  it('a partial apply shows the real count, locks Apply, and does not emit success', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      appliedCount: 2,
+      totalCount: 4,
+      partial: true,
+      message: 'Applied 2 of 4 accepted changes before a save error. Review Specifications before starting a new AI proposal.',
+    }))
+    vi.stubGlobal('$fetch', fetchMock)
+
+    const wrapper = mountReview()
+    await acceptFirstRow(wrapper)
+    await applyButtonOf(wrapper).trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('apply-success')).toBeUndefined()
+    expect(wrapper.text()).toContain('Applied 2 of 4 accepted changes')
+    expect(wrapper.text()).toContain('Open Specifications to check what was saved')
+
+    // Terminal state: no second Apply of the same proposal.
+    expect((applyButtonOf(wrapper).element as HTMLButtonElement).disabled).toBe(true)
+    await applyButtonOf(wrapper).trigger('click')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('tells the reviewer plainly that only accepted changes are written', () => {
+    const wrapper = mountReview()
+    expect(wrapper.text()).toContain('Only changes you explicitly accepted will be written to this product Draft')
+    expect(wrapper.text()).not.toContain('temporarily unavailable')
+    expect(wrapper.text()).not.toContain('atomic database transaction')
   })
 
   it('an exact group+parameter match against an existing item suggests Update, with the current value visible', () => {

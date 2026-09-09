@@ -230,13 +230,15 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 当前唯一的 AI 施工主线固定为：
 
 ```text
-AI Source Intake
-→ Proposal Review
-→ Apply accepted changes to Draft
-→ First single-product AI beta
+AI Source Intake                      ✅ 已交付
+→ Proposal Review                     ✅ 已交付
+→ Apply accepted changes to Draft     ✅ 已交付（PWS-AI-APPLY-DRAFT-01，2026-09-09）
+→ First single-product AI beta        NEXT — requires separate user authorization
 ```
 
-前两步已交付（详见 `CURRENT-STATE.md`）；第三步 `PWS-AI-APPLY-DRAFT-01` 是**下一个**产品目标，尚未获得代码施工授权。
+前三步均已交付并通过自动化与浏览器验收（详见 `CURRENT-STATE.md`）。第一个单产品 AI 闭环自此跑通：人工 Accept 的 Specifications 可写入同一产品 Draft，Draft-only、accepted-only、跨产品拒绝、部分失败如实上报。
+
+**第四步 First single-product AI beta 尚未授权**：需要 Codex 单独发出施工单，且真实 API Key 与真实收费 provider 仍未获用户授权。
 
 **在当前阶段，以下事项不作为 Apply-to-Draft 的默认前置 Gate**（依据 Charter FD-004.4，除非仓库事实证明其已直接触发某一项 P0）：
 

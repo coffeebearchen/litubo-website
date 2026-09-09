@@ -249,55 +249,46 @@ describe('cross-product isolation — product A may not reach product B\'s files
   })
 })
 
-// ── 3. Apply is inert for every body ──
+// ── 3. Apply: no longer inert, but still tightly bounded ──
 
-describe('apply.post.ts — 503 for every request, with no write path reachable', () => {
-  const bodies = [
-    undefined,
-    {},
-    { changes: [] },
-    { changes: [{ action: 'add', group: 'G', parameter: 'P', value: 'V' }] },
-    { changes: Array.from({ length: 100 }, (_, i) => ({ action: 'update', specItemId: i + 1, value: 'x' })) },
-    { changes: 'not-even-an-array' },
-  ]
-
-  it.each(bodies.map((b, i) => [i, b] as const))('body variant %i returns 503 and issues no write request', async (_i, body) => {
-    installNitroGlobals(async (url: string) => {
-      if (url.includes('/items/products')) return { data: [{ id: 3 }] }
-      return { data: null }
-    })
-    const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/apply.post')).default as (e: unknown) => Promise<unknown>
-
-    const event = mockEvent({
-      url: APPLY_PATH,
-      method: 'POST',
-      routerParams: { id: '3' },
-      body,
-      headers: { origin: 'http://localhost:3000' },
-    })
-    event.context.adminToken = 'admin-token'
-
-    expect(await statusCodeOf(() => handler(event))).toBe(503)
-
-    // Not one non-GET request reached Directus — no writer, no adminFetch write.
-    const writes = fetchCalls.filter(c => {
-      const method = String((c.options?.method as string | undefined) ?? 'GET').toUpperCase()
-      return method !== 'GET'
-    })
-    expect(writes).toEqual([])
-  })
-
-  it('the handler source contains no write call at all — a future refactor cannot silently re-enable writing', async () => {
+/**
+ * PWS-AI-APPLY-DRAFT-01 — the "503 for every body" block that lived here is
+ * gone with the behaviour it described. Apply now writes, so the replacement
+ * assertions are in §4 below: they check the gates that make writing safe
+ * rather than the absence of a write path. The source-level guard is kept and
+ * inverted — the endpoint must go through the shared writer and must never
+ * contain a delete.
+ */
+describe('apply.post.ts — the source itself cannot drift into deleting or publishing', () => {
+  it('routes writes through the shared specification writer and contains no DELETE', async () => {
     const { readFileSync } = await import('node:fs')
     const { resolve } = await import('node:path')
     const source = readFileSync(
       resolve(process.cwd(), 'server/api/admin/products/[id]/ai/specification-proposal/apply.post.ts'),
       'utf8',
     )
-    expect(source).not.toContain('applyAcceptedSpecificationChanges')
-    expect(source).not.toContain('productSpecWriter')
-    expect(source).not.toMatch(/method:\s*'(POST|PATCH|DELETE)'/)
-    expect(source).toContain('statusCode: 503')
+    expect(source).toContain('planSpecificationApply')
+    expect(source).toContain('executeSpecificationApply')
+    expect(source).not.toMatch(/method:\s*'DELETE'/)
+    // The Draft gate is in the handler itself, not only in a helper.
+    expect(source).toContain("'draft'")
+  })
+
+  it('the writer it calls contains no delete and no status write either', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const source = readFileSync(resolve(process.cwd(), 'server/utils/aiSpecificationApply.ts'), 'utf8')
+    const code = source
+      .split(/\r?\n/)
+      .filter(l => !l.trim().startsWith('*') && !l.trim().startsWith('//') && !l.trim().startsWith('/*'))
+      .join(' ')
+    expect(code).not.toContain('deleteSpecItem')
+    expect(code).not.toContain('deleteSpecGroup')
+    // It must not be able to touch the products collection at all — the
+    // lifecycle gate lives in the endpoint, and this writer must never be in a
+    // position to move a product between statuses.
+    expect(code).not.toContain('/items/products')
+    expect(code).not.toContain('status:')
   })
 })
 
@@ -1110,5 +1101,189 @@ describe('sourceRef secret missing — 503, not a silent "invalid ref"', () => {
     expect(result.ok).toBe(false)
     expect(result.error).toContain('no longer valid')
     resetGenerateSlots()
+  })
+})
+
+// ── 4. PWS-AI-APPLY-DRAFT-01: the Apply endpoint's gates ──
+
+/**
+ * The endpoint is the only place AI-derived content reaches a product, so the
+ * gates are asserted against the REAL handler: Draft-only, accepted-only,
+ * this-product-only, and no AI provider anywhere on the path.
+ *
+ * Every case below asserts the write set directly — a refusal that still wrote
+ * something would fail here even if it returned the right status code.
+ */
+describe('apply.post.ts — writes only to a Draft, only this product, only what was accepted', () => {
+  const DRAFT_PRODUCT = { data: { status: 'draft' } }
+
+  // `adminFetch` hands `$fetch` an absolute Directus URL, so these match on
+  // substrings rather than prefixes.
+  function applyFetch(overrides: Record<string, unknown> = {}) {
+    return async (url: string, options?: Record<string, unknown>) => {
+      for (const [fragment, value] of Object.entries(overrides)) {
+        if (url.includes(fragment)) return typeof value === 'function' ? (value as () => unknown)() : value
+      }
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+      if (url.includes('/items/products/3?fields=status')) return DRAFT_PRODUCT
+      if (url.includes('/items/product_spec_groups?filter')) return { data: [{ id: 5, title_en: 'Detection performance' }] }
+      if (url.includes('/items/product_spec_items/')) {
+        return { data: { id: 11, value_en: 'old', note_en: null, spec_group_id: { id: 5, product_id: 3 } } }
+      }
+      if (String(options?.method ?? 'GET').toUpperCase() === 'POST') return { data: { id: 900 } }
+      return { data: null }
+    }
+  }
+
+  async function callApply(body: unknown, overrides: Record<string, unknown> = {}) {
+    installNitroGlobals(applyFetch(overrides))
+    const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/apply.post')).default as (e: unknown) => Promise<unknown>
+    const event = mockEvent({
+      url: APPLY_PATH,
+      method: 'POST',
+      routerParams: { id: '3' },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: Readable.from([JSON.stringify(body)]),
+    })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
+    return { handler, event }
+  }
+
+  /** Any request that is not a plain read of Directus. */
+  const writeCalls = () => fetchCalls.filter(c =>
+    ['POST', 'PATCH', 'DELETE'].includes(String((c.options as { method?: string } | undefined)?.method ?? 'GET').toUpperCase()),
+  )
+
+  it('a malformed body is refused with 400 and writes nothing', async () => {
+    const { handler, event } = await callApply({ changes: [{ action: 'add', group: 'G' }] })
+    expect(await statusCodeOf(() => handler(event))).toBe(400)
+    expect(writeCalls()).toEqual([])
+  })
+
+  it('an empty changes array is refused and writes nothing', async () => {
+    const { handler, event } = await callApply({ changes: [] })
+    expect(await statusCodeOf(() => handler(event))).toBe(400)
+    expect(writeCalls()).toEqual([])
+  })
+
+  it.each(['review', 'published', 'archived'])('a %s product is refused with 409 and writes nothing', async (status) => {
+    const { handler, event } = await callApply(
+      { changes: [{ action: 'add', group: 'Detection performance', parameter: 'P', value: 'V' }] },
+      { '/items/products/3?fields=status': { data: { status } } },
+    )
+    expect(await statusCodeOf(() => handler(event))).toBe(409)
+    expect(writeCalls()).toEqual([])
+  })
+
+  it('the Draft check happens before the body is even parsed — a published product with a bad body is still 409', async () => {
+    const { handler, event } = await callApply(
+      { nonsense: true },
+      { '/items/products/3?fields=status': { data: { status: 'published' } } },
+    )
+    expect(await statusCodeOf(() => handler(event))).toBe(409)
+    expect(writeCalls()).toEqual([])
+  })
+
+  it('an update targeting another product is refused with 409 before any write', async () => {
+    const { handler, event } = await callApply(
+      { changes: [{ action: 'update', specItemId: 99, value: 'x' }] },
+      {
+        '/items/product_spec_items/99': {
+          data: { id: 99, value_en: 'x', note_en: null, spec_group_id: { id: 8, product_id: 4 } },
+        },
+      },
+    )
+    expect(await statusCodeOf(() => handler(event))).toBe(409)
+    expect(writeCalls()).toEqual([])
+  })
+
+  it('a valid mixed batch applies and reports the real counts', async () => {
+    const { handler, event } = await callApply({
+      changes: [
+        { action: 'update', specItemId: 11, value: '0.9 mm', note: 'from datasheet' },
+        { action: 'add', group: 'Detection performance', parameter: 'New param', value: 'V' },
+      ],
+    })
+    const result = await handler(event) as { ok: boolean, appliedCount: number, totalCount: number, partial: boolean }
+    expect(result).toMatchObject({ ok: true, appliedCount: 2, totalCount: 2, partial: false })
+
+    const writes = writeCalls()
+    // Exactly one PATCH and one POST — the existing group is reused, not recreated.
+    expect(writes.filter(c => (c.options as { method?: string }).method === 'PATCH')).toHaveLength(1)
+    expect(writes.filter(c => (c.options as { method?: string }).method === 'POST')).toHaveLength(1)
+    expect(writes.filter(c => (c.options as { method?: string }).method === 'DELETE')).toEqual([])
+  })
+
+  it('never issues a DELETE, and never writes to products, media, sources or SEO', async () => {
+    const { handler, event } = await callApply({
+      changes: [
+        { action: 'update', specItemId: 11, value: 'x' },
+        { action: 'add', group: 'Brand new', parameter: 'P', value: 'V' },
+      ],
+    })
+    await handler(event)
+
+    for (const call of writeCalls()) {
+      expect(String((call.options as { method?: string }).method).toUpperCase()).not.toBe('DELETE')
+      // The only collections this endpoint may write.
+      expect(call.url.includes('/items/product_spec_items') || call.url.includes('/items/product_spec_groups')).toBe(true)
+    }
+  })
+
+  it('calls no AI provider — the Apply path never reaches the network', async () => {
+    const nativeFetchSpy = vi.fn(async () => {
+      throw new Error('Apply must never call an AI provider')
+    })
+    vi.stubGlobal('fetch', nativeFetchSpy)
+    const { handler, event } = await callApply({ changes: [{ action: 'update', specItemId: 11, value: 'x' }] })
+    await handler(event)
+    expect(nativeFetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('a save error part-way through returns the real applied count and attempts nothing after it', async () => {
+    let itemPosts = 0
+    const { handler, event } = await callApply(
+      {
+        changes: [
+          { action: 'add', group: 'Detection performance', parameter: 'A', value: '1' },
+          { action: 'update', specItemId: 11, value: 'boom' },
+          { action: 'add', group: 'Detection performance', parameter: 'C', value: '3' },
+        ],
+      },
+      {
+        '/items/product_spec_items?': () => { throw new Error('unused') },
+      },
+    )
+
+    // Make the PATCH fail while POSTs succeed.
+    vi.stubGlobal('$fetch', vi.fn(async (url: string, options?: Record<string, unknown>) => {
+      fetchCalls.push({ url, options })
+      const method = String(options?.method ?? 'GET').toUpperCase()
+      if (method === 'PATCH') throw new Error('directus write failed')
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+      if (url.includes('/items/products/3?fields=status')) return { data: { status: 'draft' } }
+      if (url.includes('/items/product_spec_groups?filter')) return { data: [{ id: 5, title_en: 'Detection performance' }] }
+      if (url.includes('/items/product_spec_items/')) return { data: { id: 11, value_en: 'old', note_en: null, spec_group_id: { id: 5, product_id: 3 } } }
+      if (method === 'POST') { itemPosts++; return { data: { id: 900 + itemPosts } } }
+      return { data: null }
+    }))
+
+    const result = await handler(event) as { ok: boolean, appliedCount: number, totalCount: number, partial: boolean, message: string }
+
+    expect(result.ok).toBe(false)
+    expect(result.partial).toBe(true)
+    expect(result.appliedCount).toBe(1)
+    expect(result.totalCount).toBe(3)
+    expect(result.message).toContain('Applied 1 of 3')
+    // The third change never ran, and nothing was compensated.
+    expect(itemPosts).toBe(1)
+    expect(writeCalls().filter(c => (c.options as { method?: string }).method === 'DELETE')).toEqual([])
+  })
+
+  it('is refused for an unauthenticated caller by the real middleware', async () => {
+    installNitroGlobals(async () => ({}))
+    const middleware = (await import('../server/middleware/admin-auth')).default as (e: unknown) => Promise<unknown>
+    expect(await statusCodeOf(() => middleware(mockEvent({ url: APPLY_PATH, method: 'POST' })))).toBe(401)
   })
 })
