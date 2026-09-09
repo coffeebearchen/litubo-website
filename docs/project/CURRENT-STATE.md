@@ -3867,3 +3867,81 @@ Apply 返回 `{ ok: true, appliedCount: 1, totalCount: 1, partial: false }`；la
 本次未开始 Beta。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-APPLY-DRAFT-01R1"任务中写入。*
+
+---
+
+## PWS-AI-BETA-01R1 — Media Library 允许上传 AI 文本 source（2026-09-09）
+
+**这是 FIRST SINGLE-PRODUCT AI BETA 暴露出来的一个 P1 功能缺口，不是新模块。**
+
+### 一、Beta 第一次尝试时发现的事实
+
+准备跑第一次真实 DeepSeek 调用时，对 TEST ONLY 产品 3 做 source 清点，结果是：**7 个已关联文件全部是图片**，`analyzable` 全为 `false`，可分析的 TXT / CSV / TSV 数量为 **0**。因此本次 Beta 在「选择 source」这一步就停住了，**未发起任何真实 AI 调用，零费用**。
+
+追查后确认这不是数据没准备好，而是一个真实的功能缺口：
+
+| 环节 | 当时支持的格式 |
+|---|---|
+| AI Source Intake（分析侧） | TXT `text/plain`、CSV `text/csv`、TSV `text/tab-separated-values` |
+| Media Library upload（唯一正式上传入口） | JPG、PNG、WebP、PDF |
+
+两端不一致，意味着**管理员没有任何受支持的途径**把一份 AI 可分析的文本资料放到产品上——分析侧接受的三种格式，上传侧一种都不收。
+
+按 FD-004 分级，这属于 **P1（不触及 P0 核心边界，但直接挡住真实单产品 Beta 的可用性）**，因此在 Beta 前修复。
+
+### 二、最小修复内容
+
+只改上传白名单，不碰解析、不碰 provider、不碰 schema：
+
+1. **`server/api/admin/media/upload.post.ts`** — 在既有图片/PDF 白名单基础上增加 `text/plain` + `.txt`、`text/csv` + `.csv`、`text/tab-separated-values` + `.tsv`。判定逻辑抽成导出的 `isAllowedUpload(filename, contentType)`，便于测试直接断言**实际规则**而不是复述一份副本。规则本身未放松：**MIME 类型与扩展名必须同时匹配**，改名或伪造 content-type 单独都不足以通过。
+2. **`pages/admin/media/index.vue`** — file input 的 `accept` 同步增加 `.txt,.csv,.tsv,text/plain,text/csv,text/tab-separated-values`，既有的图片/PDF 条目全部保留。
+3. **失败文案** — 原先写死的「仅允许 JPG、PNG、WebP、PDF」已不准确，改为从与规则同处一文件的 `ALLOWED_UPLOAD_LABEL` 生成：**JPG、PNG、WebP、PDF、TXT、CSV、TSV**。两者放在一起，避免日后再次漂移。
+
+**现有图片/PDF 行为完全未变**，有专门测试逐项守住。
+
+### 三、测试（新增 23 条，合计 925）
+
+新增 `tests/mediaUploadTypes.test.ts`，断言的是从 handler 导出的真实规则：
+
+- TXT / CSV / TSV 被接受，含带 `charset` 参数的 content-type 与大写扩展名；
+- 原有 JPG / JPEG / PNG / WebP / PDF **继续**被接受（含 `image/jpg` 这一变体）；
+- XLSX、XLS、ZIP、JS、HTML、DOCX、MP4、octet-stream **继续**被拒绝；
+- 扩展名与 content-type 不匹配时被拒绝（`payload.exe` + `text/plain`、`specs.txt` + `application/x-msdownload`、无扩展名、`archive.zip` + `text/csv`）；
+- 失败文案精确等于新的七格式列表，且 handler 确实从常量生成而非硬编码；
+- 页面 `accept` 属性同时包含全部新增与全部既有条目。
+
+### 四、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **925 / 925 通过**（27 文件，本次 +23） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功 |
+
+**浏览器验收（改动了 upload UI，故按要求补做）：**
+
+| 断点 | 结果 |
+|---|---|
+| 1440px | 无横向溢出；Upload 按钮 142×44 未变；`accept` 已生效 |
+| 375px | 无横向溢出、无超宽元素；Upload 按钮 126×40 在视口内 |
+| Console | 干净标签页零错误 |
+
+**布局零变化**是结构性保证而非观察结论：唯一的模板改动是那个 `display: none` 的 file input 上的 `accept` 属性，它不参与布局。
+
+### 五、明确未做
+
+未改 Directus schema / permissions / migration；未改 Docker；未改 AI 文本抽取、PDF parser、Excel、OCR、provider；未恢复 PDF AI；未读取或修改 `.env`；未填写或输出任何 API Key；**零真实 AI 调用、零费用**；未 push / merge master；未部署。
+
+**记录为 P2 backlog（本次不修）：** `pages/admin/media/index.vue` 的 `formatType()` 对 `text/tab-separated-values` 会显示成 `TAB-SEPARATED-VALUES`，比较冗长。已实测 375px 不产生溢出，属显示细节，留待后续统一处理。
+
+### 六、下一步
+
+**继续 FIRST SINGLE-PRODUCT AI BETA，不新增模块。**
+
+管理员现在可以通过 Media Library 上传 TXT / CSV / TSV 并关联到产品。待 TEST ONLY 产品 3 关联上一份真正属于该型号的文本资料后，即可执行此前已授权的那**一次**真实 DeepSeek 调用——该授权尚未使用，仍然有效。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-BETA-01R1"任务中写入。*

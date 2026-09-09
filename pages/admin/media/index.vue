@@ -523,7 +523,7 @@ const selectedFileFolderIsLegacy = computed(() => {
           ref="fileInputRef"
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+          accept=".jpg,.jpeg,.png,.webp,.pdf,.txt,.csv,.tsv,image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv,text/tab-separated-values"
           class="hidden-input"
           @change="onFilesSelected"
         >

@@ -2,10 +2,31 @@ import { readMultipartFormData, createError } from 'h3'
 import { getAdminToken } from '~/server/utils/adminDirectusClient'
 import { assertFolderAllowsUpload } from '~/server/utils/folderRegistry'
 
+/**
+ * PWS-AI-BETA-01R1 — the Media Library is the only sanctioned upload route, so
+ * whatever the AI Source Intake screen can analyse has to be uploadable here.
+ * Text sources (TXT / CSV / TSV) were analysable but not uploadable, which left
+ * no supported way to get one onto a product at all. Image and PDF handling is
+ * unchanged; these three types are added alongside them.
+ */
 const ALLOWED_TYPES = new Set([
   'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf',
+  'text/plain', 'text/csv', 'text/tab-separated-values',
 ])
-const ALLOWED_EXTS = /\.(jpe?g|png|webp|pdf)$/i
+const ALLOWED_EXTS = /\.(jpe?g|png|webp|pdf|txt|csv|tsv)$/i
+
+/** Human-readable list of what is accepted, kept next to the rule it describes so the two cannot drift. */
+export const ALLOWED_UPLOAD_LABEL = 'JPG、PNG、WebP、PDF、TXT、CSV、TSV'
+
+/**
+ * The upload rule itself, exported so it is asserted directly rather than
+ * restated in a test. Both halves must pass: a matching MIME type AND a
+ * matching extension, so neither a renamed file nor a spoofed content type is
+ * enough on its own.
+ */
+export function isAllowedUpload(filename: string, contentType: string): boolean {
+  return ALLOWED_TYPES.has(contentType.toLowerCase().split(';')[0].trim()) && ALLOWED_EXTS.test(filename)
+}
 const MAX_SIZE = 50 * 1024 * 1024 // 50 MB
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -41,8 +62,8 @@ export default defineEventHandler(async (event) => {
     const filename = part.filename ?? 'upload'
     const ct = (part.type ?? '').toLowerCase().split(';')[0].trim() || 'application/octet-stream'
 
-    if (!ALLOWED_TYPES.has(ct) || !ALLOWED_EXTS.test(filename)) {
-      errors.push({ filename, message: `格式不支持（${ct}）。仅允许 JPG、PNG、WebP、PDF` })
+    if (!isAllowedUpload(filename, ct)) {
+      errors.push({ filename, message: `格式不支持（${ct}）。仅允许 ${ALLOWED_UPLOAD_LABEL}` })
       continue
     }
 
