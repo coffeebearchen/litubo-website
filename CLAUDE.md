@@ -217,6 +217,12 @@ Claude must never:
 
 A Codex work order may raise the tier a task must read at; it may never lower what Tier A would otherwise require. Every opening report below must state which tier applies and why, before any other field.
 
+### FD-004 — risk-proportionate AI MVP delivery (navigation only)
+
+For single-product AI MVP work, apply Charter `FD-004` (defined in full in `ADMIN-CMS-GOVERNING-CHARTER-V1.md` §D.2 — read it there, it is not restated here): prioritise the smallest reliable **Draft-only** workflow, classify every finding as **P0 / P1 / P2** before calling anything blocking, and do not expand non-blocking hardening into the current module.
+
+This lowers nothing. The P0 safety boundaries stand in full — no cross-product mixing, no fabricated technical facts, no credential leakage, no write without explicit human Accept/Edit, no auto-publish, no unrecoverable data damage, no uncontrolled AI cost loop. FD-004 governs what counts as *blocking*, never what counts as *safe*.
+
 ### Mandatory opening report fields (Admin/CMS tasks)
 
 Every Admin/CMS task opening report must declare all of the following before any code or file is modified:

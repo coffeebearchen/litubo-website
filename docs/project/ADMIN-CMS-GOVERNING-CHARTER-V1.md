@@ -305,6 +305,141 @@ C. 纯机械验证（重跑检查、核对 diff）：
 
 **作用范围（穷尽列举）：** FD-003 只优化重复阅读成本，不改变 Charter、Blueprint、Register 三者的权威关系，不降低任何代码或验收标准，不构成框架变更，不授权跳过 J 节施工顺序或任何 Decision Gate。
 
+#### FD-004 — Risk-Proportionate AI MVP Delivery（AI MVP 风险比例与最小可用闭环原则）
+
+| 项目 | 内容 |
+|------|------|
+| **决定编号** | FD-004 |
+| **决定名称** | Risk-Proportionate AI MVP Delivery |
+| **状态** | **Effective / 生效** |
+| **授权者** | 用户 |
+| **日期** | 2026-09-09 |
+| **关系** | 独立于 FD-001 / FD-002 / FD-003；不修改、不撤销三者 |
+
+**目的：** FD-004 **不降低基本安全**。它存在的原因是：当前 LITUBO 单产品 AI 填表 MVP 曾被不成比例的安全工程与基础设施工作拖偏方向。本决定的作用是把工程投入重新对齐到当前真实业务风险，使第一个可用闭环能够真正跑通。
+
+##### FD-004.1 当前 AI MVP 的业务性质
+
+当前 LITUBO AI MVP：
+
+- 用于工业设备产品资料整理；
+- 用于后台 Draft 参数、功能等内容的辅助填写；
+- 当前主要对象是**单一设备 / 单一产品**；
+- 当前首要目标是 Specifications、Functions 等结构化资料；
+- **不属于**机器安全控制系统；
+- **不属于**医疗、金融等高风险自动决策系统。
+
+因此，工程复杂度、安全措施与测试深度**必须与当前实际业务风险成比例**。不得为了理论上的完美安全，无限扩大当前 MVP 的技术范围。
+
+##### FD-004.2 当前必须守住的核心边界（P0）
+
+以下问题属于当前阶段真正的 **P0 / Blocker**：
+
+1. 跨 `product_id` / `product_code` 混入其他型号的资料；
+2. AI 把未知、缺失或无可靠来源的技术参数**猜测后当作真实事实**；
+3. API Key、Token、Cookie、密码等凭证泄露到浏览器、日志、Git 或报告；
+4. 未经明确人工 Accept / Edit 确认，AI 内容**直接写入**产品资料；
+5. AI 自动 Published、自动公开、自动发送客户或自动发布外部渠道；
+6. 造成**不可恢复**的正式产品数据或正式媒体破坏；
+7. 明显可能造成失控 AI API 费用的自动循环、无限重试或重复调用。
+
+这些硬边界继续保持。**FD-004 不取消**以下任何一项：
+
+- one-product isolation（单产品隔离）；
+- human review（人工审核）；
+- Draft-only（仅写草稿）；
+- no auto publish（不自动发布）；
+- credential protection（凭证保护）；
+- TEST ONLY 保护；
+- Media Library 作为单一媒体源；
+- 不猜测真实技术参数。
+
+##### FD-004.3 问题分级（P0 / P1 / P2）
+
+FD-004 生效后，AI MVP 相关问题**必须先分类，再决定是否阻塞**：
+
+| 级别 | 含义 | 处置 |
+|------|------|------|
+| **P0 / Blocker** | 会直接破坏 FD-004.2 的核心边界 | 当前模块**必须停止** |
+| **P1 / Fix before beta** | 不造成上述核心安全问题，但会明显影响真实单产品 Beta 的可靠使用 | 在真实 Beta **之前**解决 |
+| **P2 / Backlog** | 边缘情况、规模化问题、理论 hardening、未来基础设施增强 | **不得自动阻塞**当前 AI 填表闭环 |
+
+**明确写入：不得把所有技术缺陷自动升级为 blocker。** 一项缺陷是否阻塞，取决于它是否触及 FD-004.2 列举的核心边界，而不是取决于它在理论上是否是一个缺陷。
+
+##### FD-004.4 默认不阻塞当前 MVP 的事项
+
+除非**仓库事实证明**它们已经直接触发 FD-004.2 的某一项 P0，以下事项默认属于后续 hardening / backlog：
+
+- Redis；
+- 分布式 rate limiting；
+- 完美多实例一致性；
+- 企业级共享 quota 系统；
+- 所有异常必须拥有最理想的 HTTP 状态语义；
+- 为每一种文件格式建立独立解析服务或容器；
+- 首个单产品 Beta 前清零全部 npm audit 项；
+- 为未来大规模部署提前建设当前用不到的基础设施；
+- 与当前单产品 Draft 填表真实用户流程没有直接关系的理论攻击面强化；
+- 为极低概率边缘情况进行大规模重构。
+
+**注意：这不是说这些问题永远不处理。** 它们应进入 backlog，在真实使用、上线准备或规模增长时再处理。
+
+##### FD-004.5 当前实现原则
+
+**优先复用**现有资产，而不是新建平行体系：
+
+- Product Workspace；
+- Specifications；
+- Media & Resources；
+- Sources & Evidence；
+- 当前 Admin API；
+- 当前 Directus 数据结构。
+
+在满足 FD-004.2 核心边界的前提下，选择：
+
+```text
+最小实现 + 最少返工 + 可理解 + 可测试 + 能真实使用
+```
+
+而不是：
+
+```text
+理论最完美 + 基础设施最复杂 + 尚未需要的规模化设计
+```
+
+##### FD-004.6 当前第一 AI 产品闭环
+
+当前正式优先目标**固定**为：
+
+```text
+Current single product Draft
+→ Select already-linked sources
+→ AI proposes Specifications / Functions
+→ Human Accept / Edit / Reject
+→ Apply accepted items to the same product Draft
+→ Stop
+```
+
+完成该闭环之后，**先进行单产品真实 Beta**，再根据真实使用结果决定是否推进：PDF 恢复、Excel、更多 AI Targets、Page Content、FAQ、SEO、批量导入、多实例成本控制、更复杂的安全基础设施。
+
+**不得在第一个闭环之前，因为这些未来能力而继续扩大范围。**
+
+##### FD-004.7 FD-004 不构成的授权
+
+FD-004 **不授权**：
+
+- 部署；
+- push / merge `origin/master`；
+- 填写真实 AI API Key；
+- 调用真实收费 AI；
+- 自动发布；
+- 自动发送；
+- 修改生产环境；
+- 绕过人工审核；
+- 删除正式资料；
+- 绕过既有身份认证。
+
+**作用范围（穷尽列举）：** FD-004 只规定"当前单产品 AI MVP 阶段，什么算阻塞、什么算 backlog、工程投入应与何种风险成比例"。它不改变 Charter、Blueprint、Register 三者的权威关系，不降低 FD-004.2 列举的任何核心边界，不解除任何 Decision Gate，不授权跳过 J 节施工顺序。
+
 ---
 
 ## E. 目标系统架构与前后端联动
@@ -969,6 +1104,7 @@ Checkpoint 是远程备份，不等于已验收、已发布或可部署。
 | V1.1（框架补全） | 2026-09-06 | 完整框架 11 项补充：E.4/E.5 域所有权与前台联动合同、F.4 不可偷跑规则、G.4 数据/API 合同、G.5 生命周期/并发/错误合同、H.4 AI 接入完整 Gate 链、I.2 渐进重构兼容原则、J 节施工顺序更新至 J-1.1 格式、K.2 开工声明扩展、M.2 新增 DG-10～DG-16、新增 Section N 非视觉质量合同、新增 Section O Definition of Ready/Done | 用户 |
 | V1.1 (FD-002) | 2026-09-06 | 新增 Framework Decision FD-002 — Master Authority & Responsive Adaptation（视觉母版权威与响应式适配裁定）。裁定 VM1 两张 ADM-02 母版为 J-2 主要实施依据；P2 inbox 图片降为视觉方向参考，不得单独决定路由/数据/API/交互/移动端；English-first 优先于母版中文；J-2 右侧采用 Product Control，AI 批量导入延后至 IMP-01；PC-01/PC-02 采用 375px 卡片列表原则，其余 Workspace 模块移动端阻塞；引入工程模块 ID 与 Source Asset ID 命名空间。解决 V-0.5.1 记录的 CF-1～CF-5 五项冲突。不授权 AI、导入、真实数据或发布 | 用户 |
 | V1.1 (FD-003) | 2026-09-06 | 新增 Framework Decision FD-003 — Context-Efficient Execution（高效分层阅读规则）。设立 A/B/C 三层阅读要求：新模块/框架变化/新 Session 接手/推送前最终验收须完整阅读；同模块后续子任务只读模块相关文件；纯机械验证只读当前施工单与 diff。层级只降低重复阅读成本，不降低任何 Gate、母版、数据/API 合同、English-first 或验收标准的适用范围，不构成框架变更 | 用户 |
+| V1.1 (FD-004) | 2026-09-09 | 新增 Framework Decision FD-004 — Risk-Proportionate AI MVP Delivery（AI MVP 风险比例与最小可用闭环原则）。确认当前 AI MVP 为工业设备资料 Draft 辅助填写，非安全控制、非高风险自动决策系统，工程复杂度与测试深度须与真实业务风险成比例。设立 P0 / P1 / P2 分级：只有触及跨产品混料、猜测技术参数、凭证泄露、未经人工确认写入、自动发布、不可恢复数据破坏、失控 AI 费用循环七项核心边界的问题才构成 blocker；Redis、分布式限流、多实例一致性、企业级 quota、完美 HTTP 语义、按格式独立解析容器、npm audit 清零、未来规模化基础设施等默认进入 backlog，不得自动阻塞当前闭环。固定第一闭环为「单产品 Draft → 选择已关联资料 → AI 提议 Specifications/Functions → 人工 Accept/Edit/Reject → Apply 到同一产品 Draft」。不取消 one-product isolation、human review、Draft-only、no auto publish、凭证保护、TEST ONLY 保护、Media Library 单一媒体源、不猜测技术参数；不授权部署、master 推送、真实 AI Key、真实付费调用、自动发布或绕过人工审核 | 用户 |
 
 ### M.2 Open Decision Gates（用户待确认事项）
 

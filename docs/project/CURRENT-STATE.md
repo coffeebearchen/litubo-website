@@ -3602,3 +3602,72 @@ try {
 未 push master、未 merge、未部署、未创建 PR；未改 Docker / docker-compose / 服务器基础设施；未改 Directus schema / migration / 权限；未读取或修改真实 `.env`；未输出任何 Token / Key / Cookie；未填写 DeepSeek / OpenAI Key；未调用真实 AI provider；零费用；未启用 Apply、未改 Apply 的 503 行为；未恢复 PDF AI；未开始 Page Content / FAQ / SEO AI；未改视觉母版；未移动或整理任何 `D:\` 目录；未执行 `npm audit fix`；未顺手修复任何其他 backlog。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01"任务中写入。*
+
+---
+
+## FD-004-GOV-01 — Risk-Proportionate AI MVP Delivery 治理修订（2026-09-09）
+
+**本次任务是 documentation-only 的框架决定登记。未修改任何业务代码、测试、依赖、CI 或基础设施。**
+
+### 一、FD-004 已由用户确认并生效
+
+Governing Charter 新增 `FD-004 — Risk-Proportionate AI MVP Delivery`（AI MVP 风险比例与最小可用闭环原则），授权者为用户，日期 2026-09-09，状态 **Effective / 生效**。完整条文只定义在一处：`docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md` §D.2，紧接 FD-003 之后；Blueprint、CLAUDE.md、本文件与 MASTER-ROADMAP 均只做交叉引用，不复制条文。
+
+**FD-004 的核心：**
+
+- **风险比例原则**：当前 AI MVP 是工业设备产品资料的 Draft 辅助填写，不是机器安全控制系统，也不是医疗/金融类高风险自动决策系统。工程复杂度、安全措施与测试深度必须与这一真实风险成比例。
+- **P0 / P1 / P2 分级**：问题须先分类再决定是否阻塞。只有触及七项核心边界（跨产品混料、猜测技术参数、凭证泄露、未经人工确认写入、自动发布、不可恢复数据破坏、失控 AI 费用循环）的才是 P0 / Blocker；P1 在真实 Beta 前解决；P2 进入 backlog，**不得自动阻塞当前闭环**。明确写入：不得把所有技术缺陷自动升级为 blocker。
+- **最小可靠 Draft-only 闭环优先**：优先复用 Product Workspace、Specifications、Media & Resources、Sources & Evidence、当前 Admin API 与 Directus 结构，选择"最小实现 + 最少返工 + 可理解 + 可测试 + 能真实使用"，而不是理论最完美与尚未需要的规模化设计。
+
+**FD-004 不降低任何安全边界。** one-product isolation、human review、Draft-only、no auto publish、凭证保护、TEST ONLY 保护、Media Library 单一媒体源、不猜测真实技术参数——全部原样保留。它规定的是"什么算阻塞"，不是"什么算安全"。
+
+### 二、当前 AI MVP 基础安全收口状态
+
+`PWS-AI-ENGINE-01R2-REVIEW-FIX-03` 与 `PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01` **均已完成**，当前 AI MVP 的基础安全收口已经就位：Node 22.22.2 运行契约、CI 真实修复、AI 两页最小权限（无通用 `products/:id` 请求、零敏感字段）、文件名 Unicode 防伪、sourceRef 密钥派生与 fail-closed、Generate 成本控制。
+
+**MIN-01 的 `SourceRefUnavailableError` → 503 问题已经修复完成，不是待处理 backlog。** 该缺陷（`refKey()` 位于 `open()` 的 `try` 内，导致缺密钥被误报为"选择已失效"、503 分支不可达）已在 `ab63e6c` 修复，并有 endpoint 级回归测试与红灯验证（临时回退后 4 条新测试失败）。任何后续文档或审查都不得把它重新列为未解决事项。
+
+### 三、当前基线
+
+| 项 | 值 |
+|---|---|
+| GitHub review 基线 | **`ab63e6cd3f7752b9dbc5d38057904c685b3b674b`** |
+| GitHub Actions | 已由 Codex 独立确认**实际为绿色**（针对该基线） |
+| `origin/master` | `8f2e3847e0d7acda1bd987ffd18c3af03377fef9`（未改动、未合并、未部署） |
+
+### 四、下一个产品施工目标
+
+**`PWS-AI-APPLY-DRAFT-01`** —— 把人工已 Accept 的提议写入同一产品的 Draft，完成第一个可用闭环：
+
+```text
+Current single product Draft
+→ Select already-linked sources
+→ AI proposes Specifications / Functions
+→ Human Accept / Edit / Reject
+→ Apply accepted items to the same product Draft
+→ Stop
+```
+
+**本次文档任务不授权开始该代码模块。** 它需要 Codex 单独发出完整施工单。
+
+### 五、当前仍未授权 / 未启用的事项
+
+- **Apply 仍保持服务端 503 + UI disabled**，本次未改动其任何行为；
+- 未授权 `origin/master` merge；
+- 未授权部署；
+- 未授权填写真实 AI API Key；
+- 未授权调用真实付费 provider。
+
+### 六、当前产品方向
+
+先尽快走通：**单设备参数 / 功能 → AI proposal → 人工审核 → Draft**。
+
+在此之前，不得再把非 P0 的 hardening（Redis、分布式限流、多实例一致性、企业级 quota、完美 HTTP 语义、按格式独立解析容器、npm audit 清零、未来规模化基础设施、与当前真实用户流程无直接关系的理论攻击面强化）自动变成当前 blocker。它们进入 backlog，在真实使用、上线准备或规模增长时再处理。
+
+### 七、本次变更范围
+
+只修改 5 个治理文档：`CLAUDE.md`、`ADMIN-CMS-GOVERNING-CHARTER-V1.md`、`ADMIN-CMS-IMPLEMENTATION-BLUEPRINT-V1.md`、`CURRENT-STATE.md`（本文件）、`MASTER-ROADMAP.md`。
+
+未修改业务代码、测试、`package.json`、`package-lock.json`、CI、`.nvmrc`、Docker、Directus schema/迁移/权限、`.env`；未读取或输出任何凭证；未填写 AI Key；未调用真实 DeepSeek / OpenAI；零费用；未启用 Apply；未恢复 PDF；未开始 Page Content / FAQ / SEO AI；未开始 `PWS-AI-APPLY-DRAFT-01`；未部署；未 push / merge master；未删除任何历史治理记录；未新建第二份 Charter；未移动 `D:\` 目录；未处理 npm audit；未顺手修复其他 backlog。
+
+*最后更新：2026-09-09，由 Claude Code 在"FD-004-GOV-01"任务中写入。*

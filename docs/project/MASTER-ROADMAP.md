@@ -16,6 +16,8 @@
 
 **PWS-01-FAST-01（2026-09-07）补充：`PWS-01`（Page Content）已在 Workspace 中交付为可编辑模块（详见 `CURRENT-STATE.md`），完全复用旧编辑器自 9A-2A 起已在使用的 `product_sections`/`product_faqs` API 与字段，仅将交互模型改为"本地暂存 + 显式 Save"，未新增字段、模块类型、审核流程或发布行为。`CH-DG-13`/`BP-DG-07` 均保持未解决，未被关闭；旧编辑器 `content.vue`/`faq.vue` 未改动，仍是并行可写入口。J-2 视觉签收与 `origin/master` 状态不受影响。**
 
+**FD-004（2026-09-09）补充：** Governing Charter 新增 `FD-004 — Risk-Proportionate AI MVP Delivery`（用户确认，Effective，定义见 Charter §D.2）。当前 AI 主线重新聚焦为单产品 Draft 填表闭环；问题须先按 P0 / P1 / P2 分级再决定是否阻塞，非 P0 的 hardening 默认进入 backlog。**这是纯文档治理**：不降低任何 P0 安全边界，不授权 `PWS-AI-APPLY-DRAFT-01` 开工，Apply 仍为服务端 503 + UI disabled，`origin/master` 与部署状态不受影响。
+
 ---
 
 ## 总览
@@ -222,6 +224,41 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 - 环境变量：`OPENAI_API_KEY`、`DEEPSEEK_API_KEY`、`AI_DEFAULT_PROVIDER`、`AI_DEFAULT_MODEL`、`AI_MONTHLY_BUDGET_USD`
 - Settings 页面：只显示连接状态、模型、测试、预算、审计；**绝不显示完整密钥**
 - AI 只生成 Draft，人工审核后发布；永不自动发布
+
+### 当前 AI 主线（FD-004 生效后，2026-09-09）
+
+当前唯一的 AI 施工主线固定为：
+
+```text
+AI Source Intake
+→ Proposal Review
+→ Apply accepted changes to Draft
+→ First single-product AI beta
+```
+
+前两步已交付（详见 `CURRENT-STATE.md`）；第三步 `PWS-AI-APPLY-DRAFT-01` 是**下一个**产品目标，尚未获得代码施工授权。
+
+**在当前阶段，以下事项不作为 Apply-to-Draft 的默认前置 Gate**（依据 Charter FD-004.4，除非仓库事实证明其已直接触发某一项 P0）：
+
+- Redis；
+- distributed rate limiting；
+- multi-instance quota；
+- full PDF isolation；
+- broad dependency hardening；
+- future-scale infrastructure；
+- 其他不触发 FD-004 P0 的 hardening。
+
+这些进入后续 backlog / pre-launch hardening，**不因其未完成而阻塞当前闭环**。
+
+**以下始终保留为硬边界，任何阶段都不放松：**
+
+- no cross-product mixing（不跨产品混料）；
+- no fabricated facts（不猜测技术参数）；
+- human approval before write（写入前必须人工确认）；
+- Draft only（只写草稿）；
+- no auto publish（不自动发布）；
+- no credential leakage（不泄露凭证）；
+- no uncontrolled AI cost loop（无失控 AI 费用循环）。
 
 ### 禁止（M5）
 

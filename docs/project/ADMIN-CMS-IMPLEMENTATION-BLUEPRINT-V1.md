@@ -255,6 +255,16 @@ Current Draft
 
 AI must never cross product boundaries, overwrite confirmed fields, auto-publish, delete assets, or move formal media. Model/provider, key ownership, cost cap, retention, logging, retry, and human-review policy are user Decision Gates.
 
+**Charter FD-004 — risk proportionality (cross-reference, not a restatement).** The single-product AI MVP is governed by `FD-004 — Risk-Proportionate AI MVP Delivery`, defined once in `ADMIN-CMS-GOVERNING-CHARTER-V1.md` §D.2. Read it there; it is not duplicated here.
+
+Its consequences for this production line:
+
+1. Engineering controls must be proportionate to the actual risk of a **Draft-only industrial equipment data-entry** use case — this is not a machine-safety control system and not a high-risk automated decision system.
+2. Findings are classified **P0 / P1 / P2** before anything is declared blocking. Hardening that is not P0 under FD-004 goes to backlog by default and **must not** be allowed to block the current single-product MVP.
+3. The current priority target is the closed loop: **source selection → proposal → human review → accepted changes applied to the Draft.**
+4. Nothing above relaxes the existing boundaries. One-product isolation, human review, Draft-only writes, no auto-publish, credential protection, and no fabrication of technical facts all stand unchanged — they are exactly the P0 set FD-004 protects.
+5. Future scale requirements (distributed rate limiting, multi-instance quota, per-format isolation containers, future-scale infrastructure) do not automatically gate this module.
+
 ### 8.2 Multi-model Import Review Queue
 
 ```text
