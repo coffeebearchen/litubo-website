@@ -8,11 +8,12 @@ import type { AiStructuredProvider } from './aiProviderRegistry'
  * per call instead of hardcoding the Specifications prompt/schema — the
  * network call, config, and fail-closed behavior are otherwise unchanged.
  *
- * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — the request is issued with native
- * `fetch` rather than the `openai` SDK, which declares
- * `engines: { node: ">=22" }`, above this project's Node 20 target. The SDK
- * was only ever used here as an HTTP client for a documented JSON endpoint;
- * the request and response shapes are unchanged.
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — the request is issued with native
+ * `fetch` rather than the `openai` SDK. The project now runs on Node 22.22.2,
+ * so the SDK's `engines` range is no longer the reason to avoid it; the
+ * adapter stays on native `fetch` because the SDK was only ever an HTTP client
+ * for a documented JSON endpoint, and a dependency that is not installed
+ * cannot ship a surprise. The request and response shapes are unchanged.
  *
  * This file is never imported by a `.vue` file, a `pages/`/`components/`
  * module, or anything else that ships to the browser — only by

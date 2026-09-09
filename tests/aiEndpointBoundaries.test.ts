@@ -504,6 +504,280 @@ describe('/api/admin/products/:id/ai/sources — the browser receives no Directu
   })
 })
 
+// ── 3d. AI product context: least privilege ──
+
+const CONTEXT_PATH = '/api/admin/products/3/ai/context'
+
+/** A product row as the GENERAL endpoint would return it — everything beyond four fields must be withheld. */
+const RAW_PRODUCT_ROW = {
+  id: 3,
+  name_en: 'LT-180C Free-Fall Metal Detector',
+  product_code: 'LT-180C',
+  status: 'draft',
+  hero_image: 'aaaabbbb-cccc-dddd-eeee-ffff00001111',
+  review_notes: 'INTERNAL: pricing not agreed, do not publish',
+  seo_title: 'Buy LT-180C',
+  seo_description: 'internal seo draft',
+  summary_en: 'highlights that do not belong on this screen',
+}
+
+describe('/api/admin/products/:id/ai/context — the AI screens get four fields, not the product record', () => {
+  async function loadContext() {
+    installNitroGlobals(async (url: string) => {
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+      if (url.includes('/items/products/3')) return { data: RAW_PRODUCT_ROW }
+      return { data: null }
+    })
+    const handler = (await import('../server/api/admin/products/[id]/ai/context.get')).default as unknown as (e: unknown) => Promise<Record<string, unknown>>
+    const event = mockEvent({ url: CONTEXT_PATH, routerParams: { id: '3' } })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
+    return { result: await handler(event), event }
+  }
+
+  it('returns only productId, productName, productCode, lifecycleStatus and thumbnailUrl', async () => {
+    const { result } = await loadContext()
+    expect(Object.keys(result).sort()).toEqual(
+      ['lifecycleStatus', 'productCode', 'productId', 'productName', 'thumbnailUrl'],
+    )
+  })
+
+  it('never returns the hero UUID, review notes, SEO fields, highlights, or an assets URL', async () => {
+    const { result } = await loadContext()
+    const serialized = JSON.stringify(result)
+
+    expect(serialized).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+    expect(serialized).not.toContain('hero_image')
+    expect(serialized).not.toContain('review_notes')
+    expect(serialized).not.toContain('INTERNAL')
+    expect(serialized).not.toContain('seo_')
+    expect(serialized).not.toContain('summary_en')
+    expect(serialized).not.toContain('/assets/')
+  })
+
+  it('the thumbnail is addressed by the product route, never by a file id', async () => {
+    const { result } = await loadContext()
+    expect(result.thumbnailUrl).toBe('/api/admin/products/3/ai/hero')
+  })
+
+  it('asks Directus for only those columns — a wider response cannot leak what was never selected', async () => {
+    await loadContext()
+    const productQuery = fetchCalls.map(c => c.url).find(u => u.includes('/items/products/3'))!
+    expect(productQuery).toContain('fields=name_en,product_code,status,hero_image')
+    expect(productQuery).not.toContain('review_notes')
+  })
+
+  it('is not cached, and is refused for an unauthenticated caller', async () => {
+    const headers: Record<string, string> = {}
+    installNitroGlobals(async (url: string) => {
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+      if (url.includes('/items/products/3')) return { data: RAW_PRODUCT_ROW }
+      return { data: null }
+    })
+    const handler = (await import('../server/api/admin/products/[id]/ai/context.get')).default as unknown as (e: unknown) => Promise<unknown>
+    const event = mockEvent({ url: CONTEXT_PATH, routerParams: { id: '3' } })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
+    ;(event.node.res as unknown as { setHeader: (n: string, v: string) => void }).setHeader = (n, v) => {
+      headers[n.toLowerCase()] = String(v)
+    }
+    await handler(event)
+    expect(headers['cache-control']).toBe('private, no-store')
+
+    installNitroGlobals(async () => ({}))
+    const middleware = (await import('../server/middleware/admin-auth')).default as (e: unknown) => Promise<unknown>
+    expect(await statusCodeOf(() => middleware(mockEvent({ url: CONTEXT_PATH })))).toBe(401)
+  })
+})
+
+// ── 3e. Full authenticated chain: sources -> sourceRef -> Generate ──
+
+describe('the whole chain — list sources, then generate with the refs it minted', () => {
+  const CHAIN_ROWS = [
+    { id: 21, enabled: true, file_role: 'datasheet', directus_files_id: { filename_download: 'specs.txt', type: 'text/plain' } },
+    { id: 22, enabled: true, file_role: null, directus_files_id: { filename_download: 'photo.jpg', type: 'image/jpeg' } },
+  ]
+
+  function chainFetch(url: string) {
+    if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+    if (url.includes('/items/products_files?filter[products_id][_eq]=3')) return { data: CHAIN_ROWS }
+    if (url.includes('/items/products/3')) return { data: { name_en: 'Test product' } }
+    return { data: null }
+  }
+
+  it('a ref from ai/sources is accepted by Generate for the same admin and product, with no id or UUID anywhere', async () => {
+    const { resetGenerateSlots } = await import('../server/utils/aiGenerateRateLimit')
+    resetGenerateSlots()
+
+    // 1. List the sources as an authenticated administrator.
+    installNitroGlobals(async (url: string) => chainFetch(url))
+    const sourcesHandler = (await import('../server/api/admin/products/[id]/ai/sources.get')).default as unknown as (e: unknown) => Promise<Array<Record<string, unknown>>>
+    const sourcesEvent = mockEvent({ url: SOURCES_PATH, routerParams: { id: '3' } })
+    sourcesEvent.context.adminToken = 'admin-token'
+    sourcesEvent.context.adminUserId = 'admin-1'
+    const sources = await sourcesHandler(sourcesEvent)
+
+    const analyzable = sources.find(s => s.analyzable)!
+    expect(analyzable.displayName).toBe('specs.txt')
+
+    // 2. Generate with that ref. No provider key is configured, so this fails
+    //    closed at the provider check — which still proves the ref resolved and
+    //    the request reached the engine.
+    const generateHandler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<{ ok: boolean, error?: string }>
+    const generateEvent = mockEvent({
+      url: GENERATE_PATH,
+      method: 'POST',
+      routerParams: { id: '3' },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', sourceRefs: [analyzable.sourceRef] })]),
+    })
+    generateEvent.context.adminToken = 'admin-token'
+    generateEvent.context.adminUserId = 'admin-1'
+
+    const result = await generateHandler(generateEvent)
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('AI provider is not configured.')
+    // Not the ref-rejection message: the ref really did resolve.
+    expect(result.error).not.toContain('no longer valid')
+
+    const serialized = JSON.stringify(result)
+    expect(serialized).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+    expect(serialized).not.toContain('filename_download')
+  })
+
+  it('the same ref is refused for a DIFFERENT administrator', async () => {
+    const { resetGenerateSlots } = await import('../server/utils/aiGenerateRateLimit')
+    resetGenerateSlots()
+
+    installNitroGlobals(async (url: string) => chainFetch(url))
+    const sourcesHandler = (await import('../server/api/admin/products/[id]/ai/sources.get')).default as unknown as (e: unknown) => Promise<Array<Record<string, unknown>>>
+    const sourcesEvent = mockEvent({ url: SOURCES_PATH, routerParams: { id: '3' } })
+    sourcesEvent.context.adminToken = 'admin-token'
+    sourcesEvent.context.adminUserId = 'admin-1'
+    const sources = await sourcesHandler(sourcesEvent)
+    const ref = sources.find(s => s.analyzable)!.sourceRef
+
+    const generateHandler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<{ ok: boolean, error?: string }>
+    const generateEvent = mockEvent({
+      url: GENERATE_PATH,
+      method: 'POST',
+      routerParams: { id: '3' },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', sourceRefs: [ref] })]),
+    })
+    generateEvent.context.adminToken = 'admin-token'
+    generateEvent.context.adminUserId = 'a-different-admin'
+
+    const result = await generateHandler(generateEvent)
+    expect(result.error).toContain('no longer valid')
+  })
+})
+
+// ── 3f. Generate cost control ──
+
+describe('generate.post.ts — cost control before any provider call', () => {
+  /**
+   * The limiter is claimed only AFTER the request validates, so an invalid
+   * request never consumes a slot or trips a cooldown — it costs nothing.
+   * These tests therefore use a genuinely valid ref, minted the same way the
+   * browser gets one.
+   */
+  async function mintRef(adminUserId: string, productId = 3): Promise<string> {
+    installNitroGlobals(async (url: string) => {
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: productId }] }
+      if (url.includes('/items/products_files')) {
+        return { data: [{ id: 31, enabled: true, file_role: null, directus_files_id: { filename_download: 'specs.txt', type: 'text/plain' } }] }
+      }
+      return { data: null }
+    })
+    const handler = (await import('../server/api/admin/products/[id]/ai/sources.get')).default as unknown as (e: unknown) => Promise<Array<Record<string, unknown>>>
+    const event = mockEvent({ url: `/api/admin/products/${productId}/ai/sources`, routerParams: { id: String(productId) } })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = adminUserId
+    const sources = await handler(event)
+    return String(sources[0].sourceRef)
+  }
+
+  async function generateOnce(adminUserId: string, productId = '3', sourceRef?: string) {
+    const ref = sourceRef ?? await mintRef(adminUserId, Number(productId))
+    installNitroGlobals(async (url: string) => {
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: Number(productId) }] }
+      if (url.includes('/items/products_files')) return { data: [] }
+      if (url.includes('/items/products/')) return { data: { name_en: 'Test product' } }
+      return { data: null }
+    })
+    const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<unknown>
+    const event = mockEvent({
+      url: `/api/admin/products/${productId}/ai/specification-proposal/generate`,
+      method: 'POST',
+      routerParams: { id: productId },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', sourceRefs: [ref] })]),
+    })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = adminUserId
+    return { handler, event }
+  }
+
+  it('a second generation during the cooldown is refused with 429 and a Retry-After', async () => {
+    const { resetGenerateSlots, claimGenerateSlot, releaseGenerateSlot } = await import('../server/utils/aiGenerateRateLimit')
+    resetGenerateSlots()
+
+    // Simulate a generation that has just completed for this admin+product.
+    claimGenerateSlot('admin-1', 3)
+    releaseGenerateSlot('admin-1', 3)
+
+    const headers: Record<string, string> = {}
+    const { handler, event } = await generateOnce('admin-1')
+    ;(event.node.res as unknown as { setHeader: (n: string, v: string) => void }).setHeader = (n, v) => {
+      headers[n.toLowerCase()] = String(v)
+    }
+
+    expect(await statusCodeOf(() => handler(event))).toBe(429)
+    expect(Number(headers['retry-after'])).toBeGreaterThan(0)
+    resetGenerateSlots()
+  })
+
+  it('a generation already in flight blocks a second one for the same admin and product', async () => {
+    const { resetGenerateSlots, claimGenerateSlot } = await import('../server/utils/aiGenerateRateLimit')
+    resetGenerateSlots()
+    claimGenerateSlot('admin-1', 3) // still running
+
+    const { handler, event } = await generateOnce('admin-1')
+    expect(await statusCodeOf(() => handler(event))).toBe(429)
+    resetGenerateSlots()
+  })
+
+  it('one administrator cooldown does not affect a different administrator', async () => {
+    const { resetGenerateSlots, claimGenerateSlot, releaseGenerateSlot } = await import('../server/utils/aiGenerateRateLimit')
+    resetGenerateSlots()
+    claimGenerateSlot('admin-1', 3)
+    releaseGenerateSlot('admin-1', 3)
+
+    const { handler, event } = await generateOnce('admin-2')
+    // Not 429: this administrator has no cooldown of their own. The request
+    // proceeds and fails closed at the provider check instead.
+    const result = await handler(event) as { ok: boolean, error?: string }
+    expect(result.error).toBe('AI provider is not configured.')
+    resetGenerateSlots()
+  })
+
+  it('sets Cache-Control: private, no-store on the generate response', async () => {
+    const { resetGenerateSlots } = await import('../server/utils/aiGenerateRateLimit')
+    resetGenerateSlots()
+
+    const headers: Record<string, string> = {}
+    const { handler, event } = await generateOnce('admin-3')
+    ;(event.node.res as unknown as { setHeader: (n: string, v: string) => void }).setHeader = (n, v) => {
+      headers[n.toLowerCase()] = String(v)
+    }
+    await handler(event)
+    expect(headers['cache-control']).toBe('private, no-store')
+    resetGenerateSlots()
+  })
+})
+
 // ── 4. Generate refuses an oversized body before parsing it ──
 
 describe('generate.post.ts — oversized request bodies are refused on real bytes, before any JSON parsing', () => {

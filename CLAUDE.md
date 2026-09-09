@@ -28,7 +28,7 @@ The approved visual reference images are stored outside this repository during p
 - Nuxt 3 + Vue 3 + TypeScript, SSR/hybrid rendering enabled
 - Nuxt i18n for `en` / `es` / `pt`; route-prefix strategy defined in routing document
 - A minimal CMS is part of the first public release: product, media, resource/blog and form-submission management. Design components against a CMS-ready adapter.
-- Node 20 LTS, Docker Compose and Nginx on the existing US Tencent Cloud server. Cloudflare Free sits in front for DNS, TLS, caching and basic protection; it is not a second application server.
+- Node 22.22.2 (user-confirmed 2026-09-09 as this project's runtime standard; pinned in `.nvmrc` and `package.json` `engines`, and used by CI), Docker Compose and Nginx on the existing US Tencent Cloud server. Cloudflare Free sits in front for DNS, TLS, caching and basic protection; it is not a second application server.
 
 ## Working protocol
 

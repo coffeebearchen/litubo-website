@@ -5,7 +5,7 @@ import {
   sanitizeDisplayNameForBrowser,
   temporarilyUnsupportedReason,
 } from '~/server/utils/aiTextExtraction'
-import { createSourceRef } from '~/server/utils/aiSourceRef'
+import { createSourceRef, SourceRefUnavailableError } from '~/server/utils/aiSourceRef'
 
 /**
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — the AI Source Intake screen's own,
@@ -91,15 +91,24 @@ export default defineEventHandler(async (event): Promise<AiIntakeSource[]> => {
     + '&limit=200&sort=sort,id',
   )
 
-  return (result.data ?? []).map((row) => {
-    const reason = unavailableReasonFor(row)
-    return {
-      sourceRef: createSourceRef(row.id, { productId, adminUserId }),
-      displayName: sanitizeDisplayNameForBrowser(row.directus_files_id?.filename_download ?? null),
-      typeLabel: typeLabel(row.directus_files_id?.type ?? null),
-      roleLabel: roleLabel(row.file_role),
-      analyzable: reason === null,
-      unavailableReason: reason,
+  try {
+    return (result.data ?? []).map((row) => {
+      const reason = unavailableReasonFor(row)
+      return {
+        sourceRef: createSourceRef(row.id, { productId, adminUserId }),
+        displayName: sanitizeDisplayNameForBrowser(row.directus_files_id?.filename_download ?? null),
+        typeLabel: typeLabel(row.directus_files_id?.type ?? null),
+        roleLabel: roleLabel(row.file_role),
+        analyzable: reason === null,
+        unavailableReason: reason,
+      }
+    })
+  } catch (error) {
+    // Fail closed: with no server secret there is no safe handle to hand out,
+    // and raw Directus ids are never an acceptable fallback.
+    if (error instanceof SourceRefUnavailableError) {
+      throw createError({ statusCode: 503, message: 'AI source selection is unavailable on this server.' })
     }
-  })
+    throw error
+  }
 })

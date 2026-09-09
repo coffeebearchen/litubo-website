@@ -8,10 +8,19 @@
  * the shipped implementation.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { createSourceRef, resolveSourceRef, resolveSourceRefs, SOURCE_REF_TTL_MS } from '../server/utils/aiSourceRef'
 
 const OWNER = { productId: 3, adminUserId: 'admin-1' }
+
+/**
+ * The key is derived from the configured server secret (HKDF), so these tests
+ * supply a fixed one. Using a stable secret is also what lets the
+ * "derivation is deterministic" test below mean anything.
+ */
+beforeAll(() => {
+  vi.stubGlobal('useRuntimeConfig', () => ({ directusToken: 'test-directus-token-for-key-derivation' }))
+})
 
 describe('createSourceRef — the ref reveals nothing', () => {
   it('does not contain the media id, the product id, or the user id in readable form', () => {
@@ -114,6 +123,15 @@ describe('resolveSourceRef — binding and integrity', () => {
     ['an absurdly long value', 'x'.repeat(600)],
   ])('refuses %s', (_label, value) => {
     expect(resolveSourceRef(value, OWNER)).toBeNull()
+  })
+})
+
+describe('createSourceRef — the derived key is stable within a process', () => {
+  it('a ref minted now still resolves later in the same process — the key is not regenerated per call', () => {
+    const first = createSourceRef(5, OWNER)
+    // Mint a few more; a per-call or per-import random key would invalidate the first.
+    for (let i = 0; i < 5; i++) createSourceRef(i + 10, OWNER)
+    expect(resolveSourceRef(first, OWNER)).toBe(5)
   })
 })
 

@@ -1,10 +1,11 @@
-import { createError, getRouterParam } from 'h3'
+import { createError, getRouterParam, setResponseHeader } from 'h3'
 import { adminFetch } from '~/server/utils/adminDirectusClient'
 import { runProposalEngine } from '~/server/utils/aiProposalEngine'
 import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegistryDefault'
 import { specificationsTarget } from '~/server/utils/aiTargets/specificationsTarget'
 import { readJsonBodyWithByteLimit } from '~/server/utils/requestBodyLimit'
-import { resolveSourceRefs } from '~/server/utils/aiSourceRef'
+import { resolveSourceRefs, SourceRefUnavailableError } from '~/server/utils/aiSourceRef'
+import { claimGenerateSlot, releaseGenerateSlot } from '~/server/utils/aiGenerateRateLimit'
 import { MAX_FILES_PER_REQUEST } from '~/server/utils/aiTextExtraction'
 
 /**
@@ -50,6 +51,11 @@ export default defineEventHandler(async (event) => {
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: 'Invalid product id' })
 
   const productId = Number(id)
+
+  // A generation result describes one administrator's working session and must
+  // not be cached or persisted by anything in front of this endpoint.
+  setResponseHeader(event, 'Cache-Control', 'private, no-store')
+
   const body = await readJsonBodyWithByteLimit<GenerateBody>(event, MAX_GENERATE_BODY_BYTES)
 
   const adminUserId = event.context.adminUserId as string | undefined
@@ -58,13 +64,38 @@ export default defineEventHandler(async (event) => {
   // A ref that was not minted for this admin AND this product resolves to
   // nothing; one bad ref refuses the whole request rather than silently
   // analyzing the subset that happened to verify.
-  const mediaIds = resolveSourceRefs(body?.sourceRefs, { productId, adminUserId }, MAX_FILES_PER_REQUEST)
+  let mediaIds: number[] | null
+  try {
+    mediaIds = resolveSourceRefs(body?.sourceRefs, { productId, adminUserId }, MAX_FILES_PER_REQUEST)
+  } catch (error) {
+    // No server secret configured: fail closed rather than fall back to
+    // anything that would accept raw ids.
+    if (error instanceof SourceRefUnavailableError) {
+      throw createError({ statusCode: 503, message: 'AI source selection is unavailable on this server.' })
+    }
+    throw error
+  }
   if (mediaIds === null) {
     return {
       ok: false,
       error: 'This selection is no longer valid. Reload the page and choose the files again.',
       fileResults: [],
     }
+  }
+
+  // Cost control: one generation at a time per administrator per product, plus
+  // a cooldown. Claimed only after the request has been fully validated, so a
+  // malformed request never consumes the slot.
+  const slot = claimGenerateSlot(adminUserId, productId)
+  if (!slot.allowed) {
+    // h3 types `Retry-After` as a number (seconds), not a string.
+    setResponseHeader(event, 'Retry-After', slot.retryAfterSeconds)
+    throw createError({
+      statusCode: 429,
+      message: slot.reason === 'in-flight'
+        ? 'An analysis is already running for this product. Wait for it to finish.'
+        : 'Please wait a moment before analyzing this product again.',
+    })
   }
 
   const config = useRuntimeConfig()
@@ -76,14 +107,20 @@ export default defineEventHandler(async (event) => {
     deepseek: { apiKey: config.deepseekApiKey, model: config.deepseekModel },
   })
 
-  const result = await runProposalEngine(fetch, registry, specificationsTarget, {
-    productId,
-    providerId: body?.providerId,
-    mediaIds,
-  })
+  try {
+    const result = await runProposalEngine(fetch, registry, specificationsTarget, {
+      productId,
+      providerId: body?.providerId,
+      mediaIds,
+    })
 
-  if (!result.ok) {
-    return { ok: false, error: result.error, fileResults: result.fileResults }
+    if (!result.ok) {
+      return { ok: false, error: result.error, fileResults: result.fileResults }
+    }
+    return { ok: true, proposal: result.output, fileResults: result.fileResults }
+  } finally {
+    // Always released, including on failure — a failed analysis must not lock
+    // this product until the in-flight ceiling expires.
+    releaseGenerateSlot(adminUserId, productId)
   }
-  return { ok: true, proposal: result.output, fileResults: result.fileResults }
 })

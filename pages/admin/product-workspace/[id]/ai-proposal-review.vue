@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { AdminProduct, ProductSpecGroup, ProductSpecItem } from '~/types/product-cms'
-import { workspaceHeroUrl } from '~/utils/productWorkspace'
+import type { ProductStatus, ProductSpecGroup, ProductSpecItem } from '~/types/product-cms'
 import { workspaceAiSourceIntakeRoute } from '~/utils/productCentre'
+import type { AiProductContext } from '~/utils/aiProposal'
 
 definePageMeta({ layout: 'admin' })
 
@@ -11,16 +11,27 @@ const route = useRoute()
 const id = String(route.params.id)
 const productId = Number(id)
 
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — the AI-safe product context, not the
+ * general product record. The existing specifications ARE still loaded, because
+ * comparing proposals against them is this screen's entire purpose.
+ */
 const [
-  { data: product, error: productError },
+  { data: context, error: contextError },
   { data: specsData, error: specsFetchError },
 ] = await Promise.all([
-  useFetch<AdminProduct>(`/api/admin/products/${id}`),
+  useFetch<AiProductContext>(`/api/admin/products/${id}/ai/context`),
   useFetch<SpecGroupWithItems[]>(`/api/admin/products/${id}/specs`),
 ])
 
-const notFound = computed(() => Boolean(productError.value) || !product.value)
+const notFound = computed(() => Boolean(contextError.value) || !context.value)
 const previewHref = computed(() => `/admin/products/${id}/preview`)
+
+/** The two fields the Workspace shell actually renders — nothing else is available to it here. */
+const shellProduct = computed(() => ({
+  name_en: context.value?.productName ?? null,
+  status: (context.value?.lifecycleStatus ?? 'draft') as ProductStatus,
+}))
 const sourceIntakeHref = computed(() => workspaceAiSourceIntakeRoute(id))
 const existingSpecGroups = computed<SpecGroupWithItems[]>(() => specsData.value ?? [])
 
@@ -90,17 +101,17 @@ onBeforeRouteLeave(() => {
 
   <WorkspaceShell
     v-else
-    :product="(product as AdminProduct)"
+    :product="shellProduct"
     title="AI Proposal Review"
     :preview-href="previewHref"
   >
     <template #nav>
       <WorkspaceModuleNav
-        :product-id="(product as AdminProduct).id"
-        :product-name="(product as AdminProduct).name_en"
-        :product-code="(product as AdminProduct).product_code"
-        :product-status="(product as AdminProduct).status"
-        :product-hero-url="workspaceHeroUrl(product as AdminProduct)"
+        :product-id="productId"
+        :product-name="context!.productName"
+        :product-code="context!.productCode"
+        :product-status="context!.lifecycleStatus as ProductStatus"
+        :product-hero-url="context!.thumbnailUrl"
         active-key="ai-source-intake"
       />
     </template>

@@ -252,12 +252,12 @@ describe('sanitizeDisplayNameForBrowser — PWS-AI-ENGINE-01R2-SAFETY-01', () =>
   })
 })
 
-// PWS-AI-ENGINE-01R2-SAFETY-02 — the `Promise.race` timeout test that lived
-// here was removed along with the implementation it covered. It could only
-// prove the caller stopped waiting, never that the parse stopped running.
-// PDF parsing now happens in a terminable worker thread, and
-// `tests/pdfExtractionWorker.test.ts` proves the stronger property: after a
-// timeout the worker thread has actually exited.
+// PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — the `Promise.race` timeout test that
+// lived here was removed along with the implementation it covered; it could
+// only prove the caller stopped waiting, never that the parse stopped running.
+// The terminable PDF worker that briefly replaced it is gone as well: PDF is
+// disabled outright (see `TEMPORARILY_UNSUPPORTED_MIME_REASONS`), so there is
+// no PDF parse left to time out and no worker test to point at.
 
 describe('PWS-AI-ENGINE-01R explicit, tested limits exist', () => {
   it('all limits are finite, positive numbers', () => {

@@ -52,30 +52,47 @@ const UNSAFE_FILENAME_PATTERNS: RegExp[] = [
   /\bwww\./i,
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
   /[/\\]/,
-  // eslint-disable-next-line no-control-regex
-  /[\x00-\x1F\x7F]/,
 ]
 
+/** Zero-width, format, control and bidirectional-override characters. Mirrors the server exactly. */
+const INVISIBLE_CHARACTER_PATTERN = /[\p{Cf}\p{Cc}]/u
+
 /**
- * PWS-AI-ENGINE-01R2-SAFETY-02 — the client mirror of the server's
- * `sanitizeDisplayNameForBrowser()` (`server/utils/aiTextExtraction.ts`).
- *
- * The AI Source Intake file list renders names straight from Directus rather
- * than from a Generate response, so it needs the same rule applied at the same
- * strength: a normal human filename is shown as-is, and anything carrying a
- * URL, a UUID, a path separator, a control character, or an anomalous length
- * collapses to one generic label instead of being echoed even in part.
- * `tests/aiSourceIntakeReview.test.ts` asserts this mirror and the server
- * helper agree on a shared table of hostile names, so the two cannot drift.
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — the client mirror of the server's
+ * `sanitizeDisplayNameForBrowser()`. Same rule, same order, including the
+ * invisible-character check both before and after NFKC:
+ * `tests/aiSourceIntakeReview.test.ts` asserts the two agree on a shared table
+ * of hostile names, so they cannot drift apart.
  */
 export function safeSourceDisplayName(rawName: string | null | undefined): string {
   const name = (rawName ?? '').trim()
   if (!name) return 'Untitled file'
   if (name.length > MAX_SAFE_DISPLAY_NAME_LENGTH) return 'Source file'
-  // NFKC before matching, mirroring the server: a full-width URL or path is a
-  // URL or path to the person reading it, and must not pass ASCII patterns.
-  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(name.normalize('NFKC')))) return 'Source file'
+  if (INVISIBLE_CHARACTER_PATTERN.test(name)) return 'Source file'
+
+  const normalized = name.normalize('NFKC')
+  if (INVISIBLE_CHARACTER_PATTERN.test(normalized)) return 'Source file'
+  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(normalized))) return 'Source file'
+
   return name
+}
+
+
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — the minimal product context the AI screens
+ * receive, mirroring the server's `AiProductContext`.
+ *
+ * The AI screens deliberately do NOT load the general product record: it
+ * carries the hero image's Directus UUID, internal review notes, SEO fields and
+ * highlights. `thumbnailUrl` is a product-scoped route, never an assets URL and
+ * never a file UUID.
+ */
+export interface AiProductContext {
+  productId: number
+  productName: string
+  productCode: string | null
+  lifecycleStatus: string
+  thumbnailUrl: string | null
 }
 
 /**

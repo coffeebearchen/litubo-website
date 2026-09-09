@@ -1,26 +1,25 @@
 name: CI
 
-# PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — verification pipeline on an exact,
-# pinned Node 20 patch version.
+# PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — verification pipeline on the project's
+# standard Node version, 22.22.2.
 #
-# On the Node version, stated honestly: this repository contains no Dockerfile,
-# no application service in `docker-compose.yml`, and no `.nvmrc`, and no
-# container runs this Nuxt application — so the deployed Node version is not
-# established by any committed configuration or running service. "Node 20" is
-# the constraint the project works to, and 20.20.2 is the exact version these
-# checks are actually run against, here and locally. It is not a claim about
-# production, and the two must be reconciled when the application is first
-# deployed.
+# Node 22.22.2 is this project's agreed runtime contract, recorded in `.nvmrc`
+# and enforced by `engines` in `package.json`. It is pinned to an exact patch
+# rather than the `22` alias so a dependency that quietly requires a newer
+# runtime fails here instead of failing later. Nothing is deployed yet, so this
+# is a standard the application will be run against — not a claim about a
+# running production server.
 #
-# The version is pinned to a patch rather than the `20` alias because several
-# dependencies require `>= 20.19.0`; an older Node 20 fails to satisfy them.
-# `npm ci` is deliberate too: it installs strictly from the lockfile, so a
-# lockfile that drifts from `package.json` is a build failure rather than a
-# silent version change. (That is exactly what the first CI runs caught — a
-# lockfile written by npm 11 that npm 10 refused.)
+# `nuxt prepare` is not optional and must come before the type-aware steps:
+# Nuxt generates `.nuxt/tsconfig.json` and its auto-import declarations, and a
+# clean checkout has neither. Its absence is exactly why the first CI runs
+# failed at Vitest with every test erroring before it ran.
+#
+# `npm ci` installs strictly from the lockfile, so a lockfile that drifts from
+# `package.json` is a build failure rather than a silent version change.
 #
 # This workflow uses no secrets, calls no AI provider, contacts no Directus
-# instance, and deploys nothing. It only runs the same checks a developer runs
+# instance, and deploys nothing. It runs the same checks a developer runs
 # locally.
 
 on:
@@ -28,7 +27,6 @@ on:
     branches:
       - master
       - 'review/**'
-      - 'backup/**'
   pull_request:
   workflow_dispatch:
 
@@ -37,7 +35,7 @@ permissions:
 
 jobs:
   verify:
-    name: Tests, types, lint, build (Node 20.20.2)
+    name: Tests, types, lint, build (Node 22.22.2)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -45,14 +43,17 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
-      - name: Use the exact Node version these checks are verified against
+      - name: Use the project's standard Node version
         uses: actions/setup-node@v4
         with:
-          node-version: '20.20.2'
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies from the lockfile
         run: npm ci
+
+      - name: Generate Nuxt types and auto-imports
+        run: npx nuxt prepare
 
       - name: Unit and integration tests
         run: npx vitest run

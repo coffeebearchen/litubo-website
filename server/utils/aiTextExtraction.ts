@@ -110,31 +110,45 @@ const UNSAFE_FILENAME_PATTERNS: RegExp[] = [
   /\bwww\./i, // bare www. URL
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i, // UUID, anywhere in the name — not only at a word boundary
   /[/\\]/, // any path separator — a real filename never legitimately contains one
-  // eslint-disable-next-line no-control-regex
-  /[\x00-\x1F\x7F]/, // control characters, including newlines/tabs a delimiter-injection or prompt-injection attempt would need
 ]
 
 /**
- * PWS-AI-ENGINE-01R2-SAFETY-01 — the ONLY place a Directus `filename_download`
- * value is turned into something safe to hand back to the browser. A normal,
- * human-typed filename ("Datasheet.pdf") is returned unchanged; anything
- * carrying a URL, a UUID, a path separator, a control character (including a
- * newline — a delimiter-injection vector), or an anomalous length collapses
- * to the single generic label `'Source file'` — never partially echoed, and
- * never used to distinguish *which* rule tripped (that itself could leak
- * information about the rejected value).
+ * Zero-width, format, control and bidirectional-override characters.
+ * `\p{Cf}` covers U+200B, U+2060, U+00AD, U+FEFF and the bidi overrides
+ * (U+202A–U+202E, U+2066–U+2069); `\p{Cc}` covers C0/C1 controls. Checked on
+ * both the raw and the NFKC form — see the sanitizer below.
+ */
+const INVISIBLE_CHARACTER_PATTERN = /[\p{Cf}\p{Cc}]/u
+
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — the display-name rule, applied identically
+ * on the server and mirrored in `utils/aiProposal.ts`.
+ *
+ * Invisible characters are checked BEFORE and AFTER NFKC. Before, because
+ * normalization is exactly what would remove them and hide the attempt; after,
+ * because NFKC can also *produce* a format character from a compatibility
+ * sequence, so a name that looked clean beforehand can carry one afterwards.
+ * `\p{Cf}` covers zero-width characters (U+200B, U+2060, U+FEFF), the soft
+ * hyphen, and the bidirectional overrides (U+202A-202E, U+2066-2069);
+ * `\p{Cc}` covers C0/C1 control characters.
+ *
+ * A normal human filename is returned unchanged; anything carrying a URL, a
+ * UUID, a path separator, an invisible character, or an anomalous length
+ * collapses to one generic label rather than being echoed even in part.
  */
 export function sanitizeDisplayNameForBrowser(rawName: string | null | undefined): string {
   const name = (rawName ?? '').trim()
   if (!name) return 'Untitled file'
   if (name.length > MAX_SAFE_DISPLAY_NAME_LENGTH) return 'Source file'
-  // Patterns are matched against the NFKC form so a full-width URL or path in
-  // a filename cannot slip past ASCII patterns, exactly as in
-  // `containsUnsafeSourceLeakage()`. The raw value is what gets displayed —
-  // normalization is only ever used to decide, never to rewrite a name.
-  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(name.normalize('NFKC')))) return 'Source file'
+  if (INVISIBLE_CHARACTER_PATTERN.test(name)) return 'Source file'
+
+  const normalized = name.normalize('NFKC')
+  if (INVISIBLE_CHARACTER_PATTERN.test(normalized)) return 'Source file'
+  if (UNSAFE_FILENAME_PATTERNS.some(pattern => pattern.test(normalized))) return 'Source file'
+
   return name
 }
+
 
 export type ExtractionResult =
   | { ok: true, source: ExtractedSource }

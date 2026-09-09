@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import type { AdminProduct } from '~/types/product-cms'
-import { workspaceHeroUrl } from '~/utils/productWorkspace'
+import type { ProductStatus } from '~/types/product-cms'
 import { workspaceMediaResourcesRoute, workspaceAiProposalReviewRoute } from '~/utils/productCentre'
-import { MAX_FILES_PER_REQUEST, type AiIntakeSource, type SpecificationProposal, type SourceFileOutcome } from '~/utils/aiProposal'
+import { MAX_FILES_PER_REQUEST, type AiProductContext, type AiIntakeSource, type SpecificationProposal, type SourceFileOutcome } from '~/utils/aiProposal'
 
 interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
 interface GenerateResponse {
@@ -20,7 +19,12 @@ const id = String(route.params.id)
 const productId = Number(id)
 
 /**
- * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — this screen reads its own AI-safe source
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — this screen reads its own AI-safe
+ * product context, not the general `/api/admin/products/:id` record. That
+ * record carries the hero image's Directus UUID, internal review notes, SEO
+ * fields and highlights, none of which this screen needs or should receive.
+ *
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — it likewise reads its own AI-safe source
  * list, not the general product media endpoint. The general endpoint answers
  * with Directus file UUIDs, raw `filename_download`, captions and alt text;
  * none of that is needed here, so none of it is sent to the browser. What
@@ -28,18 +32,24 @@ const productId = Number(id)
  * `sourceRef` that only the server can resolve.
  */
 const [
-  { data: product, error: productError },
+  { data: context, error: contextError },
   { data: sourcesData, error: sourcesFetchError },
   { data: providersData, error: providersFetchError },
 ] = await Promise.all([
-  useFetch<AdminProduct>(`/api/admin/products/${id}`),
+  useFetch<AiProductContext>(`/api/admin/products/${id}/ai/context`),
   useFetch<AiIntakeSource[]>(`/api/admin/products/${id}/ai/sources`),
   useFetch<AiProviderSummary[]>('/api/admin/ai/providers'),
 ])
 
 const sources = computed<AiIntakeSource[]>(() => sourcesData.value ?? [])
-const notFound = computed(() => Boolean(productError.value) || !product.value)
+const notFound = computed(() => Boolean(contextError.value) || !context.value)
 const previewHref = computed(() => `/admin/products/${id}/preview`)
+
+/** The two fields the Workspace shell actually renders — nothing else is available to it here. */
+const shellProduct = computed(() => ({
+  name_en: context.value?.productName ?? null,
+  status: (context.value?.lifecycleStatus ?? 'draft') as ProductStatus,
+}))
 const mediaResourcesHref = computed(() => workspaceMediaResourcesRoute(id))
 
 /**
@@ -152,17 +162,17 @@ async function analyze() {
 
   <WorkspaceShell
     v-else
-    :product="(product as AdminProduct)"
+    :product="shellProduct"
     title="AI Source Intake"
     :preview-href="previewHref"
   >
     <template #nav>
       <WorkspaceModuleNav
-        :product-id="(product as AdminProduct).id"
-        :product-name="(product as AdminProduct).name_en"
-        :product-code="(product as AdminProduct).product_code"
-        :product-status="(product as AdminProduct).status"
-        :product-hero-url="workspaceHeroUrl(product as AdminProduct)"
+        :product-id="productId"
+        :product-name="context!.productName"
+        :product-code="context!.productCode"
+        :product-status="context!.lifecycleStatus as ProductStatus"
+        :product-hero-url="context!.thumbnailUrl"
         active-key="ai-source-intake"
       />
     </template>

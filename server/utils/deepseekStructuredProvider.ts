@@ -17,10 +17,10 @@ import type { AiStructuredProvider } from './aiProviderRegistry'
  * remains the actual, provider-independent safety boundary regardless of
  * how closely DeepSeek follows the schema.
  *
- * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — the request is issued with native
- * `fetch` rather than the `openai` SDK. The SDK declares
- * `engines: { node: ">=22" }`, above this project's Node 20 target, and it was
- * only ever used here as an HTTP client for a documented JSON endpoint. The
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — the request is issued with native
+ * `fetch` rather than the `openai` SDK. The project now runs on Node 22.22.2,
+ * so the SDK's `engines` range is no longer the reason to avoid it; the SDK
+ * was only ever an HTTP client for a documented JSON endpoint here. The
  * request and response shapes are unchanged.
  *
  * Remains a fully independent adapter file from the OpenAI provider module

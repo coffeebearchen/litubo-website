@@ -1,5 +1,18 @@
 <script setup lang="ts">
-import type { AdminProduct } from '~/types/product-cms'
+import type { ProductStatus } from '~/types/product-cms'
+
+/**
+ * The shell reads exactly two fields from the product, so it asks for exactly
+ * two. It previously required a whole `AdminProduct`, which forced every page
+ * using it to load the complete record — including the hero image's Directus
+ * UUID, internal review notes and SEO fields — even when the page renders only
+ * a name and a status chip. A full `AdminProduct` still satisfies this shape,
+ * so no existing caller changes.
+ */
+interface WorkspaceShellProduct {
+  name_en: string | null
+  status: ProductStatus
+}
 
 /**
  * `saveState` defaults to `'unavailable'`, which renders the exact
@@ -17,7 +30,7 @@ import type { AdminProduct } from '~/types/product-cms'
  */
 withDefaults(
   defineProps<{
-    product: AdminProduct
+    product: WorkspaceShellProduct
     title: string
     previewHref: string
     saveState?: 'unavailable' | 'idle' | 'dirty' | 'saving' | 'success' | 'error'

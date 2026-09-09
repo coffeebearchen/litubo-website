@@ -1857,7 +1857,7 @@ describe('PWS-AI-01-FAST-01 page composition', () => {
 describe('PWS-AI-01-FAST-01 reads only the current product\'s own already-associated files — never cross-product', () => {
   it('fetches exactly the product record and its own media association list, nothing else', () => {
     const page = repoFile('pages/admin/product-workspace/[id]/ai-source-intake.vue')
-    expect(page).toContain('useFetch<AdminProduct>(`/api/admin/products/${id}`)')
+    expect(page).toContain('useFetch<AiProductContext>(`/api/admin/products/${id}/ai/context`)')
     expect(page).toContain('useFetch<AiIntakeSource[]>(`/api/admin/products/${id}/ai/sources`)')
     expect(page).not.toContain('/api/admin/media/files')
     expect(page).not.toContain('/api/admin/products/${id}/sources')

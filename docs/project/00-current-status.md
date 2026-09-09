@@ -23,7 +23,7 @@
 - @nuxtjs/i18n v9.5.6, `prefix_except_default` strategy (EN no prefix, ES `/es/`, PT `/pt/`)
 - Google Fonts: Source Serif 4 (display) + Inter (body/nav/forms)
 - CMS adapter pattern: Phase 1 reads local fixtures; Phase 2 reads Directus via same interface
-- Node 20 LTS, npm; Docker + Nginx (deployment — not yet applied)
+- Node 22.22.2（`.nvmrc` + `engines` 固定，CI 同版本）, npm; Docker + Nginx (deployment — not yet applied)
 
 **Decisions recorded:** D-001 through D-020 in `docs/project/08-decision-log.md`
 

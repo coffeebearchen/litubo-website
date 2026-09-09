@@ -3279,6 +3279,9 @@ Apply 仍保持前端 disabled + 服务端 503（真实链路复验通过）；�
 
 ## PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — Node 20 对齐、真实取消、诚实页面状态与 CI（2026-09-09）
 
+> **本节结论中的 Node 版本已被 PWS-AI-ENGINE-01R2-REVIEW-FIX-03 取代：本项目现行运行标准是 Node 22.22.2。以下内容保留为当时真实发生的过程记录，不再代表当前契约。**
+
+
 **性质：** 对 `b6125f6` 的窄化修复，在 review 分支 `review/pws-ai-engine-01r2-safety-02` 上新增一个提交。未 push master、未部署、未创建 PR、未 reset/rebase/amend/force push。Apply 全程保持前端 disabled + 服务端 503。
 
 ### 一、Node 20 与 PDF：换掉不兼容依赖，并在真实 Node 20 上验证
@@ -3341,6 +3344,9 @@ Apply 仍保持前端 disabled + 服务端 503（真实链路复验通过）；�
 ---
 
 ## PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — CI 契约、AI-safe DTO、PDF 诚实停用（2026-09-09）
+
+> **本节结论中的 Node 版本已被 PWS-AI-ENGINE-01R2-REVIEW-FIX-03 取代：本项目现行运行标准是 Node 22.22.2。以下内容保留为当时真实发生的过程记录，不再代表当前契约。**
+
 
 **性质：** 修复 Codex 对 review 分支 `67ee57d` 的独立审查阻塞项。在 review 分支上新增一个提交，未 push master、未部署、未创建 PR。Apply 全程保持前端 disabled + 服务端 503。
 
@@ -3419,3 +3425,96 @@ Apply 仍保持前端 disabled + 服务端 503（真实链路复验通过）；�
 未启用 Apply、未恢复 saga、未实现 Directus transaction；未改 `docker-compose.yml`/Dockerfile/生产运行时/Directus schema/权限/迁移；未改产品数据与 Media Library；未读取或修改 `.env`；未调用真实 DeepSeek/OpenAI；零费用；未部署；未创建 PR；**未 push master**；未移动或整理任何 `D:\` 目录。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-REVIEW-FIX-02-AUTO"任务中写入。*
+
+---
+
+## PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — Node 22 运行契约与 AI 页最小权限闭环（2026-09-09）
+
+**任务范围：** 修好 GitHub CI 的真实失败原因、把 Node 版本统一为用户确认的 22.22.2、堵住 AI 两页经通用产品 API 造成的数据泄露、补齐文件名 Unicode 伪造防御、稳定 sourceRef 密钥并在真实付费调用前加成本控制。**本轮不部署、不改 Docker、不改服务器、不改 Directus schema/权限/迁移。**
+
+### 一、Node 22.22.2 运行契约（用户确认）
+
+用户确认：**本项目统一采用 Node 22.22.2，作为未来 Nuxt 应用的运行标准。** 据此：
+
+- 新增 `.nvmrc` = `22.22.2`；`package.json` 的 `engines` 改为 `>=22.22.2 <23`；CI 用 `node-version-file: .nvmrc` 读同一个来源，三处不会再各自漂移。
+- `sanitize-html` 恢复到 `^2.17.7`。此前为迁就 Node 20 而固定的 `2.17.0` 是一个已经不需要的降级。
+- 用 Node 22.22.2 自带的 npm 10.9.7 重新生成 lockfile。**未使用** `--force`、`--legacy-peer-deps`、`--ignore-engines`，也未手工编辑 lockfile。
+- `npm ci` 现在**零 EBADENGINE 警告**——之前遗留的那批警告全部来自"依赖声明需要 Node 22 而运行的是 Node 20"，换成 Node 22.22.2 后自然消失，不是被忽略。
+
+同步更新了 `CLAUDE.md` 与 `docs/project/00-current-status.md` 中"Node 20 LTS"的旧表述，否则新会话读到的仍是被取代的版本。`server/utils/openaiStructuredProvider.ts`、`server/utils/deepseekStructuredProvider.ts` 与相关测试里"SDK 要求 Node >=22，高于本项目的 Node 20 目标"这条**已经失效的理由**也一并改写：现在保持 native `fetch` 适配器的理由是 SDK 在这里从来只当 HTTP 客户端用，少一个依赖就少一份要审计的东西——**不是**引擎不兼容，也**没有**重新引入 SDK。
+
+### 二、CI 的真实失败原因（已修复）
+
+`647c9dd` 的真实 Actions 运行证明：`npm ci` 是成功的，Vitest 在跑完全部用例之前就失败了。原因是 **CI 从未执行 `nuxt prepare`**——`.nuxt/` 下的类型与自动导入产物不存在，测试与类型检查踩空。
+
+CI 顺序已固定为：`npm ci` → `npx nuxt prepare` → `npx vitest run` → `npx vue-tsc --noEmit` → `npm run lint` → `npx nuxt build`。触发分支保留 `master`、`review/**`、`pull_request`、`workflow_dispatch`，**移除了 `backup/**`**——备份分支是保险，不该消耗 CI 配额。工作流头部写清了为什么 `nuxt prepare` 是必需步骤，以及这条流水线不部署任何东西。
+
+### 三、AI 两页的最小权限（本轮核心）
+
+**修复前的问题：** AI Source Intake 与 AI Proposal Review 都在请求通用的 `/api/admin/products/:id`。那个响应里带着 hero 图的 Directus UUID、内部 `review_notes`、SEO 字段、highlights 与完整 Specifications——**这两个页面一个都不需要**，但浏览器全都拿到了。
+
+**修复：** 新增 `server/api/admin/products/[id]/ai/context.get.ts`，只返回五个字段：
+
+```
+productId · productName · productCode · lifecycleStatus · thumbnailUrl
+```
+
+它向 Directus 只请求 `fields=name_en,product_code,status,hero_image`——**没被选出来的列不可能泄露**。`hero_image` 的 UUID 在服务端用完即弃，绝不出现在响应里。缩略图改由 `server/api/admin/products/[id]/ai/hero.get.ts` 代理：路由键是**产品数字 ID**，不是文件 UUID；沿用既有的 `validateAssetId` / `buildSafeParams` / `validateMime`；拒绝跟随重定向；无图时返回中性占位，**任何情况下都不回退到通用产品 API**。三个响应统一 `Cache-Control: private, no-store`。
+
+`WorkspaceShell` 的 prop 也从整个 `AdminProduct` 收窄到它真正渲染的两个字段（`name_en` + `status`），这样一个页面不会仅仅因为要显示名字和状态徽章就被迫加载完整产品记录。
+
+**浏览器实测（登录态，产品 3）：** 拦截 `window.fetch` 记录两页的全部请求 ——
+
+| 检查项 | 结果 |
+|---|---|
+| 是否出现通用 `products/:id` 请求 | **否** |
+| `ai/context` / `ai/sources` / `ai/providers` | 均 200，均 `private, no-store` |
+| UUID / `filename_download` / `directus_files_id` / `caption` / `alt_en` / `review_notes` / `seo_` / `hero_image` / `/assets/` | **全部不存在** |
+| `ai/hero` 代理 | 200 `image/jpeg`，`private, no-store`，URL 中无 UUID |
+
+### 四、文件名 Unicode 伪造防御（补齐）
+
+服务端与客户端的清洗逻辑现在完全对齐：`\p{Cf}` 与 `\p{Cc}` 在 **NFKC 归一化之前和之后各检查一次**——只在归一化之后检查，会漏掉归一化过程中被消解的构造。URL / 路径 / UUID / 超长 / 全角的既有检查全部保留，判定为不安全的名字统一显示为 `Source file`。回归测试覆盖 U+200B、U+202E、U+2060、全角 URL、Windows 路径、内嵌 UUID，以及一组正常文件名的误报检查。
+
+### 五、sourceRef 密钥策略与 Generate 成本控制
+
+**密钥：** 此前 sourceRef 的 AES 密钥是**进程内随机**的——进程一重启，用户手上的引用就全部失效。现在改为用 **HKDF-SHA256 从既有的服务端专用密钥 `directusToken` 派生**（固定 salt/info，`server/utils/aiSourceRef.ts`）。该密钥本身既不读出也不打印，只作为派生输入。没有配置时抛 `SourceRefUnavailableError`，`ai/sources` 与 Generate 都**失败关闭**返回 503，绝不退化成接受原始 ID。**未新增任何环境变量**，也未新建 Directus 表。AES-256-GCM、短过期、管理员 + 产品双绑定、不可解码等性质不变，并有测试逐段解码确认引用本身不携带任何可读信息。
+
+**成本控制（`server/utils/aiGenerateRateLimit.ts`）：** 同一管理员 + 同一产品**同时只允许一次生成**，并有 10 秒冷却；超出返回 **429 + `Retry-After`**。槽位在请求通过全部校验之后才占用，所以一个畸形请求不会白占额度；`finally` 中必定释放，失败的分析不会把产品锁死。这是**单实例内存级**保护，文档中如实写明——它不是跨实例的配额系统。Generate 响应同样是 `private, no-store`。
+
+**全链路测试：** 登录态 GET `ai/sources` → 取得 sourceRef → 同一管理员 POST Generate（provider 被 mock，**零真实 AI 调用**）→ 验证换成另一个管理员时同一个引用被拒绝、响应中无 UUID、无 `filename_download`。
+
+### 六、PDF 与遗留描述清理
+
+PDF 现在返回**属于它自己**的停用理由（"PDF is not supported for text-source analysis yet — it needs an isolated parser with a real memory limit."），不再复用 Excel 的文案。随 PDF 停用一并删除的 `tests/pdfExtractionWorker.test.ts` 在测试注释里还留有指向它的说明，已改写为当前事实：PDF 已整体停用，没有 PDF 解析可超时，也没有 worker 测试可指。
+
+### 七、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，**零 EBADENGINE 警告** |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **856 / 856 通过**（26 个测试文件） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功（6.5 MB / 1.65 MB gzip） |
+| 浏览器 1440px（两页） | 无横向溢出，Console 零错误 |
+| 浏览器 375px（两页） | 无横向溢出，Console 零错误 |
+| AI 两页 Network | **无通用 `products/:id` 请求**；三个响应均无敏感字段，均 `private, no-store` |
+| Apply | 任意 body → **503**（仍禁用） |
+| 导航高亮 | Proposal Review 正确高亮 "AI Source Intake"，并有返回链接；**未新增任何虚构菜单项** |
+| 业务数据 | **零写入**：产品 3 仍为原有 2 个 TEST 规格组（12 + 5 条）与 7 个关联文件 |
+| 真实 AI 调用 | **零次**；未填写任何 Key；未点击真实 Generate / Apply |
+
+**GitHub Actions 状态：本次推送后需在 Actions 页面确认实际结果。本文档不声称"CI 已绿"。**
+
+### Backlog（本轮范围外，仅记录）
+
+登录限流（login rate limit）的既有问题按施工单要求未在本轮修改，留待单独排期。
+
+### 明确未做
+
+未启用 Apply（仍 503）、未恢复 PDF AI 解析、未新增 Page Content / FAQ / SEO / Publish 等任何新的 AI Target；未改 `docker-compose.yml` / Dockerfile / 生产运行时 / Directus schema / 权限 / 迁移；未改产品数据与 Media Library；未读取或修改 `.env`；未新增任何环境变量；未调用真实 DeepSeek / OpenAI；零费用；**未部署**；未创建 PR；**未 push master**；未 reset / rebase / amend / revert / force push；未移动或整理任何 `D:\` 目录；未改视觉母版资产。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-REVIEW-FIX-03-AUTO"任务中写入。*

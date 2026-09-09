@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.2 <23"
   },
   "scripts": {
     "dev": "nuxt dev",
@@ -20,7 +20,7 @@
     "@types/sanitize-html": "^2.16.1",
     "nodemailer": "^9.1.1",
     "nuxt": "^3.16.0",
-    "sanitize-html": "2.17.0",
+    "sanitize-html": "^2.17.7",
     "zod": "^4.5.4"
   },
   "devDependencies": {
