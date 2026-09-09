@@ -173,6 +173,16 @@ Console clean。
 
 ---
 
+## ML-CLOUD-UI-CLEANUP-01 — Information Architecture + Visual Cleanup ✅ COMPLETED（2026-09-10）
+
+**成果：** Sidebar 由平铺 21 项重构为 9 项三分区一级导航（Library / Folders / System，System 默认 collapsed）；二级及以下目录只出现在主内容 Folder Browse；Breadcrumb 成为当前位置唯一事实源并移除右上角 Current Folder 下拉；工具栏正常状态只保留 `+ New folder` 与 `Upload ▾`；New folder 改为显式声明 Location 的 modal；Rename / Move 改为文件夹 tile 的 `⋯` contextual 操作；`Select folder` 更名为 `Upload folder contents`；常驻拖放横幅改为仅拖拽时出现；主内容分 `FOLDERS` / `FILES`；file grid 由 6 窄列改为 4 列并允许文件名两行；File Details 默认不占宽度。
+
+**未改动：** Folder Governance、folder backend semantics、Media UUID、references、duplicate algorithm、archive lifecycle、Directus schema / permission、AI runtime。
+
+**下一步：`PWS-AI-MULTI-SOURCE-REAL-BETA-01` — AUTHORIZED BUT PAUSED / NOT STARTED，等待 UI 验收。**
+
+---
+
 ## ML-CLOUD-V1-FINAL — 封板验收 ✅ COMPLETED / SEALED（2026-09-09）
 
 **结论：MEDIA-LIBRARY-CLOUD-WORKSPACE-V1 = COMPLETED / SEALED。** 七个 Gate 全部通过；Gate 1 的 stray upload 经静态调用链 + 运行时双哨兵观察判定 `NOT REPRODUCIBLE / NO AUTOMATIC UPLOAD PATH FOUND`；Gate 7 发现并修复一个真实 P0 —— Search 此前受当前 folder 过滤而变成局部搜索，违反「Search = global Media Library search」，已改为搜索激活时不附加 folder 过滤并加提示。1168 测试通过、typecheck / lint / build 全绿、1440 四状态与 375 全部无横向溢出。AI runtime 自 `4bbc838` 起改动 0 个文件。

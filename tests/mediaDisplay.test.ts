@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { fileKind, summariseUpload } from '../utils/mediaDisplay'
+import { fileKind, summariseUpload, systemFolderLabel } from '../utils/mediaDisplay'
 
 describe('the label shown when there is no thumbnail', () => {
   it.each([
@@ -76,5 +76,45 @@ describe('reporting how an upload batch went', () => {
   it('reports a partly failed batch as both numbers', () => {
     const results = [ok('a.pdf'), ok('b.pdf'), ok('c.pdf'), ok('d.pdf'), bad('e.exe', 'Unsupported format')]
     expect(summariseUpload(results)).toBe('4 uploaded, 1 failed')
+  })
+})
+
+/**
+ * ML-CLOUD-UI-CLEANUP-01 — system folders are stored as governance slugs, and
+ * governance matches on the stored name by exact path. The label is a display
+ * transform only, so it has to be a pure function of the name with no aliases
+ * that could drift away from what is actually stored.
+ */
+describe('how a system folder name is displayed', () => {
+  it.each([
+    ['products', 'Products'],
+    ['resources', 'Resources'],
+    ['metal-detection', 'Metal Detection'],
+    ['technical-docs', 'Technical Docs'],
+    ['case-studies', 'Case Studies'],
+  ])('%s → %s', (stored, shown) => {
+    expect(systemFolderLabel(stored)).toBe(shown)
+  })
+
+  it('leaves an already-capitalised name alone', () => {
+    expect(systemFolderLabel('Products')).toBe('Products')
+  })
+
+  /**
+   * `xray` becomes "Xray", not "X-ray". Inventing a nicer label would mean
+   * keeping an alias table in step with folder names nobody remembers it
+   * depends on — the moment they disagree, the screen lies about the folder.
+   */
+  it('does not invent a prettier name than the folder actually has', () => {
+    expect(systemFolderLabel('xray')).toBe('Xray')
+  })
+
+  it('collapses repeated separators rather than emitting blanks', () => {
+    expect(systemFolderLabel('a--b')).toBe('A B')
+    expect(systemFolderLabel('  spaced  out  ')).toBe('Spaced Out')
+  })
+
+  it('survives an empty name', () => {
+    expect(systemFolderLabel('')).toBe('')
   })
 })

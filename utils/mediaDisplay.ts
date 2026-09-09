@@ -40,3 +40,25 @@ export function summariseUpload(results: UploadOutcome[]): string {
   if (ok === 0) return `${failed} file(s) failed to upload`
   return `${ok} uploaded, ${failed} failed`
 }
+
+/**
+ * ML-CLOUD-UI-CLEANUP-01 — how a SYSTEM folder's name is shown.
+ *
+ * Directus stores these as slugs (`metal-detection`, `technical-docs`) because
+ * they are business classification keys that governance matches on by exact
+ * path. Showing the slug to a customer makes the library look like a database
+ * browser, so the label is title-cased for display only — the stored name is
+ * never touched, and the modal still shows the real full path.
+ *
+ * Deliberately mechanical: it splits on hyphens and spaces and capitalises,
+ * with no alias table. A folder named `xray` reads as "Xray", not "X-ray",
+ * because inventing display names for folders is how a label starts
+ * disagreeing with the thing it labels.
+ */
+export function systemFolderLabel(name: string): string {
+  return name
+    .split(/[-\s]+/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}

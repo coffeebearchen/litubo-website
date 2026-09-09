@@ -5335,3 +5335,213 @@ PWS-AI-MULTI-SOURCE-REAL-BETA-01
 已完成的无费用准备：隔离分支 `review/pws-ai-multi-source-real-beta-01`（基线 `20b4eb1`）已创建；D-021 / D-022 已复核；DeepSeek adapter 经只读确认为 **bare `fetch`，单次请求、零应用层重试、零 SDK 传输重试、30s 超时、无 provider fallback**。
 
 *最后更新：2026-09-09，由 Claude Code 在"Media Library V1 blocking runtime hotfix"任务中写入。*
+
+---
+
+## ML-CLOUD-UI-CLEANUP-01 — Media Library Information Architecture + Visual Cleanup（2026-09-10）
+
+**状态：COMPLETED。** 只做信息架构与视觉整理，未新增文件管理功能，未改动任何后端语义。
+
+### 一、核心问题与解决
+
+页面此前"乱"的根源是**一个 UI 元素同时承担多个职责**。本轮把四种职责彻底分开：
+
+| 区域 | 只回答一个问题 |
+|---|---|
+| Sidebar | 我要去哪个大区域？ |
+| Breadcrumb | 我现在在哪里？ |
+| Main Content | 当前目录里有什么 Folder / File？ |
+| File Details | 我选中的文件是什么？ |
+
+### 二、Sidebar 重构（本模块最大改动）
+
+**Before：** 一列平铺 21 项 —— System Views、applications、company、home、products、xray、conveyor、checkweigher、combination、metal-detection、客户自建目录、`ZZ-ML-CLOUD…`、manuals、legacy、conflict、certifications 全部混在一起并用缩进表示层级。它与主内容区争抢同一个职责，把真正的入口埋了起来。
+
+**After：9 项，三个分区**
+
+```text
+LIBRARY      All files · Unclassified · Archived
+FOLDERS      📁 Applications · 📁 Company · 📁 Home · 📁 Products · 📁 Resources
+SYSTEM       System folders ▸        （默认 collapsed）
+```
+
+实测：侧栏中 `xray / conveyor / checkweigher / combination / metal-detection / manuals / ZZ-* / photos / certificates` **命中数 = 0**。二级及以下目录**永远只出现在主内容区**。
+
+Legacy / Conflict 收进 `System folders ▸`，展开后带 `Read only` / `Conflict` 标签。**Folder Governance 未改动**，只是隐藏视觉噪音。
+
+### 三、Folder 浏览流程（实测）
+
+```text
+Sidebar: Products
+  → 主内容 Folders: Checkweigher · Combination · Conveyor · Metal Detection · Technical Docs · Xray
+  → 点 Conveyor  → 面包屑 Media Library / Products / Conveyor
+                  → 主内容 Folders: 客户文件夹
+  → 点客户文件夹  → 面包屑续接，主内容分区为 Folders + Files
+```
+
+### 四、Breadcrumb = 当前位置唯一事实源
+
+面包屑现在渲染**完整祖先链**，每一级都可点击。右上角那个 `— ZZ-ML-CLOUD…` 的 Current Folder 下拉**已删除** —— 页面不再存在第二套"当前文件夹"概念。
+
+`uploadFolder` 由 `computed` 从面包屑当前目录派生，不再是独立 ref。
+
+### 五、Toolbar
+
+**正常状态只有两个按钮：** `+ New folder` 与 `Upload ▾`。
+
+`Rename` / `Move` / Current Folder 下拉 / `Select folder` **全部从常驻工具栏移除**。选中文件时工具栏才切换为 `Move / Archive / Clear`。
+
+### 六、New Folder 改为 modal
+
+顶部巨大 inline 表单已取消。改为居中弹窗（1440 宽 460px，375 贴底全宽），明确显示 **Location = 目标完整路径**，按钮为 `Cancel` / `Create folder`。创建成功后**直接出现在当前主内容 Folders 区**（实测新增 1 个 tile，且**未进入侧栏**）。
+
+### 七、Folder 操作变为 contextual
+
+每个 customer folder tile 右侧有 `⋯` → `Rename` / `Move`。弹窗标题为 `Rename folder` / `Move folder`，并显示**作用对象的完整路径**，所以"我在改谁"没有歧义。
+
+**受保护系统目录不显示 `⋯` 菜单**（实测：带锁标的 tile 菜单数 = 0）。服务端治理逻辑未改。
+
+### 八、Upload 文案
+
+`Upload ▾` 菜单：
+
+```text
+Upload files
+Upload folder contents   ← 说明：Imports the files inside a folder on your computer
+```
+
+`Select folder` 文案**全页已清除**（实测 `Select folder` 命中 = 0）—— 它此前会被理解成"选择 Media Library 的目标文件夹"，而它的真实含义是"选择本机目录并扁平导入其中的文件"。
+
+上传目标 = 面包屑当前目录（实测：文件正确落入当前客户文件夹）。当前位置不允许上传时按钮禁用并给出原因。
+
+### 九、Drag & Drop
+
+常驻的巨大拖放横幅**已移除**。仅在 `dragenter` 时于文件区出现轻量 `Drop files here` + 目标目录，`dragleave` 后消失（实测三态正确）。空文件夹时空态仍明确提示可拖放/上传。
+
+### 十、Main Content 分区与 File Grid
+
+主内容区形成 `FOLDERS` / `FILES` 两个明确分区；无子目录时 Folders 区隐藏。
+
+Folder tile 与 File card 视觉上一眼可分（folder 为带 📁 的横向 tile，file 为带缩略图的卡片）。
+
+**File grid 可读性优先：** 最小列宽 160px → **215px**，1440px 主区 1030px 下为 **4 列 / 卡片 230px**（原为 6 列窄卡）。文件名允许**两行**再截断（固定预留两行，卡片高度统一 238px）。
+
+> 如实记录：本库的 TEST ONLY 文件名长达 60 字符，两行仍会截断；真实业务文件名（如 `LT-180C-manual.pdf`）可完整显示。这是测试数据长度问题，不是网格问题。
+
+### 十一、File Details
+
+**默认不渲染，不占宽度**（实测选中前宽度 = 0）。点击文件后展开 300px，主区从 1030px 收为 730px。字段与操作维持原样，未新增功能。
+
+### 十二、系统目录显示名
+
+新增纯展示 helper `systemFolderLabel()`：`metal-detection` → `Metal Detection`。**只影响显示**，存储名与治理匹配的 `full_path` 完全不变（弹窗 Location 仍显示真实路径）。客户自建目录**按客户输入原样显示**。
+
+刻意不做别名表：`xray` 显示为 `Xray` 而非 `X-ray` —— 一旦维护别名表，标签迟早与真实文件夹名不一致。
+
+### 十三、六张视觉母版逐张对照
+
+**01-desktop-library-overview**
+Matched：左侧一级导航 + 中间内容 + 右侧详情三段式；顶部面包屑；卡片 = 缩略图 + 文件名 + 类型 chip + 大小；详情面板结构（预览 / 事实表 / Used in / Actions）。
+Intentional deviation：无 Storage / Upgrade Storage / Owner / AI Workspace / Reports（V1 禁止）；无 Grid/List 切换（母版规则允许后置）；卡片无 `⋮` 快捷菜单（逐文件操作集中在详情面板，避免两套入口）。
+
+**02-desktop-folder-management**
+Matched：文件夹以 tile 呈现在主内容区并可点击进入；New folder 为独立对话框且显式声明 Location；受保护目录带锁标且不提供改名/移动。
+Intentional deviation：文件夹 tile 未显示 item count / Modified 时间（需要额外统计查询，属新增功能）；不做 "Create as archive folder"（Folder Trash 仍 P1 deferred）；不做文件夹多选批量操作。
+
+**03-desktop-batch-selection**
+Matched：普通状态不显示批量条；选中后出现 `N selected` + 合计大小 + Select all + Clear selection，工具栏切换为批量动作；选中卡片高亮并显示勾选。
+Intentional deviation：无 Add tags / Download selected / Delete（Delete 在 V1 一律解释为可恢复 Archive）；无右侧 "Selected files" 统计侧栏（属新增面板）。
+
+**04-desktop-upload-dedup**
+Matched：拖放区 + `Upload files` / `Upload folder contents` 两个入口；重复项以警示色区分并给出 New / Existing 对照；操作为跳过 / 仍然上传 / 全部取消。
+Intentional deviation：无逐文件上传进度队列面板（属新增功能）；重复项用面板而非单选按钮，且不提供 "Replace metadata only"（会改动 duplicate 语义）；上传态不常驻整页。
+
+**05-mobile-library-overview**
+Matched：顶部搜索 + 筛选 + Upload 同屏；面包屑独立成行；`FOLDERS` 分区以行式 tile 呈现且可点击进入；文件为两列卡片。
+Intentional deviation：一级导航为横向 chip 行而非母版的抽屉/底部 Tab（不改动既有 admin 全局导航壳）；无 Grid/List 切换；无底部 Tab Bar。
+
+**06-mobile-file-details**
+Matched：点击文件后出现详情，字段顺序为 Filename / Title / Type / Size / Location / Description / Used in；详情默认不占位。
+Intentional deviation：详情为全宽堆叠区块而非 bottom sheet 抽屉（当前架构最简稳定方案，施工单 §35 允许）；无 Owner 字段；底部无固定批量操作条（批量动作在顶部工具栏）。
+
+### 十四、1440px 五个状态（真实 1440×900 视口）
+
+| State | 结果 |
+|---|---|
+| A — Products | 侧栏 9 项；主内容 6 个类目 tile（234px）；工具栏仅 `Upload ▾`（products 为容器不可建子目录）；面包屑 `Media Library / Products 🔒` |
+| B — Products/Conveyor | 客户文件夹在主内容；**侧栏不含任何客户目录**（实测 false）；工具栏出现 `+ New folder` |
+| C — New folder modal | 弹窗 460px 居中；Location 显示完整路径；`Cancel` / `Create folder`；**顶部已无 inline 表单** |
+| D — File selected | 选中前详情宽度 **0**；选中后 300px，主区 1030 → 730 |
+| E — Batch selection | 选择前无批量条；选择后 `3 selected · 1.4 MB · Select all · Clear selection` + `Move / Archive / Clear` |
+
+全部 `scrollWidth === clientWidth === 1440`，**全新标签页 console 零错误**。
+
+> **截图分辨率限制（如实说明）：** 本次会话中应用内预览面板宽度仅 **324px**，1440 视口被压缩到约 0.22 倍，截图不可读。要取得 1:1 的 1440 截图只能改用外部浏览器并提供登录凭证或导出会话 Cookie，均被本施工单禁止。因此桌面证据 = 真实 1440 视口下的精确 DOM 几何测量（上表数值均为实测），移动端证据含可读截图。
+
+### 十五、375px
+
+overview / Products browse / customer folder browse / New Folder modal / Upload menu / File selection / File Details / Rename / Move / Multi-select / Batch toolbar 全部 `scrollWidth === clientWidth === 375`。Folder tile 345×53、弹窗贴底全宽、按钮 343px、批量按钮高 40px。
+
+**修复本轮引入的一处 375 溢出：** `.folder-tile` 作为 grid item 默认 `min-width: auto`，长文件夹名把页面顶到 557px；`min-width: 0` 修复（与此前 `<select>` 是同一类问题 —— 网格/弹性子项必须自己同意变窄）。
+
+### 十六、功能回归（全部通过）
+
+New Folder（创建后出现在主内容、未进侧栏）· Rename Folder · Move Folder · Folder Browse · Upload files（落入面包屑目录）· Upload folder contents · Drag & Drop · Duplicate Warning（三个操作齐全）· Multi-select · Batch Move · Batch Archive · Archive / Restore · Search（**仍为全局**，跨 2 个 folder 返回结果，搜索时隐藏 Folders 区，清除后恢复浏览）· Filter · File Details · References。
+
+治理拒绝未受影响：系统目录改名 `FOLDER_PROTECTED`、跨 zone 移动 `FOLDER_ZONE_MISMATCH`。
+
+### 十七、Failed to Fetch 复核
+
+```text
+NOT REPRODUCIBLE
+```
+
+本轮真实浏览器全程未再出现 `New folder in undefined`、`Failed to fetch`、`Failed to load files` 或 `References unavailable`。上一轮 hotfix（`7eb1b63`）已修复 `undefined` 的根因（面板不随视图关闭），另三条为当时 dev server 反复停启造成的后端瞬时不可达。
+
+### 十八、验证（真实 Node 22.22.2；系统默认 Node 24.14.0 未改动）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1177 / 1177 通过**（31 文件，本次 +9） |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+### 十九、测试资料
+
+复用既有 TEST ONLY 目录，本轮新增 2 个 TEST ONLY 文件夹（`ZZ-UICLEANUP-RENAMED …`，以及给 hotfix 期间遗留的 `ZZ-HOTFIX-PROBE` 补上了 `TEST ONLY — NOT FOR PUBLICATION` 标识）与 1 个 TEST ONLY 文件。全部带标识，未物理删除任何资料。**客户自建 TEST 目录现在只出现在主内容 Folder Browse，不再污染 Sidebar。**
+
+### 二十、边界
+
+**0 Folder Governance 改动** · **0 folder backend semantics** · **0 Directus schema / DB / permission** · **0 Media UUID 变化** · **0 reference 断裂** · **0 AI runtime** · **0 Provider 调用** · **0 API 费用** · **0 push / merge / deploy**。
+
+---
+
+# 状态汇总
+
+```text
+MEDIA-LIBRARY-CLOUD-WORKSPACE-V1 = COMPLETED / SEALED AFTER UI CLEANUP
+
+ML-CLOUD-GOV-01      = COMPLETED
+ML-CLOUD-01          = COMPLETED
+ML-CLOUD-02          = COMPLETED
+ML-CLOUD-03          = COMPLETED
+ML-CLOUD-V1-FINAL    = COMPLETED
+ML-CLOUD-V1 HOTFIX   = COMPLETED (7eb1b63)
+ML-CLOUD-UI-CLEANUP-01 = COMPLETED
+
+Folder Trash / Restore = P1 DEFERRED
+
+NEXT:
+PWS-AI-MULTI-SOURCE-REAL-BETA-01
+
+STATUS:
+AUTHORIZED BUT PAUSED
+NOT STARTED
+WAITING FOR CHATGPT / USER UI ACCEPTANCE
+```
+
+**更新 NEXT 不代表可以自动调用 DeepSeek。** 恢复 AI Beta 需用户 / ChatGPT 在 UI 验收后另行授权。
+
+*最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-UI-CLEANUP-01"任务中写入。*

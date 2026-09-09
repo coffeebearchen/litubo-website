@@ -48,7 +48,20 @@ const editSaving = ref(false)
 // Upload state
 const uploading = ref(false)
 const uploadErrors = ref<Array<{ filename: string; message: string }>>([])
-const uploadFolder = ref<string>('')
+/**
+ * ML-CLOUD-UI-CLEANUP-01 — the upload destination IS the folder you are in.
+ *
+ * A separate destination dropdown alongside a breadcrumb gave the page two
+ * competing answers to "where am I", and the dropdown was the one that decided
+ * where files actually landed. The breadcrumb is now the only current-location
+ * concept, and this reads from it.
+ */
+const uploadFolder = computed<string>(() => {
+  if (showArchivedView.value) return ''
+  const id = selectedFolder.value
+  if (!id || id === 'root') return ''
+  return flatFolders.value.some((f: FlatFolder) => f.id === id && f.allow_upload) ? id : ''
+})
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const folderInputRef = ref<HTMLInputElement | null>(null)
 
@@ -102,9 +115,6 @@ const batchArchiveConfirm = ref(false)
 // Lifecycle / archived filter
 const showArchivedView = ref(false)
 const archivedFileIds = ref<Set<string>>(new Set())
-
-// Mobile: show legacy section
-const showLegacyMobile = ref(false)
 
 // Detail panel: references + lifecycle
 interface RefsResult {
@@ -200,26 +210,10 @@ function flattenFolders(nodes: FolderNode[], depth = 0): FlatFolder[] {
 }
 const flatFolders = computed(() => flattenFolders(folderTree.value))
 
-// Filter folder tree: show active-canonical and container-only in sidebar "正式目录"
-function filterCanonicalTree(nodes: FolderNode[]): FolderNode[] {
-  return nodes
-    .filter(n => n.policy_state === 'active-canonical' || n.policy_state === 'container-only')
-    .map(n => ({ ...n, children: filterCanonicalTree(n.children) }))
-}
-const canonicalTree = computed(() => filterCanonicalTree(folderTree.value))
-const canonicalFlatFolders = computed(() => flattenFolders(canonicalTree.value))
 // Write-target dropdown: only active-canonical (allow_upload) folders
 const uploadableFlatFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => f.allow_upload))
 
-// Legacy folders (flat, for sidebar Legacy tier)
-const legacyFlatFolders = computed(() =>
-  flatFolders.value.filter((f: FlatFolder) => f.policy_state === 'legacy-read-only')
-)
 
-// Conflict-frozen folders (flat, for sidebar Conflict tier — browsable, not writable)
-const conflictFlatFolders = computed(() =>
-  flatFolders.value.filter((f: FlatFolder) => f.policy_state === 'conflict-frozen')
-)
 
 // ── File loading ──────────────────────────────────────────────────────────────
 async function loadFiles(reset = false) {
@@ -321,15 +315,6 @@ function selectFolder(id: string | null) {
   // another folder makes it look like it describes that one.
   uploadResults.value = []
   uploadErrors.value = []
-  /**
-   * ML-CLOUD-03 — browsing into a folder that accepts files makes it the
-   * upload destination. Otherwise "drop files here" would silently mean
-   * "drop them wherever the dropdown was last left", which is the kind of
-   * quiet mismatch that files things in the wrong place.
-   */
-  if (id && id !== 'root' && flatFolders.value.some((f: FlatFolder) => f.id === id && f.allow_upload)) {
-    uploadFolder.value = id
-  }
 }
 
 function toggleArchivedView() {
@@ -362,7 +347,9 @@ const currentFolder = computed<FlatFolder | null>(() => {
  * operator a destination that is guaranteed to fail.
  */
 const folderMoveTargets = computed(() => {
-  const current = currentFolder.value
+  // Destinations for the folder the Move dialog was opened on, not for
+  // whatever folder happens to be on screen behind the dialog.
+  const current = folderActionTarget.value
   if (!current) return []
   return flatFolders.value.filter((f: FlatFolder) =>
     f.can_create_children
@@ -373,7 +360,6 @@ const folderMoveTargets = computed(() => {
 })
 
 const canCreateFolderHere = computed(() => currentFolder.value?.can_create_children === true)
-const canManageCurrentFolder = computed(() => currentFolder.value?.management === 'customer-managed')
 
 type FolderDialog = 'none' | 'create' | 'rename' | 'move'
 const folderDialog = ref<FolderDialog>('none')
@@ -382,16 +368,28 @@ const folderMoveTarget = ref('')
 const folderSubmitting = ref(false)
 const folderError = ref<string | null>(null)
 
-function openFolderDialog(kind: Exclude<FolderDialog, 'none'>) {
+/**
+ * ML-CLOUD-UI-CLEANUP-01 — every folder dialog names the folder it acts on.
+ *
+ * `create` targets the folder being browsed (that is what "New folder" means
+ * here); `rename` and `move` target the folder whose menu was opened. Storing
+ * the target explicitly is what lets the dialog say which folder it is about,
+ * instead of the operator inferring it.
+ */
+function openFolderDialog(kind: Exclude<FolderDialog, 'none'>, target?: FlatFolder | null) {
   folderError.value = null
-  folderNameInput.value = kind === 'rename' ? (currentFolder.value?.name ?? '') : ''
+  folderActionTarget.value = kind === 'create' ? (currentFolder.value ?? null) : (target ?? null)
+  folderNameInput.value = kind === 'rename' ? (folderActionTarget.value?.name ?? '') : ''
   folderMoveTarget.value = ''
   folderDialog.value = kind
+  closeFolderMenu()
+  uploadMenuOpen.value = false
 }
 
 function closeFolderDialog() {
   folderDialog.value = 'none'
   folderError.value = null
+  folderActionTarget.value = null
 }
 
 /** Shared submit path: one in-flight request at a time, refresh the tree, keep the user where they were. */
@@ -414,7 +412,7 @@ async function submitFolderAction(run: () => Promise<void>) {
 }
 
 function createFolder() {
-  const parent = currentFolder.value?.id
+  const parent = folderActionTarget.value?.id
   if (!parent) return
   return submitFolderAction(async () => {
     await $fetch('/api/admin/media/folders', {
@@ -425,7 +423,7 @@ function createFolder() {
 }
 
 function renameFolder() {
-  const id = currentFolder.value?.id
+  const id = folderActionTarget.value?.id
   if (!id) return
   return submitFolderAction(async () => {
     await $fetch(`/api/admin/media/folders/${id}`, {
@@ -436,7 +434,7 @@ function renameFolder() {
 }
 
 function moveFolder() {
-  const id = currentFolder.value?.id
+  const id = folderActionTarget.value?.id
   if (!id || !folderMoveTarget.value) return
   return submitFolderAction(async () => {
     await $fetch(`/api/admin/media/folders/${id}`, {
@@ -929,6 +927,108 @@ const parentFolderId = computed<string | null>(() => {
 
 const searchActive = computed(() => searchQuery.value.trim() !== '')
 
+// ── ML-CLOUD-UI-CLEANUP-01: information architecture ─────────────────────────
+
+/**
+ * The sidebar answers one question — "which area am I going to?" — so it lists
+ * top-level areas only.
+ *
+ * It used to flatten the entire tree into one column: system views, product
+ * categories, every customer folder and every TEST ONLY folder, all indented
+ * in a single list. That made the sidebar compete with the folder browser for
+ * the same job and buried the four places a person actually starts from.
+ * Depth is now the main area's business, expressed through the breadcrumb.
+ */
+const sidebarRoots = computed(() => flatFolders.value.filter(
+  (f: FlatFolder) => f.depth === 0
+    && f.policy_state !== 'legacy-read-only'
+    && f.policy_state !== 'conflict-frozen',
+))
+
+/** Legacy and conflict roots, kept together behind one collapsed disclosure. */
+const systemFolders = computed(() => flatFolders.value.filter(
+  (f: FlatFolder) => f.policy_state === 'legacy-read-only' || f.policy_state === 'conflict-frozen',
+))
+const systemFoldersOpen = ref(false)
+
+/**
+ * The folders that live inside the folder currently being browsed — the
+ * "Folders" section of the main area. At a library view (All files,
+ * Unclassified, Archived) there is no folder to look inside, so there is
+ * nothing to list.
+ */
+const childFolders = computed(() => {
+  const id = selectedFolder.value
+  if (!id || id === 'root' || showArchivedView.value || searchActive.value) return []
+  return flatFolders.value.filter((f: FlatFolder) => parentMap.value[f.id] === id)
+})
+
+/** Ancestors of the current folder, nearest last — the breadcrumb trail. */
+const breadcrumbTrail = computed<FlatFolder[]>(() => {
+  const id = selectedFolder.value
+  if (!id || id === 'root' || showArchivedView.value) return []
+  const chain: FlatFolder[] = []
+  let cur: string | null = id
+  const seen = new Set<string>()
+  while (cur && !seen.has(cur)) {
+    seen.add(cur)
+    const node = flatFolders.value.find((f: FlatFolder) => f.id === cur)
+    if (!node) break
+    chain.unshift(node)
+    cur = parentMap.value[cur] ?? null
+  }
+  return chain
+})
+
+/** Whether files may be uploaded where we are standing. */
+const canUploadHere = computed(() => {
+  if (showArchivedView.value) return false
+  const id = selectedFolder.value
+  if (!id || id === 'root') return true // Unclassified is a legal destination
+  return flatFolders.value.some((f: FlatFolder) => f.id === id && f.allow_upload)
+})
+
+/** Why uploading is unavailable here, for the button's title. */
+const uploadBlockedReason = computed(() => {
+  if (showArchivedView.value) return 'Switch out of the archived view to upload.'
+  if (!canUploadHere.value) return 'This folder does not accept file uploads.'
+  return ''
+})
+
+// ── Folder actions, aimed at one named folder ────────────────────────────────
+
+/**
+ * Rename and Move used to sit permanently in the toolbar acting on "the
+ * current folder", which left the operator to work out what that was. They are
+ * now opened from a specific folder tile, and `folderActionTarget` is the
+ * folder they act on.
+ */
+const folderActionTarget = ref<FlatFolder | null>(null)
+const folderMenuOpenFor = ref<string | null>(null)
+
+function toggleFolderMenu(id: string) {
+  folderMenuOpenFor.value = folderMenuOpenFor.value === id ? null : id
+}
+function closeFolderMenu() {
+  folderMenuOpenFor.value = null
+}
+
+/**
+ * A folder's display label: system slugs are title-cased, customer folder
+ * names are shown exactly as the customer typed them.
+ */
+function folderLabel(f: { name: string, management: FolderNode['management'] }): string {
+  return f.management === 'customer-managed' ? f.name : systemFolderLabel(f.name)
+}
+
+const folderDialogTitle = computed(() => {
+  if (folderDialog.value === 'create') return 'Create new folder'
+  if (folderDialog.value === 'rename') return 'Rename folder'
+  return 'Move folder'
+})
+
+const uploadMenuOpen = ref(false)
+
 function clearSearch() {
   searchQuery.value = ''
 }
@@ -963,56 +1063,45 @@ const selectedFileFolderIsLegacy = computed(() => {
   <div class="ml-shell">
     <!-- Top bar -->
     <div class="ml-topbar">
-      <div class="ml-breadcrumb">
-        <!-- ML-CLOUD-03 — one click back up the tree, next to where you are. -->
+      <!--
+        ML-CLOUD-UI-CLEANUP-01 — the breadcrumb is the ONLY statement of where
+        you are. Every ancestor is a link, so it navigates as well as informs,
+        and nothing else on the page claims to hold a "current folder".
+      -->
+      <nav class="ml-breadcrumb" aria-label="Location">
         <button
-          v-if="parentFolderId !== null || (selectedFolder && selectedFolder !== 'root')"
+          v-if="breadcrumbTrail.length > 0"
           class="breadcrumb-up"
           title="Go to parent folder"
           @click="selectFolder(parentFolderId)"
-        >↑ Up</button>
+        >↑</button>
         <button class="breadcrumb-root" @click="selectFolder(null)">Media Library</button>
-        <template v-if="currentViewLabel !== 'All files'">
+        <template v-for="(crumb, i) in breadcrumbTrail" :key="crumb.id">
+          <span class="breadcrumb-sep">/</span>
+          <button
+            v-if="i < breadcrumbTrail.length - 1"
+            class="breadcrumb-link"
+            @click="selectFolder(crumb.id)"
+          >{{ folderLabel(crumb) }}</button>
+          <span v-else class="breadcrumb-current">{{ folderLabel(crumb) }}</span>
+        </template>
+        <template v-if="breadcrumbTrail.length === 0 && currentViewLabel !== 'All files'">
           <span class="breadcrumb-sep">/</span>
           <span class="breadcrumb-current">{{ currentViewLabel }}</span>
         </template>
-        <span v-if="currentFolder && currentFolder.management !== 'customer-managed'" class="breadcrumb-lock" title="Protected system folder">🔒</span>
-      </div>
+        <span
+          v-if="currentFolder && currentFolder.management !== 'customer-managed'"
+          class="breadcrumb-lock"
+          title="Protected system folder"
+        >🔒</span>
+      </nav>
 
       <div class="ml-topbar-actions">
-        <!--
-          ML-CLOUD-01 — folder actions, shown only where they are actually
-          permitted. A protected system folder simply does not offer Rename or
-          Move; the server refuses them regardless, but an admin should not be
-          invited to try.
-        -->
-        <template v-if="selectedIds.size === 0 && currentFolder">
-          <button
-            v-if="canCreateFolderHere"
-            class="btn-folder-action"
-            :disabled="folderSubmitting"
-            @click="openFolderDialog('create')"
-          >New folder</button>
-          <button
-            v-if="canManageCurrentFolder"
-            class="btn-folder-action"
-            :disabled="folderSubmitting"
-            @click="openFolderDialog('rename')"
-          >Rename</button>
-          <button
-            v-if="canManageCurrentFolder"
-            class="btn-folder-action"
-            :disabled="folderSubmitting"
-            @click="openFolderDialog('move')"
-          >Move</button>
-          <span v-if="!canManageCurrentFolder && !canCreateFolderHere" class="folder-system-note">System folder</span>
-        </template>
-
-        <!-- Batch actions -->
+        <!-- Batch actions replace the normal toolbar while files are selected -->
         <template v-if="selectedIds.size > 0">
           <span class="selection-count">{{ selectedIds.size }} selected</span>
           <select v-model="batchTargetFolder" class="folder-select" title="Move to approved folder">
-            <option value="">— Move to approved folder —</option>
+            <option value="">— Move to folder —</option>
             <option v-for="f in uploadableFlatFolders" :key="f.id" :value="f.id">
               {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
             </option>
@@ -1033,20 +1122,48 @@ const selectedFileFolderIsLegacy = computed(() => {
             </button>
             <button class="btn-cancel-sel" @click="batchArchiveConfirm = false">Cancel</button>
           </template>
-          <button class="btn-cancel-sel" @click="clearSelection">Deselect all</button>
+          <button class="btn-cancel-sel" @click="clearSelection">Clear</button>
         </template>
 
-        <!-- Upload actions -->
+        <!--
+          Normal state: two actions, both about the folder in the breadcrumb.
+          Rename and Move are gone from here — they belong to a named folder,
+          and are opened from that folder's own menu.
+        -->
         <template v-else>
-          <select v-model="uploadFolder" class="folder-select" title="Upload destination folder">
-            <option value="">— Needs Classification —</option>
-            <option v-for="f in uploadableFlatFolders" :key="f.id" :value="f.id">
-              {{ '—'.repeat(f.depth) + (f.depth > 0 ? ' ' : '') }}{{ f.name }}
-            </option>
-          </select>
-          <button class="btn-upload" :disabled="uploading || duplicateChecking" @click="triggerUpload">
-            {{ uploading ? 'Uploading…' : duplicateChecking ? 'Checking…' : 'Upload files' }}
-          </button>
+          <button
+            v-if="canCreateFolderHere"
+            class="btn-folder-action"
+            :disabled="folderSubmitting"
+            @click="openFolderDialog('create')"
+          >+ New folder</button>
+
+          <div class="upload-menu">
+            <button
+              class="btn-upload"
+              :disabled="uploading || duplicateChecking || !canUploadHere"
+              :title="uploadBlockedReason"
+              @click="uploadMenuOpen = !uploadMenuOpen"
+            >
+              {{ uploading ? 'Uploading…' : duplicateChecking ? 'Checking…' : 'Upload' }}
+              <span class="upload-caret">▾</span>
+            </button>
+            <div v-if="uploadMenuOpen" class="upload-menu__list">
+              <!--
+                "Select folder" used to name this action, which reads as
+                "choose the Media Library folder to put things in". It picks a
+                folder on the operator's own computer and imports what is
+                inside it — flat — so it says that instead.
+              -->
+              <button class="upload-menu__item" @click="uploadMenuOpen = false; triggerUpload()">
+                Upload files
+              </button>
+              <button class="upload-menu__item" @click="uploadMenuOpen = false; triggerFolderUpload()">
+                Upload folder contents
+                <span class="upload-menu__hint">Imports the files inside a folder on your computer</span>
+              </button>
+            </div>
+          </div>
         </template>
         <!-- ML-CLOUD-03 — same accept list, same handler; only the picker differs. -->
         <input
@@ -1121,41 +1238,65 @@ const selectedFileFolderIsLegacy = computed(() => {
       change is the primary fix, and this is the guard that makes the bad
       render impossible rather than merely unlikely.
     -->
-    <div v-if="folderDialog !== 'none' && currentFolder" class="ml-folder-panel">
-      <p class="folder-panel-title">
-        {{ folderDialog === 'create' ? `New folder in ${currentFolder.name}`
-          : folderDialog === 'rename' ? `Rename ${currentFolder.name}`
-            : `Move ${currentFolder.name}` }}
-      </p>
+    <!--
+      ML-CLOUD-UI-CLEANUP-01 — folder actions are a dialog, not a slab of form
+      wedged into the top of the page.
 
-      <div class="folder-panel-row">
-        <input
-          v-if="folderDialog !== 'move'"
-          v-model="folderNameInput"
-          class="folder-panel-input"
-          type="text"
-          placeholder="Folder name"
-          :disabled="folderSubmitting"
-          @keyup.enter="folderDialog === 'create' ? createFolder() : renameFolder()"
-        >
-        <select v-else v-model="folderMoveTarget" class="folder-panel-input" :disabled="folderSubmitting">
-          <option value="">— Choose a destination —</option>
-          <option v-for="f in folderMoveTargets" :key="f.id" :value="f.id">
-            {{ '—'.repeat(f.depth) }} {{ f.name }}
-          </option>
-        </select>
+      The inline panel pushed the whole library down and gave no answer to
+      "which folder is this about" beyond a title. The dialog states the
+      Location explicitly, and it is bound to `folderActionTarget`, so the
+      folder it names is the folder it acts on.
+    -->
+    <div v-if="folderDialog !== 'none' && folderActionTarget" class="ml-modal-backdrop" @click.self="closeFolderDialog">
+      <div class="ml-modal" role="dialog" aria-modal="true" :aria-label="folderDialogTitle">
+        <div class="ml-modal__header">
+          <h2 class="ml-modal__title">{{ folderDialogTitle }}</h2>
+          <button class="ml-modal__close" aria-label="Close" :disabled="folderSubmitting" @click="closeFolderDialog">✕</button>
+        </div>
 
-        <button
-          class="btn-folder-confirm"
-          :disabled="folderSubmitting || (folderDialog === 'move' ? !folderMoveTarget : folderNameInput.trim() === '')"
-          @click="folderDialog === 'create' ? createFolder() : folderDialog === 'rename' ? renameFolder() : moveFolder()"
-        >
-          {{ folderSubmitting ? 'Working…' : folderDialog === 'create' ? 'Create' : folderDialog === 'rename' ? 'Rename' : 'Move' }}
-        </button>
-        <button class="btn-folder-cancel" :disabled="folderSubmitting" @click="closeFolderDialog">Cancel</button>
+        <div class="ml-modal__body">
+          <div class="modal-field">
+            <span class="modal-field__label">{{ folderDialog === 'create' ? 'Location' : 'Folder' }}</span>
+            <span class="modal-field__value">{{ folderActionTarget.full_path }}</span>
+          </div>
+
+          <label v-if="folderDialog !== 'move'" class="modal-field">
+            <span class="modal-field__label">Folder name</span>
+            <input
+              v-model="folderNameInput"
+              class="modal-input"
+              type="text"
+              placeholder="e.g. Manuals"
+              :disabled="folderSubmitting"
+              @keyup.enter="folderDialog === 'create' ? createFolder() : renameFolder()"
+            >
+          </label>
+
+          <label v-else class="modal-field">
+            <span class="modal-field__label">Move to</span>
+            <select v-model="folderMoveTarget" class="modal-input" :disabled="folderSubmitting">
+              <option value="">— Choose a destination —</option>
+              <option v-for="f in folderMoveTargets" :key="f.id" :value="f.id">
+                {{ '—'.repeat(f.depth) }} {{ f.name }}
+              </option>
+            </select>
+            <span class="modal-field__hint">A folder can only move within its own product area.</span>
+          </label>
+
+          <p v-if="folderError" class="modal-error" role="alert">{{ folderError }}</p>
+        </div>
+
+        <div class="ml-modal__footer">
+          <button class="btn-modal-cancel" :disabled="folderSubmitting" @click="closeFolderDialog">Cancel</button>
+          <button
+            class="btn-modal-confirm"
+            :disabled="folderSubmitting || (folderDialog === 'move' ? !folderMoveTarget : folderNameInput.trim() === '')"
+            @click="folderDialog === 'create' ? createFolder() : folderDialog === 'rename' ? renameFolder() : moveFolder()"
+          >
+            {{ folderSubmitting ? 'Working…' : folderDialog === 'create' ? 'Create folder' : folderDialog === 'rename' ? 'Rename' : 'Move' }}
+          </button>
+        </div>
       </div>
-
-      <p v-if="folderError" class="folder-panel-error" role="alert">{{ folderError }}</p>
     </div>
 
     <!-- Search + filter bar -->
@@ -1213,71 +1354,77 @@ const selectedFileFolderIsLegacy = computed(() => {
 
     <div class="ml-body">
       <!-- ── Left sidebar ─────────────────────────────────────────────────── -->
+      <!--
+        ML-CLOUD-UI-CLEANUP-01 — the sidebar answers "which area?" and nothing
+        else.
+
+        It used to flatten the whole tree into one column — system views,
+        product categories, every customer folder, every TEST ONLY folder —
+        which made it compete with the folder browser for the same job and
+        buried the handful of places a person actually starts from. Depth now
+        lives in the main area, reached by opening folders and read back from
+        the breadcrumb.
+      -->
       <aside class="ml-sidebar">
-        <!-- Tier 1: System Views -->
-        <p class="sidebar-section-label">System views</p>
+        <p class="sidebar-section-label">Library</p>
         <button
-          class="folder-item"
-          :class="{ 'folder-item--active': selectedFolder === null && !showArchivedView }"
+          class="nav-item"
+          :class="{ 'nav-item--active': selectedFolder === null && !showArchivedView }"
           @click="selectFolder(null)"
         >All files</button>
         <button
-          class="folder-item"
-          :class="{ 'folder-item--active': selectedFolder === 'root' && !showArchivedView }"
+          class="nav-item"
+          :class="{ 'nav-item--active': selectedFolder === 'root' && !showArchivedView }"
           @click="selectFolder('root')"
         >Unclassified</button>
         <button
-          class="folder-item folder-item--archived"
-          :class="{ 'folder-item--active': showArchivedView }"
+          class="nav-item nav-item--archived"
+          :class="{ 'nav-item--active': showArchivedView }"
           @click="toggleArchivedView"
         >Archived</button>
 
-        <!-- Tier 2: Active destinations -->
-        <div class="sidebar-divider" />
-        <p class="sidebar-section-label">Active destinations</p>
-        <template v-for="f in canonicalFlatFolders" :key="f.id">
+        <p class="sidebar-section-label">Folders</p>
+        <button
+          v-for="f in sidebarRoots"
+          :key="f.id"
+          class="nav-item"
+          :class="{ 'nav-item--active': selectedFolder === f.id && !showArchivedView }"
+          @click="selectFolder(f.id)"
+        >
+          <span class="nav-item__icon" aria-hidden="true">📁</span>{{ folderLabel(f) }}
+        </button>
+        <p v-if="sidebarRoots.length === 0" class="sidebar-empty">No folders</p>
+
+        <!--
+          Legacy and conflict folders are governance states, not places people
+          go. One collapsed disclosure keeps them reachable without making the
+          library look like a debugging console.
+        -->
+        <template v-if="systemFolders.length > 0">
+          <p class="sidebar-section-label">System</p>
           <button
-            class="folder-item"
-            :class="{ 'folder-item--active': selectedFolder === f.id && !showArchivedView }"
-            :style="{ paddingLeft: `calc(var(--space-3) + ${f.depth * 10}px)` }"
-            @click="selectFolder(f.id)"
-          >{{ f.name }}</button>
-        </template>
-        <p v-if="canonicalFlatFolders.length === 0" class="sidebar-empty">No active folders</p>
-
-        <!-- Tier 3: Legacy — read only -->
-        <template v-if="legacyFlatFolders.length > 0">
-          <div class="sidebar-divider" />
-          <!-- Mobile: toggle -->
-          <button class="sidebar-legacy-toggle mobile-only" @click="showLegacyMobile = !showLegacyMobile">
-            Legacy (read only) {{ showLegacyMobile ? '▲' : '▼' }}
+            class="nav-item nav-item--disclosure"
+            :aria-expanded="systemFoldersOpen"
+            @click="systemFoldersOpen = !systemFoldersOpen"
+          >
+            System folders
+            <span class="nav-item__caret">{{ systemFoldersOpen ? '▾' : '▸' }}</span>
           </button>
-          <p class="sidebar-section-label desktop-only">Legacy — read only</p>
-          <template v-for="f in legacyFlatFolders" :key="f.id">
+          <template v-if="systemFoldersOpen">
             <button
-              v-show="showLegacyMobile"
-              class="folder-item folder-item--legacy"
+              v-for="f in systemFolders"
+              :key="f.id"
+              class="nav-item nav-item--sub"
               :class="{
-                'folder-item--active': selectedFolder === f.id && !showArchivedView,
-                'mobile-legacy-hidden': !showLegacyMobile,
+                'nav-item--active': selectedFolder === f.id && !showArchivedView,
+                'nav-item--legacy': f.policy_state === 'legacy-read-only',
+                'nav-item--conflict': f.policy_state === 'conflict-frozen',
               }"
-              :style="{ paddingLeft: `calc(var(--space-3) + ${f.depth * 10}px)` }"
               @click="selectFolder(f.id)"
-            >{{ f.name }}</button>
-          </template>
-        </template>
-
-        <!-- Tier 4: Conflict — read only -->
-        <template v-if="conflictFlatFolders.length > 0">
-          <div class="sidebar-divider" />
-          <p class="sidebar-section-label">Conflict — read only</p>
-          <template v-for="f in conflictFlatFolders" :key="f.id">
-            <button
-              class="folder-item folder-item--conflict"
-              :class="{ 'folder-item--active': selectedFolder === f.id && !showArchivedView }"
-              :style="{ paddingLeft: `calc(var(--space-3) + ${f.depth * 10}px)` }"
-              @click="selectFolder(f.id)"
-            >{{ f.name }}</button>
+            >
+              {{ f.name }}
+              <span class="nav-item__tag">{{ f.policy_state === 'conflict-frozen' ? 'Conflict' : 'Read only' }}</span>
+            </button>
           </template>
         </template>
       </aside>
@@ -1319,27 +1466,57 @@ const selectedFileFolderIsLegacy = computed(() => {
         </p>
 
         <!-- Drop zone — only where files may actually be uploaded -->
-        <div v-if="dropTargetLabel && !showArchivedView" class="ml-dropzone" :class="{ 'ml-dropzone--active': dragActive }">
-          <span class="dropzone-text">
-            <!-- A phone has no drag-and-drop; it gets the honest label. -->
-            <strong class="desktop-only">Drag and drop files here</strong>
-            <strong class="mobile-only">Add files to this folder</strong>
-            <span class="dropzone-sub">
-              Uploads to <strong>{{ dropTargetLabel }}</strong> · JPG, PNG, WebP, PDF, TXT, CSV, TSV
-            </span>
-          </span>
-          <span class="dropzone-actions">
-            <button class="btn-dropzone-upload" :disabled="uploading || duplicateChecking" @click="triggerUpload">
-              {{ uploading ? 'Uploading…' : duplicateChecking ? 'Checking…' : 'Select files' }}
-            </button>
-            <button
-              class="btn-dropzone-folder"
-              :disabled="uploading || duplicateChecking"
-              title="Import every file in a folder. The files land here flat; the local folder structure is not recreated."
-              @click="triggerFolderUpload"
-            >Select folder</button>
-          </span>
+        <!--
+          ML-CLOUD-UI-CLEANUP-01 — the drop hint appears while dragging, not
+          permanently. A banner that size sitting above every folder was the
+          loudest thing on the page and said nothing most of the time.
+        -->
+        <div v-if="dragActive && canUploadHere" class="ml-dropzone ml-dropzone--active">
+          <strong>Drop files here</strong>
+          <span class="dropzone-sub">Uploads to {{ dropTargetLabel }}</span>
         </div>
+
+        <!--
+          Folders come before files, and look like folders. Without the split,
+          a directory of subfolders and a directory of documents were the same
+          undifferentiated wall of cards.
+        -->
+        <section v-if="childFolders.length > 0" class="folders-section">
+          <h2 class="section-label">Folders</h2>
+          <div class="folder-grid">
+            <div
+              v-for="f in childFolders"
+              :key="f.id"
+              class="folder-tile"
+              :class="{ 'folder-tile--protected': f.management !== 'customer-managed' }"
+              role="button"
+              tabindex="0"
+              @click="selectFolder(f.id)"
+              @keydown.enter="selectFolder(f.id)"
+            >
+              <span class="folder-tile__icon" aria-hidden="true">📁</span>
+              <span class="folder-tile__name" :title="f.full_path">{{ folderLabel(f) }}</span>
+              <span v-if="f.management !== 'customer-managed'" class="folder-tile__lock" title="Protected system folder">🔒</span>
+              <!--
+                Rename and Move belong to a folder, so they are opened from it.
+                A protected folder shows no menu at all: the server refuses
+                these actions anyway, and offering them invites a dead end.
+              -->
+              <button
+                v-if="f.management === 'customer-managed'"
+                class="folder-tile__menu"
+                :aria-label="`Actions for ${f.name}`"
+                @click.stop="toggleFolderMenu(f.id)"
+              >⋯</button>
+              <div v-if="folderMenuOpenFor === f.id" class="folder-menu" @click.stop>
+                <button class="folder-menu__item" @click="openFolderDialog('rename', f)">Rename</button>
+                <button class="folder-menu__item" @click="openFolderDialog('move', f)">Move</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <h2 v-if="childFolders.length > 0 && files.length > 0" class="section-label">Files</h2>
 
         <!-- Loading -->
         <div v-if="loading && files.length === 0" class="loading-state">
@@ -1366,10 +1543,21 @@ const selectedFileFolderIsLegacy = computed(() => {
             <p class="empty-title">Nothing needs classification</p>
             <p class="empty-hint">Every file has been filed into a folder.</p>
           </template>
+          <template v-else-if="childFolders.length > 0">
+            <p class="empty-title">No files in this folder</p>
+            <p class="empty-hint">Open one of the folders above, or add files here.</p>
+            <button v-if="canUploadHere" class="btn-empty-action" :disabled="uploading" @click="triggerUpload">
+              Upload files
+            </button>
+          </template>
           <template v-else>
+            <!-- An empty folder is where a loud drop hint earns its space. -->
             <p class="empty-title">This folder is empty</p>
-            <p class="empty-hint">Upload files or drag files here to get started.</p>
-            <button v-if="dropTargetLabel" class="btn-empty-action" :disabled="uploading" @click="triggerUpload">
+            <p class="empty-hint">
+              <span class="desktop-only">Drop files here, or upload them.</span>
+              <span class="mobile-only">Upload files to get started.</span>
+            </p>
+            <button v-if="canUploadHere" class="btn-empty-action" :disabled="uploading" @click="triggerUpload">
               Upload files
             </button>
           </template>
@@ -1656,10 +1844,18 @@ const selectedFileFolderIsLegacy = computed(() => {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
-  white-space: nowrap;
+  /*
+    ML-CLOUD-UI-CLEANUP-01 — the trail now shows every ancestor, so it is much
+    longer than the single label it replaced. It wraps rather than pushing the
+    toolbar past the viewport, and the last segment (the folder you are in,
+    which can be any length a customer typed) is the one that ellipsizes.
+  */
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
 }
+.ml-breadcrumb > * { min-width: 0; }
 .breadcrumb-root {
   font-size: var(--text-base);
   font-weight: 700;
@@ -1680,6 +1876,11 @@ const selectedFileFolderIsLegacy = computed(() => {
   color: var(--color-primary-deep);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.breadcrumb-link, .breadcrumb-root {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
 }
 
 .ml-topbar-actions {
@@ -2026,7 +2227,13 @@ const selectedFileFolderIsLegacy = computed(() => {
 /* ── File grid ── */
 .file-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  /*
+    ML-CLOUD-UI-CLEANUP-01 — readability before density. At 160px the grid fit
+    six columns and every business filename truncated to "ZZ-ML-CLOUD-…",
+    which is not a filename anyone can act on. This lands at four to five
+    columns in the ~1030px main area.
+  */
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
   gap: var(--space-3);
 }
 
@@ -2098,7 +2305,20 @@ const selectedFileFolderIsLegacy = computed(() => {
 .file-card__title {
   font-size: var(--text-xs); font-weight: 600; color: var(--color-ink);
   margin: 0 0 2px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /*
+    ML-CLOUD-UI-CLEANUP-01 — a filename gets two lines before it truncates.
+    On one line every descriptive business filename collapsed to
+    "ZZ-ML-CLOUD-…", which tells the reader nothing. Two lines are always
+    reserved, so cards stay the same height whether the name wraps or not.
+  */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  min-height: calc(2 * 1.35em);
+  line-height: 1.35;
 }
 /* ML-CLOUD-03 — Title is secondary and visibly distinct from the filename above it. */
 .file-card__subtitle {
@@ -2416,6 +2636,181 @@ const selectedFileFolderIsLegacy = computed(() => {
 }
 .detail-filename { overflow-wrap: anywhere; }
 
+/* ── ML-CLOUD-UI-CLEANUP-01: sidebar navigation ── */
+.nav-item {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  background: none; border: none; border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink);
+  text-align: left; cursor: pointer;
+}
+.nav-item:hover { background: var(--color-surface-alt); }
+.nav-item--active { background: var(--color-primary-deep); color: #fff; font-weight: 600; }
+.nav-item--active:hover { background: var(--color-primary-deep); }
+.nav-item__icon { font-size: var(--text-sm); flex-shrink: 0; }
+.nav-item__caret { margin-left: auto; font-size: var(--text-xs); color: var(--color-ink-muted); }
+.nav-item--active .nav-item__caret { color: inherit; }
+.nav-item--archived { color: #8a4b08; }
+.nav-item--archived.nav-item--active { color: #fff; }
+.nav-item--disclosure { color: var(--color-ink-muted); }
+.nav-item--sub { padding-left: var(--space-6); font-size: var(--text-xs); }
+.nav-item__tag {
+  margin-left: auto; font-size: 10px; color: var(--color-ink-muted);
+  border: 1px solid var(--color-line); border-radius: 99px; padding: 0 6px;
+}
+.nav-item--active .nav-item__tag { color: inherit; border-color: currentColor; }
+
+/* ── Section labels in the main area ── */
+.section-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--color-ink-muted);
+}
+.folders-section { margin-bottom: var(--space-5); }
+
+/* ── Folder tiles: a folder must not look like a file ── */
+.folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+.folder-tile {
+  position: relative;
+  display: flex; align-items: center; gap: var(--space-2);
+  /*
+    A grid item defaults to `min-width: auto`, so without this the tile refuses
+    to shrink below the full width of the folder name inside it and pushes the
+    page sideways. The name's own `min-width: 0` is not enough — the tile is
+    the grid item, and it is the one that has to agree to be narrow.
+  */
+  min-width: 0;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.folder-tile:hover { border-color: var(--color-primary); background: #f7fbfa; }
+.folder-tile__icon { font-size: var(--text-lg); flex-shrink: 0; }
+.folder-tile__name {
+  flex: 1; min-width: 0;
+  font-size: var(--text-sm); font-weight: 600; color: var(--color-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-tile__lock { font-size: var(--text-xs); flex-shrink: 0; }
+.folder-tile--protected { background: var(--color-surface-alt); }
+.folder-tile__menu {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink-muted); cursor: pointer;
+  line-height: 1;
+}
+.folder-tile__menu:hover { border-color: var(--color-line); background: white; color: var(--color-ink); }
+.folder-menu {
+  position: absolute; top: calc(100% - 4px); right: var(--space-2); z-index: 20;
+  min-width: 132px; padding: var(--space-1);
+  background: white; border: 1px solid var(--color-line);
+  border-radius: var(--radius-md); box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+.folder-menu__item {
+  display: block; width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: none; border: none; border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink); text-align: left; cursor: pointer;
+}
+.folder-menu__item:hover { background: var(--color-surface-alt); }
+
+/* ── Upload menu ── */
+.upload-menu { position: relative; }
+.upload-caret { margin-left: 6px; font-size: var(--text-xs); }
+.upload-menu__list {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 30;
+  min-width: 260px; padding: var(--space-1);
+  background: white; border: 1px solid var(--color-line);
+  border-radius: var(--radius-md); box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+.upload-menu__item {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: none; border: none; border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink); text-align: left; cursor: pointer;
+}
+.upload-menu__item:hover { background: var(--color-surface-alt); }
+.upload-menu__hint { font-size: var(--text-xs); color: var(--color-ink-muted); }
+
+/* ── Modal ── */
+.ml-modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--space-4);
+  background: rgba(15, 30, 26, 0.38);
+}
+.ml-modal {
+  width: 100%; max-width: 460px;
+  background: white; border-radius: var(--radius-md);
+  box-shadow: 0 18px 48px rgba(0,0,0,0.24);
+  display: flex; flex-direction: column; max-height: 90vh;
+}
+.ml-modal__header {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+}
+.ml-modal__title { margin: 0; font-size: var(--text-base); font-weight: 700; color: var(--color-ink); }
+.ml-modal__close {
+  margin-left: auto; width: 28px; height: 28px;
+  background: none; border: none; border-radius: var(--radius-sm);
+  font-size: var(--text-sm); color: var(--color-ink-muted); cursor: pointer;
+}
+.ml-modal__close:hover { background: var(--color-surface-alt); color: var(--color-ink); }
+.ml-modal__body {
+  padding: var(--space-4) var(--space-5);
+  display: flex; flex-direction: column; gap: var(--space-4);
+  overflow-y: auto;
+}
+.modal-field { display: flex; flex-direction: column; gap: var(--space-1); }
+.modal-field__label { font-size: var(--text-xs); font-weight: 600; color: var(--color-ink-muted); }
+.modal-field__value {
+  font-size: var(--text-sm); color: var(--color-ink);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-alt); border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+.modal-field__hint { font-size: var(--text-xs); color: var(--color-ink-muted); }
+.modal-input {
+  width: 100%; min-height: 40px; box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+.modal-input:focus { outline: 2px solid var(--color-primary); outline-offset: -1px; }
+.modal-error { margin: 0; font-size: var(--text-xs); color: #c0392b; overflow-wrap: anywhere; }
+.ml-modal__footer {
+  display: flex; justify-content: flex-end; gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+.btn-modal-cancel, .btn-modal-confirm {
+  min-height: 40px; padding: 0 var(--space-5);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+}
+.btn-modal-cancel { background: white; border: 1px solid var(--color-line); color: var(--color-ink); }
+.btn-modal-cancel:hover:not(:disabled) { background: var(--color-surface-alt); }
+.btn-modal-confirm { background: var(--color-primary-deep); border: 1px solid transparent; color: white; }
+.btn-modal-confirm:hover:not(:disabled) { background: var(--color-primary); }
+.btn-modal-cancel:disabled, .btn-modal-confirm:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Breadcrumb links ── */
+.breadcrumb-link {
+  background: none; border: none; padding: 0;
+  font-size: var(--text-base); color: var(--color-ink-muted); cursor: pointer;
+}
+.breadcrumb-link:hover { color: var(--color-primary-deep); text-decoration: underline; }
+
 /* ── Responsive helpers ── */
 .desktop-only { }
 .mobile-only { display: none; }
@@ -2631,5 +3026,34 @@ const selectedFileFolderIsLegacy = computed(() => {
     min-width: 0;
     max-width: 100%;
   }
+
+  /* ── ML-CLOUD-UI-CLEANUP-01: mobile IA ── */
+  /*
+    The sidebar becomes a horizontal strip of top-level areas. There are only a
+    handful of them now, which is exactly why this works — the old flat tree
+    would have scrolled forever sideways.
+  */
+  .nav-item { width: auto; flex: 0 0 auto; border: 1px solid var(--color-line); }
+  .nav-item--sub { padding-left: var(--space-3); }
+  .sidebar-section-label { flex: 1 1 100%; margin: var(--space-1) 0 0; }
+
+  /* Folders read as rows on a phone, matching the mobile master. */
+  .folder-grid { grid-template-columns: 1fr; gap: var(--space-2); }
+  .folder-tile { min-height: 48px; }
+
+  /* Dialogs sit at the bottom of the screen, where a thumb is. */
+  .ml-modal-backdrop { align-items: flex-end; padding: 0; }
+  .ml-modal { max-width: none; border-radius: var(--radius-md) var(--radius-md) 0 0; max-height: 88vh; }
+  .ml-modal__header, .ml-modal__body, .ml-modal__footer { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .ml-modal__footer { flex-direction: column-reverse; }
+  .btn-modal-cancel, .btn-modal-confirm { width: 100%; }
+
+  /* The trail is the only location statement, so it must fit a phone. */
+  .ml-breadcrumb { flex: 1 1 100%; }
+  .breadcrumb-current { max-width: 100%; }
+
+  .upload-menu { flex: 1 1 auto; }
+  .upload-menu__list { left: 0; right: 0; min-width: 0; }
+  .btn-upload { width: 100%; }
 }
 </style>
