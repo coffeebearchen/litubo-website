@@ -5238,3 +5238,100 @@ HOLD — NOT CANCELLED
 Media Library V1 已封板，但**不得先进入其他 AI / Content 模块**。AI 恢复须待本 Final 报告被验收并正式授权。
 
 *最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-V1-FINAL"任务中写入。*
+
+---
+
+## ML-CLOUD-V1 HOTFIX — Media Library V1 blocking runtime hotfix（2026-09-09）
+
+**状态：FIXED。** 这是对已封板的 `MEDIA-LIBRARY-CLOUD-WORKSPACE-V1` 的一次**阻塞性运行时热修**，不扩大功能范围。封板结论本身不变。
+
+### 一、用户报告的四个现象与实际归因
+
+| 现象 | 归因 |
+|---|---|
+| `New folder in undefined` | **真实代码缺陷（本次修复）** |
+| `POST /api/admin/media/folders → Failed to fetch` | BFF 瞬时不可达；**当时 dev server 正在被反复停启**（ML-CLOUD-V1-FINAL 期间为跑 build 多次停服） |
+| `Failed to load files` | 同上 |
+| `File Details → References unavailable` | 同上 |
+
+**基础设施复核（真实浏览器 + curl）：** dev server 302/200、Directus `server/ping` **200**、容器 `Up 34 hours`、`/api/admin/auth/me` 200、`/api/admin/media/folders` 200、files 正常返回、References 返回 `{total, can_archive}`。**不是 Directus 不可达，不是 admin session 问题，不是 folder state regression。**
+
+后三个现象只能通过强制 `fetch` 抛错复现（复现出的文案与用户截图一致：`[POST] "/api/admin/media/folders": <no response> Failed to fetch`），说明它们是后端短暂不可达的表现，而非代码逻辑错误。
+
+### 二、`New folder in undefined` 的根因（已确定性复现）
+
+文件夹操作面板（New folder / Rename / Move）**不随视图切换关闭**。`selectFolder()` 与 `toggleArchivedView()` 只改 `selectedFolder` / `showArchivedView`，从不重置 `folderDialog`。一旦视图切到 `All files` 或 `Archived`，`currentFolder` 变为 `null`，而面板仍然渲染：
+
+```text
+`New folder in ${currentFolder?.name}`   →   "New folder in undefined"
+```
+
+**复现（修复前）：**
+
+| 步骤 | 面板标题 |
+|---|---|
+| 进入客户文件夹 → 点 New folder | `New folder in ZZ-ML-CLOUD-01 TEST ONLY…` |
+| 点 `All files` | **`New folder in undefined`**（面板仍开着） |
+| 点 `Archived` | **`New folder in undefined`**（面板仍开着） |
+
+此时面板是"活的"：从该状态提交会带着 `parent: undefined` 发出请求。
+
+### 三、修复（最小、三层）
+
+1. **`selectFolder()` 与 `toggleArchivedView()` 关闭文件夹操作面板** —— 一个文件夹操作属于它被打开时所在的那个文件夹，视图变了它就该随之关闭。这是根因修复。
+2. **面板 `v-if` 增加 `currentFolder` 守卫** —— 让"渲染出 undefined"从"不太可能"变成"不可能"，即便将来出现别的状态漂移路径。
+3. **错误横幅新增 `Retry`** —— 瞬时后端故障此前会把页面留在死状态，只能靠使用者自己想到手动刷新。`retryLoad()` 重新拉取 folder 树、归档列表与文件列表；**folder 树也一并重拉**，因为树拉空正是侧栏消失、页面无法描述任何位置的原因。
+
+**未改动：** 任何 Directus schema / permission / DB、任何 AI runtime、任何既有 Media Library 业务逻辑。**0 Provider 调用、0 API 费用。**
+
+### 四、验收（真实浏览器）
+
+| 验收项 | 结果 |
+|---|---|
+| 不再出现 `undefined` | ✅ 三条导航路径（All files / Archived / 切换文件夹）面板均正确关闭；全页 `innerText` 无 `undefined` |
+| folder create API 正常响应 | ✅ 正向 200；负向 422 `FOLDER_NAME_TAKEN`（是业务响应，不是网络失败） |
+| files 正常加载 | ✅ 200，列表正常 |
+| References 正常返回 | ✅ 200，`total` / `can_archive` 正确 |
+| 页面刷新后仍正常 | ✅ 刷新后 36 卡片 / 23 文件夹 / 无错误横幅 |
+| 1440px 无新增 console error | ✅ **全新标签页零 console 错误** |
+| 375px 无横向 overflow | ✅ 六个状态全部 `scrollWidth === clientWidth === 375` |
+| 原有功能不受影响 | ✅ 见下 |
+
+**Retry 恢复实测：** 制造瞬时故障 → 出现 `Failed to load files` + Retry（375px 下 80×45 可点）→ 点击一次 → 错误横幅消失、36 张卡片与文件夹树全部恢复，**无需手动刷新**。
+
+**既有功能回归：** 系统目录改名 `FOLDER_PROTECTED`、跨 zone 移动 `FOLDER_ZONE_MISMATCH`、移入自身后代 `FOLDER_MOVE_INTO_DESCENDANT`、系统容器内创建 `FOLDER_ZONE_DISALLOWED`、文件名含分隔符 `FILENAME_SEPARATOR`、重复检查命中 1、批量归档空数组 400、References 200 —— 全部与封板时一致。
+
+### 五、全套验证（真实 Node 22.22.2；系统默认 Node 24.14.0 未改动）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1168 / 1168 通过**（31 文件） |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+### 六、测试资料
+
+验收中通过受支持路径新建了一个 TEST ONLY 子目录：
+
+```text
+products/conveyor/ZZ-ML-CLOUD-01 TEST ONLY — NOT FOR PUBLICATION/ZZ-HOTFIX-VERIFY TEST ONLY — NOT FOR PUBLICATION
+```
+
+文件夹删除仍为 `Folder Trash / Restore = P1 DEFERRED`，故保留。未物理删除任何资料。
+
+### 七、AI 主线状态未变
+
+本次热修**未触碰 AI runtime**。`PWS-AI-MULTI-SOURCE-REAL-BETA-01` 已按用户指示**暂停在真实 Analyze 之前**：
+
+```text
+PWS-AI-MULTI-SOURCE-REAL-BETA-01
+= PAUSED BEFORE FIRST PAID CALL
+
+0 Provider 调用 · 0 API 费用 · API Key 未读取 / 未显示 / 未输出
+```
+
+已完成的无费用准备：隔离分支 `review/pws-ai-multi-source-real-beta-01`（基线 `20b4eb1`）已创建；D-021 / D-022 已复核；DeepSeek adapter 经只读确认为 **bare `fetch`，单次请求、零应用层重试、零 SDK 传输重试、30s 超时、无 provider fallback**。
+
+*最后更新：2026-09-09，由 Claude Code 在"Media Library V1 blocking runtime hotfix"任务中写入。*

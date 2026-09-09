@@ -307,6 +307,16 @@ watch(searchQuery, () => {
 function selectFolder(id: string | null) {
   showArchivedView.value = false
   selectedFolder.value = id
+  /**
+   * HOTFIX — a folder action belongs to the folder it was opened for.
+   *
+   * Leaving the New folder / Rename / Move panel open across a navigation
+   * left it describing a folder the operator was no longer in: once the view
+   * moved to All files or Archived there was no current folder at all, and the
+   * title rendered "New folder in undefined". Submitting from that state sent
+   * an undefined parent. The panel closes with the view it belonged to.
+   */
+  closeFolderDialog()
   // The upload report describes the folder it happened in; carrying it into
   // another folder makes it look like it describes that one.
   uploadResults.value = []
@@ -325,6 +335,9 @@ function selectFolder(id: string | null) {
 function toggleArchivedView() {
   showArchivedView.value = !showArchivedView.value
   if (showArchivedView.value) selectedFolder.value = null
+  // Same reason as selectFolder: the archived view has no current folder, so a
+  // folder action left open here has nothing to act on.
+  closeFolderDialog()
 }
 
 // Label for the current view (breadcrumb-style topbar heading)
@@ -920,6 +933,22 @@ function clearSearch() {
   searchQuery.value = ''
 }
 
+/**
+ * HOTFIX — recover from a transient backend failure without a manual reload.
+ *
+ * The folder tree is refreshed too, not just the file list: a failed tree
+ * refresh is what empties the sidebar, and an empty sidebar is what leaves the
+ * rest of the page unable to describe where anything is.
+ */
+async function retryLoad() {
+  errorMsg.value = ''
+  try {
+    await loadFolders()
+  } catch { /* loadFiles reports the failure below */ }
+  await loadArchivedIds()
+  await loadFiles(true)
+}
+
 const hasMore = computed(() => files.value.length < totalCount.value)
 
 // Whether the currently selected file's folder is legacy (highlight "move" call to action)
@@ -1085,11 +1114,18 @@ const selectedFileFolderIsLegacy = computed(() => {
     </div>
 
     <!-- Folder action panel — one at a time, inline, no modal stack -->
-    <div v-if="folderDialog !== 'none'" class="ml-folder-panel">
+    <!--
+      HOTFIX — the panel requires a current folder to exist. Without the
+      `currentFolder` guard it could outlive the folder it was opened for and
+      render "New folder in undefined"; `closeFolderDialog()` on every view
+      change is the primary fix, and this is the guard that makes the bad
+      render impossible rather than merely unlikely.
+    -->
+    <div v-if="folderDialog !== 'none' && currentFolder" class="ml-folder-panel">
       <p class="folder-panel-title">
-        {{ folderDialog === 'create' ? `New folder in ${currentFolder?.name}`
-          : folderDialog === 'rename' ? `Rename ${currentFolder?.name}`
-            : `Move ${currentFolder?.name}` }}
+        {{ folderDialog === 'create' ? `New folder in ${currentFolder.name}`
+          : folderDialog === 'rename' ? `Rename ${currentFolder.name}`
+            : `Move ${currentFolder.name}` }}
       </p>
 
       <div class="folder-panel-row">
@@ -1139,7 +1175,19 @@ const selectedFileFolderIsLegacy = computed(() => {
     </div>
 
     <!-- Banners -->
-    <div v-if="errorMsg" class="banner banner--error">{{ errorMsg }}</div>
+    <!--
+      HOTFIX — a failed load has to offer a way out of itself.
+      A transient BFF outage (a dev server restarting, a dropped connection)
+      left "Failed to load files" on screen with no route back except the
+      operator knowing to reload the page by hand. Retry re-runs the same two
+      loads the page runs on mount.
+    -->
+    <div v-if="errorMsg" class="banner banner--error">
+      <span>{{ errorMsg }}</span>
+      <button class="btn-retry" :disabled="loading" @click="retryLoad">
+        {{ loading ? 'Retrying…' : 'Retry' }}
+      </button>
+    </div>
     <div v-if="successMsg" class="banner banner--success">{{ successMsg }}</div>
     <!--
       ML-CLOUD-03 — the outcome of every file in the batch, not one verdict for
@@ -1720,7 +1768,12 @@ const selectedFileFolderIsLegacy = computed(() => {
   font-size: var(--text-sm);
   flex-shrink: 0;
 }
-.banner--error { background: #fdf0ee; color: #c0392b; border-bottom: 1px solid #f5c6c2; }
+/* HOTFIX — the error banner carries a Retry control, so it lays out as a row. */
+.banner--error {
+  background: #fdf0ee; color: #c0392b; border-bottom: 1px solid #f5c6c2;
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+}
+.banner--error > span { min-width: 0; overflow-wrap: anywhere; }
 .banner--success { background: #d1f0e8; color: #0f5c4b; border-bottom: 1px solid #a3dbc8; }
 .banner--warn { background: #fffbf0; color: #7a6030; border-bottom: 1px solid #f0e0b0; }
 .error-list { margin: var(--space-1) 0 0 var(--space-4); padding: 0; }
@@ -1862,6 +1915,21 @@ const selectedFileFolderIsLegacy = computed(() => {
 }
 .btn-empty-action:hover:not(:disabled) { background: var(--color-primary); }
 .btn-empty-action:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn-retry {
+  margin-left: auto;
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  background: white;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-retry:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .search-scope-note {
   margin: 0 0 var(--space-3);
