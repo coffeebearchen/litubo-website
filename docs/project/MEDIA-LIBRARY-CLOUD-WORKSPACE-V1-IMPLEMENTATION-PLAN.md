@@ -124,7 +124,12 @@ AI checkpoint `4bbc838...` 全程冻结。
 
 ---
 
-## ML-CLOUD-03 — Drag & Drop + UX Polish
+## ML-CLOUD-03 — Drag & Drop + UX Polish ✅ COMPLETED（2026-09-09）
+
+**成果：** Drag & Drop 上传（与上传按钮共用同一条 pipeline，不绕过 folder policy / duplicate warning / 格式校验）；Broken thumbnail fallback（固定尺寸盒子，布局不跳动）；Upload folder 以 `webkitdirectory` 极简实现（扁平导入，不重建本地目录树）；卡片以文件名为主标题、Title 降为次级；面包屑新增 `↑ Up` 与系统目录锁标；选择摘要条；按空态原因分支的 empty state；上传错误逐文件报告失败原因。
+
+**修复本模块引入的 375px 回归：** 移动端放开上传下拉 `max-width` 后，`<select>` 由最宽 `<option>` 决定固有宽度，把工具栏顶到 506px；需容器 `min-width: 0` + select `min-width: 0` 与 `width: 0` 三处协同。
+
 
 ### 功能
 - Drag & Drop files

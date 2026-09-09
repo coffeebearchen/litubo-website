@@ -4954,3 +4954,94 @@ Archiving is disabled until it can.
 **下一候选：`ML-CLOUD-03 — Drag & Drop + UX Polish`，NOT STARTED，WAITING FOR REVIEW AUTHORIZATION。**
 
 *最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-02"任务中写入。*
+
+---
+
+## ML-CLOUD-03 — Drag & Drop + UX Polish（2026-09-09）
+
+**状态：COMPLETED。** Media Library Cloud Workspace V1 的最后一个主要施工模块。未新增业务架构，只做交互与视觉收口。
+
+### 一、Drag & Drop Upload
+
+拖放**不是第二条上传通道**。上传按钮与拖放共用同一个入口函数 `beginUpload(File[])`，因此拖放不可能拥有自己的重复规则、自己的文件夹校验或自己的错误处理 —— 它只是另一种"选文件"的方式。
+
+- **drop 目标区**为文件区本身；顶部一条虚线提示条，只在**当前位置确实允许上传**时出现；整页高亮只在拖拽悬停期间发生。不常驻大上传框。
+- `dragDepth` 计数 enter/leave：拖过子元素时父元素会收到 `dragleave`，布尔标志会闪烁；drop 时归零，避免漏掉的 leave 让页面卡在拖拽态。
+- **进入允许上传的文件夹会自动成为上传目标**（`selectFolder` 同步 `uploadFolder`），否则"拖到这里"实际会落到下拉框上次停留的位置。
+- 归档视图不显示拖放区，拖入时明确拒绝。
+
+**实测：** 拖入疑似重复文件**仍然走完整的 Possible duplicate 流程**（Cancel duplicates / Upload anyway / Cancel all），未上传任何东西；`Cancel duplicates` 只丢弃被标记的那个，其余照常上传；不支持的 `.exe` 被服务端按既有规则拒绝。
+
+### 二、Upload Folder = 已实现（极简版）
+
+按施工单 §8 的成本判断：只需要**第二个带 `webkitdirectory` 的 input** 复用同一条 pipeline，不引入目录重建、兼容体系、新 backend 或 folder mapping 架构 —— 因此实现。
+
+文件**扁平导入**到当前目标文件夹。不把本机目录树复制成业务目录：别人笔记本上的文件夹结构不是产品分类。
+
+顺带把重复检查改为**按 50 个一批分块**，选一个 200 个文件的目录也会被完整检查，而不是让警告在超限时静默失效。
+
+### 三、Broken Thumbnail Fallback
+
+缩略图区是**固定 120px 的盒子，永远渲染内容**。图片加载失败时切换到与非图片格式相同的回退块，因此失败的加载只会改变卡片显示什么，不会改变它有多高，也不会让 alt 文本溢到下面的文件名上。`alt` 置空 —— 文件名就在卡片里。
+
+回退标签按类型：`PDF` / `IMAGE` / `TXT` / `CSV` / `TSV` / `FILE`，图片额外显示 `Image unavailable`。
+
+**实测（真实数据）：** 触发真实 `error` 事件后，卡片高度 222px、缩略图 120px **均未变化**，无破图元素，文件名仍完整可读。1440px 概览中可见**库内确实存在多个缩略图失败的图片**，回退块正常承接，布局无重叠。
+
+### 四、卡片 / 文件夹 / 批量选择 UX
+
+- 卡片主标题改为**文件名**，`Title` 作为斜体次级信息且仅在与文件名不同时显示 —— 两者不再混淆
+- 面包屑新增 **`↑ Up`**（回上级）与可点击的 `Media Library` 根；受保护系统目录显示 **🔒**
+- 新增**选择摘要条**：`N selected` + 合计大小 + `Select all in this view` + `Clear selection`
+- 批量归档改为两步确认，文案写明 `Referenced files are kept.`
+
+### 五、Loading / Empty / Error 状态
+
+空态按**为什么为空**分支：搜索无结果（带 `Clear search`）/ 归档为空 / 格式筛选无结果（带 `Show all formats`）/ 待分类已清空 / 文件夹为空（带 `Upload files`）。
+
+**上传错误逐文件报告**：不再是整批一句 `Upload failed`，而是列出每个文件的结局与失败原因（实测 `✕ …exe — 格式不支持（application/x-msdownload）` 与 `✓ ….txt — uploaded` 并列）。切换文件夹时清除该报告，避免它看起来在描述另一个目录。
+
+`References unavailable` 保持 ML-CLOUD-02 的行为，不谎报 `0 references`，并禁用归档按钮（注入 500 实测通过）。
+
+### 六、验证结果（真实 Node 22.22.2；系统默认 Node 24.14.0 未改动）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1168 / 1168 通过**（31 文件，本次 +20） |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+**1440px 真实验收（三张截图 + DOM 实测）：** 概览（拖放区 / 卡片 / 侧栏）、文件夹管理态（↑ Up / 面包屑 / New folder·Rename·Move / 拖放目标写明具体文件夹）、多选态（选择条 3 selected · 24 KB / 批量 Move·Archive / 选中卡片绿框）。`scrollWidth === clientWidth === 1440`，无横向溢出。
+
+> **截图分辨率限制（如实记录）：** 应用内预览面板栅格为 800×500，1440px 视口会被等比缩小后截取。要获得 1:1 的 1440 截图，只能改用外部浏览器并提供登录凭证或导出会话 Cookie —— 两者均被本施工单 §17 禁止。因此桌面证据 = 真实 1440 视口布局的缩放截图 + 精确 DOM 几何测量。
+
+**375px：** 全部状态 `scrollWidth === clientWidth === 375`，无横向溢出；卡片两列（168px）、批量按钮高 40px、详情面板右边界 375、Filename 输入 343px、重复警告三个按钮各 312px。移动端拖放区文案改为 `Add files to this folder`（手机没有拖放）。
+
+**修复的 375px 回归（本模块自身引入）：** 移动端把上传目标下拉的 `max-width` 放开后，`<select>` 由最宽 `<option>` 决定固有宽度（测试文件夹名很长），把整条工具栏顶到 506px。修复需要三处协同：容器 `min-width: 0`、select 的 `min-width: 0` **与 `width: 0`** —— 只加 `min-width` 不够，因为固有宽度仍来自 option 文本。
+
+### 七、回归（全部通过）
+
+Folder Browse · New/Rename/Move Folder · Upload Button · **Drag & Drop** · File Rename · Title · Description · File Move · Duplicate Warning · Upload Anyway · Cancel Duplicate · Multi-select · Batch Move · Batch Archive · Archive · Restore · Search · Filter · File Details · References · **Broken Thumbnail Fallback**。
+
+全新标签页 console **零新增错误**。
+
+### 八、测试资料
+
+**本模块未新建任何文件夹**，复用既有 `products/conveyor/ZZ-ML-CLOUD-01 TEST ONLY — NOT FOR PUBLICATION` 及其 `manuals`。全部测试文件的**文件名与 Title 均带 `TEST ONLY — NOT FOR PUBLICATION`**，Unclassified 中为 0，本模块产生的一次性测试文件已 Archive（可恢复）。
+
+**一处需要说明的异常：** 会话期间出现一个我未主动上传的 `06-mobile-file-details.png`（1,450,642 B，即视觉母版文件大小，Directus 记录上传者为当前登录会话 `dev@litubo.com`，时间 13:29:10Z）。我无法解释其触发机制 —— 该时段我在处理截图缩放问题，未执行任何上传调用。它未被任何产品引用，已按受支持路径**标注为 `STRAY TEST ONLY — NOT FOR PUBLICATION` 并归档**（可恢复，未做永久删除）。如需彻底移除请在 Directus 后台处理。
+
+### 九、范围与边界
+
+**0 schema / DB migration** · **0 Directus permission 改动** · **0 permanent delete** · **0 AI 改动**（checkpoint `4bbc838` 冻结未动）· **0 Provider 调用** · **0 API 费用** · **0 push / merge / deploy**。Media UUID 与引用在改名/移动后均实测不变。
+
+未实现（施工单明确禁止）：Google Drive / OneDrive / Dropbox、Share link、collaboration、comments、Owner、per-user permissions、Storage quota、billing、version history、file diff、complex tags、AI folder classification、AI auto ALT、COS migration、Permanent Delete。视觉母版中出现的 Storage/Upgrade、Owner、Add tags、Download selected、Reports、AI Workspace **均未实现**。
+
+**Folder Trash / Restore = P1 DEFERRED**（需要新的 lifecycle / schema，未动）。
+**AI = HOLD — NOT CANCELLED**，恢复点 `PWS-AI-MULTI-SOURCE-REAL-BETA-01`。
+
+**NEXT CANDIDATE: `ML-CLOUD-V1-FINAL` — NOT STARTED，WAITING FOR CHATGPT / USER REVIEW AUTHORIZATION。**
+
+*最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-03"任务中写入。*

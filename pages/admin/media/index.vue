@@ -50,6 +50,7 @@ const uploading = ref(false)
 const uploadErrors = ref<Array<{ filename: string; message: string }>>([])
 const uploadFolder = ref<string>('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const folderInputRef = ref<HTMLInputElement | null>(null)
 
 // ML-CLOUD-02 — duplicate warning. `pendingFiles` holds the picked files while
 // the operator decides; `duplicates` is what the server recognised.
@@ -61,6 +62,35 @@ interface DuplicateMatch {
 const pendingFiles = ref<File[]>([])
 const duplicateMatches = ref<DuplicateMatch[]>([])
 const duplicateChecking = ref(false)
+
+// ML-CLOUD-03 — per-file upload outcome, so a partly failed batch is legible.
+interface UploadResult {
+  filename: string
+  ok: boolean
+  size?: number
+  message?: string
+}
+const uploadResults = ref<UploadResult[]>([])
+const uploadOkCount = computed(() => uploadResults.value.filter((r: UploadResult) => r.ok).length)
+
+/**
+ * ML-CLOUD-03 — drag-and-drop state.
+ *
+ * `dragDepth` counts enter/leave pairs: dragging over a child element fires
+ * `dragleave` on the parent, so a boolean flag flickers off the moment the
+ * cursor crosses any nested node. Counting is the fix, and resetting to zero
+ * on drop is what stops a missed leave from leaving the page stuck in its
+ * drag state.
+ */
+const dragDepth = ref(0)
+const dragActive = computed(() => dragDepth.value > 0)
+
+/** Thumbnails that failed to load, so the card can fall back once and stay stable. */
+const thumbFailed = ref<Set<string>>(new Set())
+function onThumbError(id: string) {
+  if (thumbFailed.value.has(id)) return
+  thumbFailed.value = new Set([...thumbFailed.value, id])
+}
 
 // Multi-select
 const selectedIds = ref<Set<string>>(new Set())
@@ -267,6 +297,19 @@ watch(searchQuery, () => {
 function selectFolder(id: string | null) {
   showArchivedView.value = false
   selectedFolder.value = id
+  // The upload report describes the folder it happened in; carrying it into
+  // another folder makes it look like it describes that one.
+  uploadResults.value = []
+  uploadErrors.value = []
+  /**
+   * ML-CLOUD-03 — browsing into a folder that accepts files makes it the
+   * upload destination. Otherwise "drop files here" would silently mean
+   * "drop them wherever the dropdown was last left", which is the kind of
+   * quiet mismatch that files things in the wrong place.
+   */
+  if (id && id !== 'root' && flatFolders.value.some((f: FlatFolder) => f.id === id && f.allow_upload)) {
+    uploadFolder.value = id
+  }
 }
 
 function toggleArchivedView() {
@@ -613,6 +656,20 @@ function triggerUpload() {
 }
 
 /**
+ * ML-CLOUD-03 — Upload folder, implemented as the cheap version it is allowed
+ * to be: a second input carrying `webkitdirectory`, feeding the same pipeline.
+ *
+ * The files import FLAT into the destination folder. Rebuilding a local
+ * directory tree as business folders is explicitly not wanted — a folder
+ * structure from someone's laptop is not the product classification — and
+ * building it would be the "new folder mapping architecture" this module must
+ * not add.
+ */
+function triggerFolderUpload() {
+  folderInputRef.value?.click()
+}
+
+/**
  * ML-CLOUD-02 — check for possible duplicates before uploading anything.
  *
  * The check runs first and covers the whole selection, so the operator makes
@@ -627,20 +684,43 @@ async function onFilesSelected(evt: Event) {
 
   const picked = Array.from(fileList)
   input.value = ''
+  await beginUpload(picked)
+}
+
+/**
+ * ML-CLOUD-03 — the single entry point for uploading, whatever picked the
+ * files.
+ *
+ * The Upload button and a drag-and-drop both land here, so drag-and-drop
+ * cannot end up with its own duplicate rules, its own folder validation or its
+ * own error handling. It is a second way to choose files, not a second upload
+ * path.
+ */
+async function beginUpload(picked: File[]) {
+  if (picked.length === 0) return
   uploadErrors.value = []
+  uploadResults.value = []
   errorMsg.value = ''
   duplicateMatches.value = []
 
   duplicateChecking.value = true
   try {
-    const res = await $fetch<{ duplicates: DuplicateMatch[] }>('/api/admin/media/duplicate-check', {
-      method: 'POST',
-      body: {
-        folder: uploadFolder.value || null,
-        candidates: picked.map(f => ({ filename: f.name, size: f.size })),
-      },
-    })
-    duplicateMatches.value = res.duplicates ?? []
+    // The endpoint caps a request at 50 candidates. Chunking here rather than
+    // capping the selection means picking a folder with 200 files still gets
+    // checked, instead of the warning quietly switching itself off.
+    const CHUNK = 50
+    const found: DuplicateMatch[] = []
+    for (let i = 0; i < picked.length; i += CHUNK) {
+      const res = await $fetch<{ duplicates: DuplicateMatch[] }>('/api/admin/media/duplicate-check', {
+        method: 'POST',
+        body: {
+          folder: uploadFolder.value || null,
+          candidates: picked.slice(i, i + CHUNK).map(f => ({ filename: f.name, size: f.size })),
+        },
+      })
+      found.push(...(res.duplicates ?? []))
+    }
+    duplicateMatches.value = found
   } catch {
     // A failed check must not block uploading — it is a convenience, not a gate.
     duplicateMatches.value = []
@@ -690,6 +770,9 @@ function cancelUploadSelection() {
 async function uploadFiles(picked: File[]) {
   uploading.value = true
   const allErrors: Array<{ filename: string; message: string }> = []
+  // ML-CLOUD-03 — one row per file, so a partly failed batch says which file
+  // failed and why instead of a single "Upload failed" for the whole thing.
+  const results: UploadResult[] = []
 
   await Promise.all(picked.map(async (file) => {
     const fd = new FormData()
@@ -701,18 +784,29 @@ async function uploadFiles(picked: File[]) {
         '/api/admin/media/upload',
         { method: 'POST', body: fd },
       )
-      if (res.errors?.length) allErrors.push(...res.errors)
+      if (res.errors?.length) {
+        allErrors.push(...res.errors)
+        for (const err of res.errors) {
+          results.push({ filename: err.filename || file.name, ok: false, message: err.message })
+        }
+      }
+      else {
+        results.push({ filename: file.name, ok: true, size: file.size })
+      }
     } catch (e: unknown) {
-      const fe = e as { data?: { message?: string } }
-      allErrors.push({ filename: file.name, message: fe.data?.message ?? 'Upload failed' })
+      const fe = e as { data?: { message?: string }, statusMessage?: string }
+      const message = fe.data?.message ?? fe.statusMessage ?? 'Upload failed'
+      allErrors.push({ filename: file.name, message })
+      results.push({ filename: file.name, ok: false, message })
     }
   }))
 
   uploading.value = false
   uploadErrors.value = allErrors
+  uploadResults.value = results
 
-  if (allErrors.length < picked.length) {
-    const okCount = picked.length - allErrors.length
+  const okCount = results.filter(r => r.ok).length
+  if (okCount > 0) {
     successMsg.value = `${okCount} file(s) uploaded successfully`
     setTimeout(() => (successMsg.value = ''), 4000)
     await loadFiles(true)
@@ -741,6 +835,81 @@ function formatType(type: string | null | undefined) {
   return type.split('/')[1]?.toUpperCase() ?? type
 }
 
+/** Whether a card should show a picture at all: an image whose thumbnail has not failed. */
+function showsThumbnail(f: MediaFile): boolean {
+  return isImage(f.type) && !thumbFailed.value.has(f.id)
+}
+
+// ── ML-CLOUD-03: drag and drop ───────────────────────────────────────────────
+
+/** Whether files dropped right now would have a folder to land in. */
+const dropTargetLabel = computed(() => {
+  if (showArchivedView.value) return null
+  if (!uploadFolder.value) return 'Needs Classification'
+  return folderPath(uploadFolder.value)
+})
+
+function onDragEnter(evt: DragEvent) {
+  if (!evt.dataTransfer?.types?.includes('Files')) return
+  dragDepth.value++
+}
+
+function onDragOver(evt: DragEvent) {
+  if (!evt.dataTransfer?.types?.includes('Files')) return
+  // Without this the browser navigates to the dropped file instead.
+  evt.preventDefault()
+  evt.dataTransfer.dropEffect = 'copy'
+}
+
+function onDragLeave() {
+  if (dragDepth.value > 0) dragDepth.value--
+}
+
+async function onDrop(evt: DragEvent) {
+  dragDepth.value = 0
+  const dropped = Array.from(evt.dataTransfer?.files ?? [])
+  if (dropped.length === 0) return
+
+  if (showArchivedView.value) {
+    errorMsg.value = 'Switch out of the archived view before uploading.'
+    return
+  }
+  // Straight into the shared pipeline: same folder rules, same duplicate
+  // check, same server-side format validation as the Upload button.
+  await beginUpload(dropped)
+}
+
+// ── ML-CLOUD-03: selection and navigation helpers ────────────────────────────
+
+const allVisibleSelected = computed(
+  () => files.value.length > 0 && files.value.every((f: MediaFile) => selectedIds.value.has(f.id)),
+)
+
+function toggleSelectAll() {
+  selectedIds.value = allVisibleSelected.value
+    ? new Set()
+    : new Set(files.value.map((f: MediaFile) => f.id))
+  batchArchiveConfirm.value = false
+}
+
+/** Total bytes of the current selection — what the operator is about to act on. */
+const selectedTotalSize = computed(() => files.value
+  .filter((f: MediaFile) => selectedIds.value.has(f.id))
+  .reduce((sum: number, f: MediaFile) => sum + Number(f.filesize ?? 0), 0))
+
+/** The folder one level up from here, when there is one to go to. */
+const parentFolderId = computed<string | null>(() => {
+  const id = selectedFolder.value
+  if (!id || id === 'root' || showArchivedView.value) return null
+  return parentMap.value[id] ?? null
+})
+
+const searchActive = computed(() => searchQuery.value.trim() !== '')
+
+function clearSearch() {
+  searchQuery.value = ''
+}
+
 const hasMore = computed(() => files.value.length < totalCount.value)
 
 // Whether the currently selected file's folder is legacy (highlight "move" call to action)
@@ -756,11 +925,19 @@ const selectedFileFolderIsLegacy = computed(() => {
     <!-- Top bar -->
     <div class="ml-topbar">
       <div class="ml-breadcrumb">
-        <span class="breadcrumb-root">Media Library</span>
+        <!-- ML-CLOUD-03 — one click back up the tree, next to where you are. -->
+        <button
+          v-if="parentFolderId !== null || (selectedFolder && selectedFolder !== 'root')"
+          class="breadcrumb-up"
+          title="Go to parent folder"
+          @click="selectFolder(parentFolderId)"
+        >↑ Up</button>
+        <button class="breadcrumb-root" @click="selectFolder(null)">Media Library</button>
         <template v-if="currentViewLabel !== 'All files'">
           <span class="breadcrumb-sep">/</span>
           <span class="breadcrumb-current">{{ currentViewLabel }}</span>
         </template>
+        <span v-if="currentFolder && currentFolder.management !== 'customer-managed'" class="breadcrumb-lock" title="Protected system folder">🔒</span>
       </div>
 
       <div class="ml-topbar-actions">
@@ -832,6 +1009,15 @@ const selectedFileFolderIsLegacy = computed(() => {
             {{ uploading ? 'Uploading…' : duplicateChecking ? 'Checking…' : 'Upload files' }}
           </button>
         </template>
+        <!-- ML-CLOUD-03 — same accept list, same handler; only the picker differs. -->
+        <input
+          ref="folderInputRef"
+          type="file"
+          multiple
+          webkitdirectory
+          class="hidden-input"
+          @change="onFilesSelected"
+        >
         <input
           ref="fileInputRef"
           type="file"
@@ -945,13 +1131,26 @@ const selectedFileFolderIsLegacy = computed(() => {
     <!-- Banners -->
     <div v-if="errorMsg" class="banner banner--error">{{ errorMsg }}</div>
     <div v-if="successMsg" class="banner banner--success">{{ successMsg }}</div>
-    <div v-if="uploadErrors.length" class="banner banner--warn">
-      <strong>Some files failed to upload:</strong>
+    <!--
+      ML-CLOUD-03 — the outcome of every file in the batch, not one verdict for
+      all of them. When four uploads succeed and one is the wrong format, the
+      operator needs to know which one and why, not "Upload failed".
+    -->
+    <div v-if="uploadResults.length && uploadErrors.length" class="banner banner--warn">
+      <strong>
+        Upload finished with problems —
+        {{ uploadOkCount }} uploaded,
+        {{ uploadResults.length - uploadOkCount }} failed
+      </strong>
       <ul class="error-list">
-        <li v-for="e in uploadErrors" :key="e.filename">
-          <strong>{{ e.filename }}</strong>：{{ e.message }}
+        <li v-for="(r, i) in uploadResults" :key="`${r.filename}-${i}`" :class="r.ok ? 'result-ok' : 'result-fail'">
+          <span class="result-mark">{{ r.ok ? '✓' : '✕' }}</span>
+          <strong>{{ r.filename }}</strong>
+          <template v-if="r.ok"> — uploaded</template>
+          <template v-else> — {{ r.message }}</template>
         </li>
       </ul>
+      <button class="btn-dismiss-results" @click="uploadResults = []; uploadErrors = []">Dismiss</button>
     </div>
 
     <div class="ml-body">
@@ -1026,20 +1225,86 @@ const selectedFileFolderIsLegacy = computed(() => {
       </aside>
 
       <!-- ── Main content ──────────────────────────────────────────────────── -->
-      <div class="ml-main">
+      <!--
+        ML-CLOUD-03 — the drop surface is the file area itself. The dashed
+        strip only appears where an upload could actually land, and the page
+        highlights only while something is being dragged over it, so the
+        workspace is not permanently occupied by an upload box.
+      -->
+      <div
+        class="ml-main"
+        :class="{ 'ml-main--dragging': dragActive && dropTargetLabel }"
+        @dragenter="onDragEnter"
+        @dragover="onDragOver"
+        @dragleave="onDragLeave"
+        @drop.prevent="onDrop"
+      >
+        <!-- Selection summary — what is selected and how to stop -->
+        <div v-if="selectedIds.size > 0" class="selection-bar">
+          <span class="selection-bar__count">{{ selectedIds.size }} selected</span>
+          <span class="selection-bar__size">{{ formatSize(selectedTotalSize) }}</span>
+          <label class="selection-bar__all">
+            <input type="checkbox" :checked="allVisibleSelected" @change="toggleSelectAll">
+            Select all in this view
+          </label>
+          <button class="selection-bar__clear" @click="clearSelection">Clear selection</button>
+        </div>
+
+        <!-- Drop zone — only where files may actually be uploaded -->
+        <div v-if="dropTargetLabel && !showArchivedView" class="ml-dropzone" :class="{ 'ml-dropzone--active': dragActive }">
+          <span class="dropzone-text">
+            <!-- A phone has no drag-and-drop; it gets the honest label. -->
+            <strong class="desktop-only">Drag and drop files here</strong>
+            <strong class="mobile-only">Add files to this folder</strong>
+            <span class="dropzone-sub">
+              Uploads to <strong>{{ dropTargetLabel }}</strong> · JPG, PNG, WebP, PDF, TXT, CSV, TSV
+            </span>
+          </span>
+          <span class="dropzone-actions">
+            <button class="btn-dropzone-upload" :disabled="uploading || duplicateChecking" @click="triggerUpload">
+              {{ uploading ? 'Uploading…' : duplicateChecking ? 'Checking…' : 'Select files' }}
+            </button>
+            <button
+              class="btn-dropzone-folder"
+              :disabled="uploading || duplicateChecking"
+              title="Import every file in a folder. The files land here flat; the local folder structure is not recreated."
+              @click="triggerFolderUpload"
+            >Select folder</button>
+          </span>
+        </div>
+
         <!-- Loading -->
         <div v-if="loading && files.length === 0" class="loading-state">
           <span class="loading-dot" />Loading…
         </div>
 
-        <!-- Empty -->
+        <!-- Empty — the reason it is empty decides what to say next -->
         <div v-else-if="!loading && files.length === 0" class="empty-state">
-          <p class="empty-title">No files found</p>
-          <p class="empty-hint">
-            <template v-if="showArchivedView">No archived files</template>
-            <template v-else-if="selectedFolder === 'root'">All files have been moved to approved folders</template>
-            <template v-else>Click "Upload files" to add media assets</template>
-          </p>
+          <template v-if="searchActive">
+            <p class="empty-title">No files found</p>
+            <p class="empty-hint">Nothing matches “{{ searchQuery }}” in this view.</p>
+            <button class="btn-empty-action" @click="clearSearch">Clear search</button>
+          </template>
+          <template v-else-if="showArchivedView">
+            <p class="empty-title">No archived files</p>
+            <p class="empty-hint">Files you archive appear here and can be restored at any time.</p>
+          </template>
+          <template v-else-if="typeFilter">
+            <p class="empty-title">No {{ typeFilter === 'pdf' ? 'PDF' : 'image' }} files here</p>
+            <p class="empty-hint">Try clearing the format filter.</p>
+            <button class="btn-empty-action" @click="typeFilter = ''">Show all formats</button>
+          </template>
+          <template v-else-if="selectedFolder === 'root'">
+            <p class="empty-title">Nothing needs classification</p>
+            <p class="empty-hint">Every file has been filed into a folder.</p>
+          </template>
+          <template v-else>
+            <p class="empty-title">This folder is empty</p>
+            <p class="empty-hint">Upload files or drag files here to get started.</p>
+            <button v-if="dropTargetLabel" class="btn-empty-action" :disabled="uploading" @click="triggerUpload">
+              Upload files
+            </button>
+          </template>
         </div>
 
         <!-- File grid -->
@@ -1067,21 +1332,34 @@ const selectedFileFolderIsLegacy = computed(() => {
               >
             </label>
             <span v-if="archivedFileIds.has(f.id)" class="archived-badge">Archived</span>
+            <!--
+              ML-CLOUD-03 — the thumbnail area is a fixed box that always
+              renders something. A broken image swaps to the same block a
+              non-image gets, so a failed load cannot collapse the card or
+              spill alt text across the filename below it. `alt` is empty
+              because the filename is already right there in the card.
+            -->
             <div class="file-card__thumb">
               <img
-                v-if="isImage(f.type)"
+                v-if="showsThumbnail(f)"
                 :src="thumbUrl(f.id)"
-                :alt="f.title ?? f.filename_download ?? ''"
+                alt=""
                 class="file-card__img"
                 loading="lazy"
+                @error="onThumbError(f.id)"
               >
-              <div v-else class="file-card__icon">
-                <span v-if="f.type === 'application/pdf'" class="icon-pdf">PDF</span>
-                <span v-else class="icon-file">FILE</span>
+              <div v-else class="file-card__icon" :class="`file-card__icon--${fileKind(f.type).toLowerCase()}`">
+                <span class="icon-kind">{{ fileKind(f.type) }}</span>
+                <span v-if="isImage(f.type)" class="icon-note">Image unavailable</span>
               </div>
             </div>
             <div class="file-card__info">
-              <p class="file-card__title">{{ f.title ?? f.filename_download ?? f.id.slice(0, 8) }}</p>
+              <p class="file-card__title" :title="f.filename_download ?? ''">
+                {{ f.filename_download ?? f.filename_disk ?? f.id.slice(0, 8) }}
+              </p>
+              <p v-if="f.title && f.title !== f.filename_download" class="file-card__subtitle" :title="f.title">
+                {{ f.title }}
+              </p>
               <p class="file-card__meta">
                 <span class="meta-type">{{ formatType(f.type) }}</span>
                 <span class="meta-size">{{ formatSize(f.filesize) }}</span>
@@ -1113,12 +1391,16 @@ const selectedFileFolderIsLegacy = computed(() => {
         <!-- Preview -->
         <div class="detail-preview">
           <img
-            v-if="isImage(selectedFile.type)"
+            v-if="showsThumbnail(selectedFile)"
             :src="thumbUrl(selectedFile.id)"
-            :alt="selectedFile.title ?? ''"
+            alt=""
             class="detail-preview__img"
+            @error="onThumbError(selectedFile.id)"
           >
-          <div v-else class="detail-preview__icon">{{ formatType(selectedFile.type) }}</div>
+          <div v-else class="detail-preview__icon">
+            <span>{{ fileKind(selectedFile.type) }}</span>
+            <span v-if="isImage(selectedFile.type)" class="preview-note">Image unavailable</span>
+          </div>
         </div>
 
         <!-- File facts (read-only) — single source of truth from selectedFile -->
@@ -1314,7 +1596,12 @@ const selectedFileFolderIsLegacy = computed(() => {
   font-size: var(--text-base);
   font-weight: 700;
   color: var(--color-ink);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
+.breadcrumb-root:hover { color: var(--color-primary-deep); text-decoration: underline; }
 .breadcrumb-sep {
   color: var(--color-ink-muted);
   font-size: var(--text-sm);
@@ -1543,9 +1830,99 @@ const selectedFileFolderIsLegacy = computed(() => {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.empty-state { text-align: center; padding: var(--space-16) var(--space-8); }
+.empty-state { text-align: center; padding: var(--space-12) var(--space-8); }
 .empty-title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); margin: 0 0 var(--space-2); }
 .empty-hint { font-size: var(--text-sm); color: var(--color-ink-muted); margin: 0; }
+.btn-empty-action {
+  margin-top: var(--space-4);
+  min-height: 36px; padding: 0 var(--space-4);
+  background: var(--color-primary-deep); color: white;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+}
+.btn-empty-action:hover:not(:disabled) { background: var(--color-primary); }
+.btn-empty-action:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── ML-CLOUD-03: drag and drop ── */
+.ml-main--dragging { outline: 2px dashed var(--color-primary); outline-offset: -6px; }
+
+.ml-dropzone {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4); flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.ml-dropzone--active { border-color: var(--color-primary); background: #eef6f3; }
+.dropzone-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dropzone-text > strong { font-size: var(--text-sm); color: var(--color-ink); }
+.dropzone-sub { font-size: var(--text-xs); color: var(--color-ink-muted); overflow-wrap: anywhere; }
+.btn-dropzone-upload {
+  min-height: 36px; padding: 0 var(--space-4);
+  background: var(--color-primary-deep); color: white;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  font-size: var(--text-sm); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.btn-dropzone-upload:hover:not(:disabled) { background: var(--color-primary); }
+.btn-dropzone-upload:disabled { opacity: 0.55; cursor: not-allowed; }
+.dropzone-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.btn-dropzone-folder {
+  min-height: 36px; padding: 0 var(--space-4);
+  background: var(--color-surface); color: var(--color-ink);
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font-size: var(--text-sm); cursor: pointer; white-space: nowrap;
+}
+.btn-dropzone-folder:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary-deep); }
+.btn-dropzone-folder:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── ML-CLOUD-03: selection summary ── */
+.selection-bar {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: #eef6f3;
+  border: 1px solid #bcdcd0;
+  border-radius: var(--radius-md);
+}
+.selection-bar__count { font-size: var(--text-sm); font-weight: 600; color: var(--color-primary-deep); }
+.selection-bar__size { font-size: var(--text-xs); color: var(--color-ink-muted); }
+.selection-bar__all {
+  display: flex; align-items: center; gap: var(--space-1);
+  font-size: var(--text-xs); color: var(--color-ink); cursor: pointer;
+}
+.selection-bar__clear {
+  margin-left: auto;
+  background: none; border: none; padding: 0;
+  font-size: var(--text-xs); color: var(--color-primary-deep);
+  text-decoration: underline; cursor: pointer;
+}
+
+/* ── ML-CLOUD-03: per-file upload results ── */
+.result-ok { color: var(--color-ink-muted); }
+.result-fail { color: var(--color-ink); }
+.result-mark { display: inline-block; width: 1em; font-weight: 700; }
+.result-ok .result-mark { color: #1e7a52; }
+.result-fail .result-mark { color: #c0392b; }
+.btn-dismiss-results {
+  margin-top: var(--space-2);
+  background: none; border: none; padding: 0;
+  font-size: var(--text-xs); color: var(--color-ink-muted);
+  text-decoration: underline; cursor: pointer;
+}
+
+/* ── ML-CLOUD-03: breadcrumb navigation ── */
+.breadcrumb-up {
+  min-height: 28px; padding: 0 var(--space-2);
+  background: var(--color-surface); border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs); color: var(--color-ink); cursor: pointer;
+  white-space: nowrap;
+}
+.breadcrumb-up:hover { border-color: var(--color-primary); color: var(--color-primary-deep); }
+.breadcrumb-lock { font-size: var(--text-xs); }
 
 /* ── File grid ── */
 .file-grid {
@@ -1594,16 +1971,28 @@ const selectedFileFolderIsLegacy = computed(() => {
   flex-shrink: 0;
 }
 .file-card__img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.file-card__icon { display: flex; align-items: center; justify-content: center; }
-.icon-pdf {
-  font-size: var(--text-sm); font-weight: 700;
-  background: #e74c3c; color: white;
-  padding: 6px 10px; border-radius: var(--radius-sm);
+
+/*
+  ML-CLOUD-03 — the fallback fills the same fixed 120px box a thumbnail would,
+  so a broken image changes what the card shows and never how tall it is.
+*/
+.file-card__icon {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; width: 100%; height: 100%; padding: var(--space-2); box-sizing: border-box;
 }
-.icon-file {
-  font-size: var(--text-xs); font-weight: 700;
+.icon-kind {
+  font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.04em;
   background: #7f8c8d; color: white;
   padding: 6px 10px; border-radius: var(--radius-sm);
+}
+.file-card__icon--pdf .icon-kind { background: #c0392b; }
+.file-card__icon--csv .icon-kind,
+.file-card__icon--tsv .icon-kind { background: #1e7a52; }
+.file-card__icon--txt .icon-kind { background: #4a6572; }
+.file-card__icon--image .icon-kind { background: #b06a2c; }
+.icon-note {
+  font-size: 10px; color: var(--color-ink-muted); text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
 }
 
 .file-card__info { padding: var(--space-2) var(--space-3); flex: 1; min-width: 0; }
@@ -1612,8 +2001,14 @@ const selectedFileFolderIsLegacy = computed(() => {
   margin: 0 0 2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* ML-CLOUD-03 — Title is secondary and visibly distinct from the filename above it. */
+.file-card__subtitle {
+  font-size: 10px; color: var(--color-ink-muted); font-style: italic;
+  margin: 0 0 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .file-card__meta {
-  display: flex; gap: var(--space-2); margin: 0;
+  display: flex; gap: var(--space-2); margin: 0; align-items: center;
 }
 .meta-type {
   font-size: 10px; font-weight: 600; color: var(--color-primary);
@@ -1671,11 +2066,18 @@ const selectedFileFolderIsLegacy = computed(() => {
   overflow: hidden; flex-shrink: 0;
 }
 .detail-preview__img { width: 100%; height: 100%; object-fit: contain; display: block; }
+/* ML-CLOUD-03 — same fixed box whether there is a picture or not. */
 .detail-preview__icon {
-  font-size: var(--text-2xl); font-weight: 700;
-  background: #7f8c8d; color: white;
-  padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg); font-weight: 700;
+  color: var(--color-ink-muted);
 }
+.detail-preview__icon > span:first-child {
+  background: #7f8c8d; color: white;
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm);
+}
+.preview-note { font-size: var(--text-xs); font-weight: 400; color: var(--color-ink-muted); }
 
 /* File facts */
 .detail-info {
@@ -1983,9 +2385,15 @@ const selectedFileFolderIsLegacy = computed(() => {
     background: none;
   }
   .desktop-only { display: none; }
+  .mobile-only { display: initial; }
 
   .ml-main { padding: var(--space-3); overflow: visible; }
-  .file-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-2); }
+  /*
+    ML-CLOUD-03 — two fixed columns on a phone, matching the mobile master.
+    `auto-fill minmax(140px)` gave two columns at 375px and three on a slightly
+    wider phone, which shrank the filename to unreadable. Two is the layout.
+  */
+  .file-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
 
   /* Detail: full-width below grid */
   .ml-detail {
@@ -2085,5 +2493,44 @@ const selectedFileFolderIsLegacy = computed(() => {
   .dup-actions { flex-direction: column; align-items: stretch; }
   .btn-dup-skip, .btn-dup-anyway { width: 100%; }
   .batch-confirm-msg { flex: 1 1 100%; }
+
+  /*
+    ML-CLOUD-03 — a phone has no drag-and-drop, so the strip becomes what it
+    is useful as there: a labelled Upload button that names the destination.
+  */
+  .ml-dropzone { flex-direction: column; align-items: stretch; gap: var(--space-2); }
+  .dropzone-actions { flex-direction: column; }
+  .btn-dropzone-upload, .btn-dropzone-folder { width: 100%; }
+  .dropzone-text > strong { font-size: var(--text-xs); }
+
+  /* Batch actions stack rather than shrink below a comfortable tap target. */
+  .selection-bar { gap: var(--space-2); }
+  .selection-bar__clear { margin-left: 0; }
+  .ml-topbar-actions .btn-batch-move,
+  .ml-topbar-actions .btn-batch-archive,
+  .ml-topbar-actions .btn-batch-archive-confirm,
+  .ml-topbar-actions .btn-cancel-sel { flex: 1 1 auto; min-width: 96px; }
+  /*
+    The destination dropdown takes the full row on a phone, but `min-width: 0`
+    is what actually lets it. A flex item defaults to `min-width: auto`, so a
+    <select> holding a long folder name refuses to shrink below that name and
+    pushes the whole topbar past the viewport.
+  */
+  .ml-topbar-actions {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .ml-topbar-actions .folder-select {
+    flex: 1 1 100%;
+    /*
+      `width: 0` matters as much as `min-width: 0`. A <select> is sized by its
+      widest <option>, and a folder named "ZZ-ML-CLOUD-01 TEST ONLY — NOT FOR
+      PUBLICATION" is far wider than a phone. Zeroing the base width makes the
+      flex basis decide instead of the option text.
+    */
+    width: 0;
+    min-width: 0;
+    max-width: 100%;
+  }
 }
 </style>
