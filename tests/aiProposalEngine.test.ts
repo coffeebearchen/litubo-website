@@ -281,11 +281,14 @@ describe('runProposalEngine — single dispatch, structured validation, no leaka
     // mockRegistry({generateStructured}) overrides the REGISTRY-level function, whose signature is (providerId, target, input).
     expect(generate.mock.calls[0][0]).toBe('deepseek')
     expect(generate.mock.calls[0][1]).toBe(specificationsTarget)
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       output: VALID_PROPOSAL,
       fileResults: [{ displayName: 'notes.txt', status: 'read' }],
+      // PWS-AI-DUP-GUARD-01 — a fresh analysis, identified by its fingerprint.
+      reused: false,
     })
+    if (result.ok) expect(result.fingerprint).toMatch(/^[0-9a-f]{64}$/)
   })
 
   it('propagates a malformed-structure failure from the registry as a safe, short error', async () => {

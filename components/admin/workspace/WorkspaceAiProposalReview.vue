@@ -46,6 +46,12 @@ const props = defineProps<{
    * from a duplicate. Reviewing the proposal is still allowed.
    */
   comparisonReady: boolean
+  /** PWS-AI-DUP-GUARD-01 — server-minted handle, sent back with Apply so a replay is detectable. */
+  proposalRef: string
+  /** The server served a still-valid analysis of unchanged sources; no provider was called. */
+  reused: boolean
+  /** This exact analysis has already been written to the Draft. Apply must stay closed. */
+  alreadyApplied: boolean
 }>()
 
 const emit = defineEmits<{
@@ -194,7 +200,14 @@ watch(() => props.existingSpecGroups, () => {
   }
 }, { deep: true })
 
-const unsupportedFiles = computed(() => props.fileResults.filter(f => f.status !== 'read'))
+/**
+ * PWS-AI-DUP-GUARD-01 — a duplicate is not a failure. It read fine; its text
+ * simply matched another selected file, so it was left out of the prompt
+ * rather than paid for twice. It gets its own neutral notice, away from the
+ * files that genuinely could not be used.
+ */
+const duplicateFiles = computed(() => props.fileResults.filter(f => f.status === 'duplicate'))
+const unsupportedFiles = computed(() => props.fileResults.filter(f => f.status !== 'read' && f.status !== 'duplicate'))
 const readFiles = computed(() => props.fileResults.filter(f => f.status === 'read'))
 
 /**
@@ -300,7 +313,10 @@ const canApply = computed(() =>
   acceptedCount.value > 0
   && !props.applying
   && props.comparisonReady
-  && !partialApplyLocked.value,
+  && !partialApplyLocked.value
+  // An analysis that has already been written cannot be written again — the
+  // server refuses it regardless, and the button should say so first.
+  && !props.alreadyApplied,
 )
 
 function rowsForGroup(displayName: string): ReviewRow[] {
@@ -342,7 +358,7 @@ async function applyAccepted() {
       message: string
     }>(
       `/api/admin/products/${props.productId}/ai/specification-proposal/apply`,
-      { method: 'POST', body: { changes } },
+      { method: 'POST', body: { proposalRef: props.proposalRef, changes } },
     )
     if (result.ok) {
       emit('apply-success', result.message)
@@ -373,6 +389,20 @@ async function applyAccepted() {
       <li class="ws-step ws-step--current"><span class="ws-step-index">3</span> Review proposals</li>
       <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft</li>
     </ol>
+
+    <p v-if="alreadyApplied" class="ws-already-applied" role="status">
+      This unchanged-source analysis was already applied to Draft. Nothing further will be written from it.
+    </p>
+    <p v-else-if="reused" class="ws-reused-notice" role="status">
+      Reused a recent analysis of unchanged sources. No new AI call was made.
+    </p>
+
+    <section v-if="duplicateFiles.length > 0" class="ws-card ws-card--duplicate">
+      <h3 class="ws-card-title">Duplicate sources were not analyzed twice</h3>
+      <ul class="ws-file-result-list">
+        <li v-for="(f, i) in duplicateFiles" :key="i">{{ f.displayName }}: {{ f.reason }}</li>
+      </ul>
+    </section>
 
     <section v-if="unsupportedFiles.length > 0" class="ws-card ws-card--notice">
       <h3 class="ws-card-title">Some selected files were not analyzed</h3>
@@ -570,7 +600,10 @@ async function applyAccepted() {
               : 'Apply accepted changes to Draft' }}
         </button>
 
-        <p v-if="partialApplyLocked" class="ws-apply-partial" role="alert">
+        <p v-if="alreadyApplied" class="ws-apply-disabled-note">
+          These changes were already applied to this product Draft. To make further changes, analyze the sources again after editing them.
+        </p>
+        <p v-else-if="partialApplyLocked" class="ws-apply-partial" role="alert">
           {{ partialApplyMessage }}
           Open Specifications to check what was saved. To apply the rest, start a new proposal from AI Source Intake.
         </p>
@@ -603,6 +636,15 @@ async function applyAccepted() {
 
 .ws-card { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: var(--space-5); }
 .ws-card--notice { border-color: #F5C6C2; background: #FDF0EE; }
+/* A duplicate is informational, not a failure — neutral surface, not the error surface. */
+.ws-card--duplicate { border-color: var(--color-line); background: var(--color-surface-alt); }
+
+.ws-reused-notice, .ws-already-applied {
+  margin: 0; font-size: var(--text-sm); line-height: 1.55; max-width: 72ch;
+  border-radius: var(--radius-sm); padding: var(--space-3);
+}
+.ws-reused-notice { color: var(--color-primary-deep); background: rgba(15, 92, 75, 0.06); border: 1px solid rgba(15, 92, 75, 0.25); }
+.ws-already-applied { color: #8A5A00; background: #FFF7E6; border: 1px solid #F0D9A8; }
 .ws-card-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .ws-card-title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); margin: 0 0 var(--space-2); }
 .ws-card-hint { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0 0 var(--space-4); }

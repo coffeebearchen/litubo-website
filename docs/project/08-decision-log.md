@@ -22,3 +22,4 @@
 | D-018 | Package manager: npm. | Confirmed |
 | D-019 | CMS: Directus + PostgreSQL, locked. Phase 1 covers manual product, media, resource and form-submission management. Excel bulk import is Phase 2. | Confirmed |
 | D-020 | Product fixtures used in Phase 1 development are explicitly marked DEMO / NOT FOR PUBLIC and must never appear in production builds. | Confirmed |
+| D-021 | LITUBO AI production scope is single-product only. One Product Draft may use multiple explicitly associated source files. AI generation, review and Apply remain scoped to that same Draft. Multi-product AI UI, orchestration, queues and workflows are out of scope. Interfaces may remain naturally extensible only where this adds no additional implementation complexity. | Confirmed |

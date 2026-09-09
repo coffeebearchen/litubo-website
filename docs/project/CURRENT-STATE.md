@@ -4191,3 +4191,133 @@ Apply 之前一切都只是审核状态。批量接受的行仍可用行内 Reje
 `Future sequence: Batch Review → Source/Import → Batch Generate.` —— 后两项本模块**未实现**，需要单独授权。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-REVIEW-BATCH-01"任务中写入。*
+
+---
+
+## PWS-AI-DUP-GUARD-01 — 重复分析与重放写入防护（2026-09-09）
+
+### 一、已有保护（未重写、未重复实现）
+
+施工前先确认仓库事实，以下四项**原样保留**：
+
+| 已有保护 | 位置 |
+|---|---|
+| 前端 Analyze 锁（`if (analyzing.value) return`、按钮 disabled、"Analyzing…"） | `ai-source-intake.vue` / `WorkspaceAiSourceIntake.vue` |
+| 服务端 Generate single-flight（同管理员+产品同时一次）+ 10 秒冷却 | `aiGenerateRateLimit.ts` |
+| Source 关联 ID 去重（同一 media association id 只处理一次） | `resolveSourceRefs()` / `runProposalEngine()` |
+| Apply UI 锁（applying、成功清空 proposal、部分应用锁定） | `WorkspaceAiProposalReview.vue` |
+
+本模块补的是它们看不见的一层。
+
+### 二、修复 A —— 相同资料内容去重
+
+同一产品可能关联 `LT180C-spec.txt` 与 `LT180C-spec-copy.txt`：Directus File ID 不同，内容完全一样。ID 级去重对此无效，结果是同一份文档被付费发送两次。
+
+服务端在**文本提取之后、发送 Provider 之前**对每份成功提取的文本计算 SHA-256，只有首次出现的内容进入 prompt，后续相同内容标记为 `duplicate`。
+
+digest **只存在于服务器内存**：不写磁盘、不写日志、不返回浏览器、不写入产品数据。有测试断言返回给浏览器的 `fileResults` 中既无 64 位十六进制串，也无源文本片段。
+
+prompt 标签在真正使用时才递增，因此被跳过的重复项不会在 `Source 1, 2, 3` 中留下空档。
+
+### 三、SourceFileOutcome
+
+`SourceFileStatus` 扩展为 `read | duplicate | unsupported | unreadable`。
+
+`duplicate` **不是错误**：文件本身可读，只是内容与本次选择中的另一份相同。Proposal Review 为它单独渲染一张中性卡片（`Duplicate sources were not analyzed twice`），与红色的「无法使用的文件」卡片分开，浏览器文案为 `Duplicate content excluded from analysis.`。
+
+### 四、修复 B —— Analysis Fingerprint
+
+在产品校验、来源校验、文本提取、内容去重全部完成之后、调用 Provider 之前生成，构成为：
+
+```
+sha256({ productId, target.id, providerId, productName, sorted(unique source content digests) })
+```
+
+**不含** raw source、文件名、Directus UUID、sourceRef、API Key、provider 原始响应。
+
+digest 集合**排序后**参与计算，因此先点 A 后点 B 与先点 B 后点 A 得到同一个 fingerprint —— 点击顺序不是业务输入，不该产生第二次付费分析。有测试断言这一点，以及产品 / Target / provider / 产品名 / 内容任一变化都会改变 fingerprint。
+
+### 五、修复 C —— 成功结果的短期复用
+
+**TTL = 10 分钟**（`SUCCESS_REUSE_TTL_MS`）。选 10 而非 5 的理由写在代码注释里：窗口必须覆盖真实用法——分析一次、逐条审十几条、被打断、回来后因页面刷新丢失内存会话而重新分析。5 分钟正好落在这个间隙里，会为完全相同的结果再收一次费；10 分钟覆盖它，而又足够短。更根本的是，**内容变化本身就会改变 fingerprint**，TTL 只是陈旧上界，不是变更检测手段。
+
+缓存为单实例内存级，**bounded（`MAX_CACHED_ANALYSES = 50`，按最早过期先淘汰）**、TTL 过期、并按 **admin / product / target / provider / fingerprint** 五重作用域隔离。**无 Redis、无新 Directus collection、无新数据库表、无外部 cache、无新基础设施** —— 与 `aiGenerateRateLimit` 的单实例 MVP 立场一致。
+
+**只有通过 Target validation 的成功结果才入缓存**，失败结果绝不会被当作成功复用（有测试）。
+
+命中时不调用 DeepSeek / OpenAI，直接返回此前已通过服务端校验的 Proposal，响应带 `reused: true`，页面显示 `Reused a recent analysis of unchanged sources. No new AI call was made.`
+
+### 六、修复 D —— proposalRef
+
+Generate 成功时铸造服务端生成的不透明引用（32 字节随机，base64url）。它绑定管理员、绑定产品、绑定当前 Analysis Fingerprint、有 TTL，浏览器无法从中推导任何 Directus 信息（有测试断言其中不含产品 ID、管理员 ID、fingerprint、target id）。
+
+**缓存命中必须返回同一个 proposalRef。** 每次命中都新铸一个会给调用方一张白纸，直接绕过 Apply 幂等——这是本模块最有价值的一条，有专门测试。
+
+`AiProposalSession` 增加 `proposalRef` / `reused` / `alreadyApplied` 三个字段。
+
+### 七、修复 E —— Apply 服务端幂等
+
+Apply body 改为 `{ proposalRef, changes }`，`proposalRef` 为 schema 必需项（缺失或空串直接 400）。
+
+生命周期：
+
+| 状态 | 行为 |
+|---|---|
+| `ready` | 允许第一次 Apply（认领后转 `applying`） |
+| `applying` | 并发的第二个请求 **409 "This proposal is already being applied."**，零写入 |
+| `applied` | 永不再写，**重放此前记录的结果**（不是重新执行），零额外写入 |
+| `partial` | 同样终态，返回已有 partial 结果，不重复此前已写的 rows |
+
+认领发生在**任何写入之前**。这是本模块必须放在服务端的原因：按钮禁用帮不了一个已经离开浏览器的请求——抢在 disable 之前的双击、第二个标签页、以及**浏览器没收到响应就重发**，到达服务端时都是普通请求。
+
+**零写失败的处理（§13）：** preflight / validation 失败时 `releaseApply()` 把引用退回 `ready`，管理员可修正后重试；只要 `appliedCount > 0` **或** `partial === true`（含 R1 的「建了组但 item 失败」），即进入终态，禁止再次执行——避免第一次写了 5 条、第二次又重写那 5 条。
+
+### 八、Already Applied + 再次 Analyze
+
+同一 fingerprint 在 TTL 内命中缓存、且其 proposalRef 已 Applied 时，返回已有 Proposal 并带 `alreadyApplied: true`。页面显示 `This unchanged-source analysis was already applied to Draft.`，**Apply 按钮强制禁用**（即使已有 accepted 项）。
+
+**未新铸 proposalRef 绕过保护，也未增加 "Force re-analyze"。**
+
+### 九、单品号长期决定
+
+已登记为 **D-021（Confirmed）**：LITUBO AI production scope is single-product only. One Product Draft may use multiple explicitly associated source files. AI generation, review and Apply remain scoped to that same Draft. Multi-product AI UI, orchestration, queues and workflows are out of scope. Interfaces may remain naturally extensible only where this adds no additional implementation complexity.
+
+MASTER-ROADMAP 经检索**不含**近期 multi-product AI 表述，因此未修改。
+
+### 十、测试（新增 32 条，合计 1003）
+
+`tests/aiDuplicateGuard.test.ts` 覆盖 §18 的 A–E 全部：内容去重（两份/三份、prompt 标签连续、duplicate 非错误、digest 与源文本不外泄）；fingerprint（顺序无关、内容变化、产品/Target/provider/产品名各自区分、纯 digest 形态）；复用（首次调用一次、TTL 内第二次零调用且 `reused=true`、命中返回原 proposalRef、already-applied 保持、过期后放行、失败不入缓存、跨管理员/产品/Target/provider 隔离、容量有界）；Apply 幂等（首次写入并转 applied、重放终态、并发拒绝、丢响应重发三次零额外写入、partial 终态、零写回 ready、preflight 释放、跨产品/跨管理员/过期/空/非字符串引用全部拒绝、引用不可推导）；以及 endpoint 级：**首次写 1 次、重放写 0 次**、未铸造引用 409 零写入、跨产品引用 409 零写入、preflight 拒绝零写入且引用仍可用。
+
+**红灯验证：** 临时回退内容去重、结果复用、Apply replay guard 三项后，**9 条测试失败**（三类核心各有覆盖）；恢复后 32 条全绿。临时文件已清除。
+
+### 十一、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **1003 / 1003 通过**（28 文件，本次 +32） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功 |
+
+**浏览器（0 provider 调用，状态由本地注入）：**
+
+| 断点 | 结果 |
+|---|---|
+| 1440px | 无溢出；`Reused a recent analysis…` 提示在位；duplicate 卡片与错误卡片**分属两张不同卡片**（中性 vs 红色）；零 Console error |
+| 375px | 无溢出、无超宽元素；already-applied 横幅与 duplicate 卡片均在视口内；零 Console error |
+| already-applied | 即使已 Accept 1 条，Apply 仍禁用并给出「已应用，如需继续请修改资料后重新分析」说明 |
+
+### 十二、明确未做
+
+**0 次 DeepSeek 调用、0 次 OpenAI 调用、0 API 费用、0 自动 Accept、0 自动 Apply、0 自动 Publish、0 Redis、0 新数据库表、0 multi-product、0 部署。** 未改 Directus schema / permissions；未做 job queue、Proposal database、Analysis history、长期 AI audit table、Batch Generate；未碰 PDF / Excel / OCR / Vision；未改 prompt / model / provider；未 push / merge master；未修范围外的 GET references 403（P1）与 TAB-SEPARATED-VALUES（P2）。
+
+未重新实现任何既有保护。
+
+### 十三、下一步
+
+继续单产品 Beta 的日常使用。本模块不开启任何新能力。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-DUP-GUARD-01"任务中写入。*

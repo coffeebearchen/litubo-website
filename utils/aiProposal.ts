@@ -133,7 +133,12 @@ export interface SpecificationProposal {
 
 export interface SourceFileOutcome {
   displayName: string
-  status: 'read' | 'unsupported' | 'unreadable'
+  /**
+   * PWS-AI-DUP-GUARD-01 — `duplicate` means the file read fine but its text is
+   * identical to another selected file, so it was left out of the prompt
+   * rather than paid for twice. It is not an error.
+   */
+  status: 'read' | 'duplicate' | 'unsupported' | 'unreadable'
   reason?: string
 }
 
@@ -147,4 +152,15 @@ export interface AiProposalSession {
   productId: number
   proposal: SpecificationProposal
   fileResults: SourceFileOutcome[]
+  /**
+   * PWS-AI-DUP-GUARD-01 — the server-minted handle for this proposal. Apply
+   * sends it back so the server can tell a replayed request from a first one.
+   * Opaque: nothing about the product, the files or the analysis can be read
+   * out of it.
+   */
+  proposalRef: string
+  /** True when the server served a still-valid analysis of unchanged sources instead of calling the provider. */
+  reused: boolean
+  /** True when this exact analysis has already been written to the Draft, so Apply must stay closed. */
+  alreadyApplied: boolean
 }

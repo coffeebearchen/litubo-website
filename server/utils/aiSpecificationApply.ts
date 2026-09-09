@@ -36,6 +36,14 @@ export const ApplyChangeSchema = z.discriminatedUnion('action', [
 ])
 
 export const ApplyRequestSchema = z.object({
+  /**
+   * PWS-AI-DUP-GUARD-01 — the server-minted handle for the proposal these
+   * changes came from. It is what makes a replayed Apply detectable at all;
+   * without it the server has no way to tell a second identical request from
+   * a first one. Opaque, unguessable, and bound to one administrator and one
+   * product on the server side.
+   */
+  proposalRef: z.string().min(1).max(200),
   changes: z.array(ApplyChangeSchema).min(1).max(100),
 }).strict()
 

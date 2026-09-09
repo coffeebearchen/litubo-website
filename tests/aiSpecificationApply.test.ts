@@ -71,18 +71,30 @@ describe('ApplyChangeSchema — update', () => {
 })
 
 describe('ApplyRequestSchema', () => {
+  const REF = 'a-server-minted-proposal-ref'
+
   it('accepts a request with 1-100 changes', () => {
-    expect(ApplyRequestSchema.safeParse({ changes: [{ action: 'update', specItemId: 1, value: 'X' }] }).success).toBe(true)
+    expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes: [{ action: 'update', specItemId: 1, value: 'X' }] }).success).toBe(true)
   })
   it('rejects an empty changes array', () => {
-    expect(ApplyRequestSchema.safeParse({ changes: [] }).success).toBe(false)
+    expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes: [] }).success).toBe(false)
   })
   it('rejects an unrecognized action value', () => {
-    expect(ApplyRequestSchema.safeParse({ changes: [{ action: 'delete', specItemId: 1 }] }).success).toBe(false)
+    expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes: [{ action: 'delete', specItemId: 1 }] }).success).toBe(false)
   })
   it('rejects a request with more than 100 changes', () => {
     const changes = Array.from({ length: 101 }, (_, i) => ({ action: 'update' as const, specItemId: i + 1, value: 'X' }))
-    expect(ApplyRequestSchema.safeParse({ changes }).success).toBe(false)
+    expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes }).success).toBe(false)
+  })
+
+  /**
+   * PWS-AI-DUP-GUARD-01 — without the reference the server cannot tell a
+   * replayed Apply from a first one, so a body that omits it is not a valid
+   * request at all.
+   */
+  it('rejects a request with no proposalRef', () => {
+    expect(ApplyRequestSchema.safeParse({ changes: [{ action: 'update', specItemId: 1, value: 'X' }] }).success).toBe(false)
+    expect(ApplyRequestSchema.safeParse({ proposalRef: '', changes: [{ action: 'update', specItemId: 1, value: 'X' }] }).success).toBe(false)
   })
 })
 

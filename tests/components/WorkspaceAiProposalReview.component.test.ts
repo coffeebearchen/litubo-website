@@ -34,6 +34,9 @@ const BASE_PROPS = {
   applying: false,
   applyError: null,
   comparisonReady: true,
+  proposalRef: 'test-proposal-ref',
+  reused: false,
+  alreadyApplied: false,
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   MAX_TOTAL_EXTRACTED_CHARS,
   type ExtractedSource,
 } from './aiTextExtraction'
+import { digestSourceText, buildAnalysisFingerprint } from './aiProposalReplayGuard'
 import { isAiProviderId, type AiProviderId, type AiProviderRegistry } from './aiProviderRegistry'
 import type { AiGenerationInput, TargetDefinition } from './aiTargetContract'
 import type { FetchFn } from './mediaLifecycle'
@@ -50,7 +51,13 @@ import type { FetchFn } from './mediaLifecycle'
  * `fileResults` summary, never for anything sent to a model.
  */
 
-export type SourceFileStatus = 'read' | 'unsupported' | 'unreadable'
+/**
+ * PWS-AI-DUP-GUARD-01 — `duplicate` means the file WAS readable, but its
+ * extracted text is byte-identical to another file already selected in this
+ * same request, so it was left out of the prompt rather than paid for twice.
+ * It is not an error and must not be presented as one.
+ */
+export type SourceFileStatus = 'read' | 'duplicate' | 'unsupported' | 'unreadable'
 
 export interface SourceFileOutcome {
   displayName: string
@@ -59,8 +66,27 @@ export interface SourceFileOutcome {
 }
 
 export type ProposalEngineResult<TOutput> =
-  | { ok: true, output: TOutput, fileResults: SourceFileOutcome[] }
+  | {
+      ok: true
+      output: TOutput
+      fileResults: SourceFileOutcome[]
+      /** Server-only identity of this analysis; see `buildAnalysisFingerprint`. Never derived from a filename or a Directus id. */
+      fingerprint: string
+      /** True when the validated output came from the short-term cache and no provider was called. */
+      reused: boolean
+    }
   | { ok: false, error: string, fileResults: SourceFileOutcome[] }
+
+/**
+ * PWS-AI-DUP-GUARD-01 — lets the caller serve an identical analysis from its
+ * own short-term cache instead of paying for it again. The engine still does
+ * all the free work (download, extract, dedupe) because that is precisely how
+ * it establishes the sources are unchanged; only the provider call is skipped.
+ */
+export interface ProposalReuseHooks<TOutput> {
+  lookup(fingerprint: string): TOutput | null
+  store(fingerprint: string, output: TOutput): void
+}
 
 interface ProductsFilesRow {
   id: number
@@ -207,6 +233,7 @@ const NOT_CONFIGURED_ERROR = 'AI provider is not configured.'
 const NO_SELECTION_ERROR = 'Select at least one source file to analyze.'
 const NO_READABLE_SOURCES_ERROR = 'None of the selected files could be read as text. Nothing was sent to the AI provider.'
 const NOT_ASSOCIATED_REASON = 'One of the selected files could not be used for this product.'
+const DUPLICATE_CONTENT_REASON = 'Duplicate content excluded from analysis.'
 
 /**
  * The single generation entry point, for whichever `TargetDefinition` the
@@ -219,6 +246,7 @@ export async function runProposalEngine<TOutput>(
   registry: AiProviderRegistry,
   target: TargetDefinition<TOutput>,
   params: { productId: number, providerId: unknown, mediaIds: unknown },
+  reuse?: ProposalReuseHooks<TOutput>,
 ): Promise<ProposalEngineResult<TOutput>> {
   const productExists = await assertProductExistsViaFetch(fetch, params.productId)
   if (!productExists) {
@@ -261,6 +289,8 @@ export async function runProposalEngine<TOutput>(
   const rowById = new Map(rows.map(r => [r.id, r]))
 
   const fileResults: SourceFileOutcome[] = []
+  /** Content digests already accepted into this request's prompt. Memory only. */
+  const seenDigests = new Set<string>()
   const readableSources: ExtractedSource[] = []
   // Assigned only to files that actually reach extraction — a neutral,
   // positional label ("Source 1", "Source 2", ...) is what the AI provider
@@ -307,13 +337,37 @@ export async function runProposalEngine<TOutput>(
       continue
     }
 
-    promptSourceCounter += 1
-    const promptLabel = `Source ${promptSourceCounter}`
+    // The label is only consumed once the source is actually going into the
+    // prompt, so a skipped duplicate does not leave a gap in "Source 1, 2, 3".
+    const promptLabel = `Source ${promptSourceCounter + 1}`
     const extraction = await extractTextFromFile(bytes, mime, promptLabel)
     if (!extraction.ok) {
       fileResults.push({ displayName: browserDisplayName, status: 'unreadable', reason: extraction.reason })
       continue
     }
+
+    /**
+     * PWS-AI-DUP-GUARD-01 — content-level dedupe. Two files can carry the same
+     * text under different names and different Directus ids
+     * (`LT180C-spec.txt`, `LT180C-spec-copy.txt`), and id-level dedupe cannot
+     * see that. Sending both doubles the prompt for no added information.
+     *
+     * The digest is computed in memory and stays there: it is never written to
+     * disk, never logged, never returned to the browser, and never stored on
+     * the product.
+     */
+    const digest = digestSourceText(extraction.source.text)
+    if (seenDigests.has(digest)) {
+      fileResults.push({
+        displayName: browserDisplayName,
+        status: 'duplicate',
+        reason: DUPLICATE_CONTENT_REASON,
+      })
+      continue
+    }
+    seenDigests.add(digest)
+
+    promptSourceCounter += 1
     fileResults.push({ displayName: browserDisplayName, status: 'read' })
     readableSources.push(extraction.source)
   }
@@ -331,7 +385,32 @@ export async function runProposalEngine<TOutput>(
     extractedSourceTexts: cappedSources.map(s => ({ displayName: s.displayName, text: s.text })),
   }
 
+  /**
+   * The identity of this analysis, computed from what will actually be sent:
+   * the product, the Target, the provider, the product name, and the content
+   * digests of the unique sources. It carries no filename, no Directus id, no
+   * sourceRef and no source text.
+   */
+  const fingerprint = buildAnalysisFingerprint({
+    productId: params.productId,
+    targetId: target.id,
+    providerId,
+    productName,
+    sourceDigests: [...seenDigests],
+  })
+
+  // A validated result for exactly these sources is still good. Nothing is
+  // sent to the provider, and no bill is incurred.
+  const cached = reuse?.lookup(fingerprint) ?? null
+  if (cached !== null) {
+    return { ok: true, output: cached, fileResults, fingerprint, reused: true }
+  }
+
   const result = await registry.generateStructured(providerId, target, input)
   if (!result.ok) return { ok: false, error: result.error, fileResults }
-  return { ok: true, output: result.output, fileResults }
+
+  // Only a result that passed the Target's own validation is ever cached; a
+  // failure must never be replayed as though it had succeeded.
+  reuse?.store(fingerprint, result.output)
+  return { ok: true, output: result.output, fileResults, fingerprint, reused: false }
 }

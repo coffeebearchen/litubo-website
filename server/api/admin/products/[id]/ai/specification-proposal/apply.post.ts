@@ -6,6 +6,7 @@ import {
   planSpecificationApply,
   executeSpecificationApply,
 } from '~/server/utils/aiSpecificationApply'
+import { claimApply, settleApply, releaseApply } from '~/server/utils/aiProposalReplayGuard'
 
 /**
  * A legitimate body is at most 100 changes, each bounded by the schema to
@@ -67,13 +68,51 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'These changes could not be read. Nothing was written.' })
   }
 
+  const adminUserId = event.context.adminUserId as string | undefined
+  if (!adminUserId) throw createError({ statusCode: 401, message: 'Not authenticated' })
+
+  /**
+   * PWS-AI-DUP-GUARD-01 — the one write this proposal is allowed.
+   *
+   * A disabled button cannot help a request that has already left the browser:
+   * a double click that beat the disable, a second tab, or a client that never
+   * saw the first response and retried, all arrive here as ordinary requests.
+   * The reference is claimed BEFORE any write, so a duplicate is refused
+   * rather than executed a second time.
+   */
+  const claim = claimApply(parsed.data.proposalRef, { adminUserId, productId })
+  if (!claim.ok) {
+    if (claim.reason === 'in-progress') {
+      throw createError({ statusCode: 409, message: 'This proposal is already being applied.' })
+    }
+    if (claim.reason === 'terminal') {
+      // Replaying the recorded outcome, not re-running it. Zero additional writes.
+      return claim.appliedResult ?? {
+        ok: false,
+        appliedCount: 0,
+        totalCount: 0,
+        partial: claim.state === 'partial',
+        message: 'This proposal has already been applied to Draft.',
+      }
+    }
+    throw createError({
+      statusCode: 409,
+      message: 'This proposal is no longer valid. Analyze the sources again before applying.',
+    })
+  }
+
   // Whole-batch preflight. Ownership of every update target is re-derived
   // server-side, and every add's destination group is resolved, before a
   // single write is issued.
   const plan = await planSpecificationApply(fetch, productId, parsed.data.changes)
   if (!plan.ok) {
+    // Nothing was written, so the reference goes back to ready and the
+    // reviewer can correct the request and try again.
+    releaseApply(parsed.data.proposalRef)
     throw createError({ statusCode: plan.statusCode, message: plan.message })
   }
 
-  return executeSpecificationApply(fetch, productId, plan.steps)
+  const result = await executeSpecificationApply(fetch, productId, plan.steps)
+  settleApply(parsed.data.proposalRef, result)
+  return result
 })

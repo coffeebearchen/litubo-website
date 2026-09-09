@@ -6,6 +6,8 @@ import { specificationsTarget } from '~/server/utils/aiTargets/specificationsTar
 import { readJsonBodyWithByteLimit } from '~/server/utils/requestBodyLimit'
 import { resolveSourceRefs, SourceRefUnavailableError } from '~/server/utils/aiSourceRef'
 import { claimGenerateSlot, releaseGenerateSlot } from '~/server/utils/aiGenerateRateLimit'
+import { lookupAnalysis, rememberAnalysis } from '~/server/utils/aiProposalReplayGuard'
+import type { SpecificationProposal } from '~/utils/aiProposal'
 import { MAX_FILES_PER_REQUEST } from '~/server/utils/aiTextExtraction'
 
 /**
@@ -108,16 +110,59 @@ export default defineEventHandler(async (event) => {
   })
 
   try {
+    /**
+     * PWS-AI-DUP-GUARD-01 — the reuse hooks. The engine still downloads,
+     * extracts and dedupes every time, because that is how it establishes the
+     * sources are unchanged; what it skips on a hit is the provider call.
+     *
+     * The scope is deliberately narrow: this administrator, this product, this
+     * Target, this provider, this exact set of source content. Anything
+     * different is a different analysis.
+     */
+    const scopeFor = (fingerprint: string) => ({
+      adminUserId,
+      productId,
+      targetId: specificationsTarget.id,
+      providerId: String(body?.providerId ?? config.aiDefaultProvider ?? ''),
+      fingerprint,
+    })
+
+    let reusedRef: string | null = null
+    let reusedAlreadyApplied = false
+
     const result = await runProposalEngine(fetch, registry, specificationsTarget, {
       productId,
       providerId: body?.providerId,
       mediaIds,
+    }, {
+      lookup: (fingerprint) => {
+        const hit = lookupAnalysis<SpecificationProposal>(scopeFor(fingerprint))
+        if (!hit) return null
+        reusedRef = hit.proposalRef
+        reusedAlreadyApplied = hit.alreadyApplied
+        return hit.output
+      },
+      // Storing happens below, where the reference is minted with it, so the
+      // analysis and its proposalRef can never exist independently.
+      store: () => {},
     })
 
     if (!result.ok) {
       return { ok: false, error: result.error, fileResults: result.fileResults }
     }
-    return { ok: true, proposal: result.output, fileResults: result.fileResults }
+
+    // A cache hit keeps its ORIGINAL reference. Minting a new one would hand
+    // back a clean slate and let a re-analysis walk past the Apply guard.
+    const proposalRef = reusedRef ?? rememberAnalysis(scopeFor(result.fingerprint), result.output)
+
+    return {
+      ok: true,
+      proposal: result.output,
+      fileResults: result.fileResults,
+      proposalRef,
+      reused: result.reused,
+      alreadyApplied: reusedAlreadyApplied,
+    }
   } finally {
     // Always released, including on failure — a failed analysis must not lock
     // this product until the in-flight ceiling expires.

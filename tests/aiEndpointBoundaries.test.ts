@@ -1135,6 +1135,23 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
     }
   }
 
+  /**
+   * PWS-AI-DUP-GUARD-01 — Apply now requires a server-minted reference, so
+   * each call mints a fresh one bound to this admin and product. A unique
+   * fingerprint per call keeps the references independent: a reference is
+   * single-use by design, and reusing one across tests would make later tests
+   * fail for the right reason at the wrong time.
+   */
+  let refCounter = 0
+  async function mintRef(adminUserId = 'admin-1', productId = 3) {
+    const { rememberAnalysis } = await import('../server/utils/aiProposalReplayGuard')
+    refCounter += 1
+    return rememberAnalysis(
+      { adminUserId, productId, targetId: 'specifications', providerId: 'deepseek', fingerprint: `fp-${refCounter}` },
+      { groups: [] },
+    )
+  }
+
   async function callApply(body: unknown, overrides: Record<string, unknown> = {}) {
     installNitroGlobals(applyFetch(overrides))
     const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/apply.post')).default as (e: unknown) => Promise<unknown>
@@ -1143,7 +1160,11 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
       method: 'POST',
       routerParams: { id: '3' },
       headers: { origin: 'http://localhost:3000' },
-      requestStream: Readable.from([JSON.stringify(body)]),
+      requestStream: Readable.from([JSON.stringify(
+        body && typeof body === 'object' && !Array.isArray(body) && !('proposalRef' in (body as object))
+          ? { proposalRef: await mintRef(), ...(body as object) }
+          : body,
+      )]),
     })
     event.context.adminToken = 'admin-token'
     event.context.adminUserId = 'admin-1'

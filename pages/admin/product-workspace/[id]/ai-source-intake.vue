@@ -9,6 +9,12 @@ interface GenerateResponse {
   proposal?: SpecificationProposal
   fileResults: SourceFileOutcome[]
   error?: string
+  /** PWS-AI-DUP-GUARD-01 — server-minted handle Apply must send back. */
+  proposalRef?: string
+  /** True when the server reused a still-valid analysis of unchanged sources instead of calling the provider. */
+  reused?: boolean
+  /** True when that reused analysis has already been written to the Draft. */
+  alreadyApplied?: boolean
 }
 
 definePageMeta({ layout: 'admin' })
@@ -140,7 +146,14 @@ async function analyze() {
       analyzeError.value = result.error ?? 'Could not generate a proposal right now.'
       return
     }
-    proposalSession.value = { productId, proposal: result.proposal, fileResults: result.fileResults }
+    proposalSession.value = {
+      productId,
+      proposal: result.proposal,
+      fileResults: result.fileResults,
+      proposalRef: result.proposalRef ?? '',
+      reused: result.reused === true,
+      alreadyApplied: result.alreadyApplied === true,
+    }
     await router.push(workspaceAiProposalReviewRoute(id))
   } catch (e: unknown) {
     const fe = e as { data?: { error?: string, message?: string } }
