@@ -207,3 +207,32 @@ describe('WorkspaceAiSourceIntake — nothing sensitive is required to render it
     expect(html).not.toContain('directus_files_id')
   })
 })
+
+/**
+ * PWS-AI-MULTI-SOURCE-REAL-BETA-01 — the four-step indicator has to describe
+ * the workflow that actually exists.
+ *
+ * Step 4 read "Apply to Draft (temporarily unavailable)" from the round when
+ * Apply really was disabled (`fix(admin): disable AI specification Apply`).
+ * PWS-AI-APPLY-DRAFT-01 re-enabled it and wired the Apply button, but this
+ * label was never updated — so the first screen of the flow told the reviewer
+ * their accepted changes could not be written, while the review screen offered
+ * exactly that button. Whichever way a reader resolved that, the screen was
+ * lying to them.
+ */
+describe('WorkspaceAiSourceIntake — the step indicator matches the shipped workflow', () => {
+  it('does not claim Apply to Draft is unavailable, because it is not', () => {
+    const wrapper = mountIntake({ ...BASE_PROPS })
+    expect(wrapper.text()).toContain('Apply to Draft')
+    expect(wrapper.text()).not.toContain('temporarily unavailable')
+  })
+
+  it('still names all four steps in order', () => {
+    const steps = mountIntake({ ...BASE_PROPS }).findAll('.ws-step').map(s => s.text())
+    expect(steps).toHaveLength(4)
+    expect(steps[0]).toContain('Select sources')
+    expect(steps[1]).toContain('Analyze')
+    expect(steps[2]).toContain('Review proposals')
+    expect(steps[3]).toContain('Apply to Draft')
+  })
+})

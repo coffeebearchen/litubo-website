@@ -840,3 +840,193 @@ describe('the source summary says what this analysis actually used', () => {
     expect(summary).not.toContain('directus_files_id')
   })
 })
+
+/**
+ * PWS-AI-MULTI-SOURCE-REAL-BETA-01 — the ONE real DeepSeek run, pinned.
+ *
+ * The fixture below is not invented: it is exactly what the single authorised
+ * paid call returned for TEST ONLY product 3 from three approved sources
+ * (LT180C-test-general / -electrical / -environment), and the existing
+ * specifications are the real rows the product carried at that moment.
+ *
+ * A second real Analyze is forbidden, so this is the only durable record of
+ * what the model actually produced. It exists so a future refactor cannot
+ * quietly break the three properties the Beta was run to prove:
+ *
+ *   - the 220 V / 380 V disagreement is surfaced as a conflict, never settled;
+ *   - "Accept all safe" cannot sweep that conflict up;
+ *   - the values the sources refused to state (Net weight: UNKNOWN, Detection
+ *     sensitivity: NOT VERIFIED) are absent rather than guessed.
+ */
+const REAL_BETA_PROPOSAL: SpecificationProposal = {
+  groups: [
+    { group: 'General', items: [{ parameter: 'Product model', value: 'LT180C' }] },
+    {
+      group: 'Mechanical',
+      items: [
+        { parameter: 'Aperture', value: '180 mm' },
+        { parameter: 'Material', value: 'SUS304' },
+      ],
+    },
+    { group: 'Electrical', items: [{ parameter: 'Rated power', value: '0.45 kW' }] },
+    {
+      group: 'Environmental',
+      items: [
+        { parameter: 'Ingress protection', value: 'IP54' },
+        { parameter: 'Operating temperature', value: '0–40 °C' },
+      ],
+    },
+  ],
+  conflicts: [
+    {
+      group: 'Electrical',
+      parameter: 'Power supply',
+      candidateValues: ['AC 220 V, 50 Hz', 'AC 380 V, 50 Hz'],
+    },
+  ],
+}
+
+/** The real rows product 3 already had — ids included, because the Apply payload is asserted against them. */
+const REAL_BETA_EXISTING = [
+  {
+    id: 4,
+    title_en: 'Electrical',
+    items: [
+      { id: 24, label_en: 'Power supply', value_en: 'AC 220 V, 50 Hz' },
+      { id: 25, label_en: 'Rated power', value_en: '0.45 kW' },
+    ],
+  },
+  {
+    id: 5,
+    title_en: 'Environmental',
+    items: [{ id: 27, label_en: 'Operating temperature', value_en: '0–40 °C' }],
+  },
+] as unknown as typeof BASE_PROPS['existingSpecGroups']
+
+const REAL_BETA_FILES: SourceFileOutcome[] = [
+  { displayName: 'LT180C-test-general.txt', status: 'read' },
+  { displayName: 'LT180C-test-electrical.txt', status: 'read' },
+  { displayName: 'LT180C-test-environment.txt', status: 'read' },
+]
+
+const mountRealBeta = () => mountReview({
+  proposal: REAL_BETA_PROPOSAL,
+  fileResults: REAL_BETA_FILES,
+  existingSpecGroups: REAL_BETA_EXISTING,
+})
+
+describe('PWS-AI-MULTI-SOURCE-REAL-BETA-01 — the real run, as it was reviewed', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('Gate A — three sources produce ONE combined proposal, all three analyzed', () => {
+    const wrapper = mountRealBeta()
+    const summary = wrapper.text()
+    expect(summary).toContain('LT180C-test-general.txt')
+    expect(summary).toContain('LT180C-test-electrical.txt')
+    expect(summary).toContain('LT180C-test-environment.txt')
+    // One conflict + six proposed items, reviewed on one screen.
+    expect(statOf(wrapper, 'safe')).toBe('4')
+    expect(statOf(wrapper, 'review')).toBe('3')
+  })
+
+  it('Gate B — every safe fact survives review with its value and unit intact', () => {
+    const text = mountRealBeta().text()
+    for (const fact of ['180 mm', 'IP54', '0.45 kW', '0–40 °C', 'SUS304']) {
+      expect(text).toContain(fact)
+    }
+  })
+
+  it('Gate C — the power-supply disagreement is a conflict, with both real values and no third one', () => {
+    const wrapper = mountRealBeta()
+    const conflict = wrapper.find('.ws-card--conflict')
+    expect(conflict.exists()).toBe(true)
+    expect(conflict.text()).toContain('Power supply')
+    expect(conflict.text()).toContain('AC 220 V, 50 Hz')
+    expect(conflict.text()).toContain('AC 380 V, 50 Hz')
+
+    // Exactly two candidates — the model neither chose nor averaged.
+    const candidates = conflict.findAll('input[type="radio"]')
+    expect(candidates).toHaveLength(2)
+    expect(candidates.every(c => !(c.element as HTMLInputElement).checked)).toBe(true)
+
+    // And it is not sitting in the ordinary proposal list as an ordinary row.
+    const proposalRows = wrapper.findAll('tbody tr').map(r => r.text())
+    expect(proposalRows.some(r => r.includes('Power supply'))).toBe(false)
+  })
+
+  it('Gate D — what the sources refused to state is absent, not guessed', () => {
+    const text = mountRealBeta().text()
+    expect(text).not.toContain('Net weight')
+    expect(text).not.toContain('Detection sensitivity')
+    // No invented mass figure crept in under another name.
+    expect(text).not.toMatch(/\b\d+(\.\d+)?\s?(kg|lb|lbs)\b/i)
+  })
+
+  it('"Accept all safe" accepts the four safe rows and leaves the conflict pending', async () => {
+    const wrapper = mountRealBeta()
+    await wrapper.findAll('button').find(b => b.text() === 'Accept all safe')!.trigger('click')
+
+    expect(statOf(wrapper, 'accepted')).toBe('4')
+    expect(statOf(wrapper, 'safe')).toBe('0')
+    /**
+     * The conflict row itself is still pending — this is the whole point.
+     * The badge is written lowercase in the DOM and capitalised by CSS, so
+     * the assertion reads the badge element rather than the rendered casing.
+     */
+    const conflictBadge = wrapper.find('.ws-card--conflict .ws-status-badge')
+    expect(conflictBadge.text()).toBe('pending')
+  })
+
+  it('the human choice of 220 V is what makes the conflict acceptable', async () => {
+    const wrapper = mountRealBeta()
+    await wrapper.findAll('button').find(b => b.text() === 'Accept all safe')!.trigger('click')
+
+    const useSelected = () => wrapper.findAll('button').find(b => b.text() === 'Use selected value')!
+    expect((useSelected().element as HTMLButtonElement).disabled).toBe(true)
+
+    await wrapper.find('.ws-card--conflict input[type="radio"]').setValue()
+    await useSelected().trigger('click')
+
+    expect(statOf(wrapper, 'accepted')).toBe('5')
+    expect(wrapper.find('.ws-card--conflict .ws-status-badge').text()).toBe('accepted')
+  })
+
+  it('Apply writes the four new facts as adds and the chosen 220 V as an UPDATE of the existing row', async () => {
+    const fetchMock = vi.fn(async (_url: string, _options?: { body?: { changes: Array<Record<string, unknown>> } }) => (
+      { ok: true, appliedCount: 5, totalCount: 5, partial: false, message: 'Applied 5 accepted changes to Draft.' }
+    ))
+    vi.stubGlobal('$fetch', fetchMock)
+
+    const wrapper = mountRealBeta()
+    await wrapper.findAll('button').find(b => b.text() === 'Accept all safe')!.trigger('click')
+    await wrapper.find('.ws-card--conflict input[type="radio"]').setValue()
+    await wrapper.findAll('button').find(b => b.text() === 'Use selected value')!.trigger('click')
+    await applyButtonOf(wrapper).trigger('click')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const changes = fetchMock.mock.calls[0][1]!.body!.changes
+    expect(changes).toHaveLength(5)
+
+    const adds = changes.filter(c => c.action === 'add')
+    expect(adds.map(c => c.parameter).sort()).toEqual(
+      ['Aperture', 'Ingress protection', 'Material', 'Product model'],
+    )
+
+    /**
+     * The conflict resolves against the row the product already had, so
+     * accepting 220 V updates spec item 24 rather than adding a SECOND
+     * "Power supply" to the Electrical group.
+     */
+    const updates = changes.filter(c => c.action === 'update')
+    expect(updates).toHaveLength(1)
+    expect(updates[0]).toMatchObject({ action: 'update', specItemId: 24, value: 'AC 220 V, 50 Hz' })
+
+    // Nothing the sources declined to state is written under any action.
+    const written = JSON.stringify(changes)
+    expect(written).not.toContain('Net weight')
+    expect(written).not.toContain('Detection sensitivity')
+    expect(written).not.toContain('380')
+  })
+})

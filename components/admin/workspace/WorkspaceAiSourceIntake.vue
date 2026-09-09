@@ -74,7 +74,7 @@ const canAnalyze = computed(() =>
       <li class="ws-step ws-step--current"><span class="ws-step-index">1</span> Select sources</li>
       <li class="ws-step"><span class="ws-step-index">2</span> Analyze</li>
       <li class="ws-step"><span class="ws-step-index">3</span> Review proposals</li>
-      <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft (temporarily unavailable)</li>
+      <li class="ws-step"><span class="ws-step-index">4</span> Apply to Draft</li>
     </ol>
 
     <section class="ws-card" aria-labelledby="ws-ai-provider-heading">

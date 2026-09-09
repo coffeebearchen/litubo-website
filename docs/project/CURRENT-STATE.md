@@ -5671,3 +5671,123 @@ AUTHORIZED BUT PAUSED BEFORE PAID CALL
 ```
 
 *最后更新：2026-09-10，由 Claude Code 在"MEDIA-UPLOAD-BLOCKER-HOTFIX-02"任务中写入。*
+
+---
+
+## PWS-AI-MULTI-SOURCE-REAL-BETA-01 = COMPLETED（2026-09-10）
+
+用户授权的**一次受控真实 DeepSeek Analyze** 已执行并通过全部 Gate。这是 LITUBO 第一次成功的真实单品号多资料 AI 抽取。
+
+### 一、分支基线
+
+旧 Beta 分支 `review/pws-ai-multi-source-real-beta-01` 停在 `20b4eb1`，`git branch --contains d741931` 证实其**不含** Media 上传热修。按施工单要求**未 reset / force / 覆盖**该分支，改为从精确 `d741931` 新建：
+
+```text
+review/pws-ai-multi-source-real-beta-01-r2   起点 d741931
+```
+
+另确认 `20b4eb1` 是 `d741931` 的祖先 —— 旧分支的工作全部包含在新分支内，无内容丢失。
+
+### 二、付费前 Preflight（全部通过，0 费用）
+
+| 检查 | 结果 |
+|---|---|
+| Product | id 3，`draft` |
+| 选中来源 | 恰好 3（`3 / 5 selected`）|
+| UUID | `cf9cdd74…` / `348ec8b6…` / `5a5a126f…` 与授权清单逐一相符 |
+| 第 4 个文本源 | `fc865b43…SYNTHETIC` **未勾选** |
+| CORRUPTED 归档副本 | 不出现在来源列表 |
+| Provider | DeepSeek（唯一 configured；OpenAI 未配置，fallback 不可能发生）|
+
+**静态排雷（防止把安全规则误伤当成 AI 失败）：** 预期输出的六个值逐条比对服务端 `UNSAFE_VALUE_PATTERNS`，确认 `0.45 kW` 不会命中文件扩展名模式（该模式要求 `.pdf|.xlsx|.csv|.tsv|.txt|.docx` 字面量）；`MIN_UNSAFE_ECHO_LENGTH = 80`，而来源含冒号、模型输出不含，最长可能连续匹配仅 48 字符。
+
+### 三、一次真实调用
+
+```text
+POST /api/admin/products/3/ai/specification-proposal/generate → 200 OK   （仅此一次）
+POST /api/admin/products/3/ai/specification-proposal/apply    → 200 OK   （仅此一次）
+```
+
+人工点击 Analyze **1 次**，无 double click、无重试、无 transport retry、无第二次 generation、无 OpenAI fallback、无换模型。服务端刚重启，replay guard 内存缓存为空，因此这确实是真实 provider 调用而非复用。
+
+Provider = **DeepSeek**。模型名取自服务端 `DEEPSEEK_MODEL` 运行时配置，`providers` 端点按设计不返回模型名，**本轮未读取 `.env`，故不记录具体模型字符串**。DeepSeek 适配器不打印任何凭证，因此日志中也没有可记录的 usage metadata。
+
+### 四、Gate 判定
+
+| Gate | 结果 | 证据 |
+|---|---|---|
+| **A** 3 Sources → 1 Proposal | PASS | `Analyzed 3 / Duplicate excluded 0 / Not analyzed 0`，单一合并提案（7 proposals），不是 3 份 |
+| **B** 五个 safe facts | PASS | Aperture 180 mm · Ingress protection IP54 · Rated power 0.45 kW · Operating temperature 0–40 °C · Material SUS304，语义、数值、单位全部正确（另有 Product model = LT180C，同样来自来源）|
+| **C** 220/380 冲突 | PASS | 进入 `Source conflicts — Review required`，两个候选值 `AC 220 V, 50 Hz` / `AC 380 V, 50 Hz` 均真实来自来源；AI 未自选、未取平均、未编第三值；该参数**未**出现在 safe groups 中 |
+| **D** UNKNOWN / NOT VERIFIED | PASS | `Net weight` 与 `Detection sensitivity` **完全未出现**在提案中，未被转成任何具体数值 |
+
+### 五、人工审核与写入
+
+- `Accept all safe` → Safe pending 4 → 0，Accepted = 4；**Power supply 冲突仍为 Pending / Review required，未被自动接受**。
+- 人工选择 `AC 220 V, 50 Hz`（TEST ONLY 演示值）→ `Use selected value` → 冲突转为 Accepted，Accepted = 5。
+- `Apply 5 accepted changes to Draft` → `Applied 5 accepted changes to Draft.`，提案会话随即清空，无法重复 Apply。
+
+**实际写入（41 → 45 条，4 新增 + 1 更新）：**
+
+| 参数 | 组 | 结果 |
+|---|---|---|
+| Product model = LT180C | General | 新增 id 45 |
+| Aperture = 180 mm | Mechanical | 新增 id 46 |
+| Material = SUS304 | Mechanical | 新增 id 47 |
+| Ingress protection = IP54 | Environmental | 新增 id 48 |
+| Power supply = AC 220 V, 50 Hz | Electrical | **更新既有 id 24**，未产生重复行 |
+| Rated power = 0.45 kW | Electrical | 既有 id 25，未改动 |
+| Operating temperature = 0–40 °C | Environmental | 既有 id 27，未改动 |
+
+冲突行经 `matchFor()` 命中 `Electrical :: Power supply` 的唯一既有项，因此按 `update` 写入而非 `add` —— 这也是 Electrical 组条目数保持 2 的原因。
+
+产品仍为 **id 3 / Draft**，未 Publish。`Net weight` 与 `Detection sensitivity` 在全部 45 条中均不存在。
+
+### 六、本轮修复的真实缺陷
+
+AI Source Intake 的四步指示器第 4 步长期显示 `Apply to Draft (temporarily unavailable)`。该文案是 `6e39691`（当时确实停用了 Apply）的遗留物；`PWS-AI-APPLY-DRAFT-01` 重新启用并接好 Apply 后未同步更新，于是流程首屏告诉审核者"写不进去"，而审核页却提供 Apply 按钮 —— 无论读者怎么理解，界面都在说谎。已改为 `Apply to Draft` 并补两条组件测试。
+
+### 七、验证（真实 Node 22.22.2；系统默认 Node 24.14.0 未改动）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1207 / 1207 通过**（31 文件，本次 +9）|
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+新增测试把**这一次真实调用的实际输出**固化为夹具（7 行提案 + 220/380 冲突 + 真实既有 spec ids），断言 Gate A–D、`Accept all safe` 不吞冲突、以及 Apply 载荷恰为 4 add + 1 update(specItemId 24)。**第二次真实 Analyze 被禁止，因此这是模型实际产出的唯一持久记录。**
+
+**1440px / 375px：** AI Source Intake 与 AI Proposal Review 两条路由在两个断点均 `scrollWidth === clientWidth`（1440 下为 1425，即减去滚动条），无横向溢出；全新标签页控制台 **0 条消息（0 error）**；第 4 步文案已更正。
+
+### 八、诚实说明的取证缺口
+
+真实提案**存活期间**的 1440px / 375px 截图未取得。原因是：浏览器面板原生宽 800×500，模拟 1440×900 时坐标映射失准（ref 点击落空），我改用面板原生 339px 宽完成整条流程，随后执行 Apply —— 而 Apply 会清空提案会话。施工单 §5 明令禁止第二次人工 Analyze，因此该状态无法在不违规的前提下重现。这是我的执行顺序错误，不是产品缺陷。
+
+功能一侧已由上述真实夹具组件测试完整覆盖；布局一侧已在两条 AI 路由的可达状态下于 1440/375 实测无溢出。若需要真实提案存活状态的断点截图，只能在下一次获授权的真实调用中一并取得。
+
+### 九、边界
+
+**0 第二次 Provider 调用 · 0 OpenAI · 0 benchmark · 0 换模型 · 0 credential 读取 · 0 `.env` 读取 · 0 API Key 输出 · 0 Directus schema / DB / permission 改动 · 0 push / merge / deploy / publish**。受污染的 11 个归档副本未被读取、未送 AI、未恢复、未永久删除，保持 Archived。
+
+---
+
+```text
+PWS-AI-MULTI-SOURCE-REAL-BETA-01 = COMPLETED
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+
+1 TEST ONLY Draft · 3 TEST ONLY Sources · 1 real DeepSeek Analyze
+safe facts correctly extracted
+220/380 conflict correctly surfaced
+UNKNOWN / NOT VERIFIED not fabricated
+Accept all safe did not accept the conflict
+human selected 220 V
+Apply wrote only accepted facts
+Product remained Draft
+
+NEXT MODULE = NOT AUTHORIZED
+```
+
+*最后更新：2026-09-10，由 Claude Code 在"PWS-AI-MULTI-SOURCE-REAL-BETA-01"任务中写入。*
