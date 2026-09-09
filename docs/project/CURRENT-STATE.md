@@ -4492,3 +4492,108 @@ Target 冲突（一致仍是普通条目、真实分歧成为 conflict 且不同
 **必须再次单独授权。** 本模块只做到代码 + mock / deterministic 验收，**未进行任何真实 Provider 调用**。是否授权一次真实「单产品 + 2～3 Sources」DeepSeek Beta，由用户单独决定。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-SINGLE-PRODUCT-MULTI-SOURCE-01"任务中写入。*
+
+---
+
+## ML-CLOUD-GOV-01 — Media Library Cloud Workspace 文件夹治理 + D-023（2026-09-09）
+
+**状态：COMPLETED。** Governance-only 模块：**零 runtime 代码改动、零 Directus 改动、零 AI 改动、零 Provider 调用、零费用、未 push、未部署。**
+
+### 当前项目状态
+
+```text
+ACTIVE PROGRAM:
+MEDIA-LIBRARY-CLOUD-WORKSPACE-V1
+
+NEXT:
+ML-CLOUD-01 — Customer Folder Foundation
+
+ML-CLOUD-01:
+NOT STARTED
+WAITING FOR USER / CHATGPT REVIEW AUTHORIZATION
+
+AI:
+HOLD — NOT CANCELLED
+Checkpoint 4bbc838529b6f6d4a25cb3f330e86945692a0aef
+Code Complete / Real Multi-source DeepSeek Beta Pending
+
+AI RESUME AFTER ML-CLOUD-V1-FINAL:
+PWS-AI-MULTI-SOURCE-REAL-BETA-01
+```
+
+**更新 NEXT 不等于授权 NEXT。** `ML-CLOUD-01` 尚未开工，必须由用户 / ChatGPT 单独审查授权。
+
+### 一、分支隔离
+
+Media Library 工作不再叠加在 AI review branch 上。已从 AI checkpoint 精确创建隔离分支：
+
+```text
+review/ml-cloud-workspace-v1  ←  4bbc838529b6f6d4a25cb3f330e86945692a0aef
+```
+
+创建前已确认本地与远端均无同名分支。**未 push。** AI 分支 `review/pws-ai-engine-01r2-safety-02` 保持不变。
+
+### 二、D-023 已登记
+
+`docs/project/08-decision-log.md` 新增 **D-023（Confirmed）**：Media Library 是 LITUBO 唯一业务资产工作区，通过稳定的 Media UUID/ID 服务 Product Center、AI Source、未来 Content Center 与 Settings/Branding；物理路径永远不是引用身份。文件夹分为 Protected System Folder 与 Customer-managed Folder 两类；`unknown` 绝不视为 customer-managed，区域之外继续 fail-closed；`ambiguous` / `legacy-read-only` / `conflict-frozen` 保护不变且优先求值；文件夹治理维度与文件写入维度必须分离；Rename / Move 不得改变 UUID 或破坏引用；V1 的 Delete 一律为可恢复 Trash / Archive，不提供 Permanent Delete；文件夹名只是整理工具；D-022 的 Reusable Core, LITUBO First 继续有效。
+
+登记时已确认 D-023 编号未被占用（此前最大为 D-022）。
+
+### 三、被解决的治理冲突
+
+`MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md` 新增**决策 #9**，并在决策 #2 的两条冲突规则处**就地标注**（不删除原文，保留可追溯性）：
+
+| 原 v0.1 规则 | 冲突 | 修订 |
+|---|---|---|
+| 「新文件夹名须在此文件中记录后方可创建」 | `FOLDER_POLICY` 是 frozen allowlist，不在册即 `unknown` → `allow_upload=false`。客户即使建了目录也不能用，与「客户可自建」直接矛盾 | **只适用于 Protected System Folder。** 客户在已声明区域内建的目录无需登记，也不写入代码常量 |
+| 「文件夹只表达稳定业务大类，不以型号作为文件夹层级」 | 新 Blueprint 以 `products/xray/LT-180C` 为 customer-managed 范例，直接违反该条 | **只适用于 Protected System Folder。** 原意图（不让目录结构变成产品数据模型）由「文件夹名不是业务事实来源」继续保证，而非靠禁止型号命名 |
+
+第三处结构性缺口一并解决：现有六态 `PolicyState` 只回答「能不能往里放文件」，**没有任何一态**表示「这个文件夹本身能不能被改」。决策 #9.5 确立两个维度必须分离；具体运行时类型如何演进属于 `ML-CLOUD-01` 的实现范围。
+
+### 四、判定优先级（必须按序求值）
+
+| 优先级 | 条件 | 结果 |
+|---|---|---|
+| 1 | `ambiguous` | **FAIL-CLOSED**，不得放宽 |
+| 2 | `legacy-read-only` / `conflict-frozen` | **继续冻结** |
+| 3 | 精确命中 Protected System Folder | **Protected**，文件级规则按原治理继续 |
+| 4 | 已声明 customer-manageable zone 内的合法动态后代 | **Customer-managed** |
+| 5 | 其余一切 | **`unknown` → FAIL-CLOSED** |
+
+**关键安全修正：** 预核对报告中「不在 `FOLDER_POLICY` 中 = customer-managed」的表述**未被采用**。直接采用会把现有 fail-closed 模型全局反转。权限只能来自**明确声明的区域**，不能来自「某份清单里没有它」。必须区分 *known customer-managed descendant* 与 *unknown / unmanaged path*。
+
+Protected System Folder 是否允许客户在其下建子目录，**必须逐节点明确指定，不得推断**。
+
+### 五、后续模块的硬性门槛（写入 Implementation Plan）
+
+- **ML-CLOUD-02 duplicate detection**：动手前必须先**只读**确认 Directus 是否已有可复用的 `hash` / `checksum` / `content digest`；本轮**未**查询 production schema，该确认仍未完成。若可靠 dedupe 必须新增 schema / migration / collection field → **STOP，单独授权**，不得顺手迁移。摘要只在服务端使用，不得成为浏览器业务数据。
+- **Upload folder / folder drop**：**P1 / cost-dependent，不是 V1 封板的 P0**。不得因为视觉母版出现该能力就扩大范围。
+
+### 六、纳入 Git 的正式资料
+
+- `docs/project/MEDIA-LIBRARY-CLOUD-WORKSPACE-V1-BLUEPRINT.md`
+- `docs/project/MEDIA-LIBRARY-CLOUD-WORKSPACE-V1-IMPLEMENTATION-PLAN.md`
+- `docs/design-reference/approved/admin-media-library-cloud-workspace-v1/` —— `00-VISUAL-MASTER-RULES.md` + 6 张视觉母版
+
+### 七、PACK 与 README-FIRST 处理
+
+**PACK 外壳已删除。** `LITUBO-MEDIA-LIBRARY-CLOUD-WORKSPACE-V1-PACK/` 内 10 个文件全部经 `cmp` 逐字节确认为正式位置的重复副本，**无任何唯一资料**，删除后正式位置完整性已复核。
+
+**`README-FIRST.md` 保持 untracked，未纳入 Git。** 它是安装 / 解压说明；其中提到的项目控制事实（Active Module、AI HOLD 与 checkpoint、模块顺序）在 Blueprint §12 与 Implementation Plan 中均已完整覆盖，**不存在未被记录的长期项目事实**。不为了清空 `git status` 而提交它。
+
+### 八、AI 主线冻结确认
+
+本模块**未修改任何 AI runtime**：AI Source Intake、`aiProposalEngine`、Target contract、Specifications Target、Proposal Review、Apply、Replay Guard、provider adapters、prompt、AI tests、AI governance 全部未动。**零真实 DeepSeek / OpenAI 调用、零 API 费用。**
+
+`server/utils/folderRegistry.ts` **本轮只读**作为治理依据，**未修改** —— 代码实现属于 `ML-CLOUD-01`。
+
+### 九、验证
+
+Governance-only 模块，按施工单**未**运行完整测试 / build / 浏览器回归（未修改 runtime，运行它们无法证明任何本模块的事实）。
+
+- `git diff --check` — 干净
+- 变更文件检查 — 只含 `docs/` 与 approved 视觉资产，**未出现** `pages/` `components/` `server/` `tests/` `package*` `nuxt*` / Directus / AI runtime 文件
+- **1440px desktop：N/A — governance-only module, no runtime/UI changes**
+- **375px mobile：N/A — governance-only module, no runtime/UI changes**
+
+*最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-GOV-01"任务中写入。*

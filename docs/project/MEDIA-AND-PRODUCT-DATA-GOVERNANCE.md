@@ -351,6 +351,7 @@ Product Dossier 引入"来源审核"后的扩展方向（概念，AI 阶段另�
 **确认规则（v0.1）：**
 - 文件夹名使用**英文、小写、kebab-case**（如 `products/xray`，不是 `X射线` 或 `XRay`）。
 - 文件夹只表达**稳定业务大类**，不以型号、语言、Hero/Gallery、营销活动或具体页面用途作为文件夹层级。
+  > **已由决策 #9（D-023，2026-09-09）修订：** 本条现只适用于 Protected System Folder。customer-managed 区域内允许按型号等方式整理。原意图（不让目录结构变成产品数据模型）由「文件夹名不是业务事实来源」继续保证。
 - 型号信息进入 Product Dossier 结构化字段；语言、版本、用途、排序和页面 ALT 属于元数据或 junction 引用关系，不在文件夹名中体现。
 - **v0.1 推荐文件夹结构：**
 
@@ -366,6 +367,7 @@ Product Dossier 引入"来源审核"后的扩展方向（概念，AI 阶段另�
   | `test-only` | 测试专用媒体（不对外） |
 
 - 新文件夹名须在此文件中记录后方可创建，保持目录结构可追溯。
+  > **已由决策 #9（D-023，2026-09-09）修订：** 本条现只适用于 Protected System Folder。客户在已声明 customer-manageable zone 内建立的目录不需要预先登记，也不写入代码常量；区域之外仍 fail-closed。
 
 ---
 
@@ -419,6 +421,79 @@ B0 媒体备份计划（B0-4）需要用户提供外部磁盘或网络路径，�
 
 ---
 
+### ✅ 决策 #9 — 文件夹治理双层模型（已确认，2026-09-09，ML-CLOUD-GOV-01 / D-023）
+
+本决策修订决策 #2 中与「客户可自行管理子文件夹」冲突的两条 v0.1 规则，并确立 Media Library Cloud Workspace V1 的文件夹治理模型。**决策 #2 的其余规则（英文小写 kebab-case、文件夹名不是业务事实来源）全部继续有效。**
+
+#### 9.1 被修订的两条 v0.1 规则
+
+| 原 v0.1 规则 | 修订后 |
+|---|---|
+| 「新文件夹名须在此文件中记录后方可创建」 | **只适用于 Protected System Folder。** 客户在已声明的 customer-manageable zone 内建立的目录不需要预先登记，也不写入代码常量。 |
+| 「文件夹只表达稳定业务大类，不以型号…作为文件夹层级」 | **只适用于 Protected System Folder。** customer-managed 区域内允许以型号等方式整理（如 `products/xray/LT-180C/manuals`）。这条原规则的真正意图——不让目录结构变成产品数据模型——由「文件夹名不是业务事实来源」原则继续保证，而不是靠禁止型号命名。 |
+
+#### 9.2 两类文件夹
+
+**Protected System Folder** —— 系统治理的稳定业务分类节点（如 `products`、`products/xray`、`resources`、`company`、`home`、`applications`）。
+
+- 客户**不得** Rename / Move / Trash / Archive
+- 可进入、可浏览
+- 可作为 customer-managed folder 的允许父节点
+- **是否允许客户在其下建立子目录，必须由治理规则逐节点明确指定，不得由「不在受保护清单中」推断**
+- 其既有的 `allow_upload` / `allow_move_target` 等**文件级**规则按原治理继续存在
+
+**Customer-managed Folder** —— 位于已明确声明的 customer-manageable zone 内的动态后代目录（如 `products/xray/LT-180C`、`products/xray/LT-180C/manuals`、`resources/2026-expo`）。
+
+- 客户可 Create / Rename / Move / Trash / Archive / Restore
+- 只能在允许区域内活动，不得越过 Protected System Folder 边界
+- 不得移动到自身或自身的后代节点
+- **不得写入代码常量清单**——它们是动态识别的，不是登记出来的
+
+#### 9.3 判定优先级（必须按序求值）
+
+| 优先级 | 条件 | 结果 |
+|---|---|---|
+| **1** | `ambiguous`（同一 full_path 对应多个 UUID） | **FAIL-CLOSED**，不得因 Cloud Workspace 改造而放宽 |
+| **2** | `legacy-read-only` / `conflict-frozen` | **继续冻结**，不得 Rename / Move / Trash |
+| **3** | 精确命中 Protected System Folder | **Protected**：文件夹本身不可 Rename / Move / Trash；文件级规则按原治理继续 |
+| **4** | 位于已声明 customer-manageable zone 内的合法动态后代 | **Customer-managed**：可 Create / Rename / Move / Trash / Restore，仅限该区域内 |
+| **5** | 其余一切 | **`unknown` → FAIL-CLOSED**，不得自动获得写入或管理权限 |
+
+#### 9.4 `unknown` ≠ customer-managed（安全要点）
+
+**不得把「不在受保护清单中」直接等同于「客户可管」。** 那会把现有 fail-closed 安全模型全局反转。
+
+必须区分两件不同的事：
+
+- **known customer-managed descendant** —— 位于明确声明区域内，可管理
+- **unknown / unmanaged path** —— 区域之外，继续 fail-closed
+
+没有任何路径可以因为「一份清单里没有它」而获得权限。权限只能来自**明确声明的区域**。
+
+#### 9.5 文件夹治理与文件写入治理是两个维度
+
+现有治理回答的是**文件级**问题：
+
+> 这个文件夹里能不能上传文件？能不能作为 Move 目标？
+
+Cloud Workspace 还需要一个**独立**的文件夹级问题：
+
+> 这个文件夹本身能不能被 Create / Rename / Move / Trash / Restore？
+
+**这两个维度不得由同一个状态值同时承担。** 具体的运行时类型如何演进属于 `ML-CLOUD-01` 的实现范围，本决策只确立「必须分离」这一治理要求，不规定实现形式。
+
+#### 9.6 继续保持的长期安全原则
+
+- **UUID 稳定**：Rename / Move 文件或文件夹均不得改变业务资产 UUID，不得破坏 Product / Content / Branding / AI Source 引用，不得因 rename 产生第二份物理文件
+- **Delete = 可恢复 Trash / Archive**；V1 不提供 Permanent Delete，物理永久删除需先具备全局引用保护
+- **仍被引用的资产不得发生不可恢复破坏**；Used in / References 保护继续有效
+- **文件夹名/路径只是整理工具**，不得成为型号、参数、语言、file role、AI truth 或 published truth 的唯一事实来源
+- **决策 #3 不变**：Word / Excel 未审核源文件不进入正式 Media Library
+
+**影响阶段：** ML-CLOUD-01 起全部 Media Library Cloud Workspace V1 模块
+
+---
+
 ## 八、本文件更新规则
 
 - 每完成一个阶段，在对应节中标注 ✅ 和完成日期。
@@ -428,4 +503,4 @@ B0 媒体备份计划（B0-4）需要用户提供外部磁盘或网络路径，�
 
 ---
 
-*最后更新：2026-09-04，B0-0 只读规划写入；决策 #1/#2/#3 用户确认为 v0.1 正式治理规则。*
+*最后更新：2026-09-09，ML-CLOUD-GOV-01 写入决策 #9（文件夹治理双层模型，对应 D-023），并就地标注决策 #2 中被修订的两条 v0.1 规则。此前：2026-09-04，B0-0 只读规划写入；决策 #1/#2/#3 用户确认为 v0.1 正式治理规则。*
