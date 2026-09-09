@@ -1281,6 +1281,33 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
     expect(writeCalls().filter(c => (c.options as { method?: string }).method === 'DELETE')).toEqual([])
   })
 
+  /**
+   * PWS-AI-APPLY-DRAFT-01R1 — asserted end to end, not just on the executor:
+   * a real request whose update carries no note must produce a PATCH that does
+   * not mention `note_en`, so an existing hand-written note survives.
+   */
+  it('an update sent without a note produces a PATCH containing only value_en', async () => {
+    const { handler, event } = await callApply({
+      changes: [{ action: 'update', specItemId: 11, value: 'AI proposed value' }],
+    })
+    const result = await handler(event) as { ok: boolean, appliedCount: number }
+    expect(result).toMatchObject({ ok: true, appliedCount: 1 })
+
+    const patch = writeCalls().find(c => (c.options as { method?: string }).method === 'PATCH')!
+    expect(patch.options?.body).toEqual({ value_en: 'AI proposed value' })
+    expect(patch.options?.body).not.toHaveProperty('note_en')
+  })
+
+  it('an update sent WITH a note writes both fields', async () => {
+    const { handler, event } = await callApply({
+      changes: [{ action: 'update', specItemId: 11, value: 'AI proposed value', note: 'page 7' }],
+    })
+    await handler(event)
+
+    const patch = writeCalls().find(c => (c.options as { method?: string }).method === 'PATCH')!
+    expect(patch.options?.body).toEqual({ value_en: 'AI proposed value', note_en: 'page 7' })
+  })
+
   it('is refused for an unauthenticated caller by the real middleware', async () => {
     installNitroGlobals(async () => ({}))
     const middleware = (await import('../server/middleware/admin-auth')).default as (e: unknown) => Promise<unknown>

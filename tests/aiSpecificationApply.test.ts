@@ -272,7 +272,7 @@ describe('executeSpecificationApply — writes exactly what was accepted, and no
   it('never issues a DELETE', async () => {
     const { fetch, calls } = recordingFetch({ '/items/product_spec_groups': { data: { id: 77 } } })
     await executeSpecificationApply(fetch, 3, [
-      { kind: 'update', specItemId: 11, value: 'x', note: null },
+      { kind: 'update', specItemId: 11, value: 'x', note: undefined },
       { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: null, parameter: 'P', value: 'V', note: null },
     ])
     expect(calls.filter(c => c.method === 'DELETE')).toEqual([])
@@ -294,7 +294,7 @@ describe('executeSpecificationApply — partial failure is reported, never compe
       { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: 5, parameter: 'A', value: '1', note: null },
       { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: 5, parameter: 'B', value: '2', note: null },
       // This one fails: the PATCH path throws.
-      { kind: 'update', specItemId: 11, value: 'boom', note: null },
+      { kind: 'update', specItemId: 11, value: 'boom', note: undefined },
       { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: 5, parameter: 'D', value: '4', note: null },
     ])
 
@@ -317,11 +317,189 @@ describe('executeSpecificationApply — partial failure is reported, never compe
       '/items/product_spec_items/': () => { throw new Error('directus write failed') },
     })
     const result = await executeSpecificationApply(fetch, 3, [
-      { kind: 'update', specItemId: 11, value: 'x', note: null },
-      { kind: 'update', specItemId: 12, value: 'y', note: null },
+      { kind: 'update', specItemId: 11, value: 'x', note: undefined },
+      { kind: 'update', specItemId: 12, value: 'y', note: undefined },
     ])
 
     expect(result).toMatchObject({ ok: false, appliedCount: 0, totalCount: 2, partial: false })
     expect(result.message).toContain('Nothing was written')
+  })
+})
+
+// ── PWS-AI-APPLY-DRAFT-01R1: two truthfulness fixes ──
+
+describe('an omitted note leaves the existing note alone', () => {
+  /**
+   * The bug this replaces: the planner collapsed a missing `note` to `null`,
+   * so accepting a model's new value for a specification silently erased a
+   * note a person had written by hand. `undefined` and `null` are different
+   * statements — "I am not talking about the note" versus "clear the note" —
+   * and only the first one is reachable from this screen.
+   */
+  it('the planner keeps an absent note as undefined rather than null', async () => {
+    const { fetch } = recordingFetch({
+      '/items/product_spec_items/11': { data: { id: 11, value_en: 'old', note_en: 'HUMAN NOTE', spec_group_id: { id: 5, product_id: 3 } } },
+    })
+    const plan = await planSpecificationApply(fetch, 3, [{ action: 'update', specItemId: 11, value: 'new' }])
+
+    expect(plan.ok).toBe(true)
+    if (plan.ok) {
+      const step = plan.steps[0]
+      expect(step.kind).toBe('update')
+      if (step.kind === 'update') {
+        expect(step.note).toBeUndefined()
+        expect(step.note).not.toBeNull()
+      }
+    }
+  })
+
+  it('an update with NO note sends exactly { value_en } — note_en is absent from the PATCH', async () => {
+    const { fetch, calls } = recordingFetch({})
+    const result = await executeSpecificationApply(fetch, 3, [
+      { kind: 'update', specItemId: 11, value: 'new value', note: undefined },
+    ])
+
+    expect(result.ok).toBe(true)
+    const patch = calls.find(c => c.method === 'PATCH')!
+    expect(patch.body).toEqual({ value_en: 'new value' })
+    expect(Object.keys(patch.body ?? {})).toEqual(['value_en'])
+    expect(patch.body).not.toHaveProperty('note_en')
+  })
+
+  it('an update WITH a note sends both fields', async () => {
+    const { fetch, calls } = recordingFetch({})
+    await executeSpecificationApply(fetch, 3, [
+      { kind: 'update', specItemId: 11, value: 'new value', note: 'from datasheet p7' },
+    ])
+
+    const patch = calls.find(c => c.method === 'PATCH')!
+    expect(patch.body).toEqual({ value_en: 'new value', note_en: 'from datasheet p7' })
+  })
+
+  it('either way the PATCH still cannot reach label, group, sort, enabled or a locale column', async () => {
+    const { fetch, calls } = recordingFetch({})
+    await executeSpecificationApply(fetch, 3, [
+      { kind: 'update', specItemId: 11, value: 'a', note: undefined },
+      { kind: 'update', specItemId: 12, value: 'b', note: 'n' },
+    ])
+
+    for (const patch of calls.filter(c => c.method === 'PATCH')) {
+      const keys = Object.keys(patch.body ?? {})
+      for (const forbidden of ['label_en', 'label_es', 'label_pt', 'spec_group_id', 'sort', 'enabled', 'value_es', 'value_pt', 'note_es', 'note_pt']) {
+        expect(keys).not.toContain(forbidden)
+      }
+    }
+  })
+
+  it('an add still writes its note column explicitly — a new row has no prior note to protect', async () => {
+    const { fetch, calls } = recordingFetch({})
+    await executeSpecificationApply(fetch, 3, [
+      { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: 5, parameter: 'P', value: 'V', note: null },
+    ])
+    const post = calls.find(c => c.path === '/items/product_spec_items' && c.method === 'POST')!
+    expect(post.body).toMatchObject({ note_en: null })
+  })
+})
+
+describe('a group created without its item is reported as a partial write, not as nothing', () => {
+  /**
+   * An add is two writes. Failing between them leaves a real, empty
+   * specification group in the Draft while `appliedCount` is still 0 — and the
+   * previous message for that case said "Nothing was written to this product",
+   * which was simply untrue. No rollback is introduced to fix it; the report is
+   * corrected instead.
+   */
+  function failingItemCreate() {
+    return recordingFetch({
+      '/items/product_spec_groups': { data: { id: 77 } },
+      '/items/product_spec_items': () => { throw new Error('directus item write failed') },
+    })
+  }
+
+  it('group created, item failed: partial with appliedCount 0 and an honest message', async () => {
+    const { fetch, calls } = failingItemCreate()
+    const result = await executeSpecificationApply(fetch, 3, [
+      { kind: 'add', groupKey: 'new group', groupTitle: 'New group', existingGroupId: null, parameter: 'P', value: 'V', note: null },
+    ])
+
+    expect(result.ok).toBe(false)
+    expect(result.appliedCount).toBe(0)
+    expect(result.totalCount).toBe(1)
+    expect(result.partial).toBe(true)
+    expect(result.message).not.toContain('Nothing was written')
+    expect(result.message).toContain('specification group was created')
+    expect(result.message).toContain('Review Specifications')
+
+    // The group really was created, and nothing tried to undo it.
+    expect(calls.filter(c => c.path === '/items/product_spec_groups' && c.method === 'POST')).toHaveLength(1)
+    expect(calls.filter(c => c.method === 'DELETE')).toEqual([])
+  })
+
+  it('existing group, first item failed: genuinely nothing was written, and it still says so', async () => {
+    const { fetch, calls } = failingItemCreate()
+    const result = await executeSpecificationApply(fetch, 3, [
+      { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: 5, parameter: 'P', value: 'V', note: null },
+    ])
+
+    expect(result.appliedCount).toBe(0)
+    expect(result.partial).toBe(false)
+    expect(result.message).toContain('Nothing was written')
+    // No group was created in this case — the two scenarios stay distinguishable.
+    expect(calls.filter(c => c.path === '/items/product_spec_groups' && c.method === 'POST')).toEqual([])
+  })
+
+  it('two applied, then a new group created and its item failed: both facts are reported', async () => {
+    let itemPosts = 0
+    const { fetch, calls } = recordingFetch({
+      '/items/product_spec_groups': { data: { id: 77 } },
+      '/items/product_spec_items': () => {
+        itemPosts++
+        if (itemPosts <= 2) return { data: { id: 500 + itemPosts } }
+        throw new Error('directus item write failed')
+      },
+    })
+
+    const result = await executeSpecificationApply(fetch, 3, [
+      { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: 5, parameter: 'A', value: '1', note: null },
+      { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: 5, parameter: 'B', value: '2', note: null },
+      { kind: 'add', groupKey: 'new group', groupTitle: 'New group', existingGroupId: null, parameter: 'C', value: '3', note: null },
+      { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: 5, parameter: 'D', value: '4', note: null },
+    ])
+
+    expect(result.appliedCount).toBe(2)
+    expect(result.totalCount).toBe(4)
+    expect(result.partial).toBe(true)
+    expect(result.message).toContain('Applied 2 of 4')
+    expect(result.message).toContain('specification group was also created')
+    expect(result.message).not.toContain('Nothing was written')
+
+    // The fourth change never ran, and nothing was compensated.
+    expect(itemPosts).toBe(3)
+    expect(calls.filter(c => c.method === 'DELETE')).toEqual([])
+  })
+
+  it('a group whose item DID save is not later mistaken for a dangling write', async () => {
+    let itemPosts = 0
+    const { fetch } = recordingFetch({
+      '/items/product_spec_groups': { data: { id: 77 } },
+      '/items/product_spec_items': () => {
+        itemPosts++
+        if (itemPosts === 1) return { data: { id: 501 } }
+        throw new Error('directus item write failed')
+      },
+      '/items/product_spec_items/': () => { throw new Error('directus write failed') },
+    })
+
+    // Step 1 creates the group AND its item successfully; step 2 fails on an
+    // EXISTING group, so there is no dangling group at the point of failure.
+    const result = await executeSpecificationApply(fetch, 3, [
+      { kind: 'add', groupKey: 'new group', groupTitle: 'New group', existingGroupId: null, parameter: 'A', value: '1', note: null },
+      { kind: 'add', groupKey: 'g', groupTitle: 'G', existingGroupId: 5, parameter: 'B', value: '2', note: null },
+    ])
+
+    expect(result.appliedCount).toBe(1)
+    expect(result.partial).toBe(true)
+    expect(result.message).toContain('Applied 1 of 2')
+    expect(result.message).not.toContain('specification group was also created')
   })
 })

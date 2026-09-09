@@ -74,7 +74,19 @@ export type ApplyRequest = z.infer<typeof ApplyRequestSchema>
 
 /** One resolved, ready-to-execute write. Produced only by a preflight that passed. */
 export type ApplyPlanStep =
-  | { kind: 'update', specItemId: number, value: string, note: string | null }
+  | {
+      kind: 'update'
+      specItemId: number
+      value: string
+      /**
+       * PWS-AI-APPLY-DRAFT-01R1 — `undefined` means "this change says nothing
+       * about the note", and is NOT the same as `null`. It is deliberately not
+       * collapsed to `null` here: doing so made the executor send
+       * `note_en: null`, which erased a note a person had written by hand
+       * whenever the model happened to propose a value without one.
+       */
+      note: string | undefined
+    }
   | {
       kind: 'add'
       /** Normalized group name — the cache key that stops one group being created twice in a batch. */
@@ -145,7 +157,8 @@ export async function planSpecificationApply(
         kind: 'update',
         specItemId: change.specItemId,
         value: change.value,
-        note: change.note ?? null,
+        // Passed through as-is. `?? null` here is what silently cleared notes.
+        note: change.note,
       })
       continue
     }
@@ -190,12 +203,24 @@ export async function executeSpecificationApply(
   // produce one group, not two near-duplicates.
   const createdGroupIds = new Map<string, number>()
 
+  /**
+   * PWS-AI-APPLY-DRAFT-01R1 — true between "a new group was created" and "its
+   * item was created". An add is two writes, and failing between them leaves a
+   * real, empty group in the Draft while `appliedCount` is still 0. Without
+   * this flag the batch reported "Nothing was written", which is false.
+   */
+  let groupCreatedForCurrentStep = false
+
   try {
     for (const step of steps) {
       if (step.kind === 'update') {
-        // Only these two fields. Label, group, sort, enabled and locale
-        // columns are deliberately absent from this payload.
-        await updateSpecItem(fetch, step.specItemId, { value_en: step.value, note_en: step.note })
+        // Only these fields. Label, group, sort, enabled and locale columns are
+        // deliberately absent — and `note_en` appears ONLY when this change
+        // actually carries a note, so an omitted note leaves the existing one
+        // alone instead of erasing it.
+        const payload: Record<string, unknown> = { value_en: step.value }
+        if (step.note !== undefined) payload.note_en = step.note
+        await updateSpecItem(fetch, step.specItemId, payload)
         appliedCount++
         continue
       }
@@ -204,6 +229,7 @@ export async function executeSpecificationApply(
       if (groupId === null) {
         groupId = await createSpecGroup(fetch, { product_id: productId, title_en: step.groupTitle })
         createdGroupIds.set(step.groupKey, groupId)
+        groupCreatedForCurrentStep = true
       }
 
       await createSpecItem(fetch, {
@@ -212,6 +238,8 @@ export async function executeSpecificationApply(
         value_en: step.value,
         note_en: step.note,
       })
+      // The group now holds its item, so it is no longer a dangling write.
+      groupCreatedForCurrentStep = false
       appliedCount++
     }
   } catch {
@@ -219,14 +247,27 @@ export async function executeSpecificationApply(
     // told the real number and sent to Specifications to look at it. Inventing
     // a rollback here is what produced the dishonest behaviour this endpoint
     // was disabled for in the first place.
+    // A group created without its item still changed the Draft, so it counts
+    // as a partial write even though no accepted change completed.
+    const wrotePartially = appliedCount > 0 || groupCreatedForCurrentStep
+
+    let message: string
+    if (appliedCount > 0 && groupCreatedForCurrentStep) {
+      message = `Applied ${appliedCount} of ${totalCount} accepted changes before a save error. A new specification group was also created before the error. Review Specifications before starting a new AI proposal.`
+    } else if (appliedCount > 0) {
+      message = `Applied ${appliedCount} of ${totalCount} accepted changes before a save error. Review Specifications before starting a new AI proposal.`
+    } else if (groupCreatedForCurrentStep) {
+      message = 'A new specification group was created before the item could be saved. Review Specifications before starting a new AI proposal.'
+    } else {
+      message = 'No changes could be saved. Nothing was written to this product.'
+    }
+
     return {
       ok: false,
       appliedCount,
       totalCount,
-      partial: appliedCount > 0,
-      message: appliedCount > 0
-        ? `Applied ${appliedCount} of ${totalCount} accepted changes before a save error. Review Specifications before starting a new AI proposal.`
-        : 'No changes could be saved. Nothing was written to this product.',
+      partial: wrotePartially,
+      message,
     }
   }
 

@@ -3779,3 +3779,91 @@ status 检查发生在**读取请求体之前**：非 draft 产品连 body 都�
 **First single-product AI beta。** 但**尚未授权真实 API Key 与真实收费 provider**——真实 Beta 需要 Codex 单独发出施工单并由用户明确授权。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-APPLY-DRAFT-01"任务中写入。*
+
+---
+
+## PWS-AI-APPLY-DRAFT-01R1 — Draft 写入真实性小收尾（2026-09-09）
+
+**状态：completed。** 只处理 `PWS-AI-APPLY-DRAFT-01` 遗留的两个 P1，未扩大范围。修改文件仅三个：`server/utils/aiSpecificationApply.ts`、`tests/aiSpecificationApply.test.ts`、`tests/aiEndpointBoundaries.test.ts`（外加本文件与 Roadmap）。**未改动任何 Vue / CSS**，因此按施工单未重做 1440 / 375 断点验收。
+
+### P1-1 — 省略 note 时保留既有 note_en
+
+**问题：** planner 把 update 的 `note` 由 `undefined` 折叠成 `null`（`change.note ?? null`），executor 于是总是发送 `note_en: null`。结果是：管理员只想接受 AI 提出的新 value，却把这条参数上**人工写的 note 清空了**。
+
+**修复：** `ApplyPlanStep` 的 update 分支把 `note` 类型改为 `string | undefined`，planner 原样透传 `change.note`，executor 按需构造 PATCH：
+
+```ts
+const payload: Record<string, unknown> = { value_en: step.value }
+if (step.note !== undefined) payload.note_en = step.note
+```
+
+`undefined` 与 `null` 是两种不同的陈述——"这次不涉及 note" 与 "把 note 清空"——只有前者能从这个界面产生。当前 MVP 不提供"主动清空 note"功能，因此不新增 `noteTouched`、前端状态、schema 字段或数据库字段。`add` 分支保持写入显式 `note_en`：新建行没有需要保护的既有 note。`productSpecWriter` 的通用 update 行为未改动。
+
+### P1-2 — 新组已建但 item 失败时的真实报告
+
+**问题：** 一次 add 是两个写入。若 `createSpecGroup()` 成功而随后的 `createSpecItem()` 失败，Draft 中已经真实多出一个空的规格组，但 `appliedCount` 仍是 0，旧文案因此说 **"Nothing was written to this product."**——这是不实的。
+
+**修复：** 在 executor 内增加一个极小的步内状态 `groupCreatedForCurrentStep`：创建组后置位，创建 item 成功后清除。catch 时若仍为 true，说明组已写入而 item 未写入。**不引入 rollback、补偿 DELETE、事务、Directus extension 或 audit table。**
+
+三种情形现在被明确区分：
+
+| 情形 | appliedCount | partial | message |
+|---|---|---|---|
+| 既有组、首条 item 就失败（确实零写入） | 0 | `false` | "No changes could be saved. Nothing was written to this product." |
+| 新组已建、item 失败 | 0 | **`true`** | "A new specification group was created before the item could be saved. Review Specifications before starting a new AI proposal." |
+| 已成功 N 条后，新组已建、item 失败 | N | `true` | "Applied N of M accepted changes before a save error. **A new specification group was also created before the error.** Review Specifications…" |
+
+若某个新组的 item 已成功写入，之后的步骤再失败，该组不会被误报为悬空写入（状态已清除）——这一点也有专门测试。
+
+**前端未改动**：服务端返回 `ok: false` 时组件本就会锁住同一 proposal 并显示服务端 message，现有行为已足够。
+
+### 新增测试（+11，合计 902）
+
+`tests/aiSpecificationApply.test.ts` 新增 9 条：planner 保持 `note` 为 `undefined` 而非 `null`；无 note 的 update 的 PATCH body **精确等于** `{ value_en }` 且不含 `note_en`；带 note 的 update 精确等于 `{ value_en, note_en }`；两种情况下 PATCH 都触及不到 label / group / sort / enabled / locale 列；add 仍显式写 `note_en`；以及 P1-2 的四种情形（新组+item 失败、既有组+首条失败、2 条成功后新组+item 失败、组已带 item 后失败不误报），全部断言无 DELETE、无 rollback。
+
+`tests/aiEndpointBoundaries.test.ts` 新增 2 条端到端回归：真实请求中不带 note 的 update 产出的 PATCH 只含 `value_en`；带 note 的写入两个字段。
+
+**红灯验证：** 临时回退两处修复后，4 条新测试失败；恢复后 34 条全绿——测试具备真实捕获力。
+
+### 验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **902 / 902 通过**（26 文件，本次 +11） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功 |
+
+### TEST ONLY 真实数据验证（产品 3，Draft）
+
+这一步无法由 mock 代替：P1-1 的修复依赖 **Directus 自身**在 PATCH 省略某列时不会清空该列，而 mock 只能证明请求体里没有 `note_en`。
+
+| 阶段 | 条目 1「Effective Aperture Width」 |
+|---|---|
+| **前** | value = `150–1000 mm (customized to order)`，note = `From LT-AM reference screenshot` |
+| **Apply 后**（发送一条不带 note 的 update） | value = `TEST ONLY R1 PROBE VALUE`，note = **`From LT-AM reference screenshot`（原样保留）** |
+| **恢复后** | 与基线逐字段一致 |
+
+Apply 返回 `{ ok: true, appliedCount: 1, totalCount: 1, partial: false }`；label、所属组、组数与条目数均未变；产品全程 `draft`。恢复后二次 GET 对全部 2 组 17 条逐字段比对：**零差异、零多余组、零多余条目**。未清理任何 Activity Log。
+
+### 明确未做
+
+未 push / merge master、未部署；未新增 Directus extension、Docker 改动、PostgreSQL 事务、Redis、distributed lock、rollback saga、补偿 DELETE、schema migration、权限变更、新 collection、新 audit table；未改 AI provider / Generate / Source Intake；未恢复 PDF，未做 Excel / Page Content AI / FAQ AI / SEO AI / bulk import；未执行 npm audit fix；未处理登录限流；未做视觉重设计；未读取或修改 `.env`；未填写任何 API Key；**零真实 AI 调用、零费用**。
+
+**GitHub Actions 状态：本次推送后需在 Actions 页面确认实际结果。本文档不声称"CI 已绿"。**
+
+### 当前下一步
+
+**FIRST SINGLE-PRODUCT AI BETA。**
+
+需要用户单独授权以下两项后方可开始：
+
+- 真实 AI API Key；
+- 真实 provider 调用 / API 费用。
+
+本次未开始 Beta。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-APPLY-DRAFT-01R1"任务中写入。*

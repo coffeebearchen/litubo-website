@@ -232,7 +232,7 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 ```text
 AI Source Intake                      ✅ 已交付
 → Proposal Review                     ✅ 已交付
-→ Apply accepted changes to Draft     ✅ 已交付（PWS-AI-APPLY-DRAFT-01，2026-09-09）
+→ Apply accepted changes to Draft     ✅ 已交付（PWS-AI-APPLY-DRAFT-01 + R1 真实性收尾，2026-09-09）
 → First single-product AI beta        NEXT — requires separate user authorization
 ```
 
