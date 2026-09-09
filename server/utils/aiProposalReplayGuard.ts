@@ -42,8 +42,39 @@ export const SUCCESS_REUSE_TTL_MS = 10 * 60 * 1000
  * is a bound on staleness, not the thing that detects change.
  */
 
-/** Hard ceiling on retained analyses. Oldest-expiring entries are dropped first. */
+/**
+ * PWS-AI-DUP-GUARD-01-MIN-01 — how long a PROPOSAL stays applicable, which is
+ * a different question from how long an ANALYSIS stays reusable.
+ *
+ * These were one value, and that was wrong. Reuse is about not paying for the
+ * same model call twice, so ten minutes is generous. Applying is about a
+ * person: they analyse a product, work down thirty proposed parameters,
+ * check two conflicts against the real specifications, get interrupted, come
+ * back. Ten minutes does not cover that, and under the old shared deadline
+ * their reviewed work simply stopped being applicable — the proposal was still
+ * on screen, every decision still made, and the server had quietly forgotten
+ * the reference it needed.
+ *
+ * Two hours covers a real review with interruptions. It is still short-term
+ * in-memory state; it is not a Proposal history and nothing is persisted.
+ */
+export const PROPOSAL_APPLY_TTL_MS = 2 * 60 * 60 * 1000
+
+/**
+ * Hard ceiling on the REUSE cache only. Reaching it drops the analyses closest
+ * to expiring, so a later identical request pays for the model again — an
+ * acceptable cost. It deliberately does NOT touch proposal records: evicting
+ * one of those would break an Apply that a person is still working towards.
+ */
 export const MAX_CACHED_ANALYSES = 50
+
+/**
+ * A memory backstop on tracked proposals, far above any real review workload
+ * (the Generate cooldown alone caps how many can be created). It exists so the
+ * map cannot grow without limit, not as a workflow limit, and it evicts the
+ * proposals closest to their own apply deadline rather than the newest work.
+ */
+export const MAX_TRACKED_PROPOSALS = 500
 
 /**
  * Where a proposal is in its one and only write.
@@ -74,7 +105,10 @@ interface ProposalRecord {
   applyState: ProposalApplyState
   /** The outcome of the write that reached a terminal state, replayed verbatim to a duplicate request. */
   appliedResult: RecordedApplyResult | null
-  expiresAt: number
+  /** When this analysis stops being reusable — the cheap, short deadline. */
+  reuseExpiresAt: number
+  /** When this proposal stops being applicable — the one a person's review time depends on. */
+  applyExpiresAt: number
 }
 
 /** Everything a reuse lookup is scoped by. Two analyses are the same only if all of it matches. */
@@ -97,26 +131,53 @@ function scopeKeyOf(scope: AnalysisScope): string {
     .join('|')
 }
 
-function isLive(record: ProposalRecord, now: number): boolean {
-  return record.expiresAt > now
+/** Still worth serving from the reuse cache. */
+function isReusable(record: ProposalRecord, now: number): boolean {
+  return record.reuseExpiresAt > now
 }
 
+/** Still applicable by the person who reviewed it. Outlives reusability by design. */
+function isApplicable(record: ProposalRecord, now: number): boolean {
+  return record.applyExpiresAt > now
+}
+
+/**
+ * PWS-AI-DUP-GUARD-01-MIN-01 — the two maps expire independently.
+ *
+ * An analysis leaves the reuse cache after ten minutes; its proposal stays
+ * applicable for two hours. Deleting the reference alongside the cache entry
+ * is exactly the bug this fixes: it made a reviewer's finished work
+ * unapplyable while it was still on their screen.
+ */
 function dropExpired(now: number): void {
   for (const [key, record] of byScope) {
-    if (!isLive(record, now)) {
-      byScope.delete(key)
-      byRef.delete(record.proposalRef)
-    }
+    if (!isReusable(record, now)) byScope.delete(key)
+  }
+  for (const [ref, record] of byRef) {
+    if (!isApplicable(record, now)) byRef.delete(ref)
   }
 }
 
-function enforceCeiling(): void {
+/**
+ * Trims the REUSE cache only. A dropped entry costs a future identical request
+ * one model call; it must never cost a reviewer their pending Apply, so the
+ * proposal reference is deliberately left in place.
+ */
+function enforceReuseCeiling(): void {
   if (byScope.size <= MAX_CACHED_ANALYSES) return
-  // Drop whatever expires soonest — the entries closest to being useless.
-  const ordered = [...byScope.values()].sort((a, b) => a.expiresAt - b.expiresAt)
+  const ordered = [...byScope.values()].sort((a, b) => a.reuseExpiresAt - b.reuseExpiresAt)
   for (const record of ordered.slice(0, byScope.size - MAX_CACHED_ANALYSES)) {
     byScope.delete(record.scopeKey)
+  }
+}
+
+/** Memory backstop on tracked proposals; drops those closest to their own apply deadline. */
+function enforceProposalCeiling(): void {
+  if (byRef.size <= MAX_TRACKED_PROPOSALS) return
+  const ordered = [...byRef.values()].sort((a, b) => a.applyExpiresAt - b.applyExpiresAt)
+  for (const record of ordered.slice(0, byRef.size - MAX_TRACKED_PROPOSALS)) {
     byRef.delete(record.proposalRef)
+    byScope.delete(record.scopeKey)
   }
 }
 
@@ -171,7 +232,7 @@ export interface ReusableAnalysis<TOutput> {
 export function lookupAnalysis<TOutput>(scope: AnalysisScope, now = Date.now()): ReusableAnalysis<TOutput> | null {
   dropExpired(now)
   const record = byScope.get(scopeKeyOf(scope))
-  if (!record || !isLive(record, now)) return null
+  if (!record || !isReusable(record, now)) return null
   return {
     proposalRef: record.proposalRef,
     output: record.output as TOutput,
@@ -184,8 +245,8 @@ export function rememberAnalysis(scope: AnalysisScope, output: unknown, now = Da
   dropExpired(now)
   const existing = byScope.get(scopeKeyOf(scope))
   // Should not normally happen (the caller looks first), but never replace a
-  // live record: its proposalRef may already be mid-Apply.
-  if (existing && isLive(existing, now)) return existing.proposalRef
+  // reusable record: its proposalRef may already be mid-Apply.
+  if (existing && isReusable(existing, now)) return existing.proposalRef
 
   const record: ProposalRecord = {
     // 32 random bytes: unguessable, and carrying nothing derivable — not a
@@ -197,11 +258,13 @@ export function rememberAnalysis(scope: AnalysisScope, output: unknown, now = Da
     output,
     applyState: 'ready',
     appliedResult: null,
-    expiresAt: now + SUCCESS_REUSE_TTL_MS,
+    reuseExpiresAt: now + SUCCESS_REUSE_TTL_MS,
+    applyExpiresAt: now + PROPOSAL_APPLY_TTL_MS,
   }
   byScope.set(record.scopeKey, record)
   byRef.set(record.proposalRef, record)
-  enforceCeiling()
+  enforceReuseCeiling()
+  enforceProposalCeiling()
   return record.proposalRef
 }
 
@@ -227,7 +290,7 @@ export function claimApply(
   dropExpired(now)
 
   const record = byRef.get(proposalRef)
-  if (!record || !isLive(record, now)) return { ok: false, reason: 'unknown' }
+  if (!record || !isApplicable(record, now)) return { ok: false, reason: 'unknown' }
   if (record.adminUserId !== binding.adminUserId) return { ok: false, reason: 'unknown' }
   if (record.productId !== binding.productId) return { ok: false, reason: 'unknown' }
 
@@ -251,7 +314,7 @@ export function claimApply(
  */
 export function settleApply(proposalRef: string, result: RecordedApplyResult, now = Date.now()): void {
   const record = byRef.get(proposalRef)
-  if (!record || !isLive(record, now)) return
+  if (!record || !isApplicable(record, now)) return
 
   const wroteSomething = result.appliedCount > 0 || result.partial
   if (result.ok) {
@@ -271,7 +334,7 @@ export function settleApply(proposalRef: string, result: RecordedApplyResult, no
 /** Returns a claimed reference to `ready` after a refusal that wrote nothing at all. */
 export function releaseApply(proposalRef: string, now = Date.now()): void {
   const record = byRef.get(proposalRef)
-  if (!record || !isLive(record, now)) return
+  if (!record || !isApplicable(record, now)) return
   if (record.applyState === 'applying') record.applyState = 'ready'
 }
 

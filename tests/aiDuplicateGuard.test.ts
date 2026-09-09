@@ -26,7 +26,9 @@ import {
   releaseApply,
   resetProposalGuard,
   SUCCESS_REUSE_TTL_MS,
+  PROPOSAL_APPLY_TTL_MS,
   MAX_CACHED_ANALYSES,
+  MAX_TRACKED_PROPOSALS,
 } from '../server/utils/aiProposalReplayGuard'
 import type { FetchFn } from '../server/utils/mediaLifecycle'
 import type { AiProviderRegistry } from '../server/utils/aiProviderRegistry'
@@ -416,7 +418,9 @@ describe('a proposal can only be written once', () => {
     const now = Date.now()
     const ref = rememberAnalysis(SCOPE, VALID_PROPOSAL, now)
 
-    expect(claimApply(ref, BINDING, now + SUCCESS_REUSE_TTL_MS + 1000).ok).toBe(false)
+    // PWS-AI-DUP-GUARD-01-MIN-01 — expiry here means the APPLY deadline, not
+    // the much shorter reuse one.
+    expect(claimApply(ref, BINDING, now + PROPOSAL_APPLY_TTL_MS + 1000).ok).toBe(false)
     expect(claimApply('never-minted', BINDING).ok).toBe(false)
     expect(claimApply('', BINDING).ok).toBe(false)
     expect(claimApply(undefined, BINDING).ok).toBe(false)
@@ -425,11 +429,17 @@ describe('a proposal can only be written once', () => {
 
   it('the reference carries nothing derivable about the product or the analysis', () => {
     const ref = rememberAnalysis(SCOPE, VALID_PROPOSAL)
-    expect(ref).not.toContain('3')
+    // Only meaningful multi-character values are asserted: a single digit would
+    // appear in random base64url text by chance and prove nothing.
     expect(ref).not.toContain('admin-1')
     expect(ref).not.toContain('fp-apply')
     expect(ref).not.toContain('specifications')
+    expect(ref).not.toContain('deepseek')
     expect(ref.length).toBeGreaterThan(32)
+
+    // Two references minted for different scopes share nothing.
+    const other = rememberAnalysis({ ...SCOPE, fingerprint: 'fp-apply-2' }, VALID_PROPOSAL)
+    expect(other).not.toBe(ref)
   })
 })
 
@@ -553,5 +563,115 @@ describe('apply.post.ts — a replayed request performs no additional writes', (
 
     // Still claimable: nothing was written, so the reviewer may correct and retry.
     expect(claimApply(ref, { adminUserId: 'admin-1', productId: 3 }).ok).toBe(true)
+  })
+})
+
+// ── PWS-AI-DUP-GUARD-01-MIN-01: reuse lifetime and review lifetime are separate ──
+
+/**
+ * These two deadlines answer different questions. Reuse is about not paying
+ * for the same model call twice. Applying is about a person: they analyse a
+ * product, work down thirty proposed parameters, check the conflicts against
+ * the real specifications, get interrupted, come back. Sharing one deadline
+ * meant their finished review stopped being applicable while it was still on
+ * screen — every decision made, and the server had quietly forgotten the
+ * reference it needed.
+ */
+describe('a reviewed proposal outlives the analysis reuse cache', () => {
+  const SCOPE = { adminUserId: 'admin-1', productId: 3, targetId: 'specifications', providerId: 'deepseek', fingerprint: 'fp-lifetimes' }
+  const BINDING = { adminUserId: 'admin-1', productId: 3 }
+
+  it('eleven minutes after Analyze the reuse cache is cold, but the proposal still applies', () => {
+    const t0 = Date.now()
+    const ref = rememberAnalysis(SCOPE, VALID_PROPOSAL, t0)
+
+    const elevenMinutes = t0 + 11 * 60 * 1000
+    expect(elevenMinutes - t0).toBeGreaterThan(SUCCESS_REUSE_TTL_MS)
+
+    // The analysis is no longer reusable — a fresh request would pay again.
+    expect(lookupAnalysis(SCOPE, elevenMinutes)).toBeNull()
+
+    // ...but the review the person just finished is still applicable.
+    expect(claimApply(ref, BINDING, elevenMinutes).ok).toBe(true)
+  })
+
+  it('the proposal expires on its own, much later, deadline', () => {
+    const t0 = Date.now()
+    const ref = rememberAnalysis(SCOPE, VALID_PROPOSAL, t0)
+
+    expect(PROPOSAL_APPLY_TTL_MS).toBeGreaterThan(SUCCESS_REUSE_TTL_MS)
+    // Just inside: still applicable.
+    expect(claimApply(ref, BINDING, t0 + PROPOSAL_APPLY_TTL_MS - 60_000).ok).toBe(true)
+
+    const later = rememberAnalysis({ ...SCOPE, fingerprint: 'fp-lifetimes-2' }, VALID_PROPOSAL, t0)
+    // Just outside: refused.
+    expect(claimApply(later, BINDING, t0 + PROPOSAL_APPLY_TTL_MS + 1000).ok).toBe(false)
+  })
+
+  it('filling the reuse cache evicts old analyses but never a pending proposal', () => {
+    const t0 = Date.now()
+    const pendingRef = rememberAnalysis(SCOPE, VALID_PROPOSAL, t0)
+
+    // Push far past the reuse ceiling with newer analyses.
+    for (let i = 0; i < MAX_CACHED_ANALYSES + 20; i++) {
+      rememberAnalysis({ ...SCOPE, fingerprint: `fp-flood-${i}` }, VALID_PROPOSAL, t0 + i + 1)
+    }
+
+    // The first analysis is gone from the reuse cache, as intended...
+    expect(lookupAnalysis(SCOPE, t0 + 1000)).toBeNull()
+    // ...and its proposal is untouched, so the reviewer can still apply.
+    expect(claimApply(pendingRef, BINDING, t0 + 1000).ok).toBe(true)
+  })
+
+  it('an applied proposal still replays with zero additional writes long after the reuse window', () => {
+    const t0 = Date.now()
+    const ref = rememberAnalysis(SCOPE, VALID_PROPOSAL, t0)
+    const success = { ok: true, appliedCount: 5, totalCount: 5, partial: false, message: 'Applied 5 accepted changes to Draft.' }
+
+    expect(claimApply(ref, BINDING, t0).ok).toBe(true)
+    settleApply(ref, success, t0)
+
+    const wellPastReuse = t0 + 90 * 60 * 1000
+    const replay = claimApply(ref, BINDING, wellPastReuse)
+    expect(replay.ok).toBe(false)
+    if (!replay.ok && replay.reason === 'terminal') {
+      expect(replay.state).toBe('applied')
+      expect(replay.appliedResult).toEqual(success)
+    } else {
+      throw new Error('expected a terminal refusal')
+    }
+  })
+
+  it('a partial proposal stays terminal long after the reuse window', () => {
+    const t0 = Date.now()
+    const ref = rememberAnalysis({ ...SCOPE, fingerprint: 'fp-partial-late' }, VALID_PROPOSAL, t0)
+    const partial = { ok: false, appliedCount: 2, totalCount: 4, partial: true, message: 'Applied 2 of 4 accepted changes before a save error.' }
+
+    claimApply(ref, BINDING, t0)
+    settleApply(ref, partial, t0)
+
+    const wellPastReuse = t0 + 90 * 60 * 1000
+    const replay = claimApply(ref, BINDING, wellPastReuse)
+    expect(replay.ok).toBe(false)
+    if (!replay.ok && replay.reason === 'terminal') {
+      expect(replay.state).toBe('partial')
+      expect(replay.appliedResult).toEqual(partial)
+    } else {
+      throw new Error('expected a terminal refusal')
+    }
+  })
+
+  it('tracked proposals are still bounded — the fix does not trade a leak for a bug', () => {
+    const t0 = Date.now()
+    const first = rememberAnalysis({ ...SCOPE, fingerprint: 'fp-bound-first' }, VALID_PROPOSAL, t0)
+
+    for (let i = 0; i < MAX_TRACKED_PROPOSALS + 10; i++) {
+      rememberAnalysis({ ...SCOPE, fingerprint: `fp-bound-${i}` }, VALID_PROPOSAL, t0 + i + 1)
+    }
+
+    // The oldest is evicted by the memory backstop; the newest survive.
+    expect(claimApply(first, BINDING, t0 + 1000).ok).toBe(false)
+    const newest = rememberAnalysis({ ...SCOPE, fingerprint: 'fp-bound-newest' }, VALID_PROPOSAL, t0 + MAX_TRACKED_PROPOSALS + 100)
+    expect(claimApply(newest, BINDING, t0 + MAX_TRACKED_PROPOSALS + 200).ok).toBe(true)
   })
 })

@@ -4321,3 +4321,66 @@ MASTER-ROADMAP 经检索**不含**近期 multi-product AI 表述，因此未修�
 继续单产品 Beta 的日常使用。本模块不开启任何新能力。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-DUP-GUARD-01"任务中写入。*
+
+---
+
+## PWS-AI-DUP-GUARD-01-MIN-01 — 分离分析复用期与人工审核/Apply 期（2026-09-09）
+
+**只修一个 P1，未扩大范围。改动文件仅两个：`server/utils/aiProposalReplayGuard.ts`、`tests/aiDuplicateGuard.test.ts`。无 UI 改动。**
+
+### 一、被修复的问题
+
+`DUP-GUARD-01` 用同一个 `SUCCESS_REUSE_TTL_MS = 10 分钟` 同时控制两件事：分析结果复用，以及 `proposalRef` 的 Apply 有效期。`claimApply()` 会经过 `dropExpired()`，因此管理员 Analyze 之后**只要审核超过 10 分钟**，仍在浏览器里的 Proposal 就会因引用过期而无法 Apply —— 提案还在屏幕上、每一条决定都已做出，服务端却已悄悄忘记它需要的引用。
+
+另外 `MAX_CACHED_ANALYSES` 的容量淘汰会同时删除 `byScope` 与 `byRef`，理论上也能让一个仍在人工审核中的 `proposalRef` 提前失效。
+
+这两点都不符合真实的单品号批量审核工作流：一次分析产生几十条参数，逐条审、核对冲突、被打断、回来继续，本就会超过十分钟。
+
+### 二、修复 A —— 两个生命周期分开
+
+这两个期限回答的是不同问题。**复用**关心的是不要为同一次模型调用付两次钱；**Apply** 关心的是一个人的审核时间。
+
+| 常量 | 值 | 管辖 |
+|---|---|---|
+| `SUCCESS_REUSE_TTL_MS` | **10 分钟**（不变） | `lookupAnalysis()` —— 分析结果能否复用 |
+| `PROPOSAL_APPLY_TTL_MS` | **2 小时**（新增） | `claimApply()` / `settleApply()` / `releaseApply()` —— 提案能否被应用 |
+
+记录上改为两个独立 deadline（`reuseExpiresAt` / `applyExpiresAt`），`dropExpired()` 分别按各自期限清理两张表：分析在十分钟后离开复用缓存，其提案继续可用两小时。两小时足以覆盖一次带中断的真实审核，且仍是短期内存状态——**没有引入 Proposal History，没有持久化任何东西**。
+
+### 三、修复 B —— 容量淘汰不再波及审核中的提案
+
+`enforceReuseCeiling()` 现在**只裁剪复用缓存**（`byScope`）。被淘汰的分析只意味着日后一次相同请求要重新付费调用模型；它绝不能让审核者失去待应用的提案，因此对应的 `proposalRef` 被刻意保留。
+
+另新增 `MAX_TRACKED_PROPOSALS = 500` 作为**内存兜底**（按各自 apply 期限最早者淘汰），远高于任何真实审核工作量（Generate 的 10 秒冷却本身就限制了提案生成速率）。这是防止映射无界增长的下限保护，不是工作流限制——如实记录，而不是称其为强保证。
+
+### 四、保持不变
+
+content dedupe、fingerprint、前端 analyzing lock、Generate single-flight、cooldown、provider、prompt、DeepSeek、Batch Review、Specifications Apply 内容、D-021 single-product scope —— **全部未改动**。
+
+### 五、测试（新增 6 条，合计 1009）
+
+覆盖 §D 全部：t=0 Analyze，t=11 分钟时复用缓存已冷但原 `proposalRef` **仍可 Apply**；提案在自己的、更晚的期限上才失效（期限内可用、期限外拒绝）；把复用缓存灌满超过上限后，旧分析被淘汰而**待审提案不受影响**；已 Applied 的提案在复用窗口之后很久仍以终态重放、**零额外写入**；partial 提案同样在复用窗口之后保持终态；追踪中的提案仍然有界（不以内存泄漏换取修复）。
+
+另修正两处既有断言：过期用例改用 `PROPOSAL_APPLY_TTL_MS`（这正是修复生效的体现）；`proposalRef` 不可推导用例去掉了 `not.toContain('3')`——随机 base64url 迟早会包含单个字符 `3`，那条断言本就靠运气，改为只断言有意义的多字符值。
+
+**红灯验证：** 把 apply 期限退回与 reuse 相同、并恢复连带淘汰后，**5 条测试失败**（含「11 分钟后仍可 Apply」）；恢复后 38 条全绿。临时文件已清除。
+
+### 六、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **1009 / 1009 通过**（28 文件，本次 +6） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功 |
+
+**无 UI 改动，1440 / 375 断点验收 N/A。**
+
+### 七、明确未做
+
+**0 次真实 Provider 调用、0 API 费用、0 Redis、0 数据库、0 新 collection**；未 push / merge master、未部署；未改本 P1 之外的任何行为。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-DUP-GUARD-01-MIN-01"任务中写入。*
