@@ -158,3 +158,85 @@ describe('resolveSourceRefs — all or nothing', () => {
     expect(resolveSourceRefs(tooMany, OWNER, 5)).toBeNull()
   })
 })
+
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01 — a missing server secret and a bad
+ * ref are two different failures and must never be reported as one.
+ *
+ * The module caches its derived key, and every test above has already caused a
+ * derivation, so `vi.resetModules()` is required to reach the un-derived state
+ * at all. The dynamic import below therefore gets a FRESH module instance whose
+ * key has not been derived yet.
+ */
+describe('no server secret — the error propagates instead of becoming a null ref', () => {
+  async function freshModuleWithoutSecret() {
+    vi.resetModules()
+    vi.stubGlobal('useRuntimeConfig', () => ({ directusToken: '' }))
+    return import('../server/utils/aiSourceRef')
+  }
+
+  async function restoreSecretStub() {
+    vi.resetModules()
+    vi.stubGlobal('useRuntimeConfig', () => ({ directusToken: 'test-directus-token-for-key-derivation' }))
+  }
+
+  it('createSourceRef throws SourceRefUnavailableError', async () => {
+    const mod = await freshModuleWithoutSecret()
+    expect(() => mod.createSourceRef(1, OWNER)).toThrow(mod.SourceRefUnavailableError)
+    await restoreSecretStub()
+  })
+
+  it('resolveSourceRef throws rather than returning null — null would mean "bad ref"', async () => {
+    const mod = await freshModuleWithoutSecret()
+    // A syntactically plausible ref: the point is that it is never even judged.
+    expect(() => mod.resolveSourceRef('aaa.bbb.ccc', OWNER)).toThrow(mod.SourceRefUnavailableError)
+    await restoreSecretStub()
+  })
+
+  it('resolveSourceRefs propagates the same error unchanged', async () => {
+    const mod = await freshModuleWithoutSecret()
+    expect(() => mod.resolveSourceRefs(['aaa.bbb.ccc'], OWNER, 5)).toThrow(mod.SourceRefUnavailableError)
+    await restoreSecretStub()
+  })
+
+  it('the error message never contains the secret or its config key', async () => {
+    const mod = await freshModuleWithoutSecret()
+    try {
+      mod.createSourceRef(1, OWNER)
+      throw new Error('expected SourceRefUnavailableError')
+    } catch (err) {
+      const message = String((err as Error).message)
+      expect(message).not.toContain('directusToken')
+      expect(message).not.toContain('test-directus-token')
+    }
+    await restoreSecretStub()
+  })
+})
+
+/**
+ * The guard in the other direction: with a secret configured, every ref-level
+ * failure must still resolve to null. If these ever start throwing, the 503
+ * path has swallowed the ordinary "invalid selection" path.
+ */
+describe('with a secret configured — ref-level failures stay null and never throw', () => {
+  it('tampered, truncated, expired, cross-admin and cross-product refs all return null', () => {
+    const ref = createSourceRef(99, OWNER)
+    const [iv, body, tag] = ref.split('.')
+    const mintedAt = Date.now()
+    const expiring = createSourceRef(99, OWNER, mintedAt)
+
+    const cases: Array<() => number | null> = [
+      () => resolveSourceRef(`${iv}.${body}.${tag.slice(0, -2)}xx`, OWNER),
+      () => resolveSourceRef(`${iv}.${body}`, OWNER),
+      () => resolveSourceRef(expiring, OWNER, mintedAt + SOURCE_REF_TTL_MS + 1000),
+      () => resolveSourceRef(ref, { productId: 3, adminUserId: 'someone-else' }),
+      () => resolveSourceRef(ref, { productId: 4, adminUserId: 'admin-1' }),
+      () => resolveSourceRef('not-a-ref-at-all', OWNER),
+    ]
+
+    for (const run of cases) {
+      expect(run).not.toThrow()
+      expect(run()).toBeNull()
+    }
+  })
+})

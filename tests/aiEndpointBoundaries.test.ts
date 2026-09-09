@@ -921,3 +921,194 @@ describe('generate.post.ts — oversized request bodies are refused on real byte
     expect(code).toContain('readJsonBodyWithByteLimit')
   })
 })
+
+// ── 3g. No sourceRef server secret: the endpoints must fail CLOSED with 503 ──
+
+/**
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01 — these tests exist because the 503
+ * branch in both endpoints was unreachable. `refKey()` was called inside
+ * `open()`'s `try`, so `SourceRefUnavailableError` was caught by the same
+ * handler that absorbs a forged ref and flattened into `null`; Generate then
+ * answered "this selection is no longer valid", which reads as "your refs went
+ * stale" rather than "this server cannot do this at all".
+ *
+ * Testing `createSourceRef` alone would not have caught it — minting throws
+ * from `seal()`, which was never inside a `try`. Only the resolve path through
+ * the REAL Generate handler shows the difference, so that is what is asserted
+ * here.
+ *
+ * `vi.resetModules()` is what makes the "no secret" state reachable at all:
+ * the derived key is cached per module instance, and earlier tests in this
+ * file have already derived one.
+ */
+describe('sourceRef secret missing — 503, not a silent "invalid ref"', () => {
+  const NO_SECRET_CONFIG = {
+    directusUrl: 'http://directus.test',
+    // directusToken deliberately absent — this is the whole point of the suite.
+    directusToken: '',
+    aiDefaultProvider: 'deepseek',
+    openaiApiKey: '',
+    openaiModel: '',
+    deepseekApiKey: '',
+    deepseekModel: '',
+  }
+
+  const SECRET_ROWS = [
+    { id: 21, enabled: true, file_role: 'datasheet', directus_files_id: { filename_download: 'specs.txt', type: 'text/plain' } },
+  ]
+
+  function secretFetch(url: string) {
+    if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+    if (url.includes('/items/products_files?filter[products_id][_eq]=3')) return { data: SECRET_ROWS }
+    if (url.includes('/items/products/3')) return { data: { name_en: 'Test product' } }
+    return { data: null }
+  }
+
+  /** Installs the Nitro globals with a runtime config that has no server secret. */
+  function installWithoutSecret() {
+    installNitroGlobals(async (url: string) => secretFetch(url))
+    vi.stubGlobal('useRuntimeConfig', () => NO_SECRET_CONFIG)
+  }
+
+  it('ai/sources returns 503 rather than a list with unusable refs', async () => {
+    vi.resetModules()
+    installWithoutSecret()
+
+    const handler = (await import('../server/api/admin/products/[id]/ai/sources.get')).default as unknown as (e: unknown) => Promise<unknown>
+    const event = mockEvent({ url: SOURCES_PATH, routerParams: { id: '3' } })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
+
+    expect(await statusCodeOf(() => handler(event))).toBe(503)
+  })
+
+  it('Generate returns 503 for a genuine, correctly minted ref — the secret, not the ref, is what is missing', async () => {
+    // 1. Mint a real ref while a secret IS configured. This is a well-formed,
+    //    correctly encrypted, unexpired ref for this admin and this product —
+    //    everything about it is valid.
+    vi.resetModules()
+    installNitroGlobals(async (url: string) => secretFetch(url))
+    const { createSourceRef } = await import('../server/utils/aiSourceRef')
+    const genuineRef = createSourceRef(21, { productId: 3, adminUserId: 'admin-1' })
+
+    // 2. Now take the secret away and submit that same ref.
+    vi.resetModules()
+    installWithoutSecret()
+
+    // A spy on global fetch proves no provider request is attempted: the
+    // adapters issue their call with native `fetch`.
+    const nativeFetchSpy = vi.fn(async () => {
+      throw new Error('a provider request must never be attempted without a source-ref secret')
+    })
+    vi.stubGlobal('fetch', nativeFetchSpy)
+
+    const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<unknown>
+    const event = mockEvent({
+      url: GENERATE_PATH,
+      method: 'POST',
+      routerParams: { id: '3' },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', sourceRefs: [genuineRef] })]),
+    })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
+
+    expect(await statusCodeOf(() => handler(event))).toBe(503)
+
+    // No AI provider call.
+    expect(nativeFetchSpy).not.toHaveBeenCalled()
+
+    // No product write: nothing but reads may have reached Directus, and in
+    // fact the handler refuses before it reads anything at all.
+    const writes = fetchCalls.filter(c => ['POST', 'PATCH', 'DELETE'].includes(String((c.options as { method?: string } | undefined)?.method ?? 'GET').toUpperCase()))
+    expect(writes).toEqual([])
+  })
+
+  it('the same ref and the same request succeed past the ref check once a secret IS configured', async () => {
+    // The control for the test above: identical request, secret present. It
+    // must NOT be 503 — otherwise the 503 above would prove nothing about the
+    // secret specifically.
+    vi.resetModules()
+    installNitroGlobals(async (url: string) => secretFetch(url))
+
+    const { createSourceRef } = await import('../server/utils/aiSourceRef')
+    const genuineRef = createSourceRef(21, { productId: 3, adminUserId: 'admin-1' })
+
+    const { resetGenerateSlots } = await import('../server/utils/aiGenerateRateLimit')
+    resetGenerateSlots()
+
+    const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<{ ok: boolean, error?: string }>
+    const event = mockEvent({
+      url: GENERATE_PATH,
+      method: 'POST',
+      routerParams: { id: '3' },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', sourceRefs: [genuineRef] })]),
+    })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
+
+    // No provider key is configured in the test config, so it stops at the
+    // provider check — which is well past the ref resolution being verified.
+    const result = await handler(event)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('AI provider is not configured.')
+    resetGenerateSlots()
+  })
+
+  it('a missing secret is never reported as an invalid selection', async () => {
+    vi.resetModules()
+    installWithoutSecret()
+
+    const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<unknown>
+    const event = mockEvent({
+      url: GENERATE_PATH,
+      method: 'POST',
+      routerParams: { id: '3' },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', sourceRefs: ['anything-at-all'] })]),
+    })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
+
+    let thrown: { statusCode?: number, message?: string, statusMessage?: string } | null = null
+    try {
+      await handler(event)
+    } catch (err) {
+      thrown = err as { statusCode?: number, message?: string, statusMessage?: string }
+    }
+
+    expect(thrown?.statusCode).toBe(503)
+    const text = `${thrown?.message ?? ''} ${thrown?.statusMessage ?? ''}`
+    expect(text).not.toContain('no longer valid')
+    // And the refusal never names the secret, the config key, or its value.
+    expect(text).not.toContain('directusToken')
+    expect(text).not.toContain('server-token')
+  })
+
+  it('with a secret present, a forged or expired ref is still an invalid selection — NOT a 503', async () => {
+    // The failure modes must stay distinguishable in both directions: this
+    // guards against "fix" the other way, where every bad ref becomes a 503.
+    vi.resetModules()
+    installNitroGlobals(async (url: string) => secretFetch(url))
+
+    const { resetGenerateSlots } = await import('../server/utils/aiGenerateRateLimit')
+    resetGenerateSlots()
+
+    const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<{ ok: boolean, error?: string }>
+    const event = mockEvent({
+      url: GENERATE_PATH,
+      method: 'POST',
+      routerParams: { id: '3' },
+      headers: { origin: 'http://localhost:3000' },
+      requestStream: Readable.from([JSON.stringify({ providerId: 'deepseek', sourceRefs: ['forged.ref.value'] })]),
+    })
+    event.context.adminToken = 'admin-token'
+    event.context.adminUserId = 'admin-1'
+
+    const result = await handler(event)
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('no longer valid')
+    resetGenerateSlots()
+  })
+})

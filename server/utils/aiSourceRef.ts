@@ -32,14 +32,17 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:cr
  * longer valid" errors the moment the app ran as more than one process.
  *
  * It is derived with HKDF-SHA256 from `directusToken` — an existing,
- * required, server-only secret this application cannot run without — under a
- * fixed salt and info string, so the derived key is specific to this purpose
- * and cannot be used to recover the secret or interchanged with any other
- * derived key. The secret itself is never logged, returned, or exposed; only
- * the derived key exists in memory. No new environment variable is introduced.
+ * server-only secret — under a fixed salt and info string, so the derived key
+ * is specific to this purpose and cannot be used to recover the secret or
+ * interchanged with any other derived key. The secret itself is never logged,
+ * returned, or exposed; only the derived key exists in memory. No new
+ * environment variable is introduced.
  *
- * Fail-closed: with no secret configured, no ref can be minted or resolved,
- * and the screens say so rather than falling back to raw Directus ids.
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01 — `directusToken` is not assumed to
+ * be present. When it is not configured, this module mints and resolves
+ * nothing and raises `SourceRefUnavailableError`, which the endpoints answer
+ * with 503. That is a deliberate fail-closed path, not a fallback: no raw
+ * Directus id is ever accepted in a ref's place.
  */
 
 /** How long a minted ref stays valid. Long enough to browse and analyze, short enough that a captured ref dies quickly. */
@@ -92,18 +95,34 @@ function seal(payload: SourceRefPayload): string {
   return `${iv.toString('base64url')}.${body.toString('base64url')}.${tag.toString('base64url')}`
 }
 
-/** Returns the payload, or null for anything malformed, truncated, or tampered with. */
+/**
+ * Returns the payload, or null for anything malformed, truncated, or tampered
+ * with.
+ *
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01 — the key is derived BEFORE the
+ * `try`, and deliberately before the shape check too. `refKey()` used to be
+ * called inside the block below, so a missing server secret was swallowed by
+ * the same `catch` that absorbs a forged ref: every request answered "this
+ * selection is no longer valid" and the 503 branch in both endpoints was
+ * unreachable. A missing secret is a server fault, not a bad ref, and the two
+ * must not be reported as the same thing — with no key there is nothing to
+ * judge any ref against, so the error propagates instead.
+ */
 function open(ref: string): SourceRefPayload | null {
+  const key = refKey()
+
   const parts = ref.split('.')
   if (parts.length !== 3) return null
   try {
-    const decipher = createDecipheriv('aes-256-gcm', refKey(), Buffer.from(parts[0], 'base64url'))
+    const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(parts[0], 'base64url'))
     decipher.setAuthTag(Buffer.from(parts[2], 'base64url'))
     const plain = Buffer.concat([decipher.update(Buffer.from(parts[1], 'base64url')), decipher.final()])
     return JSON.parse(plain.toString('utf8')) as SourceRefPayload
   } catch {
-    // A wrong key, a wrong IV, a truncated body, or a failed auth tag all land
-    // here. The caller learns only that the ref is unusable.
+    // Ciphertext-level failures only: a wrong IV, a truncated body, a failed
+    // auth tag, or a payload that is not JSON. The caller learns only that the
+    // ref is unusable. A missing server secret cannot reach here — it is
+    // raised above, before this block runs.
     return null
   }
 }
@@ -127,8 +146,12 @@ export function createSourceRef(mediaId: number, binding: SourceRefBinding, now 
 /**
  * Returns the `products_files.id` a ref stands for, or null if the ref is
  * malformed, tampered with, expired, or was minted for a different admin or
- * product. Never throws, and never reports which check failed — a caller
- * cannot use the failure reason to probe for valid ids.
+ * product. It never reports which of those checks failed — a caller cannot use
+ * the failure reason to probe for valid ids.
+ *
+ * The one thing it does throw is `SourceRefUnavailableError`, when the server
+ * has no secret to derive the key from. That is not a statement about the ref
+ * and must not be flattened into `null`: callers turn it into 503.
  */
 export function resolveSourceRef(ref: unknown, binding: SourceRefBinding, now = Date.now()): number | null {
   if (typeof ref !== 'string' || ref.length === 0 || ref.length > 512) return null
@@ -144,7 +167,11 @@ export function resolveSourceRef(ref: unknown, binding: SourceRefBinding, now = 
   return payload.m
 }
 
-/** Resolves a list of refs, returning null if ANY of them fails — a partially valid request is refused outright. */
+/**
+ * Resolves a list of refs, returning null if ANY of them fails — a partially
+ * valid request is refused outright. Propagates `SourceRefUnavailableError`
+ * from `resolveSourceRef` unchanged.
+ */
 export function resolveSourceRefs(refs: unknown, binding: SourceRefBinding, maxCount: number, now = Date.now()): number[] | null {
   if (!Array.isArray(refs) || refs.length === 0 || refs.length > maxCount) return null
   const mediaIds: number[] = []

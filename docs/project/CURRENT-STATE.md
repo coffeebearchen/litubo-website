@@ -3518,3 +3518,87 @@ PDF 现在返回**属于它自己**的停用理由（"PDF is not supported for t
 未启用 Apply（仍 503）、未恢复 PDF AI 解析、未新增 Page Content / FAQ / SEO / Publish 等任何新的 AI Target；未改 `docker-compose.yml` / Dockerfile / 生产运行时 / Directus schema / 权限 / 迁移；未改产品数据与 Media Library；未读取或修改 `.env`；未新增任何环境变量；未调用真实 DeepSeek / OpenAI；零费用；**未部署**；未创建 PR；**未 push master**；未 reset / rebase / amend / revert / force push；未移动或整理任何 `D:\` 目录；未改视觉母版资产。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-REVIEW-FIX-03-AUTO"任务中写入。*
+
+---
+
+## PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01 — sourceRef fail-closed 异常传播收口（2026-09-09）
+
+**任务范围：** 一个最小的安全边界修复。不改架构、不改 env、不改页面、不改 Apply、不动 backlog。
+
+### 一、被修复的真实缺陷：503 分支实际不可达
+
+独立审查发现，`server/utils/aiSourceRef.ts` 的 `open()` 把 `refKey()` 调用放在了 `try` 内部：
+
+```ts
+try {
+  const decipher = createDecipheriv('aes-256-gcm', refKey(), ...)   // ← refKey() 在 try 里
+  ...
+} catch {
+  return null                                                        // ← 什么异常都变成 null
+}
+```
+
+于是 `refKey()` 在**服务端密钥未配置**时抛出的 `SourceRefUnavailableError`，被同一个用来吸收"伪造 ref"的 catch 吞掉，变成了 `null`。结果是：
+
+- `resolveSourceRef` / `resolveSourceRefs` 返回 `null`；
+- Generate endpoint 走"ref 无效"分支，回答 **"This selection is no longer valid"**；
+- 它里面那段 `SourceRefUnavailableError → HTTP 503` 的 catch **永远不会被执行**。
+
+也就是说，"服务端根本没有配置密钥"这一**服务端故障**，被报告成了"你选的文件过期了"这一**用户侧问题**。方向完全错了：前者需要运维介入，后者只需要用户刷新页面。
+
+**修复：** `refKey()` 移到 `try` 之外，并且刻意放在格式检查之前——没有密钥时根本无从判断任何 ref，所以不该先假装去判断它。`catch` 现在只吸收密文层失败（错误 IV、截断、auth tag 失败、JSON 失败）。
+
+### 二、为什么单测 `createSourceRef` 抓不到这个问题
+
+铸造路径 `createSourceRef → seal() → refKey()` **从来不在 try 里**，所以只测铸造时，`ai/sources` 的 503 一直是正常的——本次红灯验证也确认了这一点：把代码临时改回缺陷版本后，`ai/sources returns 503` 这条测试**仍然通过**，而解析路径的 4 条测试全部失败。
+
+因此新测试直接覆盖**真实的 Generate handler**，而不是只覆盖工具函数。
+
+### 三、新增回归测试（10 条）
+
+`tests/aiEndpointBoundaries.test.ts` 新增：
+
+| 测试 | 断言 |
+|---|---|
+| 无密钥 → `ai/sources` | HTTP **503** |
+| 无密钥 → Generate，提交一个**真实铸造的合法 ref** | HTTP **503**；`fetch` spy **调用 0 次**（零 provider 调用）；Directus **零写请求**（POST/PATCH/DELETE 均为空） |
+| 有密钥 → 同一个 ref、同一个请求（对照组） | **不是 503**，停在 `AI provider is not configured.`，证明 503 确实来自缺密钥本身 |
+| 无密钥 → 拒绝文案 | **不含** "no longer valid"；**不含** `directusToken`，**不含**密钥值 |
+| 有密钥 → 伪造 ref | 仍是"无效选择"，**不是 503**（防止反向修坏） |
+
+`tests/aiSourceRef.test.ts` 新增单元级覆盖：无密钥时 `createSourceRef` / `resolveSourceRef` / `resolveSourceRefs` 三者**均抛** `SourceRefUnavailableError`；错误消息不含密钥或配置键名；以及反向守卫——有密钥时，篡改 / 截断 / 过期 / 跨管理员 / 跨产品 / 非 ref 字符串**六种情况全部返回 null 且不抛**。
+
+这些测试之所以能触及"未派生密钥"状态，是因为派生结果按模块实例缓存，必须 `vi.resetModules()` 拿到全新实例——测试注释里写明了这一点，以免以后被当成多余代码删掉。
+
+### 四、文字准确性修正
+
+`aiSourceRef.ts` 头部原先称 `directusToken` 是"an existing, **required**, server-only secret this application **cannot run without**"。这个说法与代码本身矛盾——如果它真是必需的，fail-closed 分支就不会存在。现表述为：它是**既有的 server-only secret**；**未配置时** AI sourceRef 功能 fail closed（抛 `SourceRefUnavailableError`，两个 endpoint 返回 503）；**本任务不新增任何环境变量**；不读取、不输出真实 secret。
+
+`resolveSourceRef` 的 "Never throws" 也已失效，同步改为：它不报告是哪一项检查失败，但**会**抛 `SourceRefUnavailableError`，且调用方必须把它转成 503 而不是压成 `null`。
+
+### 五、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **866 / 866 通过**（26 文件；较上轮 +10） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净（exit 0） |
+| `npx nuxt build` | 成功（6.5 MB / 1.65 MB gzip） |
+| **红灯验证** | 临时回退修复后，解析路径 4 条新测试**失败**；恢复后全绿——测试具备真实捕获力 |
+| Generate 无 sourceRef 密钥 | **503** |
+| provider 调用次数 | **0** |
+| 产品写入次数 | **0** |
+| Apply | 仍 **503** |
+
+本次未触碰任何页面代码（变更文件仅 3 个：`server/utils/aiSourceRef.ts`、`tests/aiSourceRef.test.ts`、`tests/aiEndpointBoundaries.test.ts`），因此未重做 1440px / 375px 视觉验证。
+
+**GitHub Actions 状态：本次推送后需在 Actions 页面确认实际结果。本文档不声称"CI 已绿"。**
+
+### 明确未做
+
+未 push master、未 merge、未部署、未创建 PR；未改 Docker / docker-compose / 服务器基础设施；未改 Directus schema / migration / 权限；未读取或修改真实 `.env`；未输出任何 Token / Key / Cookie；未填写 DeepSeek / OpenAI Key；未调用真实 AI provider；零费用；未启用 Apply、未改 Apply 的 503 行为；未恢复 PDF AI；未开始 Page Content / FAQ / SEO AI；未改视觉母版；未移动或整理任何 `D:\` 目录；未执行 `npm audit fix`；未顺手修复任何其他 backlog。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01"任务中写入。*
