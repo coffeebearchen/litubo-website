@@ -47,7 +47,71 @@ export type DeepSeekModelCaller = (
 ) => Promise<unknown>
 
 const NOT_CONFIGURED_ERROR = 'AI provider is not configured.'
-const CALL_FAILED_ERROR = 'The AI provider could not generate a proposal right now.'
+
+/**
+ * PWS-AI-BETA-01R2 — the first real Beta call reached DeepSeek, consumed
+ * tokens, and still produced nothing usable, and the then-current adapter
+ * collapsed every transport failure into one sentence. The specific status was
+ * constructed (`provider responded 401`) and then discarded by a bare `catch`,
+ * so the failure could not be diagnosed afterwards at all.
+ *
+ * These categories are the fix. They are a CLOSED set of fixed strings: no
+ * provider message, no raw payload, and no reasoning content ever reaches this
+ * type. Everything a caller or a log line can learn about a failure is here.
+ */
+export type DeepSeekFailureCategory =
+  | 'authentication_failed'
+  | 'insufficient_balance'
+  | 'invalid_request'
+  | 'rate_limited'
+  | 'provider_unavailable'
+  | 'provider_incomplete'
+  | 'provider_failed'
+  | 'no_output_text'
+  | 'invalid_json'
+  | 'timeout'
+  | 'network_error'
+
+/** Fixed, short, safe. Nothing here is derived from provider output. */
+export const DEEPSEEK_FAILURE_MESSAGES: Record<DeepSeekFailureCategory, string> = {
+  authentication_failed: 'DeepSeek authentication failed.',
+  insufficient_balance: 'DeepSeek account balance is insufficient.',
+  invalid_request: 'DeepSeek rejected the request.',
+  rate_limited: 'DeepSeek rate limit was reached.',
+  provider_unavailable: 'DeepSeek service is temporarily unavailable.',
+  provider_incomplete: 'DeepSeek returned an incomplete response.',
+  provider_failed: 'DeepSeek reported that generation failed.',
+  no_output_text: 'DeepSeek returned no final output.',
+  invalid_json: 'DeepSeek returned final output that could not be parsed.',
+  timeout: 'DeepSeek did not respond before the request timeout.',
+  network_error: 'DeepSeek could not be reached.',
+}
+
+/**
+ * Carries the category and, when they exist, the two pieces of metadata that
+ * are safe to record: the HTTP status and the Responses `status` field. It
+ * deliberately does NOT carry the provider's own error message or body.
+ */
+export class DeepSeekCallError extends Error {
+  constructor(
+    readonly category: DeepSeekFailureCategory,
+    readonly httpStatus?: number,
+    readonly responseStatus?: string,
+  ) {
+    super(category)
+    this.name = 'DeepSeekCallError'
+  }
+}
+
+/** HTTP status → category. Ordered most specific first. */
+function categoryForHttpStatus(status: number): DeepSeekFailureCategory {
+  if (status === 401) return 'authentication_failed'
+  if (status === 402) return 'insufficient_balance'
+  if (status === 429) return 'rate_limited'
+  if (status >= 500) return 'provider_unavailable'
+  if (status >= 400) return 'invalid_request'
+  return 'provider_unavailable'
+}
 
 /**
  * The real network call — DeepSeek's documented Responses API, reached via
@@ -94,25 +158,46 @@ async function withCallDeadline<T>(work: Promise<T>): Promise<T | typeof DEADLIN
 }
 
 /**
- * Pulls the assistant's text out of a Responses API payload. The official SDK
- * exposed this as a convenience `output_text` property computed client-side,
- * so a native caller has to do the same walk: prefer the field when a provider
- * sends it, otherwise concatenate the text parts of the output items.
+ * Pulls the model's FINAL answer out of a Responses API payload — and nothing
+ * else.
+ *
+ * PWS-AI-BETA-01R2 — the previous version accepted any `chunk.text` it found
+ * anywhere in `output`, without checking either `item.type` or `content.type`.
+ * DeepSeek V4 Flash has thinking enabled by default, so a response can carry a
+ * `reasoning` item alongside the `message` item. Under the old rule the
+ * reasoning prose would be concatenated in front of the JSON answer and handed
+ * to `JSON.parse`, which cannot succeed. This adapter now reads only what is
+ * unambiguously the final output.
+ *
+ * The reasoning text is not returned, not logged, and not inspected — it is
+ * skipped on the basis of its type alone.
  */
 function readResponsesApiOutputText(payload: unknown): string {
   const body = payload as {
     output_text?: unknown
-    output?: Array<{ content?: Array<{ text?: unknown }> }>
+    output?: Array<{ type?: unknown, content?: Array<{ type?: unknown, text?: unknown }> }>
   }
-  if (typeof body.output_text === 'string') return body.output_text
+
+  // The convenience field, when a provider computes it, already means "the
+  // final text". Only a non-empty string counts.
+  if (typeof body.output_text === 'string' && body.output_text.trim() !== '') {
+    return body.output_text
+  }
 
   const parts: string[] = []
   for (const item of body.output ?? []) {
+    // `reasoning`, tool calls and anything else are skipped outright.
+    if (item?.type !== 'message') continue
     for (const chunk of item.content ?? []) {
-      if (typeof chunk.text === 'string') parts.push(chunk.text)
+      // Within a message, only the final answer part — never `reasoning_text`,
+      // `refusal`, or any other text-bearing field.
+      if (chunk?.type === 'output_text' && typeof chunk.text === 'string') {
+        parts.push(chunk.text)
+      }
     }
   }
-  if (parts.length === 0) throw new Error('provider returned no text output')
+
+  if (parts.length === 0) throw new DeepSeekCallError('no_output_text')
   return parts.join('')
 }
 
@@ -121,32 +206,110 @@ async function defaultDeepSeekModelCaller(
   input: AiGenerationInput,
   config: DeepSeekProviderConfig,
 ): Promise<unknown> {
-  const response = await fetch(`${DEEPSEEK_BASE_URL}/responses`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: config.model,
-      instructions: target.systemInstructions,
-      input: target.buildUserInput(input),
-      // DeepSeek's documented Responses API only specifies `type`, `name` and
-      // `schema` for json_schema structured output — `strict` is an OpenAI-only
-      // guarantee this adapter must not claim or depend on.
-      text: {
-        format: {
-          type: 'json_schema',
-          name: target.schemaName,
-          schema: target.jsonSchema,
-        },
+  let response: Response
+  try {
+    response = await fetch(`${DEEPSEEK_BASE_URL}/responses`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
       },
-    }),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
+      body: JSON.stringify({
+        model: config.model,
+        instructions: target.systemInstructions,
+        input: target.buildUserInput(input),
+        /**
+         * PWS-AI-BETA-01R2 — thinking off.
+         *
+         * DeepSeek V4 Flash enables thinking by default at `effort: high`. The
+         * first real Beta call spent 7,079 tokens on what is a structured
+         * extraction task: read a document, emit a JSON object against a fixed
+         * schema. There is no reasoning budget worth paying here, and a
+         * reasoning item in the response is one more thing the parser above has
+         * to step around.
+         *
+         * This is set for every structured call, not for one Target — the
+         * adapter stays Target-neutral and does not inspect `target.id`. If a
+         * future Target genuinely needs reasoning, that belongs in a provider
+         * policy, not in a special case here.
+         */
+        reasoning: { effort: 'none' },
+        // DeepSeek's documented Responses API only specifies `type`, `name` and
+        // `schema` for json_schema structured output — `strict` is an OpenAI-only
+        // guarantee this adapter must not claim or depend on.
+        text: {
+          format: {
+            type: 'json_schema',
+            name: target.schemaName,
+            schema: target.jsonSchema,
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
+  } catch (error) {
+    // `AbortSignal.timeout()` rejects with a TimeoutError; everything else at
+    // this point is DNS, TLS, a refused connection or a proxy.
+    const name = (error as { name?: string } | null)?.name
+    throw new DeepSeekCallError(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network_error')
+  }
 
-  if (!response.ok) throw new Error(`provider responded ${response.status}`)
-  return JSON.parse(readResponsesApiOutputText(await response.json()))
+  if (!response.ok) {
+    // The status is kept as metadata — the body is not read, so no provider
+    // error message can leak through this path.
+    throw new DeepSeekCallError(categoryForHttpStatus(response.status), response.status)
+  }
+
+  let payload: unknown
+  try {
+    payload = await response.json()
+  } catch {
+    throw new DeepSeekCallError('invalid_json', response.status)
+  }
+
+  /**
+   * A Responses payload reports its own outcome. Only `incomplete` and
+   * `failed` are refused: a missing `status` is treated as usable, because
+   * rejecting a payload that carries a perfectly good final answer merely
+   * because it omitted the field would turn a working call into a failure.
+   */
+  const responseStatus = (payload as { status?: unknown } | null)?.status
+  if (responseStatus === 'incomplete') {
+    throw new DeepSeekCallError('provider_incomplete', response.status, 'incomplete')
+  }
+  if (responseStatus === 'failed') {
+    throw new DeepSeekCallError('provider_failed', response.status, 'failed')
+  }
+
+  const outputText = readResponsesApiOutputText(payload)
+  try {
+    return JSON.parse(outputText)
+  } catch {
+    throw new DeepSeekCallError('invalid_json', response.status, typeof responseStatus === 'string' ? responseStatus : undefined)
+  }
+}
+
+/**
+ * Records a failure with the only metadata that is safe to keep: which
+ * provider, which category, and the two status values when they exist.
+ *
+ * PWS-AI-BETA-01R2 — deliberately NOT logged here: the API key, any header,
+ * the prompt, the system instructions, the extracted source text, the
+ * filename, the product name or id, the provider's raw response, the
+ * provider's own error message, the reasoning content, the final output text,
+ * and the stack. A diagnosable failure does not require any of them.
+ */
+function logProviderFailure(failure: DeepSeekCallError): void {
+  const parts = ['provider=deepseek', `category=${failure.category}`]
+  if (failure.httpStatus !== undefined) parts.push(`httpStatus=${failure.httpStatus}`)
+  if (failure.responseStatus !== undefined) parts.push(`responseStatus=${failure.responseStatus}`)
+  console.warn(`[ai/deepseek] AI provider failure: ${parts.join(' ')}`)
+}
+
+/** Logs the failure once and returns its fixed, safe message. */
+function failureResult<TOutput>(failure: DeepSeekCallError): TargetGenerationResult<TOutput> {
+  logProviderFailure(failure)
+  return { ok: false, error: DEEPSEEK_FAILURE_MESSAGES[failure.category] }
 }
 
 /**
@@ -171,10 +334,16 @@ export function createDeepSeekStructuredProvider(
     let raw: unknown
     try {
       raw = await withCallDeadline(callModel(target as TargetDefinition<unknown>, input, config))
-    } catch {
-      return { ok: false, error: CALL_FAILED_ERROR }
+    } catch (error) {
+      // An uncategorised throw can only come from an injected caller (tests) or
+      // an unforeseen runtime fault; it is reported as a transport failure
+      // rather than inventing a more specific claim about it.
+      const failure = error instanceof DeepSeekCallError
+        ? error
+        : new DeepSeekCallError('network_error')
+      return failureResult(failure)
     }
-    if (raw === DEADLINE_EXCEEDED) return { ok: false, error: CALL_FAILED_ERROR }
+    if (raw === DEADLINE_EXCEEDED) return failureResult(new DeepSeekCallError('timeout'))
 
     const sourceMaterial = input.extractedSourceTexts.map(s => s.text).join('\n\n')
     return target.parseAndValidate(raw, { sourceMaterial })

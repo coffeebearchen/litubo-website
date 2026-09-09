@@ -7,11 +7,15 @@
  * generic (Target-neutral) call shape, not on anything specifications-only.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createOpenAiStructuredProvider, type ModelCaller } from '../server/utils/openaiStructuredProvider'
-import { createDeepSeekStructuredProvider, type DeepSeekModelCaller } from '../server/utils/deepseekStructuredProvider'
+import {
+  createDeepSeekStructuredProvider,
+  DEEPSEEK_FAILURE_MESSAGES,
+  type DeepSeekModelCaller,
+} from '../server/utils/deepseekStructuredProvider'
 import { specificationsTarget } from '../server/utils/aiTargets/specificationsTarget'
 import type { AiGenerationInput } from '../server/utils/aiTargetContract'
 
@@ -100,10 +104,15 @@ describe('createDeepSeekStructuredProvider — fail-closed, mock paths, and the 
   })
 
   it('a rejected model call becomes a short, safe error', async () => {
+    // PWS-AI-BETA-01R2 — an uncategorised throw (only reachable through an
+    // injected caller) is reported as a transport failure rather than as a
+    // more specific claim the adapter cannot support.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const callModel: DeepSeekModelCaller = vi.fn(async () => { throw new Error('timeout') })
     const provider = createDeepSeekStructuredProvider({ apiKey: 'ds-x', model: 'deepseek-chat' }, callModel)
     const result = await provider.generateStructured(specificationsTarget, SAMPLE_INPUT)
-    expect(result).toEqual({ ok: false, error: 'The AI provider could not generate a proposal right now.' })
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.network_error })
+    warn.mockRestore()
   })
 
   it('never sends strict:true — only the officially documented type/name/schema fields', () => {
@@ -276,9 +285,13 @@ describe('PWS-AI-ENGINE-01R2-SAFETY-02 — the caller wait limit is real behavio
       const callModel: DeepSeekModelCaller = () => new Promise(() => { /* never settles */ })
       const provider = createDeepSeekStructuredProvider({ apiKey: 'ds-x', model: 'deepseek-chat' }, callModel)
 
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const promise = provider.generateStructured(specificationsTarget, SAMPLE_INPUT)
       await vi.advanceTimersByTimeAsync(36_000)
-      await expect(promise).resolves.toEqual({ ok: false, error: 'The AI provider could not generate a proposal right now.' })
+      // PWS-AI-BETA-01R2 — the caller wait limit now reports as a timeout
+      // specifically, rather than as one undifferentiated provider failure.
+      await expect(promise).resolves.toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.timeout })
+      warn.mockRestore()
     } finally {
       vi.useRealTimers()
     }
@@ -333,5 +346,319 @@ describe('PWS-AI-ENGINE-01R2-SAFETY-02 — non-source prompt fields are sanitize
     }
     const prompt = specificationsTarget.buildUserInput(long)
     expect(prompt.split('\n')[0].length).toBeLessThan(250)
+  })
+})
+
+// ── PWS-AI-BETA-01R2: the DeepSeek Responses return path ──
+
+/**
+ * The first real Beta call reached DeepSeek, spent tokens, and produced no
+ * proposal. These tests cover the concrete defects and compatibility gaps that
+ * investigation exposed in the return path. The historical raw response was
+ * not retained, so this suite does not claim to reproduce that exact failure —
+ * it holds the corrected behaviour in place.
+ *
+ * Every test stubs global `fetch`. No real DeepSeek request is ever issued.
+ */
+describe('PWS-AI-BETA-01R2 — DeepSeek Responses parsing, status handling and diagnostics', () => {
+  const CONFIG = { apiKey: 'ds-test-key-not-real', model: 'deepseek-v4-flash' }
+
+  /** A response body that satisfies the real specificationsTarget. */
+  const PROPOSAL_JSON = JSON.stringify(VALID_RAW)
+
+  function stubFetch(impl: (url: string, init: Record<string, unknown>) => unknown) {
+    const calls: Array<{ url: string, init: Record<string, unknown> }> = []
+    const mock = vi.fn(async (url: string, init: Record<string, unknown>) => {
+      calls.push({ url, init })
+      const result = impl(url, init)
+      if (result instanceof Error) throw result
+      return result
+    })
+    vi.stubGlobal('fetch', mock)
+    return { mock, calls }
+  }
+
+  /** A Response-like object; `json()` is what the adapter actually calls. */
+  function jsonResponse(status: number, body: unknown) {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+    }
+  }
+
+  /** Runs the REAL default model caller by not injecting one. */
+  async function generate() {
+    const provider = createDeepSeekStructuredProvider(CONFIG)
+    return provider.generateStructured(specificationsTarget, SAMPLE_INPUT)
+  }
+
+  let warnSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    warnSpy.mockRestore()
+    vi.unstubAllGlobals()
+  })
+
+  const warnings = () => warnSpy.mock.calls.map(c => String(c[0])).join('\n')
+
+  // ── A. Request body ──
+
+  it('sends reasoning.effort = "none", and still sends the Target-driven fields', async () => {
+    const { calls } = stubFetch(() => jsonResponse(200, {
+      status: 'completed',
+      output: [{ type: 'message', content: [{ type: 'output_text', text: PROPOSAL_JSON }] }],
+    }))
+
+    await generate()
+
+    expect(calls).toHaveLength(1)
+    const body = JSON.parse(String(calls[0].init.body)) as Record<string, unknown>
+
+    // Thinking off — this is the whole point of the change.
+    expect(body.reasoning).toEqual({ effort: 'none' })
+
+    // ...without dropping anything the request already carried.
+    expect(body.model).toBe('deepseek-v4-flash')
+    expect(body.instructions).toBe(specificationsTarget.systemInstructions)
+    expect(body.input).toBe(specificationsTarget.buildUserInput(SAMPLE_INPUT))
+    expect(body.text).toEqual({
+      format: {
+        type: 'json_schema',
+        name: specificationsTarget.schemaName,
+        schema: specificationsTarget.jsonSchema,
+      },
+    })
+    // No token ceiling was introduced by this change.
+    expect(body).not.toHaveProperty('max_output_tokens')
+  })
+
+  // ── B. Thinking response parsing — the most important regression ──
+
+  it('parses ONLY the final message output when a reasoning item is present too', async () => {
+    const REASONING = 'THIS MUST NEVER BE PARSED — internal chain of thought about the datasheet.'
+    stubFetch(() => jsonResponse(200, {
+      status: 'completed',
+      output: [
+        { type: 'reasoning', content: [{ type: 'reasoning_text', text: REASONING }] },
+        { type: 'message', content: [{ type: 'output_text', text: PROPOSAL_JSON }] },
+      ],
+    }))
+
+    const result = await generate()
+
+    // The reasoning prose in front of the JSON would make JSON.parse fail, so
+    // succeeding at all proves it was skipped.
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.output).toEqual(VALID_RAW)
+    }
+    // And it is nowhere in what the server recorded.
+    expect(warnings()).not.toContain('THIS MUST NEVER BE PARSED')
+    expect(warnings()).not.toContain('chain of thought')
+  })
+
+  it('ignores reasoning_text even when it is the only text present', async () => {
+    stubFetch(() => jsonResponse(200, {
+      status: 'completed',
+      output: [{ type: 'reasoning', content: [{ type: 'reasoning_text', text: '{"groups":[]}' }] }],
+    }))
+
+    const result = await generate()
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.no_output_text })
+  })
+
+  it('ignores a text-bearing chunk inside a message that is not output_text', async () => {
+    stubFetch(() => jsonResponse(200, {
+      status: 'completed',
+      output: [{ type: 'message', content: [{ type: 'refusal', text: 'I cannot help with that.' }] }],
+    }))
+
+    const result = await generate()
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.no_output_text })
+  })
+
+  // ── C. Top-level output_text ──
+
+  it('uses a non-empty top-level output_text when the provider supplies one', async () => {
+    stubFetch(() => jsonResponse(200, { status: 'completed', output_text: PROPOSAL_JSON }))
+    const result = await generate()
+    expect(result.ok).toBe(true)
+  })
+
+  it('falls through to the output items when top-level output_text is blank', async () => {
+    stubFetch(() => jsonResponse(200, {
+      status: 'completed',
+      output_text: '   ',
+      output: [{ type: 'message', content: [{ type: 'output_text', text: PROPOSAL_JSON }] }],
+    }))
+    const result = await generate()
+    expect(result.ok).toBe(true)
+  })
+
+  // ── D/E. Responses status ──
+
+  it('refuses an incomplete response without parsing its output', async () => {
+    stubFetch(() => jsonResponse(200, {
+      status: 'incomplete',
+      output: [{ type: 'message', content: [{ type: 'output_text', text: PROPOSAL_JSON }] }],
+    }))
+
+    const result = await generate()
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.provider_incomplete })
+    expect(warnings()).toContain('category=provider_incomplete')
+    expect(warnings()).toContain('responseStatus=incomplete')
+  })
+
+  it('refuses a failed response and never returns the provider error message', async () => {
+    stubFetch(() => jsonResponse(200, {
+      status: 'failed',
+      error: { message: 'internal provider detail that must not surface', code: 'server_error' },
+    }))
+
+    const result = await generate()
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.provider_failed })
+    expect(JSON.stringify(result)).not.toContain('internal provider detail')
+    expect(warnings()).not.toContain('internal provider detail')
+  })
+
+  it('a payload with no status field but a valid final output is still accepted', async () => {
+    stubFetch(() => jsonResponse(200, {
+      output: [{ type: 'message', content: [{ type: 'output_text', text: PROPOSAL_JSON }] }],
+    }))
+    const result = await generate()
+    expect(result.ok).toBe(true)
+  })
+
+  // ── F/G. Output problems ──
+
+  it('completed with no final output at all is no_output_text', async () => {
+    stubFetch(() => jsonResponse(200, { status: 'completed', output: [] }))
+    const result = await generate()
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.no_output_text })
+    expect(warnings()).toContain('category=no_output_text')
+  })
+
+  it('a final output that is not JSON is invalid_json, and the text is not echoed back', async () => {
+    stubFetch(() => jsonResponse(200, {
+      status: 'completed',
+      output: [{ type: 'message', content: [{ type: 'output_text', text: 'Here are the specifications you asked for:' }] }],
+    }))
+
+    const result = await generate()
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.invalid_json })
+    expect(JSON.stringify(result)).not.toContain('Here are the specifications')
+    expect(warnings()).not.toContain('Here are the specifications')
+  })
+
+  // ── H. HTTP status mapping ──
+
+  it.each([
+    [401, 'authentication_failed'],
+    [402, 'insufficient_balance'],
+    [429, 'rate_limited'],
+    [400, 'invalid_request'],
+    [422, 'invalid_request'],
+    [404, 'invalid_request'],
+    [500, 'provider_unavailable'],
+    [503, 'provider_unavailable'],
+  ] as const)('HTTP %i maps to %s', async (status, category) => {
+    const { calls } = stubFetch(() => jsonResponse(status, { error: { message: 'provider said something' } }))
+
+    const result = await generate()
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES[category] })
+    expect(warnings()).toContain(`category=${category}`)
+    expect(warnings()).toContain(`httpStatus=${status}`)
+    // The error body is never even read on this path.
+    expect(JSON.stringify(result)).not.toContain('provider said something')
+    // Exactly one attempt: no retry, no fallback.
+    expect(calls).toHaveLength(1)
+  })
+
+  // ── I/J. Transport ──
+
+  it('a network failure is network_error', async () => {
+    stubFetch(() => new TypeError('fetch failed'))
+    const result = await generate()
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.network_error })
+    expect(warnings()).toContain('category=network_error')
+  })
+
+  it('a request timeout is timeout, not a generic network error', async () => {
+    stubFetch(() => Object.assign(new Error('The operation was aborted'), { name: 'TimeoutError' }))
+    const result = await generate()
+    expect(result).toEqual({ ok: false, error: DEEPSEEK_FAILURE_MESSAGES.timeout })
+    expect(warnings()).toContain('category=timeout')
+  })
+
+  // ── K. One request only, on every failure path ──
+
+  it('never retries and never falls back, whatever the failure', async () => {
+    const failures: Array<() => unknown> = [
+      () => jsonResponse(401, {}),
+      () => jsonResponse(402, {}),
+      () => jsonResponse(500, {}),
+      () => jsonResponse(200, { status: 'failed' }),
+      () => jsonResponse(200, { status: 'incomplete' }),
+      () => jsonResponse(200, { status: 'completed', output: [] }),
+      () => jsonResponse(200, { status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: 'not json' }] }] }),
+      () => new TypeError('fetch failed'),
+    ]
+
+    for (const impl of failures) {
+      const { calls } = stubFetch(impl)
+      const result = await generate()
+      expect(result.ok).toBe(false)
+      expect(calls).toHaveLength(1)
+      expect(calls[0].url).toBe('https://api.deepseek.com/responses')
+      vi.unstubAllGlobals()
+    }
+  })
+
+  // ── Log safety ──
+
+  it('the failure log carries only provider, category and status metadata', async () => {
+    stubFetch(() => jsonResponse(402, {}))
+    await generate()
+
+    const line = warnings()
+    expect(line).toContain('provider=deepseek')
+    expect(line).toContain('category=insufficient_balance')
+    expect(line).toContain('httpStatus=402')
+
+    // Nothing else may appear.
+    for (const forbidden of [
+      CONFIG.apiKey,
+      'Bearer',
+      'Authorization',
+      specificationsTarget.systemInstructions.slice(0, 40),
+      SAMPLE_INPUT.extractedSourceTexts[0].text,
+      SAMPLE_INPUT.sourceFileSummaries[0].displayName,
+      SAMPLE_INPUT.productName,
+    ]) {
+      expect(line).not.toContain(forbidden)
+    }
+    expect(line).not.toContain('at ')
+  })
+
+  it('every category has a fixed, non-empty, safe message', () => {
+    for (const [category, message] of Object.entries(DEEPSEEK_FAILURE_MESSAGES)) {
+      expect(message.length).toBeGreaterThan(0)
+      expect(message.length).toBeLessThan(120)
+      expect(message).not.toContain('undefined')
+      expect(category).toMatch(/^[a-z_]+$/)
+    }
+  })
+
+  it('the adapter source never logs a raw response, prompt, key or source text', () => {
+    const source = repoFile('server/utils/deepseekStructuredProvider.ts')
+    const logBlock = source.slice(source.indexOf('function logProviderFailure'), source.indexOf('function failureResult'))
+    for (const forbidden of ['apiKey', 'Authorization', 'instructions', 'extractedSourceTexts', 'outputText', 'payload', 'stack', 'reasoning']) {
+      expect(logBlock).not.toContain(forbidden)
+    }
   })
 })

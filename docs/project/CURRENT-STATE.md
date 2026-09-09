@@ -3945,3 +3945,131 @@ Apply 返回 `{ ok: true, appliedCount: 1, totalCount: 1, partial: false }`；la
 管理员现在可以通过 Media Library 上传 TXT / CSV / TSV 并关联到产品。待 TEST ONLY 产品 3 关联上一份真正属于该型号的文本资料后，即可执行此前已授权的那**一次**真实 DeepSeek 调用——该授权尚未使用，仍然有效。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-BETA-01R1"任务中写入。*
+
+---
+
+## PWS-AI-BETA-01R2 — DeepSeek Responses 解析、诊断与关闭 Thinking（2026-09-09）
+
+**第一次真实 Beta 暴露出的 P1，只修 DeepSeek 返回 → LITUBO Proposal 这一段。本轮零真实 provider 调用。**
+
+### 一、第一次真实 DeepSeek Beta 的既有事实
+
+| 项 | 值 |
+|---|---|
+| provider | DeepSeek |
+| model | `deepseek-v4-flash` |
+| source | 1 个 TEST ONLY TXT |
+| DeepSeek 控制台 | API requests = **1**，Tokens = **7,079**，Cost ≈ **¥0.01** |
+
+由此可确认：Key 有效、余额正常、**请求确实到达 DeepSeek 并产生 token 消耗**、source 抽取成功——但 **LITUBO 最终没有拿到 Proposal**。浏览器收到的是：
+
+```json
+{ "ok": false, "error": "The AI provider could not generate a proposal right now.",
+  "fileResults": [{ "displayName": "…", "status": "read" }] }
+```
+
+未进行第二次调用。
+
+### 二、诊断中发现的具体缺陷
+
+`readResponsesApiOutputText()` 当时遍历 `payload.output[].content[]`，**只要 `chunk.text` 是字符串就拼接**，既不检查 `item.type` 也不检查 `chunk.type`。
+
+DeepSeek V4 Flash **默认开启 thinking（effort 默认为 high）**，因此一次响应可能同时包含 `reasoning` item（`reasoning_text`）与 `message` item（`output_text`）。在旧规则下，推理文字会被拼在 JSON 答案前面再交给 `JSON.parse`——必然失败。
+
+**必须如实说明：** first Beta exposed this concrete parsing defect / compatibility risk; the historical raw response was not retained, so exact causality cannot be proven retroactively. 本轮不声称已证明第一次失败就是由它导致。
+
+### 三、修复 A —— 只解析最终 output_text
+
+- 若顶层 `output_text` 是**非空**字符串 → 直接采用；
+- 否则遍历 `output`，**只接受** `item.type === 'message'` 内 `content.type === 'output_text'` 的 `text`；
+- **明确忽略** `item.type === 'reasoning'`、`content.type === 'reasoning_text'`、tool/function 输出，以及任何其他携带 text 的字段（如 `refusal`）；
+- 一条最终输出都没有 → 归类为 `no_output_text`。
+
+推理内容**不读取、不返回、不记录**——仅凭类型跳过。
+
+### 四、修复 B —— 检查 Responses status
+
+读到 JSON 后、解析 output 之前检查 `status`：
+
+| status | 处置 |
+|---|---|
+| `completed` | 正常继续 |
+| `incomplete` | 不解析，归类 `provider_incomplete` |
+| `failed` | 不解析，归类 `provider_failed` |
+| **缺失** | **按可用处理并继续** |
+
+缺失时继续是刻意选择：仅因少了一个字段就拒绝一份携带完好答案的响应，会把一次本可成功的调用变成失败。该行为有专门测试守住。
+
+provider 的 `error.message`、原始响应、原始错误负载**一律不返回浏览器、不写日志**。
+
+### 五、修复 C —— 安全失败分类
+
+不再把所有失败折叠成一句不可诊断的信息。固定的封闭类别集合（11 类）与固定文案：
+
+| 类别 | 触发条件 | 用户可见文案 |
+|---|---|---|
+| `authentication_failed` | HTTP 401 | DeepSeek authentication failed. |
+| `insufficient_balance` | HTTP 402 | DeepSeek account balance is insufficient. |
+| `rate_limited` | HTTP 429 | DeepSeek rate limit was reached. |
+| `invalid_request` | 其他 4xx | DeepSeek rejected the request. |
+| `provider_unavailable` | 5xx | DeepSeek service is temporarily unavailable. |
+| `provider_incomplete` | status = incomplete | DeepSeek returned an incomplete response. |
+| `provider_failed` | status = failed | DeepSeek reported that generation failed. |
+| `no_output_text` | completed 但无最终输出 | DeepSeek returned no final output. |
+| `invalid_json` | 最终输出无法 JSON.parse | DeepSeek returned final output that could not be parsed. |
+| `timeout` | AbortSignal 超时 / 调用者等待上限 | DeepSeek did not respond before the request timeout. |
+| `network_error` | fetch / DNS / TLS / 连接失败 | DeepSeek could not be reached. |
+
+**安全日志**（新增一条 warning）只含固定元数据：
+
+```
+[ai/deepseek] AI provider failure: provider=deepseek category=insufficient_balance httpStatus=402
+```
+
+**刻意不记录：** API Key、Authorization header、prompt、system instructions、source 原文、文件名、产品名/ID、provider 原始响应、provider 错误消息、reasoning 内容、最终输出文本、stack trace。有测试逐项断言这些都不出现。
+
+非 4xx/5xx 路径不读取响应体，因此 provider 的错误消息在该路径上根本没有机会泄露。
+
+### 六、修复 D —— 关闭 Thinking
+
+请求体新增 `reasoning: { effort: 'none' }`。第一次调用为一个「读文档、按固定 schema 输出 JSON」的结构化抽取任务花掉 7,079 tokens，没有值得付费的推理预算；同时 reasoning item 也是解析器要额外绕开的一层。
+
+该设置对**所有**结构化调用生效，**不按 `target.id` 特判**，适配器保持 Target-neutral。未来若出现确实需要 reasoning 的 Target，属于 provider policy 的范畴，本轮不提前设计。
+
+**未新增 `max_output_tokens`**——本轮浪费来源是默认 high thinking，先用 `effort: none` 解决，不硬编码任何截断上限。有测试断言请求体中不含该字段。
+
+`specificationsTarget.ts` **未改动**：Zod、source leakage scan、echo scan、`NO_SAFE_ITEMS` / `MALFORMED_RESPONSE` / `OVERSIZED_RESPONSE` 全部保持原样。**provider 传输失败**与 **Target 校验失败**是两套互不混淆的路径。
+
+### 七、测试（新增 25 条，合计 950）
+
+覆盖：请求体含 `reasoning.effort = none` 且保留 model/instructions/input/text.format 全部字段、不含 `max_output_tokens`；**reasoning + message 并存时只解析最终输出**（本轮最重要回归）；仅有 reasoning_text 时归 `no_output_text`；message 内非 output_text 的 text 被忽略；顶层 output_text 正常解析、空白时回退到 output items；incomplete / failed 不解析且不泄露 provider 错误；status 缺失但有合法输出仍接受；no_output_text；invalid_json 且不回显原文；HTTP 401/402/429/400/422/404/500/503 映射；network_error；timeout；**所有失败路径 fetch 调用数 = 1**（无 retry、无 fallback）；日志只含允许的元数据。
+
+**红灯验证：** 临时回退解析器与 `reasoning.effort` 后，4 条测试失败（含两项核心）；恢复后 53 条全绿。临时文件已清除。
+
+### 八、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **950 / 950 通过**（27 文件，本次 +25） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功 |
+
+**No UI files changed; prior responsive acceptance remains applicable.**（1440 / 375 本轮 N/A）
+
+### 九、明确未做
+
+**本轮 0 次真实 DeepSeek 调用、0 次 OpenAI 调用、0 次 retry、0 费用。** 未读取 `.env`、未读取或输出 API Key；未改 model、Directus、Media Library、schema、permissions、Docker、Redis、transaction；未碰 PDF / Excel / OCR / Vision / Page Content AI / FAQ AI / SEO AI / bulk import；未改 Apply、未发布、未部署、未 push / merge master。
+
+**范围外问题按 FD-004 记录、未施工：** `GET /api/admin/media/:uuid/references` 的 Directus 403（P1）；`formatType()` 把 `text/tab-separated-values` 显示为 `TAB-SEPARATED-VALUES`（P2）。
+
+### 十、下一步
+
+**Resume FIRST SINGLE-PRODUCT AI BETA with a separately authorized second real DeepSeek call.**
+
+第二次 Beta **尚未进行、尚未完成**，需要用户单独授权。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-BETA-01R2"任务中写入。*
