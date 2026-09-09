@@ -5545,3 +5545,129 @@ WAITING FOR CHATGPT / USER UI ACCEPTANCE
 **更新 NEXT 不代表可以自动调用 DeepSeek。** 恢复 AI Beta 需用户 / ChatGPT 在 UI 验收后另行授权。
 
 *最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-UI-CLEANUP-01"任务中写入。*
+
+---
+
+## MEDIA-UPLOAD-BLOCKER-HOTFIX-02 = COMPLETED（2026-09-10）
+
+真实用户验收发现合法 TXT 上传被阻塞（`Upload finished with problems — 0 uploaded, 1 failed`）。本轮只解决上传，未扩展功能。
+
+### 一、根因：上传发送的是 Node buffer 池，而不是文件本身
+
+`server/api/admin/media/upload.post.ts` 用 `part.data.buffer` 构造要转发给 Directus 的 `Blob`。
+
+`part.data` 是 Node `Buffer`。**Node 从一个共享的 8192 字节池中分配小于 8KB 的 buffer**，因此 `part.data.buffer` 是**整个池**，不是这个文件。真正标识文件的是 `byteOffset` 与 `byteLength`。
+
+实测证据：
+
+```text
+Buffer.from('hello world')  → length = 11，但 .buffer.byteLength = 8192，byteOffset = 8
+```
+
+于是每个小于 8KB 的上传都被发成**从偏移 0 开始的 8192 字节**。真实验证：一个 **160 字节**的 TXT 被存成 **8192 字节**，下载回来的内容是：
+
+```text
+{"id":392,"type":"resolve","payload":{"id":"vue","importer":"D:/LITUBO-website/layouts/admin.vue"}}…
+```
+
+即 dev server 的内部 IPC 数据 —— 文件内容被**进程内存中相邻的字节**整体替换。另一个样本里甚至包含了一段 Directus API 响应（其他文件的清单）。
+
+### 二、为什么表现为"有时失败、有时成功"
+
+Directus 收到的是一份声明为 `text/plain`、内容却是任意二进制的载荷。**它接受还是拒绝，取决于那一刻池子里恰好是什么字节。** 这解释了为什么：
+
+- 用户的真实 TXT 上传**失败**；
+- 我此前几轮的合成测试却**通过**（当时池中恰好是可通过的文本）；
+- 同一个文件重试结果可能不同。
+
+所以这不是 MIME、扩展名、folder UUID、multipart 字段顺序、breadcrumb target 或 BFF 断连的问题 —— 那些在本轮都逐项排除过：目标 folder UUID 正确且 `allow_upload = true`、`text/plain` 在白名单内、字段顺序在 ML-CLOUD-01 已修正、Directus `server/ping` 正常。
+
+### 三、修复
+
+```ts
+// 之前：发送整个池
+const rawBuf = part.data.buffer instanceof SharedArrayBuffer ? … : (part.data.buffer as ArrayBuffer)
+
+// 之后：只发送这个文件的字节
+const exactBytes = new Uint8Array(part.data.buffer, part.data.byteOffset, part.data.byteLength).slice()
+```
+
+同时按施工单 §6 把 `catch {}` 的笼统 `上传失败` 改为**按 HTTP 状态给出可行动的安全原因**（`uploadFailureMessage()`）：401/403 → 重新登录；413 → 文件过大；415/400 → 存储服务无法识别内容；5xx → 暂时不可用；无响应 → 无法连接。**只读状态码，绝不转发响应体**（响应体可能含路径与内部细节）。
+
+按 §7，`All files` 与 `Archived` 没有合法写入目标，Upload 入口不再显示为可用按钮，而是显示 `Open a folder to upload.`（`Unclassified` 仍是合法目标，保持可上传）。**未改动任何 backend governance。**
+
+### 四、最低验收（3 个真实 TEST ONLY TXT，同一合法产品资料目录）
+
+目录：`products/checkweigher/LT180C AI BETA TEST ONLY — NOT FOR PUBLICATION`（`customer-managed`、`allow_upload = true`）
+
+| # | 验收项 | 结果 |
+|---|---|---|
+| 1 | 3 个文件全部上传成功 | ✅ 无失败横幅 |
+| 2 | 刷新后仍存在 | ✅ |
+| 3 | 稳定 Media UUID | ✅ `cf9cdd74…` / `348ec8b6…` / `5a5a126f…` |
+| 4 | Filename 正确 | ✅ general / electrical / environment |
+| 5 | MIME / size 正常 | ✅ `text/plain`；**160 / 138 / 85 字节**（修复前一律 8192） |
+| 6 | Folder 正确 | ✅ 全部在测试目录 |
+| 7 | Search 可找到 | ✅ |
+| 8 | File Details 可打开 | ✅ |
+| 9 | References 正常返回 | ✅ 三者均 `200 / total 0 / can_archive true` |
+| 10 | 0 未标识测试资料 | ✅ 见下 |
+
+**内容完整性（本轮最关键的一条）：** 三个文件下载回来与原文**逐字节完全一致**（`内容完全一致: true`），不再含任何进程内存残留。
+
+### 五、清理修复前产生的受污染副本
+
+发现 **11 个** 修复前上传的 `LT180C-test-*.txt`，全部恰好 8192 字节且内容为池残留（其中一个包含 Directus API 响应片段）。已按受支持路径：
+
+- 重命名为 `… CORRUPTED-N PRE-HOTFIX TEST ONLY — NOT FOR PUBLICATION`
+- Title 标注 `CORRUPTED PRE-HOTFIX — DO NOT USE — TEST ONLY — NOT FOR PUBLICATION`
+- **全部 Archive（可恢复，未做永久删除）**
+
+归档后它们不再出现在 AI Source Intake 的可选来源中，因此不会被误选入 Analyze。
+
+### 六、Media → AI 免费 Preflight（未产生任何费用）
+
+```text
+Product: [TEST ONLY — NOT FOR PUBLICATION] LT-180C Free-Fall Metal Detector (id 3, Draft)
+3 Sources 已通过既有 POST /api/admin/products/3/media 关联到该 Draft
+AI Source Intake 三个 TXT 均可见且可勾选
+选择计数: 3 / 5 selected
+Analyze 按钮: 存在且可用
+已归档的受污染副本: 不出现在来源列表中
+产品状态: Draft（未变）
+```
+
+**已停在 Analyze 按钮之前，未点击。0 DeepSeek / 0 OpenAI / 0 Provider 调用 / 0 API 费用。**
+
+### 七、验证（真实 Node 22.22.2；系统默认 Node 24.14.0 未改动）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1198 / 1198 通过**（31 文件，本次 +21） |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+新增回归测试针对**真正池化的 Buffer** 断言切片规则，并断言安全错误消息不泄露 token / 路径 / URL —— 一旦有人改回读 `.buffer`，测试立即失败。
+
+**1440px：** `All files` 显示 `Open a folder to upload.`；`Archived` 显示 `Archived files cannot be added to. Open a folder to upload.`；合法目录内真实上传 57 字节 → 存储 57 字节，无失败横幅，无横向溢出。
+
+**375px：** 同样的 gate 行为；合法目录内真实上传 56 字节 → 存储 56 字节；File Details 右边界 375；全部状态 `scrollWidth === clientWidth === 375`。
+
+### 八、边界
+
+**0 Directus schema · 0 DB migration · 0 permission change · 0 credential 读取 · 0 AI runtime 改动 · 0 Provider 调用 · 0 API 费用 · 0 push / merge / deploy · 0 真实产品数据修改**（产品 3 为既有授权 TEST ONLY 沙盒，仍为 Draft）。
+
+---
+
+```text
+MEDIA-UPLOAD-BLOCKER-HOTFIX-02 = COMPLETED
+
+Media Library → 3 TEST ONLY TXT → Media UUID → AI Source Intake preflight = PASS
+
+PWS-AI-MULTI-SOURCE-REAL-BETA-01 =
+AUTHORIZED BUT PAUSED BEFORE PAID CALL
+```
+
+*最后更新：2026-09-10，由 Claude Code 在"MEDIA-UPLOAD-BLOCKER-HOTFIX-02"任务中写入。*

@@ -27,6 +27,19 @@ export const ALLOWED_UPLOAD_LABEL = 'JPG、PNG、WebP、PDF、TXT、CSV、TSV'
 export function isAllowedUpload(filename: string, contentType: string): boolean {
   return ALLOWED_TYPES.has(contentType.toLowerCase().split(';')[0].trim()) && ALLOWED_EXTS.test(filename)
 }
+/**
+ * A safe, actionable reason for a storage failure, derived from the HTTP
+ * status alone. Nothing from the provider's response body reaches the browser.
+ */
+export function uploadFailureMessage(status: number | undefined): string {
+  if (status === 401 || status === 403) return '没有权限保存该文件，请重新登录后重试'
+  if (status === 413) return '文件过大，存储服务拒绝接收'
+  if (status === 415 || status === 400) return '存储服务无法识别该文件内容'
+  if (status !== undefined && status >= 500) return '存储服务暂时不可用，请稍后重试'
+  if (status === undefined) return '无法连接存储服务，请稍后重试'
+  return `文件未能保存（存储服务返回 ${status}），请重试`
+}
+
 const MAX_SIZE = 50 * 1024 * 1024 // 50 MB
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -86,12 +99,27 @@ export default defineEventHandler(async (event) => {
      * file part.
      */
     const fd = new FormData()
-    const rawBuf = part.data.buffer instanceof SharedArrayBuffer
-      ? new Uint8Array(part.data).slice().buffer
-      : (part.data.buffer as ArrayBuffer)
+    /**
+     * MEDIA-UPLOAD-BLOCKER-HOTFIX-02 — send THIS file's bytes, not the buffer
+     * pool they happen to live in.
+     *
+     * `part.data` is a Node Buffer, and Node allocates buffers under 8 KB from
+     * a shared 8192-byte pool. `part.data.buffer` is therefore the whole pool,
+     * not the file: reading it uploaded 8192 bytes starting at offset 0, which
+     * both truncated/padded every small file to 8 KB and shipped whatever else
+     * was in the pool at that moment — in testing, a 160-byte text file was
+     * stored as 8 KB of the dev server's internal IPC traffic.
+     *
+     * That also explains why this failed intermittently rather than always:
+     * Directus accepts or rejects the result depending on what the neighbouring
+     * bytes happen to be, so the same file could upload once and fail the next
+     * time. `byteOffset` and `byteLength` are what identify the file inside the
+     * pool, and `.slice()` on the view copies exactly those bytes.
+     */
+    const exactBytes = new Uint8Array(part.data.buffer, part.data.byteOffset, part.data.byteLength).slice()
     fd.append('title', autoTitle)
     if (folder) fd.append('folder', folder)
-    fd.append('file', new Blob([rawBuf], { type: ct }), filename)
+    fd.append('file', new Blob([exactBytes], { type: ct }), filename)
 
     try {
       const res = await $fetch<{ data: { id: string; filename_download: string; title: string } }>(
@@ -99,8 +127,16 @@ export default defineEventHandler(async (event) => {
         { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd },
       )
       uploaded.push(res.data)
-    } catch {
-      errors.push({ filename, message: '上传失败，Directus 返回错误，请重试' })
+    } catch (e: unknown) {
+      /**
+       * Report why, without leaking how. "Upload failed" gave the operator
+       * nothing to act on; the Directus status distinguishes the cases they
+       * can actually do something about. The response body is never forwarded
+       * — it can carry paths and internal detail — so only the status is read.
+       */
+      const status = (e as { statusCode?: number, response?: { status?: number } })?.statusCode
+        ?? (e as { response?: { status?: number } })?.response?.status
+      errors.push({ filename, message: uploadFailureMessage(status) })
     }
   }
 

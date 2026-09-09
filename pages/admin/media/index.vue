@@ -980,17 +980,26 @@ const breadcrumbTrail = computed<FlatFolder[]>(() => {
   return chain
 })
 
-/** Whether files may be uploaded where we are standing. */
+/**
+ * Whether files may be uploaded where we are standing.
+ *
+ * MEDIA-UPLOAD-BLOCKER-HOTFIX-02 — "All files" and "Archived" are library
+ * views, not places. Offering Upload there implied the page knew a
+ * destination when it did not; the operator opens a folder first.
+ * "Unclassified" stays uploadable because it IS a real destination.
+ */
 const canUploadHere = computed(() => {
   if (showArchivedView.value) return false
   const id = selectedFolder.value
-  if (!id || id === 'root') return true // Unclassified is a legal destination
+  if (id === null) return false // "All files" is a view, not a destination
+  if (id === 'root') return true // Unclassified is a legal destination
   return flatFolders.value.some((f: FlatFolder) => f.id === id && f.allow_upload)
 })
 
-/** Why uploading is unavailable here, for the button's title. */
+/** Why uploading is unavailable here, said in terms of what to do next. */
 const uploadBlockedReason = computed(() => {
-  if (showArchivedView.value) return 'Switch out of the archived view to upload.'
+  if (showArchivedView.value) return 'Archived files cannot be added to. Open a folder to upload.'
+  if (selectedFolder.value === null) return 'Open a folder to upload.'
   if (!canUploadHere.value) return 'This folder does not accept file uploads.'
   return ''
 })
@@ -1138,10 +1147,12 @@ const selectedFileFolderIsLegacy = computed(() => {
             @click="openFolderDialog('create')"
           >+ New folder</button>
 
-          <div class="upload-menu">
+          <!-- Where there is no destination, say so instead of showing a dead button. -->
+          <span v-if="!canUploadHere" class="upload-hint">{{ uploadBlockedReason }}</span>
+          <div v-else class="upload-menu">
             <button
               class="btn-upload"
-              :disabled="uploading || duplicateChecking || !canUploadHere"
+              :disabled="uploading || duplicateChecking"
               :title="uploadBlockedReason"
               @click="uploadMenuOpen = !uploadMenuOpen"
             >
@@ -2725,6 +2736,7 @@ const selectedFileFolderIsLegacy = computed(() => {
 
 /* ── Upload menu ── */
 .upload-menu { position: relative; }
+.upload-hint { font-size: var(--text-xs); color: var(--color-ink-muted); white-space: nowrap; }
 .upload-caret { margin-left: 6px; font-size: var(--text-xs); }
 .upload-menu__list {
   position: absolute; top: calc(100% + 4px); right: 0; z-index: 30;
