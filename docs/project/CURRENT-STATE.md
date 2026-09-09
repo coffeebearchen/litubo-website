@@ -5045,3 +5045,196 @@ Folder Browse · New/Rename/Move Folder · Upload Button · **Drag & Drop** · F
 **NEXT CANDIDATE: `ML-CLOUD-V1-FINAL` — NOT STARTED，WAITING FOR CHATGPT / USER REVIEW AUTHORIZATION。**
 
 *最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-03"任务中写入。*
+
+---
+
+# MEDIA-LIBRARY-CLOUD-WORKSPACE-V1: COMPLETED / SEALED（2026-09-09）
+
+```text
+ML-CLOUD-GOV-01    = COMPLETED
+ML-CLOUD-01        = COMPLETED
+ML-CLOUD-02        = COMPLETED
+ML-CLOUD-03        = COMPLETED
+ML-CLOUD-V1-FINAL  = COMPLETED
+```
+
+封板分支 `review/ml-cloud-workspace-v1`，自 AI checkpoint `4bbc838` 起共 5 个本地提交。**未 push、未 merge、未 deploy，master 未动。**
+
+## ML-CLOUD-V1-FINAL — 最终封板验收
+
+本轮不新增功能、不重新设计、不打磨 P1/P2，只验收既有 V1 合同并修真正阻塞的 P0。
+
+### Gate 1 — 不明 stray upload：根因闭环
+
+**静态调用链（全仓库唯一 upload 出口）：**
+
+```text
+POST /api/admin/media/upload   仅出现在 pages/admin/media/index.vue 的 uploadFiles()
+uploadFiles()  ← beginUpload() / skipDuplicates() / uploadAnyway()
+beginUpload()  ← onFilesSelected()（两个 file input 的 @change）/ onDrop()（@drop.prevent）
+```
+
+`onMounted` 只调 `loadFiles` 与 `loadArchivedIds`；无 timer、无 watcher、无 paste/clipboard 处理器触及上传。**不存在自动上传路径。**
+
+**运行时观察（页面内 fetch + XHR 双哨兵）：** 17 项常规操作 —— 文件夹导航、进入系统目录、开关详情面板、搜索、清空搜索、三种类型筛选、Archived / Unclassified / All files 视图切换、多选、清除选择、**dragenter + dragover + dragleave（不 drop）** —— **upload POST 累计 0**。全新标签页的首次加载与刷新同样 **0**。
+
+**阳性对照：** 显式选择一个 TEST ONLY 文件 → **恰好 1 次** upload flow，文件正确落入目标文件夹。
+
+**结论：**
+
+```text
+STRAY UPLOAD:
+NOT REPRODUCIBLE
+NO AUTOMATIC UPLOAD PATH FOUND
+likely test/browser interaction artifact
+```
+
+不阻塞 V1。相关文件保持 `06-mobile-file-details STRAY TEST ONLY — NOT FOR PUBLICATION.png` 且 **Archived**。
+
+### Gate 2 — Folder（全部实测通过）
+
+| 场景 | 结果 |
+|---|---|
+| 系统目录 `products/xray` 改名 / 移动 | 422 `FOLDER_PROTECTED` |
+| 跨 zone 移动 | 422 `FOLDER_ZONE_MISMATCH` |
+| 移入自身 / 移入自身后代 | 422 `FOLDER_MOVE_INTO_SELF` / `FOLDER_MOVE_INTO_DESCENDANT` |
+| 系统容器 / legacy 内创建 | 422 `FOLDER_ZONE_DISALLOWED` |
+| 同名 sibling / 含分隔符 | 422 `FOLDER_NAME_TAKEN` / `FOLDER_NAME_SEPARATOR` |
+| 正向 Rename → 同 zone 上移至 zone 根 → 移回 → 改回原名 | 全部 200，路径逐步正确 |
+
+动态 customer folder：`management = customer-managed`、`allow_upload = true`、`allow_move_target = true`。受保护 zone 根 `products/xray`：`protected` 但 `can_create_children = true`。**正向路径复用既有 `manuals` 子目录完成，本轮新建文件夹数 = 0。**
+
+### Gate 3 / Gate 5 — File 与 References
+
+**被产品引用的文件**（TEST ONLY 产品 3）：Rename + Title + Description 全部 200 后，**UUID / storage 对象 / MIME 均未变**，引用 `total` 保持 1 且产品名不变；对其归档 → **409「仍被 1 个引用使用」**。
+
+**无引用 TEST ONLY 文件**：`can_archive = true` → Move → Archive → Restore 全程 200，**UUID / storage / MIME 未变**，引用未变。
+
+**Batch Move**：moved 1 / failed 0。**Batch Archive**（混入被引用文件）：`archived 1 / skipped 1`，被引用文件结果为 `referenced` —— **批量复用了单文件的引用保护**。
+
+引用查询失败时显示 `References unavailable` 并禁用归档，**不显示 0**。
+
+### Gate 4 — Duplicate
+
+拖放入口与上传按钮入口**都**触发 `Possible duplicate`，判定依据如实写明 `same folder + normalized filename + filesize`，非加密保证。`Cancel duplicates` → 未上传、原文件 UUID 不变；`Upload anyway` → 产生**新 UUID 的第二份**，原文件**未被覆盖、未被删除**。
+
+### Gate 6 — Broken Thumbnail
+
+库内真实存在 4 张缩略图失败的图片。全部卡片缩略图盒统一 **120px**；回退卡片高度统一 **221px**，与正常缩略图卡片一致；无原生破图元素；文件名始终位于缩略图盒之外，不重叠。手动触发真实 `error` 事件：高度 **221 → 221 未变**，回退为 `IMAGE / Image unavailable`。
+
+四类均覆盖：正常图片（9）、broken image 回退（4）、PDF（1）、TXT（22）。
+
+> **记录一项 P2（不修）：** 4 张卡片高 203px 而非 221px —— 差值恰为可选的 Title 次级行（仅当 Title 与文件名不同才渲染）。回退卡片本身高度完全一致，**不是缩略图塌陷**。按 Final「不打磨 P1/P2」不做处理。
+
+### Gate 7 — Search / Filter / Folder（发现并修复一个 P0）
+
+**修复：Search 此前是 folder-local，不是 global。** 在 `products/xray` 内搜索 `ZZ-ML-CLOUD` 只返回 1 条且全部来自 xray —— 位于其它目录的同名资产被当成"不存在"。这违反本模块 §12「Search = global Media Library search」。
+
+`loadFiles` 现在在搜索激活时**不再附加 folder 过滤**；同时新增一行提示说明结果已越出当前目录（每张卡片本就显示所属 folder），搜索空态文案由「in this view」改为「anywhere in the Media Library」。
+
+修复后实测：xray 内搜索 → **13 条结果、跨 3 个不同 folder**；清除搜索 → 正确回到该目录自身的 4 个文件，提示消失。类型筛选、Archived、Needs Classification 与搜索的组合切换均无状态错乱。
+
+### 1440px 正式视觉验收
+
+四个状态均在**真实 1440×900 视口**下验收，`scrollWidth === clientWidth === 1440`，无横向溢出；侧栏 190px / 主区 1030px。
+
+| State | 内容 |
+|---|---|
+| A | Media Library overview（虚线拖放条 + `Select files` / `Select folder`、卡片网格、侧栏） |
+| B | Customer folder management（`↑ Up`、面包屑、New folder·Rename·Move、拖放目标写明具体文件夹） |
+| C | Multi-select / batch actions（`3 selected · 1.4 MB · Select all · Clear selection`、Move·Archive、选中卡片绿框） |
+| D | Duplicate / upload state（NEW vs EXISTING 两列、三个操作、"其余文件照常上传"说明） |
+
+**与母版逐项对照 —— 已落地：** 顶部虚线拖放条（母版 01/03）、Select files + Select folder（04）、选择摘要条 count/size/Select all/Clear（03）、卡片 = 缩略图 + 文件名 + 类型 chip + 大小（01）、右侧详情面板（01/06）、受保护目录锁标（02）。
+
+**明确不实现（V1 禁止，母版中出现也不做）：** Storage / Upgrade Storage、Owner、Add tags、Download selected、Trash 计数、Reports、AI Workspace、Permanent Delete、Share。
+
+**接受的偏离（记录，不在 Final 内改）：** 文件夹以侧栏列表呈现而非网格文件夹卡片（母版 02）—— Final 禁止 redesign；卡片右下 `⋮` 快捷菜单未实现 —— 逐文件操作集中在详情面板，避免两套入口；Grid/List 切换 —— 母版规则已注明可后置。
+
+> **截图分辨率限制（如实说明）：** 应用内预览面板栅格约 509×318，1440 视口会被等比缩小后截取。要取得 1:1 的 1440 截图只能改用外部浏览器并提供登录凭证或导出会话 Cookie，两者均被本施工单禁止。因此桌面证据 = 真实 1440 视口布局的缩放截图 + 精确 DOM 几何测量。
+
+### 375px Final
+
+overview / folder browse / Upload / File Details / File Rename / Move / Duplicate Warning / Multi-select / Batch Move / Batch Archive 全部实测 **`scrollWidth === clientWidth === 375`，无横向滚动**。触控尺寸：上传按钮 312×45、批量按钮高 40、详情保存按钮高 40、Filename 输入 343、Move 目的地下拉 312、重复警告三按钮各 312×40。
+
+### 测试资料盘点
+
+| 类别 | 数量 |
+|---|---|
+| TEST ONLY 文件夹 | 2（`products/conveyor/ZZ-ML-CLOUD-01 TEST ONLY — NOT FOR PUBLICATION` 及其 `manuals`） |
+| active TEST ONLY files | 14 |
+| archived TEST ONLY files | 6（含 STRAY） |
+| 合计 | 20 |
+| 未标识的 ZZ- / STRAY 残留 | **0** |
+
+**未做物理删除，未绕过受支持路径。** 本轮新建文件夹 0 个。
+
+### 全套测试（真实 Node 22.22.2；系统默认 Node 24.14.0 未改动）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1168 / 1168 通过**（31 文件） |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+> Gate 7 的搜索作用域修复是页面组件内 3 行条件逻辑，本仓库无 page 组件挂载测试基座，故以浏览器实测为证据，未新增单元测试 —— 如实记录。
+
+### AI 冻结最终复核
+
+自 `4bbc838529b6f6d4a25cb3f330e86945692a0aef` 至封板 HEAD，改动文件共 29 个：视觉母版 7、治理与状态文档 5、Media 代码与测试 17。**AI runtime 改动 0 个**，逐项核对：
+
+```text
+server/api/admin/products（含 /ai/*）    未改动
+server/utils/aiProposalEngine.ts         未改动
+server/utils/aiTargets（Target contract / Specifications Target）  未改动
+server/utils/aiSpecificationApply.ts     未改动
+server/utils/aiProposalReplayGuard.ts    未改动
+server/utils/aiSourceRef.ts              未改动
+server/utils/aiStructuredProvider.ts     未改动
+server/utils/deepseekStructuredProvider.ts（provider adapter / prompt）  未改动
+server/utils/aiProviderRegistry.ts       未改动
+server/utils/aiTextExtraction.ts         未改动
+components/admin/workspace（Source Intake / Proposal Review）      未改动
+```
+
+**0 Provider 调用 · 0 API 费用。** 状态维持 `AI = HOLD — NOT CANCELLED`。
+
+### Git 历史异常（只读记录，本轮不处理）
+
+```text
+local master  = b6125f6
+origin/master = 8f2e384
+master 领先 origin/master 6 个提交；origin/master 领先 master 0 个
+```
+
+即可快进关系，非分叉。本模块分支自 `b6125f6` 分出。**未 merge / rebase / reset / force，未改动 master。** 真正 push/merge 前另行专项处理。
+
+## 延后项（继续保留）
+
+```text
+Folder Trash / Restore = P1 DEFERRED
+```
+
+原因：需要新的 lifecycle / schema 保存 trash state 与 original parent。文件级 Archive / Restore 可用且可恢复。
+
+继续不做：Permanent Delete、Google Drive / OneDrive / Dropbox、Share、Owner、per-user permission、Storage quota、Billing、Version history、Complex tags、AI folder classification。
+
+## ACTIVE MODULE → NEXT
+
+```text
+NEXT:
+PWS-AI-MULTI-SOURCE-REAL-BETA-01
+
+STATUS:
+NOT STARTED
+WAITING FOR CHATGPT / USER REVIEW AUTHORIZATION
+
+AI:
+HOLD — NOT CANCELLED
+```
+
+Media Library V1 已封板，但**不得先进入其他 AI / Content 模块**。AI 恢复须待本 Final 报告被验收并正式授权。
+
+*最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-V1-FINAL"任务中写入。*

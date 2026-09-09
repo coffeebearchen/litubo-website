@@ -250,9 +250,19 @@ async function loadFiles(reset = false) {
         limit: String(PAGE),
         offset: String(offset.value),
       }
-      if (selectedFolder.value) params.folder = selectedFolder.value
+      /**
+       * ML-CLOUD-V1-FINAL — Search is a Media Library search, not a search of
+       * the folder you happen to be standing in.
+       *
+       * Combining the folder filter with the query made it silently local: an
+       * operator inside products/xray searching for a file that lives in
+       * products/conveyor was told it does not exist. Every result card already
+       * shows its folder path, so a global result set stays readable.
+       */
+      const searching = searchQuery.value.trim() !== ''
+      if (selectedFolder.value && !searching) params.folder = selectedFolder.value
       if (typeFilter.value) params.type = typeFilter.value
-      if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
+      if (searching) params.search = searchQuery.value.trim()
 
       const res = await $fetch<ApiFilesResult>('/api/admin/media/files', { query: params })
       if (reset) {
@@ -1250,6 +1260,16 @@ const selectedFileFolderIsLegacy = computed(() => {
           <button class="selection-bar__clear" @click="clearSelection">Clear selection</button>
         </div>
 
+        <!--
+          ML-CLOUD-V1-FINAL — say so when a search widens the view past the
+          folder the operator is standing in, so results from elsewhere are not
+          mistaken for contents of this folder.
+        -->
+        <p v-if="searchActive && selectedFolder" class="search-scope-note">
+          Searching the whole Media Library — results below may live outside
+          <strong>{{ currentViewLabel }}</strong>. Each card shows its folder.
+        </p>
+
         <!-- Drop zone — only where files may actually be uploaded -->
         <div v-if="dropTargetLabel && !showArchivedView" class="ml-dropzone" :class="{ 'ml-dropzone--active': dragActive }">
           <span class="dropzone-text">
@@ -1282,7 +1302,7 @@ const selectedFileFolderIsLegacy = computed(() => {
         <div v-else-if="!loading && files.length === 0" class="empty-state">
           <template v-if="searchActive">
             <p class="empty-title">No files found</p>
-            <p class="empty-hint">Nothing matches “{{ searchQuery }}” in this view.</p>
+            <p class="empty-hint">Nothing matches “{{ searchQuery }}” anywhere in the Media Library.</p>
             <button class="btn-empty-action" @click="clearSearch">Clear search</button>
           </template>
           <template v-else-if="showArchivedView">
@@ -1842,6 +1862,17 @@ const selectedFileFolderIsLegacy = computed(() => {
 }
 .btn-empty-action:hover:not(:disabled) { background: var(--color-primary); }
 .btn-empty-action:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.search-scope-note {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  overflow-wrap: anywhere;
+}
 
 /* ── ML-CLOUD-03: drag and drop ── */
 .ml-main--dragging { outline: 2px dashed var(--color-primary); outline-offset: -6px; }
