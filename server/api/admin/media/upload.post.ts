@@ -74,13 +74,24 @@ export default defineEventHandler(async (event) => {
 
     const autoTitle = filename.replace(/\.[^.]+$/, '')
 
+    /**
+     * ML-CLOUD-01 — field order matters here, and getting it wrong is silent.
+     *
+     * Directus reads the multipart stream in order and applies the metadata
+     * fields it has seen by the time the file part arrives; anything appended
+     * after the file is ignored without an error. `folder` and `title` were
+     * being appended last, so every upload landed in Unclassified no matter
+     * which folder the operator chose — the request succeeded, the file was
+     * stored, and the destination was quietly dropped. They now precede the
+     * file part.
+     */
     const fd = new FormData()
     const rawBuf = part.data.buffer instanceof SharedArrayBuffer
       ? new Uint8Array(part.data).slice().buffer
       : (part.data.buffer as ArrayBuffer)
-    fd.append('file', new Blob([rawBuf], { type: ct }), filename)
     fd.append('title', autoTitle)
     if (folder) fd.append('folder', folder)
+    fd.append('file', new Blob([rawBuf], { type: ct }), filename)
 
     try {
       const res = await $fetch<{ data: { id: string; filename_download: string; title: string } }>(

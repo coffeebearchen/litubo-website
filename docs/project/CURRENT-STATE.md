@@ -4597,3 +4597,135 @@ Governance-only 模块，按施工单**未**运行完整测试 / build / 浏览�
 - **375px mobile：N/A — governance-only module, no runtime/UI changes**
 
 *最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-GOV-01"任务中写入。*
+
+---
+
+## ML-CLOUD-01 — Customer Folder Foundation（2026-09-09）
+
+**状态：COMPLETED（Folder Trash / Restore 按校准 P1 deferred）。** 按业务校准的「Simple Cloud-like Business File Management」原则施工：简单、稳定、少返工。
+
+### 一、客户文件夹治理落地
+
+新增独立的**文件夹管理维度** `FolderManagement`（`protected` / `customer-managed` / `locked`），与既有的 `PolicyState`（文件内容维度）分离 —— 满足 D-023 / 决策 #9.5「一个状态值不得同时承担两个职责」。
+
+**declared customer-manageable zones**（`CUSTOMER_MANAGEABLE_ROOTS`）只开放产品业务资产实际需要的五个类目根：
+
+```text
+products/xray
+products/metal-detection
+products/combination
+products/checkweigher
+products/conveyor
+```
+
+权限来自**这份声明**，不来自「`FOLDER_POLICY` 里没有它」。判定顺序严格按决策 #9.3：
+
+| 优先级 | 条件 | management |
+|---|---|---|
+| 1 | `ambiguous` | `locked`（同时锁死文件维度） |
+| 2 | `legacy-read-only` / `conflict-frozen` | `locked` |
+| 3 | `FOLDER_POLICY` 精确命中 | `protected` |
+| 4 | declared zone 的严格后代 | `customer-managed` |
+| 5 | 其余 | `locked`（`unknown` 继续 fail-closed） |
+
+zone 根**自身仍是 protected**（不可改名/移动），但显式允许在其下建子目录 —— 这一许可逐节点声明，不由推断得出。
+
+### 二、file-content 继承
+
+customer folder **继承其 zone 根的文件内容策略**，因此 `products/xray/LT-180C/manuals` 的 `policy_state = active-canonical`、`allow_upload = true`、`allow_move_target = true`，可以真正用于整理文件。一个能建却不能往里放东西的文件夹不是文件管理，是装饰。
+
+继承**不外溢**：zone 之外的 `unknown` 与 legacy 全部保持 `allow_upload = false`。
+
+### 三、新增端点
+
+| 端点 | 用途 |
+|---|---|
+| `POST /api/admin/media/folders` | 创建 customer folder |
+| `PATCH /api/admin/media/folders/:id` | 改名与/或移动（同一行 Directus 写入，合并为一个端点） |
+
+两者都在写入前**重新解析注册表**并校验 —— 这也是 V1 的并发策略全部：服务端写前重查 sibling 重名 + 前端提交状态防重复。单租户后台不需要分布式锁。
+
+**命名规则（服务端统一执行）：** trim；空拒绝；`/` 与 `\` 拒绝；长度上限 80；同一 parent 下不区分大小写禁止重名。**未**引入视觉等价 / confusable 算法。
+
+**层级保护：** 拒绝移入自身、移入自身后代（路径前缀判定，无需图遍历）、移动 protected 文件夹、移出 customer zone。`parentChain` 另加 visited 集合作为简单 cycle guard，异常数据只会得到截断链而不会死循环。
+
+### 四、前端
+
+- **面包屑**复用既有 `folderPath`，显示完整路径
+- **New folder / Rename / Move** 按权限渲染：customer folder 三个都有；zone 根只有 New folder；非 zone 系统目录显示 `System folder` 且无动作
+- 内联操作面板（无模态栈），一次只有一个动作在飞
+- customer folder 因继承 `active-canonical` 而**自动出现在既有侧栏**，未改动侧栏筛选逻辑
+
+### 五、顺带修复的既有 bug（P1）
+
+验收「upload 能用于 customer folder」时发现：**上传时选择的目标文件夹一直被静默丢弃**，所有文件都落到 Unclassified。
+
+根因不在本模块：`upload.post.ts` 把 `title` 与 `folder` 追加在 `file` **之后**，而 Directus 按流顺序读取 multipart，file 之后的元数据字段会被忽略且**不报错**。用系统目录 `products/xray` 做对照上传同样落到 `folder: null`，确认与 customer zone 无关。
+
+修复为一行字段顺序调整（`title` / `folder` 前置于 `file`），已实测：修复后文件正确落入 `products/conveyor/ZZ-ML-CLOUD-01-RENAMED/manuals`。
+
+这是本模块验收标准的一部分，因此就地修复而非仅记录。
+
+### 六、Folder Trash / Restore = P1 deferred
+
+只读确认结论：文件级 Archive 依赖专门的 **lifecycle collection** 存储归档状态；Directus folder 无等价字段。实现文件夹回收站需要新数据结构保存 trash state 与 original parent —— 属 schema 改动，按校准**不阻塞本模块**。
+
+文件级 Archive / Restore **保持现状未动**。
+
+### 七、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **1087 / 1087 通过**（28 文件，本次 +48） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功 |
+
+**真实 Directus 端到端验收（1440px 登录态）：**
+
+| 场景 | 结果 |
+|---|---|
+| zone 内创建 / 嵌套创建 | 200 |
+| 同名 sibling（大小写不同） | 422 `FOLDER_NAME_TAKEN` |
+| 含 `/` 的名字 | 422 `FOLDER_NAME_SEPARATOR` |
+| 系统容器 `products` 内创建 | 422 `FOLDER_ZONE_DISALLOWED` |
+| legacy `products/technical-docs` 内创建 | 422 |
+| customer folder 改名 | 200 |
+| **系统目录 `products/xray` 改名** | **422 `FOLDER_PROTECTED`** |
+| **移入自身后代** | **422 `FOLDER_MOVE_INTO_DESCENDANT`** |
+| 移入自身 | 422 |
+| 跨 zone 移动（xray → conveyor） | 200，子树整体跟随，路径正确 |
+| 上传到 customer folder（修复后） | 200，文件确实落入该文件夹 |
+
+**UI 权限分层实测：** customer folder → `New folder / Rename / Move`；zone 根 `products/xray` → 仅 `New folder`；非 zone 系统目录 `home` → 无动作 + `System folder` 提示。
+
+**断点：** 1440px 与 375px 均**无横向溢出**；Console 无页面错误（出现的 422 均为我主动发起的否定路径 API 测试）。
+
+### 八、遗留测试数据（需你手工清理）
+
+验收在真实 Directus 上创建了测试数据，**无法经受支持路径清除**：
+
+- **文件夹删除本模块未实现**（Folder Trash P1 deferred）
+- **文件归档失败（403）** —— 归档的引用检查读取 `products_files`，被 Directus 权限拒绝，即此前已记录的既有 P1
+
+遗留项：
+
+| 类型 | 标识 |
+|---|---|
+| 文件夹 | `products/conveyor/ZZ-ML-CLOUD-01-RENAMED` 及其子目录 `manuals` |
+| 文件 | `ZZ-ML-CLOUD-01-VERIFY.txt`、`ZZ-ML-CLOUD-01-CONTROL.txt`（均 Unclassified）、`ZZ-ML-CLOUD-01-AFTERFIX.txt`（在测试文件夹内） |
+
+如需清除，请在 Directus 后台直接删除。我未绕过受支持路径去写 Directus。
+
+### 九、范围与边界
+
+**0 AI 改动**（AI checkpoint `4bbc838` 冻结未动）、**0 Directus schema / DB 改动**、**0 Provider 调用**、**0 API 费用**、**0 permanent delete**、**0 push**、**0 部署**、**master 未改**。
+
+未建设：distributed lock、并发引擎、folder audit history、per-user permissions、owner/collaborator、folder 版本历史、复杂 lifecycle 引擎、合规级删除、复杂名称归一化算法。Search 架构**未重写**。
+
+**记录未修的既有 P1：** `products_files` 的 Directus 403 —— 它同时导致 `references` 与**文件归档**不可用。属 Directus 权限配置，本模块禁止改动。
+
+*最后更新：2026-09-09，由 Claude Code 在"ML-CLOUD-01"任务中写入。*

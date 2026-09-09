@@ -3,6 +3,12 @@ import {
   buildFolderRegistry,
   validateUploadFolder,
   validateMoveFolder,
+  validateFolderCreate,
+  validateFolderRename,
+  validateFolderMove,
+  folderCanHoldCustomerFolders,
+  normalizeFolderName,
+  MAX_FOLDER_NAME_LENGTH,
 } from '../server/utils/folderRegistry'
 
 // ── Shared test UUIDs ─────────────────────────────────────────────────────────
@@ -450,5 +456,243 @@ describe('route-level policy simulation — batch-move', () => {
     expect(check.ok).toBe(true)
     // All file IDs in the batch would be written to the same UUID.xray — enforced in batch-move.post.ts
     expect(UUID.xray).toBe('aa000006-0000-0000-0000-000000000006')
+  })
+})
+
+// ── ML-CLOUD-01: customer folder foundation ─────────────────────────────────
+
+/**
+ * The governance this implements (D-023 / decision #9) turns on one thing:
+ * rights come from a declared customer zone, never from a path's absence from
+ * a list. These tests hold that line, and hold the folder-management dimension
+ * apart from the file-content one.
+ */
+
+/** A tree covering every case: system roots, a declared zone, its descendants, and paths outside any zone. */
+const TREE = [
+  { id: 'f-products', name: 'products', parent: null },
+  { id: 'f-xray', name: 'xray', parent: 'f-products' },
+  { id: 'f-lt180c', name: 'LT-180C', parent: 'f-xray' },
+  { id: 'f-manuals', name: 'manuals', parent: 'f-lt180c' },
+  { id: 'f-photos', name: 'photos', parent: 'f-lt180c' },
+  { id: 'f-techdocs', name: 'technical-docs', parent: 'f-products' },
+  { id: 'f-resources', name: 'resources', parent: null },
+  { id: 'f-downloads', name: 'downloads', parent: 'f-resources' },
+  { id: 'f-stray', name: 'stray-folder', parent: null },
+]
+
+const reg = () => buildFolderRegistry(TREE)
+const at = (path: string) => reg().find(e => e.full_path === path)!
+
+describe('folder management is a separate dimension from file-content policy', () => {
+  it.each([
+    ['products', 'protected'],
+    ['products/xray', 'protected'],
+    ['resources', 'protected'],
+  ])('%s is a system folder → %s', (path, management) => {
+    expect(at(path).management).toBe(management)
+  })
+
+  it.each([
+    'products/xray/LT-180C',
+    'products/xray/LT-180C/manuals',
+    'products/xray/LT-180C/photos',
+  ])('%s is inside a declared zone → customer-managed', (path) => {
+    expect(at(path).management).toBe('customer-managed')
+  })
+
+  it.each([
+    ['products/technical-docs', 'legacy-read-only'],
+    ['resources/downloads', 'legacy-read-only'],
+  ])('%s stays frozen (%s) and is never customer-managed', (path, policy) => {
+    const entry = at(path)
+    expect(entry.policy_state).toBe(policy)
+    expect(entry.management).toBe('locked')
+  })
+
+  it('a path outside every declared zone stays unknown and locked', () => {
+    const stray = at('stray-folder')
+    expect(stray.policy_state).toBe('unknown')
+    expect(stray.management).toBe('locked')
+    expect(stray.allow_upload).toBe(false)
+    expect(stray.allow_move_target).toBe(false)
+  })
+
+  it('a customer folder inherits its zone root’s file policy, so it is actually usable', () => {
+    // This is the point of the inheritance: a folder you can create but never
+    // upload into is not folder management, it is decoration.
+    const zoneRoot = at('products/xray')
+    const child = at('products/xray/LT-180C/manuals')
+    expect(zoneRoot.policy_state).toBe('active-canonical')
+    expect(child.policy_state).toBe('active-canonical')
+    expect(child.allow_upload).toBe(true)
+    expect(child.allow_move_target).toBe(true)
+  })
+
+  it('inheritance does not leak outside the zone', () => {
+    expect(at('stray-folder').allow_upload).toBe(false)
+    expect(at('products/technical-docs').allow_upload).toBe(false)
+  })
+
+  it('ambiguity outranks everything — the folder locks even inside a zone', () => {
+    const ambiguous = buildFolderRegistry([
+      ...TREE,
+      { id: 'f-dupe', name: 'manuals', parent: 'f-lt180c' },
+    ])
+    for (const entry of ambiguous.filter(e => e.full_path === 'products/xray/LT-180C/manuals')) {
+      expect(entry.policy_state).toBe('ambiguous')
+      expect(entry.management).toBe('locked')
+      expect(entry.allow_upload).toBe(false)
+    }
+  })
+
+  it('a parent cycle in malformed data terminates instead of hanging', () => {
+    const cyclic = buildFolderRegistry([
+      { id: 'a', name: 'a', parent: 'b' },
+      { id: 'b', name: 'b', parent: 'a' },
+    ])
+    expect(cyclic).toHaveLength(2)
+    for (const entry of cyclic) expect(entry.management).toBe('locked')
+  })
+})
+
+describe('folder names', () => {
+  it('trims, and keeps the trimmed value', () => {
+    const result = normalizeFolderName('  manuals  ')
+    expect(result).toEqual({ ok: true, name: 'manuals' })
+  })
+
+  it.each([
+    ['empty', ''],
+    ['whitespace only', '   '],
+    ['forward slash', 'a/b'],
+    ['backslash', 'a\\b'],
+    ['not a string', 42],
+  ])('rejects %s', (_label, value) => {
+    expect(normalizeFolderName(value).ok).toBe(false)
+  })
+
+  it('rejects a name past the length cap', () => {
+    expect(normalizeFolderName('x'.repeat(MAX_FOLDER_NAME_LENGTH)).ok).toBe(true)
+    expect(normalizeFolderName('x'.repeat(MAX_FOLDER_NAME_LENGTH + 1)).ok).toBe(false)
+  })
+})
+
+describe('creating a folder', () => {
+  it('is allowed inside a declared zone root', () => {
+    const result = validateFolderCreate(reg(), 'f-xray', 'LT-200')
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.name).toBe('LT-200')
+  })
+
+  it('is allowed inside an existing customer folder', () => {
+    expect(validateFolderCreate(reg(), 'f-lt180c', 'datasheets').ok).toBe(true)
+  })
+
+  it.each([
+    ['a container-only system root', 'f-products'],
+    ['a frozen legacy folder', 'f-techdocs'],
+    ['a folder outside every zone', 'f-stray'],
+  ])('is refused inside %s', (_label, parent) => {
+    const result = validateFolderCreate(reg(), parent, 'anything')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_ZONE_DISALLOWED')
+  })
+
+  it('is refused when a sibling already has that name, case-insensitively', () => {
+    const result = validateFolderCreate(reg(), 'f-lt180c', 'MANUALS')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_NAME_TAKEN')
+  })
+
+  it('allows the same name under a different parent', () => {
+    expect(validateFolderCreate(reg(), 'f-xray', 'manuals').ok).toBe(true)
+  })
+
+  it('requires a parent — nothing is created at the tree root', () => {
+    const result = validateFolderCreate(reg(), null, 'orphan')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_PARENT_REQUIRED')
+  })
+})
+
+describe('renaming a folder', () => {
+  it('is allowed for a customer folder', () => {
+    const result = validateFolderRename(reg(), 'f-lt180c', 'LT-180C-rev2')
+    expect(result.ok).toBe(true)
+  })
+
+  it.each([
+    ['a system root', 'f-products'],
+    ['a declared zone root', 'f-xray'],
+    ['a frozen legacy folder', 'f-techdocs'],
+    ['a folder outside every zone', 'f-stray'],
+  ])('is refused for %s', (_label, id) => {
+    const result = validateFolderRename(reg(), id, 'new-name')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_PROTECTED')
+  })
+
+  it('is refused when it would collide with a sibling', () => {
+    const result = validateFolderRename(reg(), 'f-manuals', 'photos')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_NAME_TAKEN')
+  })
+
+  it('renaming a folder to its own name is not a collision with itself', () => {
+    expect(validateFolderRename(reg(), 'f-manuals', 'manuals').ok).toBe(true)
+  })
+})
+
+describe('moving a folder', () => {
+  it('is allowed between two places in the same zone', () => {
+    expect(validateFolderMove(reg(), 'f-manuals', 'f-photos').ok).toBe(true)
+  })
+
+  it('is refused into itself', () => {
+    const result = validateFolderMove(reg(), 'f-lt180c', 'f-lt180c')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_MOVE_INTO_SELF')
+  })
+
+  it('is refused into its own descendant — the subtree cannot be detached', () => {
+    const result = validateFolderMove(reg(), 'f-lt180c', 'f-manuals')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_MOVE_INTO_DESCENDANT')
+  })
+
+  it.each([
+    ['a system container', 'f-products'],
+    ['a frozen legacy folder', 'f-techdocs'],
+    ['a folder outside every zone', 'f-stray'],
+  ])('is refused into %s', (_label, target) => {
+    const result = validateFolderMove(reg(), 'f-manuals', target)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_ZONE_DISALLOWED')
+  })
+
+  it('is refused for a protected folder, whatever the destination', () => {
+    const result = validateFolderMove(reg(), 'f-xray', 'f-lt180c')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_PROTECTED')
+  })
+
+  it('is refused when the destination already has a folder with that name', () => {
+    const withClash = buildFolderRegistry([...TREE, { id: 'f-clash', name: 'manuals', parent: 'f-photos' }])
+    const result = validateFolderMove(withClash, 'f-manuals', 'f-photos')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.code).toBe('FOLDER_NAME_TAKEN')
+  })
+})
+
+describe('which folders may hold customer-created children', () => {
+  it.each([
+    ['a declared zone root', 'products/xray', true],
+    ['a customer folder', 'products/xray/LT-180C', true],
+    ['a system container', 'products', false],
+    ['a frozen legacy folder', 'products/technical-docs', false],
+    ['a path outside every zone', 'stray-folder', false],
+  ])('%s → %s', (_label, path, expected) => {
+    expect(folderCanHoldCustomerFolders(at(path))).toBe(expected)
   })
 })

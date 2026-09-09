@@ -1,6 +1,6 @@
 import { adminFetch } from '~/server/utils/adminDirectusClient'
-import { buildFolderRegistry } from '~/server/utils/folderRegistry'
-import type { PolicyState } from '~/server/utils/folderRegistry'
+import { buildFolderRegistry, folderCanHoldCustomerFolders } from '~/server/utils/folderRegistry'
+import type { PolicyState, FolderManagement } from '~/server/utils/folderRegistry'
 
 export interface FolderNode {
   id: string
@@ -10,6 +10,14 @@ export interface FolderNode {
   policy_state: PolicyState
   allow_upload: boolean
   allow_move_target: boolean
+  /**
+   * ML-CLOUD-01 — whether the folder ITSELF may be renamed or moved, which is
+   * a different question from whether files may be put in it. The browser
+   * needs both to render the right controls.
+   */
+  management: FolderManagement
+  /** True when a customer may create folders inside this one. */
+  can_create_children: boolean
   children: FolderNode[]
 }
 
@@ -36,6 +44,8 @@ export default defineEventHandler(async (event) => {
       policy_state: entry?.policy_state ?? 'unknown',
       allow_upload: entry?.allow_upload ?? false,
       allow_move_target: entry?.allow_move_target ?? false,
+      management: entry?.management ?? 'locked',
+      can_create_children: entry ? folderCanHoldCustomerFolders(entry) : false,
       children: [],
     })
   }

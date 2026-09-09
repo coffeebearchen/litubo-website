@@ -41,7 +41,11 @@ AI checkpoint `4bbc838...` 全程冻结。
 
 ---
 
-## ML-CLOUD-01 — Customer Folder Foundation
+## ML-CLOUD-01 — Customer Folder Foundation ✅ COMPLETED（2026-09-09）
+
+**成果：** `FolderManagement` 维度与 `PolicyState` 分离；五个产品类目根声明为 customer-manageable zone；customer folder 继承 zone 根的文件内容策略；新增 folder create / rename / move 端点与前端动作；面包屑复用既有实现。顺带修复既有上传 bug（Directus multipart 字段顺序导致目标文件夹被静默丢弃）。
+
+**Folder Trash / Restore = P1 deferred** —— 只读确认：文件级归档依赖专门的 lifecycle collection，Directus folder 无等价字段，实现需新数据结构保存 trash state 与 original parent（schema 改动），按业务校准不阻塞本模块。文件级 Archive / Restore 保持现状。
 
 ### 目标
 让客户在受控区域真正管理自己的文件夹。

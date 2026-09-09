@@ -75,7 +75,7 @@ const restoreConfirm = ref(false)
 const lifecycleWorking = ref(false)
 
 // Folder tree
-const { data: foldersData } = await useFetch<FolderNode[]>('/api/admin/media/folders')
+const { data: foldersData, refresh: loadFolders } = await useFetch<FolderNode[]>('/api/admin/media/folders')
 const folderTree = computed(() => foldersData.value ?? [])
 
 // Flat folder map id→name
@@ -112,11 +112,30 @@ function folderPath(folderId: string | null): string {
 }
 
 // Flatten all folders (for folderMap, parentMap building)
-type FlatFolder = { id: string; name: string; depth: number; policy_state: FolderNode['policy_state']; allow_upload: boolean; allow_move_target: boolean }
+type FlatFolder = {
+  id: string
+  name: string
+  depth: number
+  policy_state: FolderNode['policy_state']
+  allow_upload: boolean
+  allow_move_target: boolean
+  /** ML-CLOUD-01 — may the folder itself be renamed/moved. Separate from the file-content flags above. */
+  management: FolderNode['management']
+  can_create_children: boolean
+}
 function flattenFolders(nodes: FolderNode[], depth = 0): FlatFolder[] {
   const result: FlatFolder[] = []
   for (const n of nodes) {
-    result.push({ id: n.id, name: n.name, depth, policy_state: n.policy_state, allow_upload: n.allow_upload, allow_move_target: n.allow_move_target })
+    result.push({
+      id: n.id,
+      name: n.name,
+      depth,
+      policy_state: n.policy_state,
+      allow_upload: n.allow_upload,
+      allow_move_target: n.allow_move_target,
+      management: n.management,
+      can_create_children: n.can_create_children,
+    })
     result.push(...flattenFolders(n.children, depth + 1))
   }
   return result
@@ -228,6 +247,99 @@ function toggleArchivedView() {
 }
 
 // Label for the current view (breadcrumb-style topbar heading)
+// ── ML-CLOUD-01: customer folder management ──────────────────────────────────
+//
+// Every action re-validates on the server before it writes; the disabled
+// buttons and the submitting flag here are the client half of that, not the
+// guarantee. Nothing below assumes the browser's view of policy is authoritative.
+
+const currentFolder = computed<FlatFolder | null>(() => {
+  const id = selectedFolder.value
+  if (!id || id === 'root' || showArchivedView.value) return null
+  return flatFolders.value.find((f: FlatFolder) => f.id === id) ?? null
+})
+
+/** Folders a customer folder may be moved into — anywhere that can hold customer folders. */
+const folderMoveTargets = computed(() =>
+  flatFolders.value.filter((f: FlatFolder) =>
+    f.can_create_children && f.id !== currentFolder.value?.id,
+  ),
+)
+
+const canCreateFolderHere = computed(() => currentFolder.value?.can_create_children === true)
+const canManageCurrentFolder = computed(() => currentFolder.value?.management === 'customer-managed')
+
+type FolderDialog = 'none' | 'create' | 'rename' | 'move'
+const folderDialog = ref<FolderDialog>('none')
+const folderNameInput = ref('')
+const folderMoveTarget = ref('')
+const folderSubmitting = ref(false)
+const folderError = ref<string | null>(null)
+
+function openFolderDialog(kind: Exclude<FolderDialog, 'none'>) {
+  folderError.value = null
+  folderNameInput.value = kind === 'rename' ? (currentFolder.value?.name ?? '') : ''
+  folderMoveTarget.value = ''
+  folderDialog.value = kind
+}
+
+function closeFolderDialog() {
+  folderDialog.value = 'none'
+  folderError.value = null
+}
+
+/** Shared submit path: one in-flight request at a time, refresh the tree, keep the user where they were. */
+async function submitFolderAction(run: () => Promise<void>) {
+  if (folderSubmitting.value) return
+  folderSubmitting.value = true
+  folderError.value = null
+  try {
+    await run()
+    await loadFolders()
+    closeFolderDialog()
+  }
+  catch (e: unknown) {
+    const fe = e as { data?: { message?: string }, message?: string }
+    folderError.value = fe.data?.message ?? fe.message ?? 'That did not work. Try again.'
+  }
+  finally {
+    folderSubmitting.value = false
+  }
+}
+
+function createFolder() {
+  const parent = currentFolder.value?.id
+  if (!parent) return
+  return submitFolderAction(async () => {
+    await $fetch('/api/admin/media/folders', {
+      method: 'POST',
+      body: { name: folderNameInput.value, parent },
+    })
+  })
+}
+
+function renameFolder() {
+  const id = currentFolder.value?.id
+  if (!id) return
+  return submitFolderAction(async () => {
+    await $fetch(`/api/admin/media/folders/${id}`, {
+      method: 'PATCH',
+      body: { name: folderNameInput.value },
+    })
+  })
+}
+
+function moveFolder() {
+  const id = currentFolder.value?.id
+  if (!id || !folderMoveTarget.value) return
+  return submitFolderAction(async () => {
+    await $fetch(`/api/admin/media/folders/${id}`, {
+      method: 'PATCH',
+      body: { parent: folderMoveTarget.value },
+    })
+  })
+}
+
 const currentViewLabel = computed(() => {
   if (showArchivedView.value) return 'Archived'
   if (selectedFolder.value === null) return 'All files'
@@ -492,6 +604,34 @@ const selectedFileFolderIsLegacy = computed(() => {
       </div>
 
       <div class="ml-topbar-actions">
+        <!--
+          ML-CLOUD-01 — folder actions, shown only where they are actually
+          permitted. A protected system folder simply does not offer Rename or
+          Move; the server refuses them regardless, but an admin should not be
+          invited to try.
+        -->
+        <template v-if="selectedIds.size === 0 && currentFolder">
+          <button
+            v-if="canCreateFolderHere"
+            class="btn-folder-action"
+            :disabled="folderSubmitting"
+            @click="openFolderDialog('create')"
+          >New folder</button>
+          <button
+            v-if="canManageCurrentFolder"
+            class="btn-folder-action"
+            :disabled="folderSubmitting"
+            @click="openFolderDialog('rename')"
+          >Rename</button>
+          <button
+            v-if="canManageCurrentFolder"
+            class="btn-folder-action"
+            :disabled="folderSubmitting"
+            @click="openFolderDialog('move')"
+          >Move</button>
+          <span v-if="!canManageCurrentFolder && !canCreateFolderHere" class="folder-system-note">System folder</span>
+        </template>
+
         <!-- Batch actions -->
         <template v-if="selectedIds.size > 0">
           <span class="selection-count">{{ selectedIds.size }} selected</span>
@@ -528,6 +668,44 @@ const selectedFileFolderIsLegacy = computed(() => {
           @change="onFilesSelected"
         >
       </div>
+    </div>
+
+    <!-- Folder action panel — one at a time, inline, no modal stack -->
+    <div v-if="folderDialog !== 'none'" class="ml-folder-panel">
+      <p class="folder-panel-title">
+        {{ folderDialog === 'create' ? `New folder in ${currentFolder?.name}`
+          : folderDialog === 'rename' ? `Rename ${currentFolder?.name}`
+            : `Move ${currentFolder?.name}` }}
+      </p>
+
+      <div class="folder-panel-row">
+        <input
+          v-if="folderDialog !== 'move'"
+          v-model="folderNameInput"
+          class="folder-panel-input"
+          type="text"
+          placeholder="Folder name"
+          :disabled="folderSubmitting"
+          @keyup.enter="folderDialog === 'create' ? createFolder() : renameFolder()"
+        >
+        <select v-else v-model="folderMoveTarget" class="folder-panel-input" :disabled="folderSubmitting">
+          <option value="">— Choose a destination —</option>
+          <option v-for="f in folderMoveTargets" :key="f.id" :value="f.id">
+            {{ '—'.repeat(f.depth) }} {{ f.name }}
+          </option>
+        </select>
+
+        <button
+          class="btn-folder-confirm"
+          :disabled="folderSubmitting || (folderDialog === 'move' ? !folderMoveTarget : folderNameInput.trim() === '')"
+          @click="folderDialog === 'create' ? createFolder() : folderDialog === 'rename' ? renameFolder() : moveFolder()"
+        >
+          {{ folderSubmitting ? 'Working…' : folderDialog === 'create' ? 'Create' : folderDialog === 'rename' ? 'Rename' : 'Move' }}
+        </button>
+        <button class="btn-folder-cancel" :disabled="folderSubmitting" @click="closeFolderDialog">Cancel</button>
+      </div>
+
+      <p v-if="folderError" class="folder-panel-error" role="alert">{{ folderError }}</p>
     </div>
 
     <!-- Search + filter bar -->
@@ -1500,5 +1678,82 @@ const selectedFileFolderIsLegacy = computed(() => {
   }
 
   .folder-select { min-width: 140px; max-width: 200px; }
+}
+
+/* ── ML-CLOUD-01: customer folder management ─────────────────────────────── */
+
+.btn-folder-action {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-folder-action:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary-deep); }
+.btn-folder-action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.folder-system-note { font-size: var(--text-xs); color: var(--color-ink-muted); white-space: nowrap; }
+
+.ml-folder-panel {
+  margin: var(--space-3) var(--space-6) 0;
+  padding: var(--space-3);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+.folder-panel-title { margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); overflow-wrap: anywhere; }
+.folder-panel-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.folder-panel-input {
+  flex: 1 1 220px;
+  min-width: 0;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  box-sizing: border-box;
+}
+.btn-folder-confirm {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-4);
+  background: var(--color-primary);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-folder-confirm:hover:not(:disabled) { background: var(--color-primary-deep); }
+.btn-folder-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-folder-cancel {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.btn-folder-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.folder-panel-error {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: #C0392B;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  /* Keep the actions reachable without a horizontal scroll on a phone. */
+  .ml-folder-panel { margin-left: var(--space-4); margin-right: var(--space-4); }
+  .folder-panel-row { flex-direction: column; align-items: stretch; }
+  .folder-panel-input { flex: 1 1 auto; }
+  .btn-folder-action { flex: 1 1 auto; }
 }
 </style>
