@@ -15,6 +15,15 @@ interface ReviewRow {
   note: string
   status: 'pending' | 'accepted' | 'rejected'
   editing: boolean
+  /**
+   * PWS-AI-REVIEW-BATCH-01 — true once the reviewer has changed this row's
+   * value or note by hand. An edited row is deliberately excluded from
+   * "Accept all safe": the reviewer has already given it individual
+   * attention, and a bulk action must not quietly ratify that work.
+   */
+  edited: boolean
+  /** Checkbox state for the batch toolbar. Review state only — never persisted. */
+  selected: boolean
   draftValue: string
   draftNote: string
   matchKind: ReviewMatchKind
@@ -160,6 +169,8 @@ function buildRows(): ReviewRow[] {
       note: it.note ?? '',
       status: 'pending' as const,
       editing: false,
+      edited: false,
+      selected: false,
       draftValue: it.value,
       draftNote: it.note ?? '',
       ...matchFor(g.displayName, it.parameter),
@@ -186,7 +197,93 @@ watch(() => props.existingSpecGroups, () => {
 const unsupportedFiles = computed(() => props.fileResults.filter(f => f.status !== 'read'))
 const readFiles = computed(() => props.fileResults.filter(f => f.status === 'read'))
 
+/**
+ * PWS-AI-REVIEW-BATCH-01 — batch review.
+ *
+ * A real Beta run produced thirteen proposals for one product, and accepting
+ * them one click at a time is not how this screen will be used in production.
+ * What follows adds bulk review state changes — and nothing else. Every action
+ * here moves rows between Pending / Accepted / Rejected in memory. None of them
+ * writes to the product: `Apply accepted changes to Draft` remains the only
+ * write, and it is deliberately kept visually and physically apart from these
+ * controls so the two are never confused.
+ *
+ * "Safe" is not a new judgement. It reuses the `matchKind` this screen already
+ * computes against the product's existing specifications — the same thing the
+ * "Review required" flag has always been rendered from. A row is safe only when
+ * nothing about it needs a human decision:
+ *
+ *   - no existing specification matches it (`matchKind === 'none'`), and
+ *   - the reviewer has not already edited it by hand.
+ *
+ * A conflicting row can still be accepted — but only by an explicit click on
+ * that row, or by explicitly selecting it. It can never be swept up by
+ * "Accept all safe".
+ */
+function isSafeRow(row: ReviewRow): boolean {
+  return row.matchKind === 'none' && !row.edited
+}
+
 const acceptedCount = computed(() => rows.value.filter((r: ReviewRow) => r.status === 'accepted').length)
+const rejectedCount = computed(() => rows.value.filter((r: ReviewRow) => r.status === 'rejected').length)
+const totalCount = computed(() => rows.value.length)
+
+/** Exactly the set "Accept all safe" acts on, so the count really does fall to zero when it is clicked. */
+const safePendingRows = computed(() => rows.value.filter((r: ReviewRow) => r.status === 'pending' && isSafeRow(r)))
+const safePendingCount = computed(() => safePendingRows.value.length)
+
+/** Counted regardless of review status: a conflicting row that has been accepted is still a row a person had to look at. */
+const reviewRequiredCount = computed(() => rows.value.filter((r: ReviewRow) => r.matchKind !== 'none').length)
+
+const selectedRows = computed(() => rows.value.filter((r: ReviewRow) => r.selected))
+const selectedCount = computed(() => selectedRows.value.length)
+
+const allSafePendingSelected = computed(() =>
+  safePendingCount.value > 0 && safePendingRows.value.every((r: ReviewRow) => r.selected),
+)
+
+/** Accepts every safe Pending row. Conflicts, edited, rejected and already-accepted rows are untouched. */
+function acceptAllSafe() {
+  if (partialApplyLocked.value) return
+  for (const row of safePendingRows.value) row.status = 'accepted'
+  clearSelection()
+}
+
+/**
+ * Accepts what the reviewer explicitly picked — including a conflicting row, if
+ * they deliberately selected it. That keeps the same meaning the row's own
+ * "Accept as Add" button already has: a new item is proposed, and no existing
+ * specification is merged into or overwritten.
+ */
+function acceptSelected() {
+  if (partialApplyLocked.value) return
+  for (const row of selectedRows.value) row.status = 'accepted'
+  clearSelection()
+}
+
+function rejectSelected() {
+  if (partialApplyLocked.value) return
+  for (const row of selectedRows.value) row.status = 'rejected'
+  clearSelection()
+}
+
+function clearSelection() {
+  for (const row of rows.value) row.selected = false
+}
+
+function toggleSelectAllSafe(checked: boolean) {
+  for (const row of safePendingRows.value) row.selected = checked
+}
+
+/** One group's table header checkbox — the lightweight per-group control, scoped to that group only. */
+function groupFullySelected(displayName: string): boolean {
+  const groupRows = rowsForGroup(displayName)
+  return groupRows.length > 0 && groupRows.every((r: ReviewRow) => r.selected)
+}
+
+function toggleGroup(displayName: string, checked: boolean) {
+  for (const row of rowsForGroup(displayName)) row.selected = checked
+}
 
 /**
  * PWS-AI-APPLY-DRAFT-01 — a batch that stopped part-way through locks this
@@ -223,6 +320,7 @@ function saveEdit(row: ReviewRow) {
   row.value = row.draftValue.trim()
   row.note = row.draftNote.trim()
   row.editing = false
+  row.edited = true
 }
 
 async function applyAccepted() {
@@ -286,27 +384,120 @@ async function applyAccepted() {
     <section class="ws-card" aria-labelledby="ws-ai-review-heading">
       <div class="ws-card-header">
         <h2 id="ws-ai-review-heading" class="ws-card-title">Specification proposals</h2>
-        <span class="ws-accepted-count">{{ acceptedCount }} accepted</span>
       </div>
+
+      <!-- Live counts, so the reviewer never has to count rows by hand. -->
+      <div class="ws-review-summary">
+        <dl class="ws-stats" aria-label="Proposal review status">
+          <div class="ws-stat">
+            <dt class="ws-stat-label">Total proposals</dt>
+            <dd class="ws-stat-value">{{ totalCount }}</dd>
+          </div>
+          <div class="ws-stat ws-stat--safe">
+            <dt class="ws-stat-label">Safe pending</dt>
+            <dd class="ws-stat-value">{{ safePendingCount }}</dd>
+          </div>
+          <div class="ws-stat ws-stat--review">
+            <dt class="ws-stat-label">Review required</dt>
+            <dd class="ws-stat-value">{{ reviewRequiredCount }}</dd>
+          </div>
+          <div class="ws-stat ws-stat--accepted">
+            <dt class="ws-stat-label">Accepted</dt>
+            <dd class="ws-stat-value">{{ acceptedCount }}</dd>
+          </div>
+          <div class="ws-stat ws-stat--rejected">
+            <dt class="ws-stat-label">Rejected</dt>
+            <dd class="ws-stat-value">{{ rejectedCount }}</dd>
+          </div>
+        </dl>
+
+        <p class="ws-batch-notice">
+          Batch actions only change review status. No data is written to the product until you click
+          <strong>Apply accepted changes to Draft</strong>.
+        </p>
+      </div>
+
+      <div class="ws-batch-toolbar">
+        <label class="ws-select-all">
+          <input
+            type="checkbox"
+            :checked="allSafePendingSelected"
+            :disabled="safePendingCount === 0"
+            @change="toggleSelectAllSafe(($event.target as HTMLInputElement).checked)"
+          >
+          <span>Select all safe</span>
+        </label>
+
+        <div class="ws-batch-actions">
+          <button
+            type="button"
+            class="btn btn-primary btn-batch"
+            :disabled="safePendingCount === 0 || partialApplyLocked"
+            @click="acceptAllSafe"
+          >
+            Accept all safe
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-batch"
+            :disabled="selectedCount === 0 || partialApplyLocked"
+            @click="acceptSelected"
+          >
+            Accept selected
+          </button>
+          <button
+            type="button"
+            class="btn btn-danger btn-batch"
+            :disabled="selectedCount === 0 || partialApplyLocked"
+            @click="rejectSelected"
+          >
+            Reject selected
+          </button>
+        </div>
+
+        <span class="ws-selected-count" role="status">{{ selectedCount }} selected</span>
+      </div>
+
       <p class="ws-card-hint">
         Analyzed {{ readFiles.length }} source file{{ readFiles.length === 1 ? '' : 's' }}. Every item starts as Pending — nothing is accepted by default.
       </p>
 
       <div v-for="g in mergedGroups" :key="g.displayName" class="ws-group">
-        <h3 class="ws-group-title">{{ g.displayName }}</h3>
+        <div class="ws-group-header">
+          <h3 class="ws-group-title">{{ g.displayName }}</h3>
+          <span class="ws-group-count">
+            {{ rowsForGroup(g.displayName).length }} item{{ rowsForGroup(g.displayName).length === 1 ? '' : 's' }}
+          </span>
+        </div>
         <div class="ws-table-wrap">
           <table class="ws-table">
             <thead>
               <tr>
+                <th scope="col" class="ws-col-select">
+                  <input
+                    type="checkbox"
+                    :checked="groupFullySelected(g.displayName)"
+                    :aria-label="`Select every proposal in ${g.displayName}`"
+                    @change="toggleGroup(g.displayName, ($event.target as HTMLInputElement).checked)"
+                  >
+                </th>
                 <th scope="col">Parameter</th>
                 <th scope="col">Proposed value</th>
                 <th scope="col">Status</th>
+                <th scope="col">Note (if any)</th>
                 <th scope="col">Action</th>
               </tr>
             </thead>
             <tbody>
               <template v-for="row in rowsForGroup(g.displayName)" :key="row.key">
-                <tr :class="{ 'ws-row--accepted': row.status === 'accepted', 'ws-row--rejected': row.status === 'rejected' }">
+                <tr :class="{ 'ws-row--accepted': row.status === 'accepted', 'ws-row--rejected': row.status === 'rejected', 'ws-row--selected': row.selected }">
+                  <td data-label="Select" class="ws-col-select">
+                    <input
+                      v-model="row.selected"
+                      type="checkbox"
+                      :aria-label="`Select ${row.parameter}`"
+                    >
+                  </td>
                   <td data-label="Parameter">
                     {{ row.parameter }}
                     <span v-if="row.matchKind !== 'none'" class="ws-review-required">Review required</span>
@@ -314,13 +505,6 @@ async function applyAccepted() {
                   <td data-label="Proposed value">
                     <div v-if="!row.editing">
                       <div>{{ row.value }}</div>
-                      <div v-if="row.note" class="ws-row-note">{{ row.note }}</div>
-                      <div v-if="row.matchKind === 'exact'" class="ws-current-value">
-                        Current value: {{ row.matchedCurrentValue || '—' }} ({{ row.matchedGroupTitle }})
-                      </div>
-                      <div v-else-if="row.matchKind === 'ambiguous'" class="ws-current-value ws-current-value--ambiguous">
-                        A specification named "{{ row.parameter }}" already exists in {{ row.matchedGroupTitle }} — this will be added as a new item, not merged automatically.
-                      </div>
                     </div>
                     <div v-else class="ws-edit-form">
                       <input v-model="row.draftValue" class="ws-form-input" placeholder="Value">
@@ -333,6 +517,21 @@ async function applyAccepted() {
                   </td>
                   <td data-label="Status">
                     <span class="ws-status-badge" :class="`ws-status-badge--${row.status}`">{{ row.status }}</span>
+                    <!-- An edited row is left out of "Accept all safe" on purpose; say so rather than let the count drop silently. -->
+                    <span v-if="row.edited" class="ws-edited-badge">Edited</span>
+                  </td>
+
+                  <td data-label="Note (if any)" class="ws-col-note">
+                    <template v-if="!row.editing">
+                      <div v-if="row.note" class="ws-row-note">{{ row.note }}</div>
+                      <div v-if="row.matchKind === 'exact'" class="ws-current-value">
+                        Current value: {{ row.matchedCurrentValue || '—' }} ({{ row.matchedGroupTitle }})
+                      </div>
+                      <div v-else-if="row.matchKind === 'ambiguous'" class="ws-current-value ws-current-value--ambiguous">
+                        A specification named "{{ row.parameter }}" already exists in {{ row.matchedGroupTitle }} — this will be added as a new item, not merged automatically.
+                      </div>
+                      <span v-else-if="!row.note" class="ws-note-empty">—</span>
+                    </template>
                   </td>
                   <td data-label="Action" class="ws-row-actions">
                     <template v-if="!row.editing">
@@ -349,6 +548,13 @@ async function applyAccepted() {
           </table>
         </div>
       </div>
+
+      <p class="ws-proposal-footer">
+        <span v-if="readFiles.length > 0" class="ws-proposal-source">
+          Source: {{ readFiles.map(f => f.displayName).join(', ') }}
+        </span>
+        <span class="ws-proposal-total">{{ totalCount }} proposal{{ totalCount === 1 ? '' : 's' }}</span>
+      </p>
 
       <div class="ws-apply-row">
         <button
@@ -401,11 +607,71 @@ async function applyAccepted() {
 .ws-card-title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); margin: 0 0 var(--space-2); }
 .ws-card-hint { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0 0 var(--space-4); }
 
-.ws-accepted-count {
-  font-size: var(--text-xs); font-weight: 600; color: var(--color-ink-muted);
-  background: var(--color-surface-alt); border: 1px solid var(--color-line);
-  border-radius: 999px; padding: var(--space-1) var(--space-3); white-space: nowrap;
+/* ── PWS-AI-REVIEW-BATCH-01: summary, batch toolbar, selection ── */
+
+.ws-review-summary {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-4); flex-wrap: wrap;
+  padding: var(--space-4); margin-bottom: var(--space-4);
+  border: 1px solid var(--color-line); border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
 }
+
+.ws-stats { display: flex; flex-wrap: wrap; gap: var(--space-5); margin: 0; }
+.ws-stat { display: flex; flex-direction: column-reverse; gap: 2px; min-width: 0; }
+.ws-stat-value { font-size: var(--text-2xl); font-weight: 700; line-height: 1.1; color: var(--color-ink); margin: 0; }
+.ws-stat-label { font-size: var(--text-xs); color: var(--color-ink-muted); white-space: nowrap; }
+.ws-stat--safe .ws-stat-value { color: var(--color-primary); }
+.ws-stat--review .ws-stat-value { color: #A23B3B; }
+.ws-stat--rejected .ws-stat-value { color: var(--color-ink-muted); }
+
+.ws-batch-notice {
+  flex: 1 1 260px; max-width: 42ch; margin: 0;
+  font-size: var(--text-xs); line-height: 1.5; color: var(--color-ink-muted);
+  background: var(--color-surface); border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm); padding: var(--space-3);
+}
+
+.ws-batch-toolbar {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  padding-bottom: var(--space-4); margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.ws-select-all { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-ink); cursor: pointer; }
+.ws-batch-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* Deliberately no size override here: the admin's own .btn sizing (44px touch
+   target) governs, so these read as the same buttons used everywhere else. */
+.btn-danger { background: var(--color-surface); color: #A23B3B; border-color: #F0C4C0; }
+.btn-danger:hover:not(:disabled) { background: #FDF0EE; }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ws-selected-count { margin-left: auto; font-size: var(--text-xs); color: var(--color-ink-muted); white-space: nowrap; }
+
+.ws-col-select { width: 36px; }
+.ws-col-select input { width: 16px; height: 16px; cursor: pointer; }
+.ws-col-note { max-width: 32ch; }
+.ws-note-empty { color: var(--color-ink-muted); }
+
+.ws-row--selected { background: rgba(15, 92, 75, 0.04); }
+
+.ws-edited-badge {
+  display: inline-block; margin-left: var(--space-1);
+  font-size: 0.625rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--color-ink-muted); border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm); padding: 0 4px;
+}
+
+.ws-group-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.ws-group-count { font-size: var(--text-xs); color: var(--color-ink-muted); white-space: nowrap; }
+
+.ws-proposal-footer {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+  flex-wrap: wrap; margin: var(--space-4) 0 0;
+  font-size: var(--text-xs); color: var(--color-ink-muted);
+}
+.ws-proposal-source { overflow-wrap: anywhere; min-width: 0; }
+.ws-proposal-total { white-space: nowrap; }
 
 .ws-group { margin-top: var(--space-4); }
 .ws-group-title { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); margin: 0 0 var(--space-2); }
@@ -486,6 +752,28 @@ async function applyAccepted() {
    * drops the table's min-content to 155px and the overflow with it.
    */
   .ws-row-actions { white-space: normal; }
+
+  /* ── PWS-AI-REVIEW-BATCH-01 at 375px ──
+     Stacked cards, not a squeezed table. The primary batch action stays full
+     width and obvious; the secondary ones sit together beneath it; the Apply
+     action is left where it is, well clear of them. */
+  .ws-review-summary { flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+  .ws-stats { gap: var(--space-3); justify-content: space-between; width: 100%; }
+  .ws-stat { flex: 1 1 auto; align-items: center; text-align: center; }
+  .ws-stat-value { font-size: var(--text-lg); }
+  .ws-stat-label { font-size: 0.625rem; white-space: normal; line-height: 1.2; }
+  .ws-batch-notice { max-width: none; }
+
+  .ws-batch-toolbar { flex-direction: column; align-items: stretch; gap: var(--space-2); }
+  .ws-batch-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+  /* Accept all safe is the primary action and spans the row. */
+  .ws-batch-actions .btn-primary { grid-column: 1 / -1; }
+  .ws-selected-count { margin-left: 0; }
+
+  /* The row checkbox leads each stacked card, so it does not need its own label. */
+  .ws-table td.ws-col-select { width: auto; padding-bottom: var(--space-2); }
+  .ws-table td.ws-col-select::before { content: none; }
+  .ws-col-note { max-width: none; }
 
   .ws-steps { gap: var(--space-1); }
 }

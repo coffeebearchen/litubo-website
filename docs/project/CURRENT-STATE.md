@@ -4073,3 +4073,121 @@ provider 的 `error.message`、原始响应、原始错误负载**一律不返�
 第二次 Beta **尚未进行、尚未完成**，需要用户单独授权。
 
 *最后更新：2026-09-09，由 Claude Code 在"PWS-AI-BETA-01R2"任务中写入。*
+
+---
+
+## PWS-AI-REVIEW-BATCH-01 — AI Proposal Review 批量审核（2026-09-09）
+
+**背景：** 单产品真实 AI Beta 已跑通，随之暴露的是操作瓶颈——AI 一次生成十几条参数时，逐条点击 "Accept as Add" 不适合真实生产使用。本模块只补批量审核，不扩大 AI 能力。
+
+### 一、Approved visual
+
+正式母版（本次一并纳入 Git）：
+
+```
+docs/design-reference/approved/admin-ai-proposal-review-batch-v1/
+  ├─ admin-ai-proposal-review-batch-v1.png      （1440px 桌面 + 375px 移动端）
+  └─ AI-PROPOSAL-REVIEW-BATCH-V1.md            （交互规则）
+```
+
+只纳入这两个文件，未提交 zip，未顺手提交其他历史 untracked 的 design-reference / construction-pack 目录。
+
+### 二、Accept all safe 的实现规则
+
+**"safe" 不是新判断**，直接复用页面既有的 `matchKind`——也就是 "Review required" 一直以来渲染所依据的同一份数据。一行只有在**没有任何需要人来决定的地方**时才算 safe：
+
+```ts
+function isSafeRow(row) {
+  return row.matchKind === 'none' && !row.edited
+}
+```
+
+`Accept all safe` 只处理 `status === 'pending' && isSafeRow(row)`，因此以下**一律不会被自动接受**：
+
+| 排除项 | 原因 |
+|---|---|
+| Review required / conflict | `matchKind !== 'none'`——必须由人明确决定 |
+| Rejected | 已被人否决 |
+| Accepted | 已处理 |
+| Edited | 人已单独看过并改过，批量动作不得替他追认 |
+
+**未重做 duplicate detection、未自动 merge、未覆盖既有 Specification、未改数据结构。**
+
+一个冲突行仍然可以被接受——但只能通过点击该行自己的按钮，或**显式勾选**它。语义与既有 "Accept as Add" 完全一致：提出新条目，绝不合并或覆盖既有行。
+
+### 三、选择与批量动作
+
+- **行复选框**：每行一个。
+- **组复选框**：每个 group 的表头一个，只作用于该组（页面本就是一组一张表，因此表头复选框天然就是组级控件——与母版一致，且没有制造额外按钮）。
+- **Select all safe**：只勾选 safe pending 行，冲突行不会被勾上。
+- **Accept selected** / **Reject selected**：只改变被勾选行的审核状态，完成后清空选择，避免同一动作被误触两次。
+
+按 §10 要求，group 只实现了**一种**最轻量的能力（组复选框），未堆叠 Accept group / Reject group / Accept safe in group 等。
+
+### 四、实时统计
+
+卡片顶部显示五项：Total proposals / Safe pending / Review required / Accepted / Rejected。
+
+`Safe pending` **精确等于** `Accept all safe` 将要处理的集合，所以点击后它必然归零——数字不会说谎。`Review required` 与审核状态无关地统计（一个已被接受的冲突行，仍然是一行需要人看过的行）。
+
+`Edited` 行会显示一个 `Edited` 小标记，说明它为何离开 safe 集合，而不是让计数无声下降。
+
+### 五、Apply 边界（P0）
+
+**所有批量动作都只改内存中的审核状态，零 Directus 写入、零 provider 调用、零发布。** 唯一的写入动作仍然只有用户主动点击 `Apply accepted changes to Draft`。
+
+浏览器实测：点击 Accept all safe 前后各 GET 一次产品 Specifications，**结构完全一致（`productUnchanged: true`）**。
+
+Apply 只写 accepted（含 edited 后被接受的行，使用编辑后的值），pending 与 rejected 永不进入 payload——有测试逐项断言。批量 toolbar 与 Apply 之间隔着整张提案表，视觉上不可能混淆。
+
+### 六、状态可逆
+
+Apply 之前一切都只是审核状态。批量接受的行仍可用行内 Reject 改回；批量否决的行仍可用行内 Accept 改回；原有逐行 Accept / Reject / Edit 三个控件在每一行上都完整保留（有测试断言 13 行 × 3 个控件全部存在）。
+
+### 七、测试（新增 20 条，合计 970）
+
+覆盖 §17 全部要求：13 条初始统计；Accept all safe → 11 accepted / 2 review required 不变；冲突行永不被自动接受；已 rejected / 已 edited 不被扫入；Accept selected 与 Reject selected 只作用于勾选行；组选择互不影响；Select all safe 不勾冲突行；显式勾选的冲突行可被接受且仍标注 "not merged automatically"；统计四项正确更新；0 accepted 时 Apply disabled、accepted > 0 时 enabled 且文案带数量；Apply payload 只含 accepted；edited+accepted 用编辑后的值；批量动作零请求、零 apply-success；状态双向可逆；单行控件完整保留。
+
+### 八、验证结果（真实 Node 22.22.2 / npm 10.9.7）
+
+| 检查 | 结果 |
+|---|---|
+| `npm ci` | 成功，零 EBADENGINE 警告 |
+| `npx nuxt prepare` | 成功 |
+| `npx vitest run` | **970 / 970 通过**（27 文件，本次 +20） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 干净 |
+| `npx nuxt build` | 成功 |
+
+### 九、浏览器验收
+
+用**本地注入的 synthetic proposal**（13 条，其中 2 条与产品既有参数重名）复现母版场景，**零 provider 调用**：
+
+| 断点 | 结果 |
+|---|---|
+| **1440px** | 无横向溢出；统计五项顺序与母版一致（Total / Safe pending / Review required / Accepted / Rejected），Safe 绿、Review 红；安全提示框在位；toolbar 顺序为 Accept all safe（primary）→ Accept selected → Reject selected，右侧 "N selected"；13 个行复选框 x 坐标完全对齐；组标题带 "N item(s)" 且单复数正确；Review required 标记为红色；Apply 与 toolbar 之间隔着整张表 |
+| **375px** | 无横向溢出、无超宽元素；Accept all safe 全宽 301px，两个次级动作并排各 146px；13 个复选框 16px 且全部在视口内；Apply 在视口内且与批量动作分离；五项统计仍完整显示 |
+| Console | 干净标签页零错误 |
+
+**核心场景实测：** 13 / 11 safe / 2 review / 0 / 0 → 点击 Accept all safe → **13 / 0 safe / 2 review / 11 accepted / 0 rejected**，Accept all safe 随即 disabled，Apply 变为 `Apply 11 accepted changes to Draft` 且可用，**产品数据零变化**。
+
+一处工具限制如实记录：Browser 面板宽度不足以 1:1 呈现 1440px，且 `zoom` 区域裁剪不受支持，因此桌面视觉核验采用 DOM 量测（位置、对齐、颜色、层级、间距）而非缩略截图——这比缩放后的截图更能证明对齐与层级。
+
+### 十、明确未做
+
+**0 次 DeepSeek 调用、0 次 OpenAI 调用、0 API 费用、0 自动 Apply、0 自动 Publish。** 未改 provider / generation endpoint / Specifications 持久化 / Directus schema / permissions / Media Library / Sources & evidence；未做多产品 AI、Batch Generate、Batch Source Import、Excel、PDF、OCR、Vision；未改 prompt、model、token 策略；未部署、未 push/merge master。
+
+**Deferred:** One user-authored manual Specification edit exists on TEST ONLY product 3. Its visible name appeared similar to "Node....ony...". User explicitly deferred verification. Do not modify until separately authorized. —— 本模块**未删除、未修改、未分析、未判断其正确与否**。
+
+**范围外问题按 FD-004 记录、未施工：** `GET /api/admin/media/:uuid/references` 的 Directus 403（P1）；`formatType()` 显示 `TAB-SEPARATED-VALUES` 过长（P2）；`WorkspaceAiProposalReview` 在同一挂载实例上不会因 `proposal` prop 变化而重建 `rows`（P2，生产中 proposal 只在新挂载时到达，无用户可见影响）。
+
+一处仓库事实记录：产品 3 现已包含第二次真实 Beta 应用后的分组（General / Electrical / Outputs / Environmental / User Interface / Construction / Dimensions），因此视觉验收的 synthetic proposal 刻意改用当前不存在的参数名，以精确复现母版的 11 safe / 2 review 场景。
+
+### 十一、下一步
+
+继续单产品 Beta 的日常使用。
+
+`Future sequence: Batch Review → Source/Import → Batch Generate.` —— 后两项本模块**未实现**，需要单独授权。
+
+*最后更新：2026-09-09，由 Claude Code 在"PWS-AI-REVIEW-BATCH-01"任务中写入。*
