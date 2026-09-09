@@ -62,3 +62,59 @@ export function systemFolderLabel(name: string): string {
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
 }
+
+/**
+ * ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — which SECTION of the folder navigation a
+ * folder is listed under.
+ *
+ * This is presentation only. It reads the governance values the server already
+ * computed (`management`, `policy_state`) and never decides them: nothing here
+ * can make a protected folder renameable or a frozen folder writable. The
+ * server re-checks every action regardless of where the browser drew the row.
+ *
+ * The four sections partition the tree — every folder lands in exactly one, so
+ * a phone screen never shows the same folder twice while still listing all of
+ * them:
+ *
+ *   quick-access  the healthy top-level areas, the places people start from
+ *   customer      folders the customer may create, rename and move
+ *   system        the protected system tree below the top level
+ *   protected     everything fail-closed: frozen, legacy, ambiguous, unknown
+ *
+ * "Quick access" is a shortcut layer, not a governance class: a folder listed
+ * there keeps its real `management` value and still renders its real badge.
+ */
+export type FolderSection = 'quick-access' | 'customer' | 'system' | 'protected'
+
+export interface FolderPresentationInput {
+  depth: number
+  management: 'protected' | 'customer-managed' | 'locked'
+  policy_state: string
+}
+
+export function folderSection(f: FolderPresentationInput): FolderSection {
+  if (f.management === 'customer-managed') return 'customer'
+  if (f.management === 'locked') return 'protected'
+  // management === 'protected' from here: a healthy system folder.
+  return f.depth === 0 ? 'quick-access' : 'system'
+}
+
+/**
+ * The badge shown beside a folder's name, or null when there is nothing
+ * unusual to say.
+ *
+ * Badges are derived from real state and are never decorative. A folder that
+ * appears under Quick access shows the SAME badge it would show anywhere else:
+ * a shortcut must not make a frozen folder look ordinary.
+ *
+ * `ambiguous` reads as "Conflict" because that is what it is — two distinct
+ * folder UUIDs resolving to one path. `Protected` covers the remaining
+ * fail-closed cases (`unknown`, and anything else locked), where the honest
+ * statement is only that the customer cannot manage it.
+ */
+export function folderBadge(f: FolderPresentationInput): 'Conflict' | 'Read only' | 'Protected' | null {
+  if (f.policy_state === 'conflict-frozen' || f.policy_state === 'ambiguous') return 'Conflict'
+  if (f.policy_state === 'legacy-read-only') return 'Read only'
+  if (f.management === 'locked') return 'Protected'
+  return null
+}

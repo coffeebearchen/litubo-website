@@ -5791,3 +5791,101 @@ NEXT MODULE = NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-10，由 Claude Code 在"PWS-AI-MULTI-SOURCE-REAL-BETA-01"任务中写入。*
+
+---
+
+## ML-CLOUD-MOBILE-VISUAL-ALIGN-01 = COMPLETED（2026-09-10）
+
+Media Library 375px 手机端信息架构与视觉对齐。**只做前端层级与视觉，未新增功能，未触碰后端。**
+
+### 一、07 母版正式升级为 PRIMARY
+
+```text
+docs/design-reference/approved/admin-media-library-cloud-workspace-v1/
+07-mobile-layered-folder-navigation.png
+=
+PRIMARY visual master for /admin/media at 375px
+```
+
+已在 `00-VISUAL-MASTER-RULES.md` 的视觉文件表中新增「权威级别」列并登记；`05-mobile-library-overview.png` 与 `06-mobile-file-details.png` **保留未删除**，降为 `Supplementary mobile reference`，并写明：当 05/06 与 07 在页面结构、分组或导航层级上不一致时以 07 为准。该 PNG 本轮已**精确加入 Git**（1,010,919 bytes），此前为 untracked，与同目录 01–06 的状态就此一致。
+
+升级母版**不改变任何功能授权范围** —— 05/06 中出现的底部 Tab Bar、通知铃铛、Owner、Download selected、视频资产等仍属未授权内容。
+
+### 二、问题与目标
+
+手机端此前把 sidebar 变成一条横向 pill 滚动条：所有文件夹不分治理状态并排堆在一行。它能放下，却抹掉了操作者最需要的区分 —— 哪些是自己的、哪些是系统的、哪些不可改 —— 并把文件网格挤到一堵 chip 墙之下。
+
+现在按 07 重排为：Page tools → File state → Quick access → Customer folders → System folders → Protected folders → Current folder contents。
+
+### 三、信息分类（映射既有治理，未新增治理类型）
+
+新增纯函数 `folderSection()` / `folderBadge()`（`utils/mediaDisplay.ts`），**只读取服务端已经算好的 `management` 与 `policy_state`，从不决定它们**。四个分区对整棵树构成划分，每个文件夹恰好出现一次：
+
+| Section | 规则 | 真实数据 |
+|---|---|---|
+| Quick access | `management = protected` 且 `depth = 0` | 5：Applications / Company / Home / Products / Resources |
+| Customer folders | `management = customer-managed` | 6（全部为 TEST ONLY 目录） |
+| System folders | `management = protected` 且 `depth > 0` | 5：五个产品类目 |
+| Protected folders | `management = locked` | 6：Certifications / Global Service / Technical Docs / Case Studies / Downloads / Insights |
+
+合计 5+6+5+6 = **22 = 服务端返回的全部文件夹**。
+
+**Quick access 是展示层快捷入口，不是治理类型** —— 它不改变任何文件夹的 `FolderManagement`，服务端仍对每个动作独立复核。
+
+**安全状态优先（施工单 §8）：** 冻结目录**不会**因为位于顶层而被提升进 Quick access —— `certifications`（`conflict-frozen`、depth 0）出现在 Protected folders 并带 `Conflict` 徽章，与 07 母版一致。徽章是状态的纯函数，因此同一文件夹无论画在哪一区都显示同一徽章。
+
+徽章映射：`conflict-frozen` / `ambiguous` → **Conflict**；`legacy-read-only` → **Read only**；其余 `locked`（含 `unknown`）→ **Protected**；健康目录无徽章。**未伪造任何徽章。**
+
+### 四、375px 实现
+
+- **Header**：新增手机端副标题 `Manage and organize your media files`，topbar 行间距由 16px 收到 8px，三段各占一行。修正了标题比副标题右缩 20px 的错位 —— 成因是全局 `.admin-shell button` 以 `!important` 设定 20px 水平内边距（该规则保障触摸目标，未改动，只在面包屑根按钮上取消左右内边距）。
+- **File state**：`All files / Unclassified / Archived` 改为 segmented control，与文件夹导航明确分层。按钮 `min-width: 0`，否则 "Unclassified" 会撑出 1/3 屏宽下限。
+- **四个分区卡片**：白底、圆角、边框；head 56px，含图标 + 标题 + 说明 + caret。
+- **Progressive disclosure**：Quick access 默认展开，其余三个默认折叠。折叠状态**仅存在于前端 ref，不写入数据库、不写 localStorage / sessionStorage / cookie**。
+- **统一 folder row**：≥44px 触摸目标（实测 46–47px），一致的图标 / 内边距 / 分隔线，长名称 ellipsis 截断（`min-width: 0`），badge 不挤压 chevron。
+- **Empty state**：`This folder is empty` / `Upload files to get started.` / `Upload files`，与 07 一致。
+- 顺带删除 `ML-CLOUD-UI-CLEANUP-01` 之后已失效的死 CSS：`.folder-item*`、`.sidebar-divider`、`.sidebar-legacy-toggle`（模板中 0 引用）。
+
+### 五、1440px 回归（未重新设计桌面）
+
+sidebar 仍 190px、file state 仍纵向堆叠、分区卡片样式只在 ≤767px 生效（桌面 `nav-section` 背景透明）、手机副标题在桌面隐藏。进入客户目录后 4 个 folder tile 及其 `⋯` Rename / Move 菜单、`+ New folder`、`Upload ▾`、10 个 file card 均正常。`scrollWidth = clientWidth = 1440`，**console 0 error**。
+
+桌面侧唯一可见变化：原「Folders」标签改称「Quick access」并可折叠，另新增两个**默认折叠**的分区头（Customer folders / System folders），原「System folders」组更名为 Protected folders，内容与徽章不变。
+
+### 六、验证（真实 Node 22.22.2；系统默认 Node 24.14.0 未改动）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1229 / 1229 通过**（31 文件，本次 +22） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+新测试覆盖分区规则、徽章规则、「冻结目录不得被提升进 Quick access」、真实 22 条目录树的**划分不重不漏**，以及页面接线（四区都由 `folderSection()` 构建、默认开合状态、四个 `aria-expanded`、**不持久化开合状态**）。
+
+**375px 实测：** `scrollWidth = clientWidth = 375`，全新标签页 **console 0 error**；Quick access 5 行 / Customer 6 行 / System 5 行 / Protected 6 行（徽章 1×Conflict + 5×Read only）；进入客户目录出现 `+ New folder` 与 `Upload ▾`，空目录显示 07 的空态。页面无横向溢出（19 个 `right > 375` 的 span 全部是 file card 内 `overflow: hidden` 的目录路径行，属既有截断行为，非本轮引入）。
+
+### 七、诚实说明的取证缺口
+
+**1440px 无法产出可辨认截图。** Browser 面板当前停靠宽度只有 280 CSS px，模拟 1440 视口时面板以约 0.11× 绘制，文字不可辨认；换高度、换标签页、重载均无效。因此 1440 证据以 DOM 几何 + console 记录为准（见上）。若需要 1440 截图，需要把 Browser 面板拉宽后重新截取。
+
+**本轮浏览器指针输入失效。** `computer` 的点击与 Enter/Space 在本会话中一律超时（Tab 键可移动焦点，JS 求值正常，页面已 hydrate 且 `head.click()` 可正确展开分区并渲染 6 行）。因此折叠/展开与目录切换是通过页面自身的 click handler 触发后再截图取证的，不是经由面板的鼠标事件。折叠/展开的**行为正确性**由上述自动化测试覆盖。
+
+### 八、边界
+
+**0 Directus schema · 0 DB · 0 folder governance · 0 `folderRegistry` runtime policy · 0 media UUID 语义 · 0 duplicate engine · 0 archive 语义 · 0 AI 改动 · 0 Provider 调用 · 0 新增功能 · 0 push / merge / deploy**。未新建任何文件夹以迁就视觉。`MASTER-ROADMAP.md` 的 Media Library 段落仍滞后（P2 documentation debt），按施工单 §27 **本轮未修改**。
+
+---
+
+```text
+ML-CLOUD-MOBILE-VISUAL-ALIGN-01 = COMPLETED
+
+07-mobile-layered-folder-navigation.png = 375px PRIMARY VISUAL MASTER
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+
+NEXT MODULE = NOT AUTHORIZED
+```
+
+*最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-MOBILE-VISUAL-ALIGN-01"任务中写入。*

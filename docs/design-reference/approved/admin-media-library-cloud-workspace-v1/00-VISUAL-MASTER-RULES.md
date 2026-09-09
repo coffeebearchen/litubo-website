@@ -4,14 +4,27 @@
 
 ## 视觉文件
 
-| 文件 | 用途 |
-|---|---|
-| `01-desktop-library-overview.png` | 桌面主视图：文件树、文件卡片、详情侧栏 |
-| `02-desktop-folder-management.png` | 桌面文件夹：新建、文件夹卡片、文件夹操作 |
-| `03-desktop-batch-selection.png` | 桌面多选状态与批量工具栏 |
-| `04-desktop-upload-dedup.png` | 拖拽上传、上传队列、重复提醒的视觉方向 |
-| `05-mobile-library-overview.png` | 手机端文件浏览与选择 |
-| `06-mobile-file-details.png` | 手机端详情抽屉 / Bottom Sheet 与多选操作 |
+| 文件 | 权威级别 | 用途 |
+|---|---|---|
+| `01-desktop-library-overview.png` | PRIMARY（1440px） | 桌面主视图：文件树、文件卡片、详情侧栏 |
+| `02-desktop-folder-management.png` | PRIMARY（1440px） | 桌面文件夹：新建、文件夹卡片、文件夹操作 |
+| `03-desktop-batch-selection.png` | PRIMARY（1440px） | 桌面多选状态与批量工具栏 |
+| `04-desktop-upload-dedup.png` | PRIMARY（1440px） | 拖拽上传、上传队列、重复提醒的视觉方向 |
+| `07-mobile-layered-folder-navigation.png` | **PRIMARY（375px）** | **`/admin/media` 手机端主母版**：信息层级、分层文件夹导航、分组折叠、row / badge / touch target、空态 |
+| `05-mobile-library-overview.png` | Supplementary mobile reference | 手机端文件浏览与选择 |
+| `06-mobile-file-details.png` | Supplementary mobile reference | 手机端详情抽屉 / Bottom Sheet 与多选操作 |
+
+### 手机端母版权威（ML-CLOUD-MOBILE-VISUAL-ALIGN-01，2026-09-10）
+
+```text
+07-mobile-layered-folder-navigation.png
+=
+PRIMARY visual master for /admin/media at 375px
+```
+
+`05` 与 `06` 保留，但降为 **Supplementary mobile references**：它们仍是文件卡片、多选栏与 File Details 抽屉的参考，**不再定义手机端的信息层级**。当 `05` / `06` 与 `07` 在页面结构、分组或导航层级上不一致时，以 `07` 为准。
+
+两份 supplementary 图中出现而 V1 未授权的元素（底部 Tab Bar、通知铃铛、Owner、Download selected、视频资产等）仍按下方「图片中出现但 V1 明确不授权的内容」处理 —— 升级 `07` 不改变任何功能授权范围。
 
 ## 母版优先级
 

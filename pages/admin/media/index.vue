@@ -930,26 +930,29 @@ const searchActive = computed(() => searchQuery.value.trim() !== '')
 // ── ML-CLOUD-UI-CLEANUP-01: information architecture ─────────────────────────
 
 /**
- * The sidebar answers one question — "which area am I going to?" — so it lists
- * top-level areas only.
+ * ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — layered folder navigation.
  *
- * It used to flatten the entire tree into one column: system views, product
- * categories, every customer folder and every TEST ONLY folder, all indented
- * in a single list. That made the sidebar compete with the folder browser for
- * the same job and buried the four places a person actually starts from.
- * Depth is now the main area's business, expressed through the breadcrumb.
+ * The navigation used to be two groups: every top-level area in one flat list,
+ * and frozen folders behind one disclosure. On a phone that stacked into a
+ * single undifferentiated column where a customer's own folder, a protected
+ * system folder and a frozen one all looked the same, and the page ran long
+ * before any file was visible.
+ *
+ * `folderSection()` partitions the tree by the governance the server already
+ * decided, so each folder is listed exactly once and each section says what
+ * kind of thing it holds. Only Quick access is open by default; the rest are
+ * progressive disclosure, and that open/closed state is browser-only — it is
+ * never persisted anywhere.
  */
-const sidebarRoots = computed(() => flatFolders.value.filter(
-  (f: FlatFolder) => f.depth === 0
-    && f.policy_state !== 'legacy-read-only'
-    && f.policy_state !== 'conflict-frozen',
-))
+const quickAccessFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => folderSection(f) === 'quick-access'))
+const customerFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => folderSection(f) === 'customer'))
+const systemFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => folderSection(f) === 'system'))
+const protectedFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => folderSection(f) === 'protected'))
 
-/** Legacy and conflict roots, kept together behind one collapsed disclosure. */
-const systemFolders = computed(() => flatFolders.value.filter(
-  (f: FlatFolder) => f.policy_state === 'legacy-read-only' || f.policy_state === 'conflict-frozen',
-))
+const quickAccessOpen = ref(true)
+const customerFoldersOpen = ref(false)
 const systemFoldersOpen = ref(false)
+const protectedFoldersOpen = ref(false)
 
 /**
  * The folders that live inside the folder currently being browsed — the
@@ -1104,6 +1107,13 @@ const selectedFileFolderIsLegacy = computed(() => {
           title="Protected system folder"
         >🔒</span>
       </nav>
+
+      <!--
+        ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — the phone header names the page the
+        way 07 does. On desktop the surrounding chrome already says what this
+        screen is, so the line is hidden there rather than repeated.
+      -->
+      <p class="ml-subtitle">Manage and organize your media files</p>
 
       <div class="ml-topbar-actions">
         <!-- Batch actions replace the normal toolbar while files are selected -->
@@ -1377,67 +1387,174 @@ const selectedFileFolderIsLegacy = computed(() => {
         the breadcrumb.
       -->
       <aside class="ml-sidebar">
+        <!--
+          File STATE is not folder navigation. It answers "which slice of the
+          library am I looking at?", so it sits above the folder sections and
+          renders as one segmented control on a phone rather than three rows
+          that read like folders.
+        -->
         <p class="sidebar-section-label">Library</p>
-        <button
-          class="nav-item"
-          :class="{ 'nav-item--active': selectedFolder === null && !showArchivedView }"
-          @click="selectFolder(null)"
-        >All files</button>
-        <button
-          class="nav-item"
-          :class="{ 'nav-item--active': selectedFolder === 'root' && !showArchivedView }"
-          @click="selectFolder('root')"
-        >Unclassified</button>
-        <button
-          class="nav-item nav-item--archived"
-          :class="{ 'nav-item--active': showArchivedView }"
-          @click="toggleArchivedView"
-        >Archived</button>
-
-        <p class="sidebar-section-label">Folders</p>
-        <button
-          v-for="f in sidebarRoots"
-          :key="f.id"
-          class="nav-item"
-          :class="{ 'nav-item--active': selectedFolder === f.id && !showArchivedView }"
-          @click="selectFolder(f.id)"
-        >
-          <span class="nav-item__icon" aria-hidden="true">📁</span>{{ folderLabel(f) }}
-        </button>
-        <p v-if="sidebarRoots.length === 0" class="sidebar-empty">No folders</p>
+        <div class="file-state">
+          <button
+            class="nav-item"
+            :class="{ 'nav-item--active': selectedFolder === null && !showArchivedView }"
+            @click="selectFolder(null)"
+          >All files</button>
+          <button
+            class="nav-item"
+            :class="{ 'nav-item--active': selectedFolder === 'root' && !showArchivedView }"
+            @click="selectFolder('root')"
+          >Unclassified</button>
+          <button
+            class="nav-item nav-item--archived"
+            :class="{ 'nav-item--active': showArchivedView }"
+            @click="toggleArchivedView"
+          >Archived</button>
+        </div>
 
         <!--
-          Legacy and conflict folders are governance states, not places people
-          go. One collapsed disclosure keeps them reachable without making the
-          library look like a debugging console.
+          ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — four sections, partitioned by the
+          governance the server already decided (see `folderSection()`). Each
+          folder appears in exactly one of them, so the list never repeats
+          itself, and each heading says what kind of folder is inside.
+
+          Only Quick access opens by default. The rest are progressive
+          disclosure: on a phone the whole navigation is then about one screen
+          tall instead of a column the operator has to scroll past to reach
+          any file.
         -->
-        <template v-if="systemFolders.length > 0">
-          <p class="sidebar-section-label">System</p>
+        <section class="nav-section">
           <button
-            class="nav-item nav-item--disclosure"
+            class="nav-section__head"
+            :aria-expanded="quickAccessOpen"
+            @click="quickAccessOpen = !quickAccessOpen"
+          >
+            <span class="nav-section__icon" aria-hidden="true">★</span>
+            <span class="nav-section__text">
+              <span class="nav-section__title">Quick access</span>
+              <span class="nav-section__sub">Your main folders</span>
+            </span>
+            <span class="nav-section__caret" aria-hidden="true">{{ quickAccessOpen ? '▾' : '▸' }}</span>
+          </button>
+          <div v-if="quickAccessOpen" class="nav-section__body">
+            <button
+              v-for="f in quickAccessFolders"
+              :key="f.id"
+              class="folder-row"
+              :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
+              @click="selectFolder(f.id)"
+            >
+              <span class="folder-row__icon" aria-hidden="true">📁</span>
+              <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
+              <!--
+                A shortcut must not make a folder look safer than it is: the
+                badge is computed from the same state wherever the row is drawn.
+              -->
+              <span
+                v-if="folderBadge(f)"
+                class="folder-row__badge"
+                :class="`folder-row__badge--${folderBadge(f) === 'Conflict' ? 'conflict' : 'muted'}`"
+              >{{ folderBadge(f) }}</span>
+              <span class="folder-row__chevron" aria-hidden="true">›</span>
+            </button>
+            <p v-if="quickAccessFolders.length === 0" class="nav-section__empty">No folders</p>
+          </div>
+        </section>
+
+        <section class="nav-section">
+          <button
+            class="nav-section__head"
+            :aria-expanded="customerFoldersOpen"
+            @click="customerFoldersOpen = !customerFoldersOpen"
+          >
+            <span class="nav-section__icon" aria-hidden="true">👥</span>
+            <span class="nav-section__text">
+              <span class="nav-section__title">Customer folders</span>
+              <span class="nav-section__sub">Folders you can create, rename and move</span>
+            </span>
+            <span class="nav-section__caret" aria-hidden="true">{{ customerFoldersOpen ? '▾' : '▸' }}</span>
+          </button>
+          <div v-if="customerFoldersOpen" class="nav-section__body">
+            <button
+              v-for="f in customerFolders"
+              :key="f.id"
+              class="folder-row"
+              :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
+              @click="selectFolder(f.id)"
+            >
+              <span class="folder-row__icon" aria-hidden="true">📁</span>
+              <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
+              <span class="folder-row__chevron" aria-hidden="true">›</span>
+            </button>
+            <p v-if="customerFolders.length === 0" class="nav-section__empty">No customer folders yet</p>
+          </div>
+        </section>
+
+        <section class="nav-section">
+          <button
+            class="nav-section__head"
             :aria-expanded="systemFoldersOpen"
             @click="systemFoldersOpen = !systemFoldersOpen"
           >
-            System folders
-            <span class="nav-item__caret">{{ systemFoldersOpen ? '▾' : '▸' }}</span>
+            <span class="nav-section__icon" aria-hidden="true">⚙</span>
+            <span class="nav-section__text">
+              <span class="nav-section__title">System folders</span>
+              <span class="nav-section__sub">Business classification, managed by LITUBO</span>
+            </span>
+            <span class="nav-section__caret" aria-hidden="true">{{ systemFoldersOpen ? '▾' : '▸' }}</span>
           </button>
-          <template v-if="systemFoldersOpen">
+          <div v-if="systemFoldersOpen" class="nav-section__body">
             <button
               v-for="f in systemFolders"
               :key="f.id"
-              class="nav-item nav-item--sub"
-              :class="{
-                'nav-item--active': selectedFolder === f.id && !showArchivedView,
-                'nav-item--legacy': f.policy_state === 'legacy-read-only',
-                'nav-item--conflict': f.policy_state === 'conflict-frozen',
-              }"
+              class="folder-row"
+              :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
               @click="selectFolder(f.id)"
             >
-              {{ f.name }}
-              <span class="nav-item__tag">{{ f.policy_state === 'conflict-frozen' ? 'Conflict' : 'Read only' }}</span>
+              <span class="folder-row__icon" aria-hidden="true">📁</span>
+              <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
+              <span
+                v-if="folderBadge(f)"
+                class="folder-row__badge folder-row__badge--muted"
+              >{{ folderBadge(f) }}</span>
+              <span class="folder-row__chevron" aria-hidden="true">›</span>
             </button>
-          </template>
-        </template>
+            <p v-if="systemFolders.length === 0" class="nav-section__empty">No system folders</p>
+          </div>
+        </section>
+
+        <section v-if="protectedFolders.length > 0" class="nav-section">
+          <button
+            class="nav-section__head"
+            :aria-expanded="protectedFoldersOpen"
+            @click="protectedFoldersOpen = !protectedFoldersOpen"
+          >
+            <span class="nav-section__icon" aria-hidden="true">🔒</span>
+            <span class="nav-section__text">
+              <span class="nav-section__title">Protected folders</span>
+              <span class="nav-section__sub">Read-only folders</span>
+            </span>
+            <span class="nav-section__caret" aria-hidden="true">{{ protectedFoldersOpen ? '▾' : '▸' }}</span>
+          </button>
+          <div v-if="protectedFoldersOpen" class="nav-section__body">
+            <button
+              v-for="f in protectedFolders"
+              :key="f.id"
+              class="folder-row"
+              :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
+              @click="selectFolder(f.id)"
+            >
+              <span class="folder-row__icon" aria-hidden="true">📁</span>
+              <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
+              <span
+                v-if="folderBadge(f)"
+                class="folder-row__badge"
+                :class="`folder-row__badge--${folderBadge(f) === 'Conflict' ? 'conflict' : 'muted'}`"
+              >{{ folderBadge(f) }}</span>
+              <span class="folder-row__chevron" aria-hidden="true">›</span>
+            </button>
+          </div>
+        </section>
       </aside>
 
       <!-- ── Main content ──────────────────────────────────────────────────── -->
@@ -1850,6 +1967,9 @@ const selectedFileFolderIsLegacy = computed(() => {
   min-height: 56px;
 }
 
+/* Phone-only page subtitle — see the note in the template. */
+.ml-subtitle { display: none; }
+
 /* Breadcrumb */
 .ml-breadcrumb {
   display: flex;
@@ -2030,60 +2150,121 @@ const selectedFileFolderIsLegacy = computed(() => {
   font-style: italic;
 }
 
-.folder-item {
-  display: block;
+/*
+  ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — layered folder navigation.
+
+  On DESKTOP these keep the sealed V1 look: the section head reads as the
+  small uppercase label it replaced, and a folder row is the same 36px
+  `.nav-item`-sized line it already was. Everything that turns this into the
+  master's mobile layout — cards, 44px rows, segmented tabs — lives in the
+  767px block near the end of this stylesheet, so the desktop cannot drift
+  when the phone layout changes.
+
+  (Replaces the `.folder-item*` / `.sidebar-divider` / `.sidebar-legacy-toggle`
+  rules, which had been dead since ML-CLOUD-UI-CLEANUP-01 replaced that markup
+  with `.nav-item`.)
+*/
+
+/* File state — three views, stacked on desktop, segmented on a phone. */
+.file-state { display: flex; flex-direction: column; gap: 1px; }
+
+.nav-section { display: flex; flex-direction: column; }
+
+.nav-section__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   width: 100%;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  background: none;
+  border: none;
   text-align: left;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
+  cursor: pointer;
   color: var(--color-ink-muted);
+}
+.nav-section__head:hover { color: var(--color-ink); }
+
+.nav-section__icon { display: none; flex-shrink: 0; }
+
+.nav-section__text { display: flex; flex-direction: column; min-width: 0; }
+
+.nav-section__title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* The explanatory line is a phone affordance; the desktop column is too narrow for it. */
+.nav-section__sub { display: none; }
+
+.nav-section__caret { margin-left: auto; font-size: var(--text-xs); flex-shrink: 0; }
+
+.nav-section__body { display: flex; flex-direction: column; gap: 1px; }
+
+.nav-section__empty {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  padding: var(--space-1) var(--space-3);
+  margin: 0;
+  font-style: italic;
+}
+
+/*
+  One folder row, used by all four sections. A single row shape is the point:
+  it is what lets a person compare a customer folder against a protected one
+  without re-reading the layout.
+*/
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
   background: none;
   border: none;
   border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  text-align: left;
   cursor: pointer;
-  white-space: nowrap;
+}
+.folder-row:hover { background: var(--color-surface-alt); }
+.folder-row--active { background: var(--color-primary-deep); color: #fff; font-weight: 600; }
+.folder-row--active:hover { background: var(--color-primary-deep); }
+
+.folder-row__icon { flex-shrink: 0; font-size: var(--text-sm); }
+
+/*
+  `min-width: 0` is what allows the ellipsis: a flex item defaults to
+  `min-width: auto` and refuses to shrink below its content, which pushes the
+  badge and chevron off the right edge instead of truncating the name.
+*/
+.folder-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
 }
-.folder-item:hover { background: rgba(18, 60, 50, 0.05); color: var(--color-ink); }
-.folder-item--active { background: rgba(18, 60, 50, 0.1); color: var(--color-primary-deep); font-weight: 600; }
 
-/* Legacy folder items — italic + muted */
-.folder-item--legacy {
+.folder-row__badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1.6;
+  padding: 0 6px;
+  border-radius: 99px;
+  border: 1px solid var(--color-line);
   color: var(--color-ink-muted);
-  font-style: italic;
-  font-size: calc(var(--text-sm) - 1px);
+  background: var(--color-surface);
+  white-space: nowrap;
 }
-.folder-item--legacy:hover { color: var(--color-ink); background: rgba(18,60,50,0.04); }
-.folder-item--legacy.folder-item--active { background: rgba(18,60,50,0.08); color: var(--color-ink); font-weight: 600; }
+.folder-row__badge--conflict { color: #8a4b08; border-color: #d9a26a; background: #fdf6ec; }
+.folder-row--active .folder-row__badge { color: inherit; border-color: currentColor; background: transparent; }
 
-.folder-item--conflict {
-  color: #7a3a3a;
-  font-style: italic;
-  font-size: calc(var(--text-sm) - 1px);
-}
-.folder-item--conflict:hover { color: var(--color-ink); background: rgba(122,58,58,0.06); }
-.folder-item--conflict.folder-item--active { background: rgba(122,58,58,0.1); color: var(--color-ink); font-weight: 600; }
-
-/* Archived special item */
-.folder-item--archived { color: #8a5a00; }
-.folder-item--archived.folder-item--active { background: rgba(180,120,0,0.12); color: #7a4e00; font-weight: 600; }
-
-.sidebar-divider { height: 1px; background: var(--color-line); margin: var(--space-2) var(--space-3); }
-
-.sidebar-legacy-toggle {
-  display: none; /* shown only on mobile via .mobile-only */
-  width: 100%;
-  text-align: left;
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-ink-muted);
-  background: none;
-  border: none;
-  cursor: pointer;
-}
+/* Only meaningful on a phone, where a row is a navigation target rather than a list item. */
+.folder-row__chevron { display: none; flex-shrink: 0; color: var(--color-ink-muted); }
+.folder-row--active .folder-row__chevron { color: inherit; }
 
 /* ── Main ── */
 .ml-main {
@@ -2833,65 +3014,155 @@ const selectedFileFolderIsLegacy = computed(() => {
 }
 
 /* ── Responsive 767px (375px) ── */
+/*
+  ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — the phone gets its own hierarchy, not a
+  narrowed desktop.
+
+  What was here before turned the sidebar into a horizontal strip of pills:
+  every folder, at every governance state, side by side in one scrolling row.
+  It fitted, but it flattened the one distinction the operator most needs —
+  which folders are theirs, which are the system's, and which cannot be touched
+  — and it pushed the file grid below a wall of chips.
+
+  The layout now follows 07-mobile-layered-folder-navigation.png: file state as
+  one segmented control, then four labelled section cards, only the first of
+  them open.
+*/
 @media (max-width: 767px) {
   .ml-shell { height: auto; overflow: visible; }
-  .ml-topbar { padding: var(--space-3) var(--space-4); min-height: auto; }
+
+  /*
+    The header stacks: location, then what this screen is, then its actions.
+    The 16px row gap it inherits is meant for a wide toolbar; on a phone the
+    three parts sit on their own lines and that gap became 112px of header
+    holding one short sentence.
+  */
+  .ml-topbar {
+    padding: var(--space-3) var(--space-4);
+    min-height: auto;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+  .ml-breadcrumb { flex: 1 1 100%; }
+  /*
+    `.admin-shell button` sets a 20px horizontal padding with `!important` to
+    guarantee touch targets. On the breadcrumb root that indented the page
+    title 20px past the subtitle beneath it, so the header read as two
+    unrelated lines. The vertical padding — and with it the touch target —
+    is left alone; only the left inset is removed so the two lines align.
+  */
+  .ml-shell .ml-topbar .ml-breadcrumb button.breadcrumb-root {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .ml-subtitle {
+    display: block;
+    flex: 1 1 100%;
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--color-ink-muted);
+  }
+  .ml-topbar-actions { flex: 1 1 100%; }
+
   .ml-filterbar { padding: var(--space-2) var(--space-4); }
   .file-count { display: none; }
 
   .ml-body { flex-direction: column; overflow: visible; }
 
-  /* Sidebar: horizontal chips */
   .ml-sidebar {
     width: 100%;
+    flex-direction: column;
     border-right: none;
     border-bottom: 1px solid var(--color-line);
-    flex-direction: row;
-    flex-wrap: wrap;
-    overflow-x: auto;
-    padding: var(--space-2);
-    gap: var(--space-1);
+    background: var(--color-surface-alt);
+    overflow: visible;
+    padding: var(--space-3);
+    gap: var(--space-3);
   }
 
+  /* The section cards carry their own headings, so the column label is noise. */
   .sidebar-section-label { display: none; }
-  .sidebar-divider { display: none; }
-  .sidebar-empty { display: none; }
 
-  .folder-item {
-    width: auto;
-    flex-shrink: 0;
-    padding: var(--space-1) var(--space-3);
+  /*
+    File state as a segmented control. `min-width: 0` on the buttons is what
+    keeps "Unclassified" from setting a floor wider than a third of a 375px
+    screen and pushing the control past the viewport.
+  */
+  .file-state {
+    flex-direction: row;
+    gap: 0;
+    background: var(--color-surface);
     border: 1px solid var(--color-line);
-    border-radius: 99px;
+    border-radius: var(--radius-md);
+    padding: 3px;
+  }
+  .file-state .nav-item {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    min-height: 40px;
+    padding: var(--space-1);
     font-size: var(--text-xs);
-    font-style: normal;
+    border-radius: calc(var(--radius-md) - 3px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .folder-item--active {
-    background: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
-    font-weight: 600;
-  }
-  .folder-item--legacy { font-style: normal; }
 
-  /* Mobile: legacy items hidden until toggle */
-  @media (max-width: 767px) {
-    .mobile-legacy-hidden { display: none; }
+  /* Each folder section is a card, so the boundary between groups is visible. */
+  .nav-section {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    overflow: hidden;
   }
-  .sidebar-legacy-toggle {
+
+  .nav-section__head {
+    min-height: 56px;
+    padding: var(--space-2) var(--space-3);
+    color: var(--color-ink);
+  }
+  .nav-section__icon { display: inline; font-size: var(--text-base); }
+  .nav-section__title {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--color-ink);
+  }
+  .nav-section__sub {
     display: block;
-    width: auto;
-    flex-shrink: 0;
-    padding: var(--space-1) var(--space-3);
-    border: 1px dashed var(--color-line);
-    border-radius: 99px;
     font-size: var(--text-xs);
     color: var(--color-ink-muted);
-    cursor: pointer;
-    background: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .desktop-only { display: none; }
-  .mobile-only { display: initial; }
+  .nav-section__caret { font-size: var(--text-base); color: var(--color-ink-muted); }
+
+  /*
+    The filter is a three-option select; the search field is where a long
+    filename gets typed, so the remaining width goes to search rather than
+    being split evenly.
+  */
+  .type-select { flex: 0 0 auto; min-width: 0; width: auto; }
+
+  .nav-section__body { border-top: 1px solid var(--color-line); gap: 0; }
+  .nav-section__body > .folder-row + .folder-row { border-top: 1px solid var(--color-line); }
+  .nav-section__empty { padding: var(--space-3); }
+
+  /*
+    44px is the minimum comfortable touch target, and every row is the same
+    height whether or not it carries a badge — a list whose rows change height
+    by status is harder to scan than the status itself is to read.
+  */
+  .folder-row {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: 0;
+  }
+  .folder-row__icon { font-size: var(--text-base); }
+  .folder-row__chevron { display: inline; }
 
   .ml-main { padding: var(--space-3); overflow: visible; }
   /*
@@ -2907,6 +3178,9 @@ const selectedFileFolderIsLegacy = computed(() => {
     border-left: none;
     border-top: 2px solid var(--color-primary);
   }
+
+  .desktop-only { display: none; }
+  .mobile-only { display: initial; }
 
   .folder-select { min-width: 140px; max-width: 200px; }
 }

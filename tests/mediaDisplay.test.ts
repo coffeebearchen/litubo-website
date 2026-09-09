@@ -9,7 +9,9 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { fileKind, summariseUpload, systemFolderLabel } from '../utils/mediaDisplay'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { fileKind, summariseUpload, systemFolderLabel, folderSection, folderBadge } from '../utils/mediaDisplay'
 
 describe('the label shown when there is no thumbnail', () => {
   it.each([
@@ -116,5 +118,185 @@ describe('how a system folder name is displayed', () => {
 
   it('survives an empty name', () => {
     expect(systemFolderLabel('')).toBe('')
+  })
+})
+
+/**
+ * ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — which section a folder is listed under,
+ * and what it is allowed to say about itself.
+ *
+ * The mobile navigation is the first place a person reads a folder's status,
+ * so the rule that decides it has to be checkable without a browser. These
+ * assert the two things that would actually hurt someone if they broke: a
+ * folder appearing in the wrong group, and a frozen folder rendering as if it
+ * were ordinary.
+ */
+describe('which navigation section a folder belongs to', () => {
+  const folder = (
+    depth: number,
+    management: 'protected' | 'customer-managed' | 'locked',
+    policy_state = 'active-canonical',
+  ) => ({ depth, management, policy_state })
+
+  it('a customer-managed folder is a Customer folder, at any depth', () => {
+    expect(folderSection(folder(1, 'customer-managed'))).toBe('customer')
+    expect(folderSection(folder(4, 'customer-managed'))).toBe('customer')
+  })
+
+  it('a healthy top-level system folder is a Quick access shortcut', () => {
+    expect(folderSection(folder(0, 'protected'))).toBe('quick-access')
+    expect(folderSection(folder(0, 'protected', 'container-only'))).toBe('quick-access')
+  })
+
+  it('a healthy system folder below the top level is a System folder', () => {
+    expect(folderSection(folder(1, 'protected'))).toBe('system')
+    expect(folderSection(folder(2, 'protected'))).toBe('system')
+  })
+
+  it.each([
+    ['legacy', 'legacy-read-only'],
+    ['a naming conflict', 'conflict-frozen'],
+    ['ambiguous', 'ambiguous'],
+    ['unknown', 'unknown'],
+  ])('a locked folder (%s) is a Protected folder', (_label, state) => {
+    expect(folderSection(folder(1, 'locked', state))).toBe('protected')
+  })
+
+  /**
+   * The safety rule from the work order: a shortcut may not launder a folder's
+   * status. A frozen folder that happens to sit at the top level is NOT
+   * promoted into Quick access, where it would sit beside ordinary folders.
+   */
+  it('a frozen top-level folder is never promoted into Quick access', () => {
+    expect(folderSection(folder(0, 'locked', 'conflict-frozen'))).toBe('protected')
+    expect(folderSection(folder(0, 'locked', 'legacy-read-only'))).toBe('protected')
+  })
+
+  /**
+   * The real tree as the server returns it. The four sections have to partition
+   * it: list a folder twice and a phone screen repeats itself; list it zero
+   * times and the folder becomes unreachable from the navigation.
+   */
+  it('partitions the real folder tree — every folder in exactly one section', () => {
+    const tree = [
+      folder(0, 'protected'), // applications
+      folder(0, 'locked', 'conflict-frozen'), // certifications
+      folder(0, 'protected'), // company
+      folder(1, 'locked', 'legacy-read-only'), // company/global-service
+      folder(0, 'protected'), // home
+      folder(0, 'protected', 'container-only'), // products
+      folder(1, 'protected'), // products/checkweigher
+      folder(2, 'customer-managed'), // …/LT180C AI BETA TEST ONLY
+      folder(1, 'protected'), // products/combination
+      folder(1, 'protected'), // products/conveyor
+      folder(2, 'customer-managed'), // …/ZZ-ML-CLOUD-01 TEST ONLY
+      folder(3, 'customer-managed'),
+      folder(3, 'customer-managed'),
+      folder(3, 'customer-managed'),
+      folder(3, 'customer-managed'), // …/manuals
+      folder(1, 'protected'), // products/metal-detection
+      folder(1, 'locked', 'legacy-read-only'), // products/technical-docs
+      folder(1, 'protected'), // products/xray
+      folder(0, 'protected', 'container-only'), // resources
+      folder(1, 'locked', 'legacy-read-only'), // resources/case-studies
+      folder(1, 'locked', 'legacy-read-only'), // resources/downloads
+      folder(1, 'locked', 'legacy-read-only'), // resources/insights
+    ]
+    const counts = { 'quick-access': 0, customer: 0, system: 0, protected: 0 }
+    for (const f of tree) counts[folderSection(f)] += 1
+
+    expect(counts).toEqual({ 'quick-access': 5, customer: 6, system: 5, protected: 6 })
+    // Nothing lost, nothing duplicated.
+    expect(counts['quick-access'] + counts.customer + counts.system + counts.protected).toBe(tree.length)
+  })
+})
+
+describe('what a folder row is allowed to say about itself', () => {
+  const folder = (
+    management: 'protected' | 'customer-managed' | 'locked',
+    policy_state: string,
+  ) => ({ depth: 1, management, policy_state })
+
+  it('a naming conflict says Conflict', () => {
+    expect(folderBadge(folder('locked', 'conflict-frozen'))).toBe('Conflict')
+  })
+
+  /** Two folder UUIDs resolving to one path is a conflict, not a read-only state. */
+  it('an ambiguous path says Conflict too', () => {
+    expect(folderBadge(folder('locked', 'ambiguous'))).toBe('Conflict')
+  })
+
+  it('a legacy folder says Read only', () => {
+    expect(folderBadge(folder('locked', 'legacy-read-only'))).toBe('Read only')
+  })
+
+  /** Fail-closed but with nothing more specific to report. */
+  it('an unknown folder says only Protected', () => {
+    expect(folderBadge(folder('locked', 'unknown'))).toBe('Protected')
+  })
+
+  it.each([
+    ['a healthy system folder', 'protected', 'active-canonical'],
+    ['a container', 'protected', 'container-only'],
+    ['a customer folder', 'customer-managed', 'active-canonical'],
+  ])('%s carries no badge', (_label, management, state) => {
+    expect(folderBadge(folder(management as 'protected' | 'customer-managed', state))).toBeNull()
+  })
+
+  /**
+   * The badge is a pure function of state, so the SAME folder shows the same
+   * badge wherever it is drawn. Quick access cannot quietly drop it.
+   */
+  it('does not depend on where the row is drawn', () => {
+    const frozen = { management: 'locked' as const, policy_state: 'conflict-frozen' }
+    expect(folderBadge({ ...frozen, depth: 0 })).toBe('Conflict')
+    expect(folderBadge({ ...frozen, depth: 3 })).toBe('Conflict')
+  })
+})
+
+/**
+ * The page wiring. `pages/admin/media/index.vue` awaits `useFetch` at setup
+ * top level, so it cannot be mounted in isolation; this repo's established
+ * pattern for asserting that page's markup is to read the source (see
+ * `tests/mediaUploadTypes.test.ts`).
+ *
+ * These check the promises the work order makes to the operator, not styling.
+ */
+describe('the Media Library navigation is wired to those rules', () => {
+  const source = readFileSync(resolve(process.cwd(), 'pages/admin/media/index.vue'), 'utf8')
+
+  it('builds all four sections from folderSection(), not from ad-hoc filters', () => {
+    for (const group of ['quick-access', 'customer', 'system', 'protected']) {
+      expect(source).toContain(`folderSection(f) === '${group}'`)
+    }
+  })
+
+  it('opens Quick access and leaves the other three closed', () => {
+    expect(source).toContain('const quickAccessOpen = ref(true)')
+    expect(source).toContain('const customerFoldersOpen = ref(false)')
+    expect(source).toContain('const systemFoldersOpen = ref(false)')
+    expect(source).toContain('const protectedFoldersOpen = ref(false)')
+  })
+
+  it('every section head reports its state to assistive technology', () => {
+    expect(source.match(/:aria-expanded="(quickAccess|customerFolders|systemFolders|protectedFolders)Open"/g) ?? [])
+      .toHaveLength(4)
+  })
+
+  /**
+   * Open/closed is a browser-only preference. Persisting it would make one
+   * person's phone habit change what the next person sees, and would put a
+   * presentation detail into folder data.
+   */
+  it('never persists open/closed state', () => {
+    for (const persisted of ['localStorage', 'sessionStorage', 'useCookie']) {
+      expect(source).not.toContain(persisted)
+    }
+  })
+
+  it('renders every row from the same badge rule rather than inlining status strings', () => {
+    expect(source).toContain('folderBadge(f)')
+    // The pre-existing inline ternary that hard-coded these two labels is gone.
+    expect(source).not.toContain("policy_state === 'conflict-frozen' ? 'Conflict' : 'Read only'")
   })
 })
