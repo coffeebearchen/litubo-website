@@ -5959,3 +5959,100 @@ NEXT MODULE = NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-MOBILE-VISUAL-ALIGN-01 CLOSEOUT FIX"任务中写入。*
+
+---
+
+## ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R1 — 目录层级补充决定（2026-09-10）
+
+用户确认了 Media Library 的长期目录使用逻辑。核对后发现**首版确实违反其中两条**，已修正。
+
+### 一、违规 1：Customer folders 全局扁平化（已修）
+
+首版的三个治理分区是对**整棵扁平树**的全局过滤：
+
+```js
+customerFolders = flatFolders.filter(f => folderSection(f) === 'customer')
+```
+
+于是全站所有 `customer-managed` 目录被收进同一个列表，不论深度 —— `LT180C AI BETA`（depth 2）与它自己的 `manuals`（depth 3）并列成兄弟。这是一棵与真实结构冲突的**第二棵目录树**，并且隐藏了每一行真正的父目录。
+
+改为**只列当前位置的直接子目录**，逻辑抽成可测纯函数 `directChildFolders(folders, parentOf, contextId)`（`utils/mediaDisplay.ts`）：`contextId = null` 表示根，返回 depth 0；否则返回 `parentOf[id] === contextId`。
+
+同时按用户第 4 条：**某个分区在当前位置没有直接子目录，就整段不渲染**，不为迁就视觉母版而显示空标题或全局列表。**真实 hierarchy 优先于母版示例数据。**
+
+实测根视图因此只剩两个分区：
+
+```text
+Quick access       Applications / Company / Home / Products / Resources
+Protected folders  certifications（根目录下唯一 locked 直接子目录）
+```
+
+`Customer folders` 与 `System folders` 在根下没有直接子目录，**自动隐藏**。
+
+### 二、违规 2：Unclassified 是上传目标（已修）
+
+用户正式定义 `Unclassified` = **没有正式 folder assignment 的文件的视图 / filter**，不是 folder、不是上传目标。首版沿用 `MEDIA-UPLOAD-BLOCKER-HOTFIX-02` 的 `if (id === 'root') return true`，把它当成合法目的地 —— 实际含义是「上传但不归档」，等于把「不归类」做成界面里最省事的路径，与该视图存在的目的相反。
+
+改为 `return false`，并给出说明性提示：
+
+```text
+Unclassified lists files that have no folder yet. Open a folder to upload.
+```
+
+常规上传流程因此只剩一条：**进入可写目录 → Upload → 文件落入当前目录**。
+
+顺带修一个由此暴露的真实溢出：`.upload-hint` 原本是 `white-space: nowrap`，新提示语在 375px 下形成 430px 不可折行文本，把页面顶到 446px。改为可折行 + `min-width: 0`。
+
+### 三、Folder View 只显示自身内容
+
+按用户第 9 条，打开任意目录后**根部四区整体隐藏**（`inFolderView`），主区只显示该目录的直接子目录 + 文件。主区的 `childFolders` 本来就只取直接子级，未改。
+
+### 四、375px 逐层实测（使用现有 TEST ONLY 数据，未新建任何测试数据）
+
+| 层级 | Breadcrumb | 根部四区 | 直接子目录 | 文件 |
+|---|---|---|---|---|
+| 根 | `Media Library` | 2 段（Quick access / Protected） | 5 个顶层区域 | — |
+| 1 | `↑ Media Library / Products 🔒` | **0** | 6（Checkweigher…Xray） | 0 |
+| 2 | `… / Products / Conveyor 🔒` | **0** | 1（ZZ-ML-CLOUD-01） | 0 |
+| 3 | `… / Conveyor / ZZ-ML-CLOUD-01 …` | **0** | 4（3 个 ZZ- + manuals） | 10 |
+| 4 | `… / ZZ-UICLEANUP-RENAMED …` | **0** | 1（test23） | 4 |
+
+**每一层只出现直接子级，任何一层都没有 descendants 上浮。** `↑` 返回父级正确；面包屑祖先链接跳回 `Products` 后重新显示其 6 个直接子级；切回 `All files` 后根部分区恢复。四个库视图（All files / Unclassified / Archived / 目录内）`scrollWidth = clientWidth = 375`，全新标签页 **console 0 error**。
+
+### 五、未做（按施工单）
+
+- **未实现真正的 Upload folder**（保留目录结构的递归上传）。现有能力仍是 ML-CLOUD-03 交付的**扁平**导入，界面明确写作 `Imports the files inside a folder on your computer`；**未新增** `webkitdirectory` 输入、未新增递归后端。测试断言只存在 1 个此类 input，且代码中不出现 `webkitRelativePath` / `fullPath` / `createReader`。
+- **未修改 AI**、未调用 Provider。长期关系保持：Folder = 组织/发现，Product ID = 产品身份，人工选定的 Media = AI Source。
+- **未修改任何测试数据。**
+- 桌面 sidebar 保持上一轮恢复的 V1 结构（`LIBRARY / FOLDERS / SYSTEM`，190px），本轮未再改动。
+
+### 六、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1249 / 1249 通过**（31 文件，本次 +12） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+新增测试守住这条层级规则：根只返回 depth 0；每一层只返回自身直接子级；**祖孙绝不上浮到父级旁边**；无关分支不混入；无子目录的目录返回空而不是回退到整棵树。另断言分区按位置取子级、空分区不渲染、目录内隐藏根部四区、Unclassified 不可上传、以及未新增递归上传能力。
+
+**1440px 回归：** 桌面 nav 仍为 V1、`.ml-nav--mobile` 不渲染、sidebar 190px、Unclassified 提示正常换行、`scrollWidth = clientWidth = 1440`、**console 0 error**。
+
+---
+
+```text
+ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R1 = COMPLETED
+
+Folder navigation = direct children only, at every level
+Customer folders = 当前位置的直接子目录，无则不显示
+Unclassified = view / filter，不是上传目标
+Upload folder（保留目录结构）= 未实现，留作独立模块
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+
+NEXT MODULE = NOT AUTHORIZED
+```
+
+*最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R1"任务中写入。*

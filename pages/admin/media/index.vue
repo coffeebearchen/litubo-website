@@ -944,10 +944,52 @@ const searchActive = computed(() => searchQuery.value.trim() !== '')
  * progressive disclosure, and that open/closed state is browser-only — it is
  * never persisted anywhere.
  */
+/**
+ * Quick access is a fixed shortcut to the top-level areas, and the desktop
+ * sidebar's "Folders" list. It never changes with where you are standing.
+ */
 const quickAccessFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => folderSection(f) === 'quick-access'))
-const customerFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => folderSection(f) === 'customer'))
-const systemFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => folderSection(f) === 'system'))
+
+/** Every frozen folder, in one place — the sealed V1 desktop disclosure. */
 const protectedFolders = computed(() => flatFolders.value.filter((f: FlatFolder) => folderSection(f) === 'protected'))
+
+/**
+ * ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R1 — the phone's governance sections list
+ * the DIRECT CHILDREN of where you are, never the whole tree.
+ *
+ * The first cut filtered `flatFolders` globally, which collected every
+ * customer-managed folder in the library into one list regardless of depth:
+ * `LT180C`, its `manuals`, and a `photos` folder from an unrelated model all
+ * appeared as siblings. That is a second, flattened folder tree pretending to
+ * be navigation — it hides the real parent of every row and contradicts the
+ * hierarchy the library actually has.
+ *
+ * A section with no direct children of its kind renders nothing at all. An
+ * empty "Customer folders" heading kept only to match the sample data in the
+ * visual master would be a claim about this library that is not true.
+ */
+const navChildren = computed<FlatFolder[]>(() => {
+  // At a library view (All files / Unclassified / Archived) the context is the root.
+  const id = selectedFolder.value
+  const context = (id === null || id === 'root' || showArchivedView.value) ? null : id
+  return directChildFolders(flatFolders.value, parentMap.value, context)
+})
+
+const navCustomerFolders = computed(() => navChildren.value.filter((f: FlatFolder) => folderSection(f) === 'customer'))
+const navSystemFolders = computed(() => navChildren.value.filter((f: FlatFolder) => folderSection(f) === 'system'))
+const navProtectedFolders = computed(() => navChildren.value.filter((f: FlatFolder) => folderSection(f) === 'protected'))
+
+/**
+ * Whether a real folder is open, as opposed to a library view.
+ *
+ * In folder view the phone shows the folder's own contents — child folders and
+ * files — and nothing else. Keeping the root sections on screen there would
+ * offer two competing answers to "what is inside this?", and push the contents
+ * below a navigation block the operator has already used.
+ */
+const inFolderView = computed(() =>
+  selectedFolder.value !== null && selectedFolder.value !== 'root' && !showArchivedView.value,
+)
 
 const quickAccessOpen = ref(true)
 const customerFoldersOpen = ref(false)
@@ -995,7 +1037,14 @@ const canUploadHere = computed(() => {
   if (showArchivedView.value) return false
   const id = selectedFolder.value
   if (id === null) return false // "All files" is a view, not a destination
-  if (id === 'root') return true // Unclassified is a legal destination
+  /**
+   * ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R1 — "Unclassified" is a FILTER: the files
+   * that have no folder yet. It is not a folder, so it cannot be a destination.
+   * Uploading "into" it previously meant uploading with no folder at all, which
+   * quietly made "leave this file unfiled" the easiest path in the interface —
+   * the opposite of what the view exists to help you fix.
+   */
+  if (id === 'root') return false
   return flatFolders.value.some((f: FlatFolder) => f.id === id && f.allow_upload)
 })
 
@@ -1003,6 +1052,7 @@ const canUploadHere = computed(() => {
 const uploadBlockedReason = computed(() => {
   if (showArchivedView.value) return 'Archived files cannot be added to. Open a folder to upload.'
   if (selectedFolder.value === null) return 'Open a folder to upload.'
+  if (selectedFolder.value === 'root') return 'Unclassified lists files that have no folder yet. Open a folder to upload.'
   if (!canUploadHere.value) return 'This folder does not accept file uploads.'
   return ''
 })
@@ -1506,6 +1556,12 @@ const selectedFileFolderIsLegacy = computed(() => {
             >Archived</button>
           </div>
 
+          <!--
+            The root sections belong to the root. Once a folder is open, its
+            contents are the answer to "what is in here?", and the main area
+            below already gives them — child folders first, then files.
+          -->
+          <template v-if="!inFolderView">
           <section class="nav-section">
             <button
               class="nav-section__head"
@@ -1544,7 +1600,7 @@ const selectedFileFolderIsLegacy = computed(() => {
             </div>
           </section>
 
-          <section class="nav-section">
+          <section v-if="navCustomerFolders.length > 0" class="nav-section">
             <button
               class="nav-section__head"
               :aria-expanded="customerFoldersOpen"
@@ -1559,7 +1615,7 @@ const selectedFileFolderIsLegacy = computed(() => {
             </button>
             <div v-if="customerFoldersOpen" class="nav-section__body">
               <button
-                v-for="f in customerFolders"
+                v-for="f in navCustomerFolders"
                 :key="f.id"
                 class="folder-row"
                 :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
@@ -1569,11 +1625,10 @@ const selectedFileFolderIsLegacy = computed(() => {
                 <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
                 <span class="folder-row__chevron" aria-hidden="true">›</span>
               </button>
-              <p v-if="customerFolders.length === 0" class="nav-section__empty">No customer folders yet</p>
             </div>
           </section>
 
-          <section class="nav-section">
+          <section v-if="navSystemFolders.length > 0" class="nav-section">
             <button
               class="nav-section__head"
               :aria-expanded="systemFoldersOpen"
@@ -1588,7 +1643,7 @@ const selectedFileFolderIsLegacy = computed(() => {
             </button>
             <div v-if="systemFoldersOpen" class="nav-section__body">
               <button
-                v-for="f in systemFolders"
+                v-for="f in navSystemFolders"
                 :key="f.id"
                 class="folder-row"
                 :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
@@ -1602,11 +1657,10 @@ const selectedFileFolderIsLegacy = computed(() => {
                 >{{ folderBadge(f) }}</span>
                 <span class="folder-row__chevron" aria-hidden="true">›</span>
               </button>
-              <p v-if="systemFolders.length === 0" class="nav-section__empty">No system folders</p>
             </div>
           </section>
 
-          <section v-if="protectedFolders.length > 0" class="nav-section">
+          <section v-if="navProtectedFolders.length > 0" class="nav-section">
             <button
               class="nav-section__head"
               :aria-expanded="protectedFoldersOpen"
@@ -1621,7 +1675,7 @@ const selectedFileFolderIsLegacy = computed(() => {
             </button>
             <div v-if="protectedFoldersOpen" class="nav-section__body">
               <button
-                v-for="f in protectedFolders"
+                v-for="f in navProtectedFolders"
                 :key="f.id"
                 class="folder-row"
                 :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
@@ -1638,6 +1692,7 @@ const selectedFileFolderIsLegacy = computed(() => {
               </button>
             </div>
           </section>
+          </template>
         </div>
       </aside>
 
@@ -3040,7 +3095,14 @@ const selectedFileFolderIsLegacy = computed(() => {
 
 /* ── Upload menu ── */
 .upload-menu { position: relative; }
-.upload-hint { font-size: var(--text-xs); color: var(--color-ink-muted); white-space: nowrap; }
+/*
+  `nowrap` was safe while every reason fitted in a few words. The Unclassified
+  reason has to explain what that view IS before it can explain why you cannot
+  upload into it, and at 375px an unwrappable 430px sentence pushed the whole
+  page 71px past the viewport. The hint wraps; only the toolbar row it sits in
+  needs to stay tidy.
+*/
+.upload-hint { font-size: var(--text-xs); color: var(--color-ink-muted); min-width: 0; }
 .upload-caret { margin-left: 6px; font-size: var(--text-xs); }
 .upload-menu__list {
   position: absolute; top: calc(100% + 4px); right: 0; z-index: 30;

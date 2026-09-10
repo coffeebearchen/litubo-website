@@ -118,3 +118,26 @@ export function folderBadge(f: FolderPresentationInput): 'Conflict' | 'Read only
   if (f.management === 'locked') return 'Protected'
   return null
 }
+
+/**
+ * ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R1 — the folders directly inside one
+ * location, never deeper.
+ *
+ * The navigation sections were first written as global filters over the whole
+ * flattened tree, which collected every customer-managed folder in the library
+ * into a single list: a model's folder, its own `manuals`, and an unrelated
+ * model's `photos` all rendered as siblings. That is a second folder tree that
+ * disagrees with the real one, and it hides each row's actual parent.
+ *
+ * `contextId` of `null` means the library root, whose direct children are the
+ * top-level folders. Anything deeper is reached by opening a folder, which is
+ * what makes the breadcrumb the honest answer to "where am I".
+ */
+export function directChildFolders<T extends { id: string, depth: number }>(
+  folders: readonly T[],
+  parentOf: Readonly<Record<string, string | null>>,
+  contextId: string | null,
+): T[] {
+  if (contextId === null) return folders.filter(f => f.depth === 0)
+  return folders.filter(f => parentOf[f.id] === contextId)
+}

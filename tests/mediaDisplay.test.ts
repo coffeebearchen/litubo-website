@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { fileKind, summariseUpload, systemFolderLabel, folderSection, folderBadge } from '../utils/mediaDisplay'
+import { fileKind, summariseUpload, systemFolderLabel, folderSection, folderBadge, directChildFolders } from '../utils/mediaDisplay'
 
 describe('the label shown when there is no thumbnail', () => {
   it.each([
@@ -372,5 +372,122 @@ describe('the sealed desktop sidebar is left alone', () => {
     expect(source).toContain('.ml-nav--mobile { display: none;')
     expect(source).toContain('.ml-nav--desktop { display: none; }')
     expect(source).toContain('.ml-nav--mobile { display: flex; }')
+  })
+})
+
+/**
+ * ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R1 — the navigation shows one level at a
+ * time.
+ *
+ * The library's shape is Products → Category → Model → Subfolder → Files, and
+ * the navigation has to agree with it. The first cut listed every
+ * customer-managed folder in one section regardless of depth, so a model's
+ * folder and its own `manuals` appeared as siblings — a second, flattened tree
+ * that contradicts the real one and hides each row's parent.
+ */
+describe('a folder listing shows direct children only', () => {
+  /** products → checkweigher → LT180C → {manuals, specifications, photos} */
+  const tree = [
+    { id: 'products', depth: 0 },
+    { id: 'checkweigher', depth: 1 },
+    { id: 'lt180c', depth: 2 },
+    { id: 'manuals', depth: 3 },
+    { id: 'specifications', depth: 3 },
+    { id: 'photos', depth: 3 },
+    { id: 'lt200c', depth: 2 },
+    { id: 'old-versions', depth: 3 },
+    { id: 'resources', depth: 0 },
+  ]
+  const parentOf: Record<string, string | null> = {
+    products: null,
+    checkweigher: 'products',
+    lt180c: 'checkweigher',
+    manuals: 'lt180c',
+    specifications: 'lt180c',
+    photos: 'lt180c',
+    lt200c: 'checkweigher',
+    'old-versions': 'lt200c',
+    resources: null,
+  }
+  const idsAt = (context: string | null) => directChildFolders(tree, parentOf, context).map(f => f.id)
+
+  it('lists the top-level folders at the root, and nothing deeper', () => {
+    expect(idsAt(null)).toEqual(['products', 'resources'])
+  })
+
+  it.each([
+    ['products', ['checkweigher']],
+    ['checkweigher', ['lt180c', 'lt200c']],
+    ['lt180c', ['manuals', 'specifications', 'photos']],
+  ])('inside %s, lists only its own children', (context, expected) => {
+    expect(idsAt(context)).toEqual(expected)
+  })
+
+  /**
+   * The exact shape the work order forbids: a model's subfolders must never
+   * surface beside the model itself.
+   */
+  it('never pulls a grandchild up beside its parent', () => {
+    const atCategory = idsAt('checkweigher')
+    for (const grandchild of ['manuals', 'specifications', 'photos', 'old-versions']) {
+      expect(atCategory).not.toContain(grandchild)
+    }
+  })
+
+  it('never collects folders from unrelated branches', () => {
+    expect(idsAt('lt180c')).not.toContain('old-versions')
+    expect(idsAt('lt200c')).toEqual(['old-versions'])
+  })
+
+  it('a folder with no subfolders lists nothing, rather than falling back to the tree', () => {
+    expect(idsAt('manuals')).toEqual([])
+  })
+})
+
+describe('the Media Library navigation follows the real hierarchy', () => {
+  const source = readFileSync(resolve(process.cwd(), 'pages/admin/media/index.vue'), 'utf8')
+
+  it('scopes the governance sections to the current location, not the whole tree', () => {
+    expect(source).toContain('directChildFolders(flatFolders.value, parentMap.value, context)')
+    for (const list of ['navCustomerFolders', 'navSystemFolders', 'navProtectedFolders']) {
+      expect(source).toContain(`const ${list} = computed(() => navChildren.value.filter(`)
+      expect(source).toContain(`v-for="f in ${list}"`)
+    }
+  })
+
+  /**
+   * An empty heading kept only to match the sample data in the visual master
+   * would be a claim about this library that is not true.
+   */
+  it('renders a governance section only when it actually has folders', () => {
+    for (const list of ['navCustomerFolders', 'navSystemFolders', 'navProtectedFolders']) {
+      expect(source).toContain(`<section v-if="${list}.length > 0" class="nav-section">`)
+    }
+  })
+
+  it('hides the root sections once a folder is open', () => {
+    expect(source).toContain('<template v-if="!inFolderView">')
+    expect(source).toMatch(/const inFolderView = computed\(\(\) =>\s*\n\s*selectedFolder\.value !== null && selectedFolder\.value !== 'root' && !showArchivedView\.value,/)
+  })
+
+  /**
+   * "Unclassified" is the files that have no folder yet. Uploading into it
+   * means uploading with no folder at all, which would make "leave this unfiled"
+   * the easiest path in the interface — the opposite of what the view is for.
+   */
+  it('refuses Unclassified as an upload destination and says why', () => {
+    expect(source).toContain("if (id === 'root') return false")
+    expect(source).toContain('Unclassified lists files that have no folder yet. Open a folder to upload.')
+    expect(source).not.toContain("if (id === 'root') return true")
+  })
+
+  /** R1 defers real folder-tree upload; nothing here may grow that capability. */
+  it('does not add recursive or tree-preserving folder upload', () => {
+    // Exactly one input picks a local folder, and it imports flat — no tree is rebuilt.
+    expect(source.match(/<input\b[^>]*webkitdirectory[^>]*>/g) ?? []).toHaveLength(1)
+    expect(source).toContain('Imports the files inside a folder on your computer')
+    for (const recursive of ['webkitRelativePath', 'fullPath', 'createReader']) {
+      expect(source).not.toContain(recursive)
+    }
   })
 })
