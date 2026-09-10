@@ -1388,13 +1388,27 @@ const selectedFileFolderIsLegacy = computed(() => {
       -->
       <aside class="ml-sidebar">
         <!--
-          File STATE is not folder navigation. It answers "which slice of the
-          library am I looking at?", so it sits above the folder sections and
-          renders as one segmented control on a phone rather than three rows
-          that read like folders.
+          ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — two presentations of ONE
+          classification.
+
+          The phone and the desktop want different things from this column. A
+          1440px workspace has a persistent sidebar beside a folder browser, so
+          it lists the areas you start from and keeps governance states behind a
+          single disclosure. A 375px screen has no beside — the column stacks on
+          top of the files — so it needs the four groups spelled out and closed
+          by default, which is what 07-mobile-layered-folder-navigation.png
+          shows.
+
+          Both are rendered from the SAME computeds (`folderSection()`), so the
+          duplication here is presentation only: there is one classification
+          rule, one badge rule, and one place to change either. CSS decides
+          which block is shown, so the choice survives SSR without a hydration
+          flash.
+
+          The desktop block below is the sealed V1 markup, unchanged.
         -->
-        <p class="sidebar-section-label">Library</p>
-        <div class="file-state">
+        <div class="ml-nav ml-nav--desktop">
+          <p class="sidebar-section-label">Library</p>
           <button
             class="nav-item"
             :class="{ 'nav-item--active': selectedFolder === null && !showArchivedView }"
@@ -1410,151 +1424,221 @@ const selectedFileFolderIsLegacy = computed(() => {
             :class="{ 'nav-item--active': showArchivedView }"
             @click="toggleArchivedView"
           >Archived</button>
+
+          <p class="sidebar-section-label">Folders</p>
+          <button
+            v-for="f in quickAccessFolders"
+            :key="f.id"
+            class="nav-item"
+            :class="{ 'nav-item--active': selectedFolder === f.id && !showArchivedView }"
+            @click="selectFolder(f.id)"
+          >
+            <span class="nav-item__icon" aria-hidden="true">📁</span>{{ folderLabel(f) }}
+          </button>
+          <p v-if="quickAccessFolders.length === 0" class="sidebar-empty">No folders</p>
+
+          <!--
+            Legacy and conflict folders are governance states, not places people
+            go. One collapsed disclosure keeps them reachable without making the
+            library look like a debugging console.
+          -->
+          <template v-if="protectedFolders.length > 0">
+            <p class="sidebar-section-label">System</p>
+            <button
+              class="nav-item nav-item--disclosure"
+              :aria-expanded="protectedFoldersOpen"
+              @click="protectedFoldersOpen = !protectedFoldersOpen"
+            >
+              System folders
+              <span class="nav-item__caret">{{ protectedFoldersOpen ? '▾' : '▸' }}</span>
+            </button>
+            <template v-if="protectedFoldersOpen">
+              <button
+                v-for="f in protectedFolders"
+                :key="f.id"
+                class="nav-item nav-item--sub"
+                :class="{
+                  'nav-item--active': selectedFolder === f.id && !showArchivedView,
+                  'nav-item--legacy': f.policy_state === 'legacy-read-only',
+                  'nav-item--conflict': f.policy_state === 'conflict-frozen',
+                }"
+                @click="selectFolder(f.id)"
+              >
+                {{ f.name }}
+                <span class="nav-item__tag">{{ folderBadge(f) }}</span>
+              </button>
+            </template>
+          </template>
         </div>
 
         <!--
-          ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — four sections, partitioned by the
-          governance the server already decided (see `folderSection()`). Each
-          folder appears in exactly one of them, so the list never repeats
-          itself, and each heading says what kind of folder is inside.
+          The phone: four sections, partitioned by the governance the server
+          already decided. Each folder appears in exactly one of them, so the
+          list never repeats itself, and each heading says what kind of folder
+          is inside.
 
           Only Quick access opens by default. The rest are progressive
-          disclosure: on a phone the whole navigation is then about one screen
-          tall instead of a column the operator has to scroll past to reach
-          any file.
+          disclosure: the whole navigation is then about one screen tall instead
+          of a column the operator has to scroll past to reach any file.
         -->
-        <section class="nav-section">
-          <button
-            class="nav-section__head"
-            :aria-expanded="quickAccessOpen"
-            @click="quickAccessOpen = !quickAccessOpen"
-          >
-            <span class="nav-section__icon" aria-hidden="true">★</span>
-            <span class="nav-section__text">
-              <span class="nav-section__title">Quick access</span>
-              <span class="nav-section__sub">Your main folders</span>
-            </span>
-            <span class="nav-section__caret" aria-hidden="true">{{ quickAccessOpen ? '▾' : '▸' }}</span>
-          </button>
-          <div v-if="quickAccessOpen" class="nav-section__body">
+        <div class="ml-nav ml-nav--mobile">
+          <!--
+            File STATE is not folder navigation. It answers "which slice of the
+            library am I looking at?", so it sits above the folder sections and
+            renders as one segmented control rather than three rows that read
+            like folders.
+          -->
+          <div class="file-state">
             <button
-              v-for="f in quickAccessFolders"
-              :key="f.id"
-              class="folder-row"
-              :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
-              @click="selectFolder(f.id)"
-            >
-              <span class="folder-row__icon" aria-hidden="true">📁</span>
-              <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
-              <!--
-                A shortcut must not make a folder look safer than it is: the
-                badge is computed from the same state wherever the row is drawn.
-              -->
-              <span
-                v-if="folderBadge(f)"
-                class="folder-row__badge"
-                :class="`folder-row__badge--${folderBadge(f) === 'Conflict' ? 'conflict' : 'muted'}`"
-              >{{ folderBadge(f) }}</span>
-              <span class="folder-row__chevron" aria-hidden="true">›</span>
-            </button>
-            <p v-if="quickAccessFolders.length === 0" class="nav-section__empty">No folders</p>
+              class="nav-item"
+              :class="{ 'nav-item--active': selectedFolder === null && !showArchivedView }"
+              @click="selectFolder(null)"
+            >All files</button>
+            <button
+              class="nav-item"
+              :class="{ 'nav-item--active': selectedFolder === 'root' && !showArchivedView }"
+              @click="selectFolder('root')"
+            >Unclassified</button>
+            <button
+              class="nav-item nav-item--archived"
+              :class="{ 'nav-item--active': showArchivedView }"
+              @click="toggleArchivedView"
+            >Archived</button>
           </div>
-        </section>
 
-        <section class="nav-section">
-          <button
-            class="nav-section__head"
-            :aria-expanded="customerFoldersOpen"
-            @click="customerFoldersOpen = !customerFoldersOpen"
-          >
-            <span class="nav-section__icon" aria-hidden="true">👥</span>
-            <span class="nav-section__text">
-              <span class="nav-section__title">Customer folders</span>
-              <span class="nav-section__sub">Folders you can create, rename and move</span>
-            </span>
-            <span class="nav-section__caret" aria-hidden="true">{{ customerFoldersOpen ? '▾' : '▸' }}</span>
-          </button>
-          <div v-if="customerFoldersOpen" class="nav-section__body">
+          <section class="nav-section">
             <button
-              v-for="f in customerFolders"
-              :key="f.id"
-              class="folder-row"
-              :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
-              @click="selectFolder(f.id)"
+              class="nav-section__head"
+              :aria-expanded="quickAccessOpen"
+              @click="quickAccessOpen = !quickAccessOpen"
             >
-              <span class="folder-row__icon" aria-hidden="true">📁</span>
-              <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
-              <span class="folder-row__chevron" aria-hidden="true">›</span>
+              <span class="nav-section__icon" aria-hidden="true">★</span>
+              <span class="nav-section__text">
+                <span class="nav-section__title">Quick access</span>
+                <span class="nav-section__sub">Your main folders</span>
+              </span>
+              <span class="nav-section__caret" aria-hidden="true">{{ quickAccessOpen ? '▾' : '▸' }}</span>
             </button>
-            <p v-if="customerFolders.length === 0" class="nav-section__empty">No customer folders yet</p>
-          </div>
-        </section>
+            <div v-if="quickAccessOpen" class="nav-section__body">
+              <button
+                v-for="f in quickAccessFolders"
+                :key="f.id"
+                class="folder-row"
+                :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
+                @click="selectFolder(f.id)"
+              >
+                <span class="folder-row__icon" aria-hidden="true">📁</span>
+                <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
+                <!--
+                  A shortcut must not make a folder look safer than it is: the
+                  badge is computed from the same state wherever the row is drawn.
+                -->
+                <span
+                  v-if="folderBadge(f)"
+                  class="folder-row__badge"
+                  :class="`folder-row__badge--${folderBadge(f) === 'Conflict' ? 'conflict' : 'muted'}`"
+                >{{ folderBadge(f) }}</span>
+                <span class="folder-row__chevron" aria-hidden="true">›</span>
+              </button>
+              <p v-if="quickAccessFolders.length === 0" class="nav-section__empty">No folders</p>
+            </div>
+          </section>
 
-        <section class="nav-section">
-          <button
-            class="nav-section__head"
-            :aria-expanded="systemFoldersOpen"
-            @click="systemFoldersOpen = !systemFoldersOpen"
-          >
-            <span class="nav-section__icon" aria-hidden="true">⚙</span>
-            <span class="nav-section__text">
-              <span class="nav-section__title">System folders</span>
-              <span class="nav-section__sub">Business classification, managed by LITUBO</span>
-            </span>
-            <span class="nav-section__caret" aria-hidden="true">{{ systemFoldersOpen ? '▾' : '▸' }}</span>
-          </button>
-          <div v-if="systemFoldersOpen" class="nav-section__body">
+          <section class="nav-section">
             <button
-              v-for="f in systemFolders"
-              :key="f.id"
-              class="folder-row"
-              :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
-              @click="selectFolder(f.id)"
+              class="nav-section__head"
+              :aria-expanded="customerFoldersOpen"
+              @click="customerFoldersOpen = !customerFoldersOpen"
             >
-              <span class="folder-row__icon" aria-hidden="true">📁</span>
-              <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
-              <span
-                v-if="folderBadge(f)"
-                class="folder-row__badge folder-row__badge--muted"
-              >{{ folderBadge(f) }}</span>
-              <span class="folder-row__chevron" aria-hidden="true">›</span>
+              <span class="nav-section__icon" aria-hidden="true">👥</span>
+              <span class="nav-section__text">
+                <span class="nav-section__title">Customer folders</span>
+                <span class="nav-section__sub">Folders you can create, rename and move</span>
+              </span>
+              <span class="nav-section__caret" aria-hidden="true">{{ customerFoldersOpen ? '▾' : '▸' }}</span>
             </button>
-            <p v-if="systemFolders.length === 0" class="nav-section__empty">No system folders</p>
-          </div>
-        </section>
+            <div v-if="customerFoldersOpen" class="nav-section__body">
+              <button
+                v-for="f in customerFolders"
+                :key="f.id"
+                class="folder-row"
+                :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
+                @click="selectFolder(f.id)"
+              >
+                <span class="folder-row__icon" aria-hidden="true">📁</span>
+                <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
+                <span class="folder-row__chevron" aria-hidden="true">›</span>
+              </button>
+              <p v-if="customerFolders.length === 0" class="nav-section__empty">No customer folders yet</p>
+            </div>
+          </section>
 
-        <section v-if="protectedFolders.length > 0" class="nav-section">
-          <button
-            class="nav-section__head"
-            :aria-expanded="protectedFoldersOpen"
-            @click="protectedFoldersOpen = !protectedFoldersOpen"
-          >
-            <span class="nav-section__icon" aria-hidden="true">🔒</span>
-            <span class="nav-section__text">
-              <span class="nav-section__title">Protected folders</span>
-              <span class="nav-section__sub">Read-only folders</span>
-            </span>
-            <span class="nav-section__caret" aria-hidden="true">{{ protectedFoldersOpen ? '▾' : '▸' }}</span>
-          </button>
-          <div v-if="protectedFoldersOpen" class="nav-section__body">
+          <section class="nav-section">
             <button
-              v-for="f in protectedFolders"
-              :key="f.id"
-              class="folder-row"
-              :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
-              @click="selectFolder(f.id)"
+              class="nav-section__head"
+              :aria-expanded="systemFoldersOpen"
+              @click="systemFoldersOpen = !systemFoldersOpen"
             >
-              <span class="folder-row__icon" aria-hidden="true">📁</span>
-              <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
-              <span
-                v-if="folderBadge(f)"
-                class="folder-row__badge"
-                :class="`folder-row__badge--${folderBadge(f) === 'Conflict' ? 'conflict' : 'muted'}`"
-              >{{ folderBadge(f) }}</span>
-              <span class="folder-row__chevron" aria-hidden="true">›</span>
+              <span class="nav-section__icon" aria-hidden="true">⚙</span>
+              <span class="nav-section__text">
+                <span class="nav-section__title">System folders</span>
+                <span class="nav-section__sub">Business classification, managed by LITUBO</span>
+              </span>
+              <span class="nav-section__caret" aria-hidden="true">{{ systemFoldersOpen ? '▾' : '▸' }}</span>
             </button>
-          </div>
-        </section>
+            <div v-if="systemFoldersOpen" class="nav-section__body">
+              <button
+                v-for="f in systemFolders"
+                :key="f.id"
+                class="folder-row"
+                :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
+                @click="selectFolder(f.id)"
+              >
+                <span class="folder-row__icon" aria-hidden="true">📁</span>
+                <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
+                <span
+                  v-if="folderBadge(f)"
+                  class="folder-row__badge folder-row__badge--muted"
+                >{{ folderBadge(f) }}</span>
+                <span class="folder-row__chevron" aria-hidden="true">›</span>
+              </button>
+              <p v-if="systemFolders.length === 0" class="nav-section__empty">No system folders</p>
+            </div>
+          </section>
+
+          <section v-if="protectedFolders.length > 0" class="nav-section">
+            <button
+              class="nav-section__head"
+              :aria-expanded="protectedFoldersOpen"
+              @click="protectedFoldersOpen = !protectedFoldersOpen"
+            >
+              <span class="nav-section__icon" aria-hidden="true">🔒</span>
+              <span class="nav-section__text">
+                <span class="nav-section__title">Protected folders</span>
+                <span class="nav-section__sub">Read-only folders</span>
+              </span>
+              <span class="nav-section__caret" aria-hidden="true">{{ protectedFoldersOpen ? '▾' : '▸' }}</span>
+            </button>
+            <div v-if="protectedFoldersOpen" class="nav-section__body">
+              <button
+                v-for="f in protectedFolders"
+                :key="f.id"
+                class="folder-row"
+                :class="{ 'folder-row--active': selectedFolder === f.id && !showArchivedView }"
+                @click="selectFolder(f.id)"
+              >
+                <span class="folder-row__icon" aria-hidden="true">📁</span>
+                <span class="folder-row__name" :title="f.full_path">{{ folderLabel(f) }}</span>
+                <span
+                  v-if="folderBadge(f)"
+                  class="folder-row__badge"
+                  :class="`folder-row__badge--${folderBadge(f) === 'Conflict' ? 'conflict' : 'muted'}`"
+                >{{ folderBadge(f) }}</span>
+                <span class="folder-row__chevron" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </section>
+        </div>
       </aside>
 
       <!-- ── Main content ──────────────────────────────────────────────────── -->
@@ -2151,60 +2235,98 @@ const selectedFileFolderIsLegacy = computed(() => {
 }
 
 /*
-  ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — layered folder navigation.
+  ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — the two navigation presentations.
 
-  On DESKTOP these keep the sealed V1 look: the section head reads as the
-  small uppercase label it replaced, and a folder row is the same 36px
-  `.nav-item`-sized line it already was. Everything that turns this into the
-  master's mobile layout — cards, 44px rows, segmented tabs — lives in the
-  767px block near the end of this stylesheet, so the desktop cannot drift
-  when the phone layout changes.
+  `.ml-nav--desktop` is the sealed V1 sidebar and carries no styling of its
+  own: it is built from `.sidebar-section-label` / `.nav-item`, exactly as
+  before this module.
+
+  Everything below `.ml-nav--mobile` styles markup that ONLY ever renders at
+  375px, so it is written as the phone layout directly rather than as a desktop
+  look with mobile overrides. Nothing here can reach the desktop sidebar.
 
   (Replaces the `.folder-item*` / `.sidebar-divider` / `.sidebar-legacy-toggle`
   rules, which had been dead since ML-CLOUD-UI-CLEANUP-01 replaced that markup
   with `.nav-item`.)
 */
+.ml-nav { display: flex; flex-direction: column; min-width: 0; }
+.ml-nav--desktop { gap: 1px; }
+.ml-nav--mobile { display: none; gap: var(--space-3); }
 
-/* File state — three views, stacked on desktop, segmented on a phone. */
-.file-state { display: flex; flex-direction: column; gap: 1px; }
+/* File state — three views as one segmented control. */
+.file-state {
+  display: flex;
+  gap: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+/*
+  `min-width: 0` is what keeps "Unclassified" from setting a floor wider than a
+  third of a 375px screen and pushing the control past the viewport.
+*/
+.file-state .nav-item {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  min-height: 40px;
+  padding: var(--space-1);
+  font-size: var(--text-xs);
+  border-radius: calc(var(--radius-md) - 3px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-.nav-section { display: flex; flex-direction: column; }
+/* Each folder section is a card, so the boundary between groups is visible. */
+.nav-section {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
 
 .nav-section__head {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  padding: var(--space-2) var(--space-3) var(--space-1);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
   background: none;
   border: none;
   text-align: left;
   cursor: pointer;
+  color: var(--color-ink);
+}
+
+.nav-section__icon { flex-shrink: 0; font-size: var(--text-base); }
+.nav-section__text { display: flex; flex-direction: column; min-width: 0; }
+.nav-section__title { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
+.nav-section__sub {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-section__caret {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--text-base);
   color: var(--color-ink-muted);
 }
-.nav-section__head:hover { color: var(--color-ink); }
 
-.nav-section__icon { display: none; flex-shrink: 0; }
-
-.nav-section__text { display: flex; flex-direction: column; min-width: 0; }
-
-.nav-section__title {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-/* The explanatory line is a phone affordance; the desktop column is too narrow for it. */
-.nav-section__sub { display: none; }
-
-.nav-section__caret { margin-left: auto; font-size: var(--text-xs); flex-shrink: 0; }
-
-.nav-section__body { display: flex; flex-direction: column; gap: 1px; }
+.nav-section__body { display: flex; flex-direction: column; border-top: 1px solid var(--color-line); }
+.nav-section__body > .folder-row + .folder-row { border-top: 1px solid var(--color-line); }
 
 .nav-section__empty {
   font-size: var(--text-xs);
   color: var(--color-ink-muted);
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-3);
   margin: 0;
   font-style: italic;
 }
@@ -2212,18 +2334,20 @@ const selectedFileFolderIsLegacy = computed(() => {
 /*
   One folder row, used by all four sections. A single row shape is the point:
   it is what lets a person compare a customer folder against a protected one
-  without re-reading the layout.
+  without re-reading the layout. 44px is the minimum comfortable touch target,
+  and every row is the same height whether or not it carries a badge — a list
+  whose rows change height by status is harder to scan than the status itself
+  is to read.
 */
 .folder-row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  min-height: 36px;
-  padding: var(--space-1) var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
   background: none;
   border: none;
-  border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   color: var(--color-ink);
   text-align: left;
@@ -2233,7 +2357,7 @@ const selectedFileFolderIsLegacy = computed(() => {
 .folder-row--active { background: var(--color-primary-deep); color: #fff; font-weight: 600; }
 .folder-row--active:hover { background: var(--color-primary-deep); }
 
-.folder-row__icon { flex-shrink: 0; font-size: var(--text-sm); }
+.folder-row__icon { flex-shrink: 0; font-size: var(--text-base); }
 
 /*
   `min-width: 0` is what allows the ellipsis: a flex item defaults to
@@ -2262,8 +2386,7 @@ const selectedFileFolderIsLegacy = computed(() => {
 .folder-row__badge--conflict { color: #8a4b08; border-color: #d9a26a; background: #fdf6ec; }
 .folder-row--active .folder-row__badge { color: inherit; border-color: currentColor; background: transparent; }
 
-/* Only meaningful on a phone, where a row is a navigation target rather than a list item. */
-.folder-row__chevron { display: none; flex-shrink: 0; color: var(--color-ink-muted); }
+.folder-row__chevron { flex-shrink: 0; color: var(--color-ink-muted); }
 .folder-row--active .folder-row__chevron { color: inherit; }
 
 /* ── Main ── */
@@ -3024,9 +3147,9 @@ const selectedFileFolderIsLegacy = computed(() => {
   which folders are theirs, which are the system's, and which cannot be touched
   — and it pushed the file grid below a wall of chips.
 
-  The layout now follows 07-mobile-layered-folder-navigation.png: file state as
-  one segmented control, then four labelled section cards, only the first of
-  them open.
+  This block does not restyle the desktop sidebar into a phone layout; it swaps
+  which of the two navigation blocks is rendered. The sealed V1 sidebar is left
+  exactly as it was for every width above this one.
 */
 @media (max-width: 767px) {
   .ml-shell { height: auto; overflow: visible; }
@@ -3071,74 +3194,16 @@ const selectedFileFolderIsLegacy = computed(() => {
 
   .ml-sidebar {
     width: 100%;
-    flex-direction: column;
     border-right: none;
     border-bottom: 1px solid var(--color-line);
     background: var(--color-surface-alt);
     overflow: visible;
     padding: var(--space-3);
-    gap: var(--space-3);
   }
 
-  /* The section cards carry their own headings, so the column label is noise. */
-  .sidebar-section-label { display: none; }
-
-  /*
-    File state as a segmented control. `min-width: 0` on the buttons is what
-    keeps "Unclassified" from setting a floor wider than a third of a 375px
-    screen and pushing the control past the viewport.
-  */
-  .file-state {
-    flex-direction: row;
-    gap: 0;
-    background: var(--color-surface);
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-md);
-    padding: 3px;
-  }
-  .file-state .nav-item {
-    flex: 1 1 0;
-    min-width: 0;
-    justify-content: center;
-    min-height: 40px;
-    padding: var(--space-1);
-    font-size: var(--text-xs);
-    border-radius: calc(var(--radius-md) - 3px);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* Each folder section is a card, so the boundary between groups is visible. */
-  .nav-section {
-    background: var(--color-surface);
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-  }
-
-  .nav-section__head {
-    min-height: 56px;
-    padding: var(--space-2) var(--space-3);
-    color: var(--color-ink);
-  }
-  .nav-section__icon { display: inline; font-size: var(--text-base); }
-  .nav-section__title {
-    font-size: var(--text-sm);
-    font-weight: 600;
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--color-ink);
-  }
-  .nav-section__sub {
-    display: block;
-    font-size: var(--text-xs);
-    color: var(--color-ink-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .nav-section__caret { font-size: var(--text-base); color: var(--color-ink-muted); }
+  /* The one swap this whole block exists for. */
+  .ml-nav--desktop { display: none; }
+  .ml-nav--mobile { display: flex; }
 
   /*
     The filter is a three-option select; the search field is where a long
@@ -3146,23 +3211,6 @@ const selectedFileFolderIsLegacy = computed(() => {
     being split evenly.
   */
   .type-select { flex: 0 0 auto; min-width: 0; width: auto; }
-
-  .nav-section__body { border-top: 1px solid var(--color-line); gap: 0; }
-  .nav-section__body > .folder-row + .folder-row { border-top: 1px solid var(--color-line); }
-  .nav-section__empty { padding: var(--space-3); }
-
-  /*
-    44px is the minimum comfortable touch target, and every row is the same
-    height whether or not it carries a badge — a list whose rows change height
-    by status is harder to scan than the status itself is to read.
-  */
-  .folder-row {
-    min-height: 44px;
-    padding: var(--space-2) var(--space-3);
-    border-radius: 0;
-  }
-  .folder-row__icon { font-size: var(--text-base); }
-  .folder-row__chevron { display: inline; }
 
   .ml-main { padding: var(--space-3); overflow: visible; }
   /*

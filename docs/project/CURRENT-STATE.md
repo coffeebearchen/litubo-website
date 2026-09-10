@@ -5889,3 +5889,73 @@ NEXT MODULE = NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-MOBILE-VISUAL-ALIGN-01"任务中写入。*
+
+---
+
+## ML-CLOUD-MOBILE-VISUAL-ALIGN-01 — CLOSEOUT FIX（2026-09-10）
+
+审核结论 `TECHNICAL IMPLEMENTATION = PASS / FINAL VISUAL SIGN-OFF = PENDING`，指出一处**越界**：首版把四层导航渲染在所有宽度上，因而改动了已封板的 1440px 桌面 —— 「Folders」被改名为「Quick access」，并多出两个桌面从未有过的折叠分区。本模块的授权范围是 `375px = PRIMARY / 1440px = REGRESSION ONLY`，该改动确实超范围。**审核意见成立，已修正。**
+
+### 修正方式：一套分类，两种呈现
+
+`.ml-sidebar` 内改为两个块，由 CSS 按宽度切换（SSR 安全，无 hydration 闪烁）：
+
+- `.ml-nav--desktop` —— **原封不动的 V1 markup**（`ce61498` 版本），>767px 显示；
+- `.ml-nav--mobile` —— 四层手机导航，≤767px 显示。
+
+两者由**同一批 computed** 驱动（`quickAccessFolders` / `customerFolders` / `systemFolders` / `protectedFolders`，均出自 `folderSection()`），并共用同一个 `folderBadge()`。因此重复的只有 presentation markup —— **分类规则一处、徽章规则一处**，不存在两套需要同步的逻辑。桌面的 `System folders` 折叠开关复用 `protectedFoldersOpen`（两者展示同一份列表，且永不同时可见）。
+
+桌面同时因此**去掉了** `sidebarRoots` 与「仅冻结目录」的旧 `systemFolders` 两个过滤器 —— 它们已被 `folderSection()` 覆盖。
+
+### 桌面实测已恢复原状（1440px，全新标签页）
+
+```text
+LIBRARY | All files | Unclassified | Archived
+FOLDERS | 📁 Applications | 📁 Company | 📁 Home | 📁 Products | 📁 Resources
+SYSTEM  | System folders ▸
+```
+
+展开 `System folders` 后仍是**原来的 raw slug + tag** 形式：`certifications [Conflict]` / `global-service [Read only]` / `technical-docs [Read only]` / `case-studies [Read only]` / `downloads [Read only]` / `insights [Read only]`。sidebar 仍 **190px**，手机副标题 `display: none`，`.ml-nav--mobile` 不渲染，`scrollWidth = clientWidth = 1440`，**console 0 error**。
+
+唯一与 `ce61498` 的差异：徽章文案由原先写死的三元表达式改为共用的 `folderBadge()`。对现有 6 个目录输出完全一致，且对 `unknown` 目录不再误标为 `Read only`。
+
+### 375px 未受影响（全新标签页复验）
+
+`.ml-nav--mobile` 显示、`.ml-nav--desktop` 隐藏；四个分区默认 `Quick access` 展开、其余折叠；segmented tabs 正常；folder row 46px；副标题显示；`scrollWidth = clientWidth = 375`；**console 0 error**。Protected 展开为 6 行（1×Conflict + 5×Read only），Customer 展开为真实客户目录列表。
+
+### 验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1237 / 1237 通过**（31 文件，本次 +8） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+新增 8 条测试专门守住这条边界：桌面块保留 `Library / Folders / System` 三个 V1 标题、不出现任何手机端措辞（`Quick access` / `Customer folders` / `Protected folders` / `Your main folders`）、只用 `.nav-item` 系列而不含 `.nav-section` / `.folder-row` / `.file-state`、且必须由同一批 computed 构建。
+
+### 取证状态
+
+375px 三张证据（默认层级 / Protected 展开 / Customer 展开）已提供且清晰可辨。**1440px 仍无法从 Browser 面板取得可辨认截图** —— 面板停靠宽度只有 280 CSS px，模拟 1440 时以约 0.11× 绘制。按施工单要求**未安装任何新依赖、未为迁就截图工具改动代码**，1440 证据以上述 DOM geometry + console 记录为准。
+
+### 测试数据说明（非本轮操作）
+
+用户自行截图期间在 TEST ONLY 沙盒内新增了 1 个目录（`test23`）与 4 个文件（`README-TEST-ONLY.txt` 及三个 `LT180C-test-*.txt` 副本，位于 `products/conveyor/ZZ-ML-CLOUD-01 …/ZZ-UICLEANUP-RENAMED …`）。**本轮未修改任何测试数据。** 已复核：AI Beta 的三个授权来源 `cf9cdd74…` / `348ec8b6…` / `5a5a126f…` 仍在 `products/checkweigher/LT180C AI BETA TEST ONLY — NOT FOR PUBLICATION`，UUID 与 160/138/85 字节均未变；新副本为不同 UUID 且未关联任何产品，不进入 AI Source Intake。
+
+---
+
+```text
+ML-CLOUD-MOBILE-VISUAL-ALIGN-01 = COMPLETED（含 closeout fix）
+
+375px = 四层 mobile hierarchy
+1440px = 已恢复封板前的 V1 folder presentation
+
+07-mobile-layered-folder-navigation.png = 375px PRIMARY VISUAL MASTER
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+
+NEXT MODULE = NOT AUTHORIZED
+```
+
+*最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-MOBILE-VISUAL-ALIGN-01 CLOSEOUT FIX"任务中写入。*

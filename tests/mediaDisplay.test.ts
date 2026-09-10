@@ -278,9 +278,10 @@ describe('the Media Library navigation is wired to those rules', () => {
     expect(source).toContain('const protectedFoldersOpen = ref(false)')
   })
 
+  /** Four phone sections plus the desktop sidebar's own System folders disclosure. */
   it('every section head reports its state to assistive technology', () => {
     expect(source.match(/:aria-expanded="(quickAccess|customerFolders|systemFolders|protectedFolders)Open"/g) ?? [])
-      .toHaveLength(4)
+      .toHaveLength(5)
   })
 
   /**
@@ -298,5 +299,78 @@ describe('the Media Library navigation is wired to those rules', () => {
     expect(source).toContain('folderBadge(f)')
     // The pre-existing inline ternary that hard-coded these two labels is gone.
     expect(source).not.toContain("policy_state === 'conflict-frozen' ? 'Conflict' : 'Read only'")
+  })
+})
+
+/**
+ * ML-CLOUD-MOBILE-VISUAL-ALIGN-01 closeout — the phone hierarchy stays on the
+ * phone.
+ *
+ * The first cut of this module rendered the four sections at every width, which
+ * renamed the desktop sidebar's "Folders" heading to "Quick access" and added
+ * two disclosures the sealed 1440px workspace never had. That is a desktop
+ * redesign, and this module was only ever authorised to change 375px.
+ *
+ * The sidebar now holds two presentations of ONE classification: the sealed V1
+ * markup, and the phone hierarchy. These tests are the guard that the second
+ * never leaks into the first — they check the structural facts a reader of the
+ * desktop sidebar would notice, not styling.
+ */
+describe('the sealed desktop sidebar is left alone', () => {
+  const source = readFileSync(resolve(process.cwd(), 'pages/admin/media/index.vue'), 'utf8')
+  /** Comments are not rendered, so they are stripped before asserting on what a block shows. */
+  const between = (open: string, close: string) => {
+    const start = source.indexOf(open)
+    expect(start).toBeGreaterThan(-1)
+    return source.slice(start, source.indexOf(close, start)).replace(/<!--[\s\S]*?-->/g, '')
+  }
+  const desktopNav = () => between('<div class="ml-nav ml-nav--desktop">', '<div class="ml-nav ml-nav--mobile">')
+  const mobileNav = () => between('<div class="ml-nav ml-nav--mobile">', '</aside>')
+
+  it('keeps the V1 headings — Library, Folders, System — not the phone ones', () => {
+    const nav = desktopNav()
+    expect(nav).toContain('<p class="sidebar-section-label">Library</p>')
+    expect(nav).toContain('<p class="sidebar-section-label">Folders</p>')
+    expect(nav).toContain('<p class="sidebar-section-label">System</p>')
+    expect(nav).toContain('System folders')
+  })
+
+  /** The four-section vocabulary is what the reviewer saw leak onto 1440px. */
+  it.each(['Quick access', 'Customer folders', 'Protected folders', 'Your main folders'])(
+    'does not show the phone heading %s',
+    (heading) => {
+      expect(desktopNav()).not.toContain(heading)
+      expect(mobileNav()).toContain(heading)
+    },
+  )
+
+  it('renders rows as V1 nav items, and the phone card markup only on the phone', () => {
+    const desktop = desktopNav()
+    expect(desktop).toContain('class="nav-item"')
+    expect(desktop).toContain('nav-item--sub')
+    expect(desktop).toContain('nav-item__tag')
+    for (const phoneOnly of ['nav-section', 'folder-row', 'file-state']) {
+      expect(desktop).not.toContain(phoneOnly)
+      expect(mobileNav()).toContain(phoneOnly)
+    }
+  })
+
+  /**
+   * Two presentations, one classification. If the desktop went back to its own
+   * filters we would have two rules to keep in step, and they would drift.
+   */
+  it('is built from the same computeds as the phone, not a second set of filters', () => {
+    const desktop = desktopNav()
+    expect(desktop).toContain('v-for="f in quickAccessFolders"')
+    expect(desktop).toContain('v-for="f in protectedFolders"')
+    expect(desktop).toContain('folderBadge(f)')
+    // The pre-module `sidebarRoots` / frozen-only `systemFolders` filters are gone.
+    expect(source).not.toContain('sidebarRoots')
+  })
+
+  it('swaps the two blocks by width and shows the desktop one by default', () => {
+    expect(source).toContain('.ml-nav--mobile { display: none;')
+    expect(source).toContain('.ml-nav--desktop { display: none; }')
+    expect(source).toContain('.ml-nav--mobile { display: flex; }')
   })
 })
