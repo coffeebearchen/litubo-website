@@ -1031,7 +1031,10 @@ const breadcrumbTrail = computed<FlatFolder[]>(() => {
  * MEDIA-UPLOAD-BLOCKER-HOTFIX-02 — "All files" and "Archived" are library
  * views, not places. Offering Upload there implied the page knew a
  * destination when it did not; the operator opens a folder first.
- * "Unclassified" stays uploadable because it IS a real destination.
+ *
+ * R1 added "Unclassified" to that list. It reads like a folder but it is the
+ * set of files that are in none, so uploading "into" it meant uploading with
+ * no folder at all.
  */
 const canUploadHere = computed(() => {
   if (showArchivedView.value) return false
@@ -1229,9 +1232,24 @@ const selectedFileFolderIsLegacy = computed(() => {
               <button class="upload-menu__item" @click="uploadMenuOpen = false; triggerUpload()">
                 Upload files
               </button>
+              <!--
+                ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R2 — this action was named for
+                what it picks, not for what it does, and understated its reach
+                twice. `webkitdirectory` hands back every file in the chosen
+                folder INCLUDING its subfolders, and `onFilesSelected` ignores
+                `webkitRelativePath` entirely, so all of them land side by side
+                in the folder you are standing in. "Imports the files inside a
+                folder" reads as "the files I can see in it, arranged as they
+                are" — the opposite of both. Say the reach and the flattening,
+                because both are surprises worth having before the upload, not
+                after.
+              -->
               <button class="upload-menu__item" @click="uploadMenuOpen = false; triggerFolderUpload()">
-                Upload folder contents
-                <span class="upload-menu__hint">Imports the files inside a folder on your computer</span>
+                Upload files from a folder
+                <span class="upload-menu__hint">
+                  Picks a folder on your computer and adds every file in it — subfolders included —
+                  directly into this folder. The folder structure is not recreated.
+                </span>
               </button>
             </div>
           </div>
@@ -1544,7 +1562,16 @@ const selectedFileFolderIsLegacy = computed(() => {
               :class="{ 'nav-item--active': selectedFolder === null && !showArchivedView }"
               @click="selectFolder(null)"
             >All files</button>
+            <!--
+              ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R2 — "Unclassified" means files
+              that are in no folder at all, so inside a folder it is a
+              contradiction: nothing here can ever be unclassified. Offering it
+              beside the folder's own contents invited a tap that silently
+              abandons the folder you are standing in. "All files" and
+              "Archived" stay, because those remain coherent places to jump to.
+            -->
             <button
+              v-if="!inFolderView"
               class="nav-item"
               :class="{ 'nav-item--active': selectedFolder === 'root' && !showArchivedView }"
               @click="selectFolder('root')"
@@ -1840,6 +1867,13 @@ const selectedFileFolderIsLegacy = computed(() => {
               'file-card--selected': selectedFile?.id === f.id,
               'file-card--checked': selectedIds.has(f.id),
               'file-card--archived': archivedFileIds.has(f.id),
+              /*
+                A document has no picture to look at, so its card is carrying a
+                NAME. On a phone that name is the whole point, and it is what a
+                two-column grid squeezes hardest. Marked here; laid out as a
+                full-width row in the 767px block.
+              */
+              'file-card--doc': !isImage(f.type),
             }"
             role="button"
             tabindex="0"
@@ -3282,6 +3316,51 @@ const selectedFileFolderIsLegacy = computed(() => {
   */
   .file-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
 
+  /*
+    ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R2 — documents get the full row.
+
+    Two columns suit thumbnails: half a phone is enough to recognise a picture.
+    A document card has no picture, so the same half-width column was spending
+    120px of height on a coloured TXT chip and then breaking the filename —
+    the only thing that identifies the file — across two clipped lines
+    ("README-TEST-" / "ONLY.txt"). Given the whole width the card turns on its
+    side: a narrow kind strip, then the name on one line with its type, size
+    and folder under it.
+
+    Images keep the two-column grid, so a mixed folder reads as what it is
+    rather than being flattened to one shape.
+  */
+  .file-card--doc {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: stretch;
+  }
+  .file-card--doc .file-card__thumb { height: auto; width: 84px; }
+  .file-card--doc .file-card__icon { padding: var(--space-2) 4px; }
+  .file-card--doc .file-card__info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: var(--space-2) var(--space-3);
+  }
+  /* Full width means the name no longer has to be clamped to fit. */
+  .file-card--doc .file-card__title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /*
+    The "Archived" badge is pinned to the card's top-right, which was over the
+    thumbnail while the card was a column. Turning the card on its side put the
+    filename under it, so an archived document read "LT180C-test-general
+    CORRUP[Archived]" — the badge covering the very characters that tell the
+    two files apart. The title reserves the badge's width instead; only the
+    title needs it, since the lines below sit clear of the badge.
+  */
+  .file-card--doc.file-card--archived .file-card__title { padding-right: 68px; }
+
+
   /* Detail: full-width below grid */
   .ml-detail {
     width: 100%;
@@ -3449,7 +3528,21 @@ const selectedFileFolderIsLegacy = computed(() => {
   .breadcrumb-current { max-width: 100%; }
 
   .upload-menu { flex: 1 1 auto; }
-  .upload-menu__list { left: 0; right: 0; min-width: 0; }
+  /*
+    The list used to be pinned to both edges of the Upload button, so it was
+    whatever the button was — about 150px once "+ New folder" takes its half of
+    the toolbar. That was wide enough for two-word labels; it broke the folder
+    action's new sentence into eleven lines. Anchored to the right edge only,
+    it opens leftwards to the page margin. `left: auto` matters: with left,
+    right and width all set the box is over-constrained, and CSS drops `right`
+    — which sent it off the right of the screen instead.
+  */
+  .upload-menu__list {
+    left: auto;
+    right: 0;
+    min-width: 0;
+    width: min(340px, calc(100vw - 2 * var(--space-4)));
+  }
   .btn-upload { width: 100%; }
 }
 </style>

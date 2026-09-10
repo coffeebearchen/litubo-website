@@ -6056,3 +6056,84 @@ NEXT MODULE = NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R1"任务中写入。*
+
+---
+
+## ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R2 — 手机端 UX Closeout（2026-09-10）
+
+三个窄范围 UI/UX 修正，均只作用于 ≤767px；桌面 1440px 保持 R2 前状态。
+
+### 一、Folder View 隐藏 Unclassified
+
+`Unclassified` 的含义是「完全不在任何 folder 里的文件」，因此在一个 folder 内部它是自相矛盾的 —— 这里的任何文件都不可能是 unclassified。把它摆在该 folder 自己的内容旁边，等于提供一个「一按就悄悄离开当前目录」的入口。
+
+改为 `v-if="!inFolderView"`。`All files` 与 `Archived` 保留 —— 它们在目录内部仍是有意义的跳转目标。实测 Folder View 的分段控件为 `["All files", "Archived"]`。
+
+**桌面 sidebar 未改**：R2 范围是手机端，且上一轮的审核结论正是「不得因手机模块改动已封板的桌面」。
+
+### 二、`Upload folder contents` 文案（两处失实，均已改）
+
+只读核对真实行为后确认原文案在**两个方向**上都不准确：
+
+1. `webkitdirectory` 返回所选目录下的**全部文件，包含其子目录**；
+2. `onFilesSelected` 完全忽略 `webkitRelativePath`，因此所有文件**平铺**落入当前 folder。
+
+原文案 `Upload folder contents / Imports the files inside a folder on your computer` 读起来是「它里面我看得见的那些文件，按原样排列」—— 与事实相反。改为：
+
+```text
+Upload files from a folder
+Picks a folder on your computer and adds every file in it — subfolders
+included — directly into this folder. The folder structure is not recreated.
+```
+
+**未新增任何递归上传能力**，真正的 Upload Folder 仍未实现。
+
+### 三、375px 文档类文件单列布局
+
+图片卡两列是合理的：半个手机宽足以认出一张图。文档卡没有图，同样的半宽却把 120px 高度花在一个彩色 TXT 徽标上，然后把**唯一能识别该文件的文件名**截断成两行（`README-TEST-` / `ONLY.txt`）。
+
+文档卡（`!isImage(f.type)`）在 ≤767px 占满整行并横向排列：窄的类型条 + 一行完整文件名 + 其下的 Title / 类型 / 大小 / 路径。图片卡保持两列网格，混合目录因此仍读得出是混合的。
+
+### 四、本轮自查发现并修掉的两个真实缺陷
+
+1. **Archived 徽标压住文件名。** 徽标固定在卡片右上角 —— 卡片是纵向时它在缩略图上方，改为横向后正好压在文件名上，`LT180C-test-general CORRUP[Archived]` 遮住了区分两个文件的那几个字。改为 archived 文档卡的标题预留 68px；实测 16 张全部在 275px 处截断，徽标从 297px 开始，净空 22px。
+2. **Upload 菜单在 375px 溢出到 545px。** 该菜单原被同时钉在 Upload 按钮的左右两边（约 150px），新文案被压成十一行。改为只锚定右边并给定宽度后，初版把 `left / right / width` 三者同时指定 —— 过约束时 CSS 会丢弃 `right`，盒子于是从按钮左边向右长出屏幕。加 `left: auto` 后正确右对齐，实测 19→359，页面 `scrollWidth = clientWidth = 375`。
+
+### 五、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1254 / 1254 通过**（31 文件，本次 +5） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+**375px 实测：** Root View（三个标签齐全、Quick access 展开、Protected 折叠）· Folder View（`Media Library / Products / Checkweigher / LT180C AI BETA`，标签仅 `All files` + `Archived`，根部四区 0）· Upload 菜单新文案四行完整可读 · 文档卡整行 · File Details 满宽 375、右边界 375 · 全部状态 `scrollWidth = clientWidth = 375` · **console 0 error**。
+
+**1440px 回归：** 桌面 nav 仍为 V1（`LIBRARY / FOLDERS / SYSTEM`，190px）· 文件网格仍 4 列 230px · `.file-card--doc` 在桌面**不生效**（`flex-direction: column` / `grid-column: auto`）· Upload 菜单仍 260px 右对齐于 1410 · Search / Filter / Breadcrumb 正常 · `scrollWidth = clientWidth = 1440` · **console 0 error**。
+
+### 六、附带记录：一次误判为「密码被改」的真实故障
+
+本轮中途 Docker Desktop 未运行，Directus 与 Postgres 全停（`/server/ping` 无响应），但 `server/api/admin/auth/login.post.ts` 的 catch 块把**任何**异常一律转成 `401 Invalid credentials` 并调用 `recordLoginFailure(ip)`。因此正确的密码连续报「账号或密码错误」，5 次后触发 15 分钟锁定。
+
+**凭证从未变更**，是基础设施停机被误报为凭证错误。Postgres 重启后自动完成 crash recovery 恢复正常。
+
+**本轮未修该缺陷** —— 按施工单「确认属于新的 backend/API defect 则 STOP，不在视觉模块顺手修 server」。登记为待评估项：登录接口应区分「凭证错误」与「无法连接认证服务」，且后者不应计入失败锁定。
+
+---
+
+```text
+ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R2 = COMPLETED
+
+Folder View = 不再提供 Unclassified
+Upload folder 文案 = 与真实行为一致（含子目录、平铺、不重建结构）
+375px 文档卡 = 整行单列
+真正的 Upload Folder（保留目录结构）= 仍未实现，留作独立模块
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+
+NEXT MODULE = NOT AUTHORIZED
+```
+
+*最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R2"任务中写入。*

@@ -485,9 +485,84 @@ describe('the Media Library navigation follows the real hierarchy', () => {
   it('does not add recursive or tree-preserving folder upload', () => {
     // Exactly one input picks a local folder, and it imports flat — no tree is rebuilt.
     expect(source.match(/<input\b[^>]*webkitdirectory[^>]*>/g) ?? []).toHaveLength(1)
-    expect(source).toContain('Imports the files inside a folder on your computer')
+    /*
+      Comments are stripped first: explaining that the flattening is deliberate
+      means naming the API being ignored, and that prose is not an implementation.
+    */
+    const code = source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
     for (const recursive of ['webkitRelativePath', 'fullPath', 'createReader']) {
-      expect(source).not.toContain(recursive)
+      expect(code).not.toContain(recursive)
     }
+  })
+})
+
+/**
+ * ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R2 — the phone UX closeout.
+ *
+ * Three small things, each of which was telling the operator something untrue:
+ * a filter offered where it cannot apply, an action named for less than it
+ * does, and a card shape that hid the only thing identifying a document.
+ */
+describe('the phone Media Library says only true things', () => {
+  const source = readFileSync(resolve(process.cwd(), 'pages/admin/media/index.vue'), 'utf8')
+  const mobileNav = () => {
+    const start = source.indexOf('<div class="ml-nav ml-nav--mobile">')
+    return source.slice(start, source.indexOf('</aside>', start))
+  }
+
+  /**
+   * "Unclassified" is the files that are in NO folder, so inside a folder it
+   * can never match anything. Leaving it there offered a tap that silently
+   * abandons the folder the operator had navigated into.
+   */
+  it('drops Unclassified from the file-state control once a folder is open', () => {
+    const nav = mobileNav()
+    const unclassified = nav.slice(nav.indexOf('<button'), nav.indexOf('>Unclassified</button>'))
+    const guarded = nav.slice(0, nav.indexOf('>Unclassified</button>'))
+    expect(guarded).toContain('v-if="!inFolderView"')
+    expect(unclassified).toBeTruthy()
+  })
+
+  it('keeps All files and Archived reachable from inside a folder', () => {
+    const nav = mobileNav()
+    for (const label of ['>All files</button>', '>Archived</button>']) {
+      const upTo = nav.slice(0, nav.indexOf(label))
+      // The guard belongs to Unclassified alone — it must not have swallowed its neighbours.
+      expect(upTo.lastIndexOf('v-if="!inFolderView"')).toBeLessThan(upTo.lastIndexOf('<button'))
+    }
+  })
+
+  /**
+   * The old label promised less than the action delivers in both directions:
+   * `webkitdirectory` returns subfolder files too, and every one of them is
+   * uploaded into the current folder with its path discarded.
+   */
+  it('says what the folder upload actually reaches and what it discards', () => {
+    expect(source).toContain('Upload files from a folder')
+    expect(source).toMatch(/subfolders included/i)
+    expect(source).toMatch(/folder structure is not recreated/i)
+    // The wording that described it as just "the files inside a folder".
+    expect(source).not.toContain('Imports the files inside a folder on your computer')
+    expect(source).not.toContain('Upload folder contents')
+  })
+
+  /**
+   * A document card carries a name, not a picture. Half a phone width spent
+   * 120px of height on a kind chip and then clipped the filename across two
+   * lines — so documents take the full row, and images keep the grid.
+   */
+  it('gives document cards the full row on a phone, and leaves image cards gridded', () => {
+    expect(source).toContain("'file-card--doc': !isImage(f.type),")
+    expect(source).toMatch(/\.file-card--doc \{[^}]*grid-column: 1 \/ -1;/)
+    expect(source).toMatch(/\.file-card--doc \{[^}]*flex-direction: row;/)
+    // Still two columns for everything that is not a document.
+    expect(source).toContain('.file-grid { grid-template-columns: repeat(2, minmax(0, 1fr));')
+  })
+
+  it('scopes the full-width document card to phone widths only', () => {
+    const mobileBlock = source.slice(source.indexOf('@media (max-width: 767px) {'))
+    expect(mobileBlock).toContain('.file-card--doc {')
+    const beforeMobile = source.slice(0, source.indexOf('@media (max-width: 767px) {'))
+    expect(beforeMobile).not.toContain('.file-card--doc {')
   })
 })
