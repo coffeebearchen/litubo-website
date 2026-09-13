@@ -191,12 +191,24 @@ function enforceProposalCeiling(): void {
  *
  * The digests themselves are content hashes computed by the caller; the source
  * text never reaches this module.
+ *
+ * PRODUCT-MODEL-RELEVANCE-GUARD-01 — the product code and the prompt contract
+ * version are part of the identity too. A cached analysis answers the question
+ * that was asked: once the current product's code changes, or the shared prompt
+ * contract asks the model something different, an analysis made under the old
+ * question must not be replayed as the answer to the new one. Every input is a
+ * plain value from the caller; nothing time-, random- or session-dependent is
+ * ever part of a fingerprint.
  */
 export function buildAnalysisFingerprint(parts: {
   productId: number
   targetId: string
   providerId: string
   productName: string
+  /** The current product's code as stored, or null when it has none. */
+  productCode: string | null
+  /** `PROMPT_CONTRACT_VERSION` of the prompt contract the analysis was made under. */
+  promptContractVersion: number
   sourceDigests: string[]
 }): string {
   const canonical = JSON.stringify({
@@ -204,6 +216,8 @@ export function buildAnalysisFingerprint(parts: {
     t: parts.targetId,
     v: parts.providerId,
     n: parts.productName,
+    c: parts.productCode,
+    pv: parts.promptContractVersion,
     d: [...parts.sourceDigests].sort(),
   })
   return createHash('sha256').update(canonical).digest('hex')

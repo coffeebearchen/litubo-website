@@ -10,7 +10,7 @@ import {
 import { aiSourceFormatFor, aiSourceFormatRefusal, sourceFailureMessage, type SourceFailureCode } from '../../utils/aiSourceFormats'
 import { digestSourceText, buildAnalysisFingerprint } from './aiProposalReplayGuard'
 import { isAiProviderId, type AiProviderId, type AiProviderRegistry } from './aiProviderRegistry'
-import type { AiGenerationInput, TargetDefinition } from './aiTargetContract'
+import { PROMPT_CONTRACT_VERSION, type AiGenerationInput, type TargetDefinition } from './aiTargetContract'
 import type { FetchFn } from './mediaLifecycle'
 
 /**
@@ -133,11 +133,29 @@ async function resolveProductSourceFiles(
   return result.data ?? []
 }
 
-async function fetchProductName(fetch: FetchFn, productId: number): Promise<string> {
-  const result = await fetch<{ data: { name_en: string } | null }>(
-    `/items/products/${productId}?fields=name_en`,
+/**
+ * PRODUCT-MODEL-RELEVANCE-GUARD-01 — the current product's identity as the
+ * prompt and the fingerprint see it: its English name, and its product code
+ * when it has one.
+ *
+ * Read-only, and only these two columns. The code is taken exactly as stored —
+ * never created, filled in or corrected here — and a blank or non-string code
+ * counts as no code. `model_or_series` is deliberately not read: it can name a
+ * series or platform shared by several models, which must never pass for this
+ * one product's identity.
+ */
+async function fetchProductIdentity(
+  fetch: FetchFn,
+  productId: number,
+): Promise<{ productName: string, productCode: string | null }> {
+  const result = await fetch<{ data: { name_en?: string | null, product_code?: unknown } | null }>(
+    `/items/products/${productId}?fields=name_en,product_code`,
   )
-  return result.data?.name_en ?? 'This product'
+  const rawCode = result.data?.product_code
+  return {
+    productName: result.data?.name_en ?? 'This product',
+    productCode: typeof rawCode === 'string' && rawCode.trim() !== '' ? rawCode : null,
+  }
 }
 
 /**
@@ -452,25 +470,34 @@ export async function runProposalEngine<TOutput>(
   }
 
   const cappedSources = capTotalCharacters(readableSources, MAX_TOTAL_EXTRACTED_CHARS)
-  const productName = await fetchProductName(fetch, params.productId)
+  const { productName, productCode } = await fetchProductIdentity(fetch, params.productId)
 
   const input: AiGenerationInput = {
     productName,
+    productCode,
     sourceFileSummaries: cappedSources.map(s => ({ displayName: s.displayName, fileType: s.fileType })),
     extractedSourceTexts: cappedSources.map(s => ({ displayName: s.displayName, text: s.text })),
   }
 
   /**
    * The identity of this analysis, computed from what will actually be sent:
-   * the product, the Target, the provider, the product name, and the content
-   * digests of the unique sources. It carries no filename, no Directus id, no
-   * sourceRef and no source text.
+   * the product, the Target, the provider, the product name and code, the
+   * version of the shared prompt contract, and the content digests of the
+   * unique sources. It carries no filename, no Directus id, no sourceRef and no
+   * source text.
+   *
+   * PRODUCT-MODEL-RELEVANCE-GUARD-01 — the code and the contract version are
+   * both part of it: a product whose code changes is a different analysis, and
+   * an analysis made before the relevance guard existed can never be served as
+   * though it had been made with it.
    */
   const fingerprint = buildAnalysisFingerprint({
     productId: params.productId,
     targetId: target.id,
     providerId,
     productName,
+    productCode,
+    promptContractVersion: PROMPT_CONTRACT_VERSION,
     sourceDigests: [...seenDigests],
   })
 

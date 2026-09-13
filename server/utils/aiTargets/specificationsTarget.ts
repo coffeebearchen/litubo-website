@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import {
   UNTRUSTED_SOURCE_MATERIAL_PREAMBLE,
+  PRODUCT_MODEL_RELEVANCE_GUARD,
+  buildCurrentProductContext,
   buildSourceMaterialBlock,
   containsUnsafeSourceLeakage,
   normalizeForLeakageComparison,
@@ -280,8 +282,13 @@ function buildUserInput(input: AiGenerationInput): string {
     .map(f => `- ${sanitizeModelInputText(f.displayName, 60)} (${sanitizeModelInputText(f.fileType, 20)})`)
     .join('\n')
   const contextNote = input.contextNote ? sanitizeModelInputText(input.contextNote, 500) : ''
+  // PRODUCT-MODEL-RELEVANCE-GUARD-01 — the shared current-product block (name,
+  // and product code only when the product has one) opens the prompt. A value a
+  // document gives for another model is not a disagreement to adjudicate: the
+  // relevance guard already says to leave it out, and a candidate list is
+  // still a place a borrowed value could reach the reviewer.
   return (
-    `Product: ${sanitizeModelInputText(input.productName)}\n`
+    buildCurrentProductContext(input)
     + `Approved source materials (already associated with this product):\n${fileList}\n`
     + (contextNote ? `Additional approved context: ${contextNote}\n` : '')
     + 'Propose specification groups and parameters supported by these materials. '
@@ -289,7 +296,8 @@ function buildUserInput(input: AiGenerationInput): string {
     + 'If two or more of these materials give clearly incompatible values for the same parameter '
     + '(for example 220 V against 380 V), DO NOT CHOOSE ONE. Leave that parameter out of groups and list it '
     + 'under conflicts with the values the materials actually gave. A difference in formatting or spacing alone '
-    + '("220V" against "220 V") is not a conflict. If the materials simply do not state a value, omit the '
+    + '("220V" against "220 V") is not a conflict. A value the materials give for a different product model '
+    + 'is not a conflict either — leave it out entirely. If the materials simply do not state a value, omit the '
     + 'parameter — never guess, and never present a missing value as a conflict.\n\n'
     + buildSourceMaterialBlock(input.extractedSourceTexts)
   )
@@ -299,8 +307,11 @@ export const specificationsTarget: TargetDefinition<SpecificationProposal> = {
   id: 'specifications',
   schemaName: 'specification_proposal',
   jsonSchema: SPECIFICATION_PROPOSAL_JSON_SCHEMA,
+  // PRODUCT-MODEL-RELEVANCE-GUARD-01 — the shared relevance guard follows the
+  // preamble, whose own wording stays verbatim.
   systemInstructions:
     UNTRUSTED_SOURCE_MATERIAL_PREAMBLE
+    + ' ' + PRODUCT_MODEL_RELEVANCE_GUARD
     + ' You produce structured product specification proposals for internal review, each with a group, a parameter name, and a value only — never a note, source citation, or locator.'
     + ' When the approved materials clearly disagree about a parameter, you report the disagreement under conflicts instead of settling it; a person decides.',
   buildUserInput,

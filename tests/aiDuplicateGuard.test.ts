@@ -32,6 +32,7 @@ import {
 } from '../server/utils/aiProposalReplayGuard'
 import type { FetchFn } from '../server/utils/mediaLifecycle'
 import type { AiProviderRegistry } from '../server/utils/aiProviderRegistry'
+import { PROMPT_CONTRACT_VERSION } from '../server/utils/aiTargetContract'
 
 const VALID_PROPOSAL = {
   groups: [{ group: 'Detection performance', items: [{ parameter: 'Detection sensitivity (Fe)', value: '0.8 mm' }] }],
@@ -187,7 +188,14 @@ describe('identical source content is only sent to the provider once', () => {
 // ── C. Analysis fingerprint ──
 
 describe('the analysis fingerprint identifies the work, not the clicks', () => {
-  const base = { productId: 3, targetId: 'specifications', providerId: 'deepseek', productName: 'LT-180C' }
+  const base = {
+    productId: 3,
+    targetId: 'specifications',
+    providerId: 'deepseek',
+    productName: 'LT-180C',
+    productCode: null as string | null,
+    promptContractVersion: PROMPT_CONTRACT_VERSION,
+  }
 
   it('the same sources in a different order produce the same fingerprint', () => {
     const a = buildAnalysisFingerprint({ ...base, sourceDigests: ['aaa', 'bbb', 'ccc'] })

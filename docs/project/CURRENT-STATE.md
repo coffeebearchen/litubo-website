@@ -6642,3 +6642,149 @@ STATUS: NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-13，由 Claude Code 在"GOV-AI-STATE-SYNC-01"任务中写入。*
+
+---
+
+## PRODUCT-MODEL-RELEVANCE-GUARD-01 = COMPLETED（2026-09-13）
+
+```text
+Current product identity + multi-model attribution guard + fingerprint versioning.
+AI-readable today: TXT / CSV / TSV only.
+```
+
+在 PDF / DOCX / XLSX / Image OCR 接入之前，先统一建立"当前产品型号归属保护"：同一份资料里写着 LT180C、LT200C、LT300C 多个型号时，只能给当前产品提取明确属于它的值。本模块只改服务端 Prompt 合同与分析指纹，**0 UI、0 新格式、0 Provider adapter 改动**。
+
+**分支：** `review/product-model-relevance-guard-01`，从 `1f6c01c` 创建，仅本地，未 push。
+
+### 一、当前产品身份
+
+- **只读两列：** 引擎（`server/utils/aiProposalEngine.ts`）改为读取 `/items/products/:id?fields=name_en,product_code`，原先只读 `name_en`。不读 `model_or_series`。
+- **Prompt 开头的共享块** `buildCurrentProductContext()`（`server/utils/aiTargetContract.ts`）：
+  ```text
+  Current product:
+  Product: <name_en>
+  Product code: <product_code>    ← 只有非空时才写
+  ```
+- **没有 code 时：** 整行不写，绝不出现 `Product code: null / undefined / unknown` 或占位符。空字符串、纯空格、非字符串值，以及清洗后为空的值，都按"没有 code"处理。
+- **清洗：** 名称和 code 都经过既有的 `sanitizeModelInputText()`（NFKC、控制 / 零宽 / 双向字符转空格、中和 `---`、折叠空白、截断，code 上限 100 字符）。不因数据库已有格式约束就跳过清洗。
+- **`product_code` 只读：** AI 路径不创建、不补写、不修改、不清空。产品 3 在 Product Center 中仍显示 "No product code"，本模块未改动任何产品数据。
+- **`model_or_series` 不作为身份：** 它可能表示系列、平台或产品族，不是唯一型号。
+
+### 二、统一 Relevance Guard（共享 Prompt 合同）
+
+新增 `PRODUCT_MODEL_RELEVANCE_GUARD`，接在既有 `UNTRUSTED_SOURCE_MATERIAL_PREAMBLE` 之后，preamble 原文一字未改。`TargetDefinition` 的说明同步写明：每个 Target 的 `systemInstructions` 依次包含 preamble 与 guard，`buildUserInput()` 以 `buildCurrentProductContext()` 开头。Specifications Target 已按此接入。
+
+最终英文语义（在 Prompt 中以空格连接成一段）：
+
+```text
+The source material may describe several product models.
+Extract a value only when the source material clearly attributes that value to the current product, the one named under "Current product" in the input.
+Attribution is clear only when the source material identifies the current product code, clearly identifies the current product name, or is clearly and exclusively about the current product.
+A model name or code that is merely similar to the current product's is not the current product.
+A value explicitly stated to apply to all models in a series may be used only when the source material itself says that it applies to all models.
+If product attribution is ambiguous, omit the value.
+Never copy a value that belongs to another product model.
+Text marked [?] could not be read reliably. Never infer a value from text marked [?].
+```
+
+- **同一次调用内生效：** 不增加"先判断是不是当前型号"的第二次 Provider 调用。
+- **不做模糊匹配：** 代码中没有 edit distance / Levenshtein / 前缀 / 相似型号 / 文件名或目录名推断；guard 本身写明"仅相似的型号名称或 code 不是当前产品"。
+- **`[?]`：** 为未来本地 OCR 的低置信文字预留统一含义。本模块 0 OCR、0 图片、0 Vision。
+- **Specifications 冲突规则补一句：** 其他型号给出的值不算"来源冲突"，应直接省略，避免借来的值以候选值形式出现在审核页。
+
+### 三、指纹与旧缓存失效
+
+指纹（`server/utils/aiProposalReplayGuard.ts`）的输入现为：`productId · targetId · providerId · productName · productCode · promptContractVersion · 排序后的来源内容摘要`。其中没有时间戳、随机数或会话信息。
+
+- **新增 `PROMPT_CONTRACT_VERSION = 2`：** 1 = guard 之前；2 = 名称 + 有值时的 code + guard。它不是 schema / API / DB 版本，不需要迁移；以后 Prompt 语义变化时提升它。
+- **旧缓存不会被静默复用：** 用 `git show 1f6c01c` 取出旧实现实测。同一组输入（产品 3、specifications、deepseek、同一来源摘要）：
+
+| 计算方式 | 指纹 |
+|---|---|
+| 旧实现（`1f6c01c`） | `0e4a74d2…0bba` |
+| 测试中的旧公式复刻 | `0e4a74d2…0bba`（与旧实现一致） |
+| 新实现，`productCode = null` | `4696b0ab…5043` |
+| 新实现，`productCode = LT-180C` | `21193b0f…8294` |
+
+- **复用机制本身未改：** TTL、replay 校验、single-flight、Provider 选择都不变；复用缓存仍是单实例内存状态，无新表、无持久缓存。
+
+### 四、未改动
+
+- **Provider：** DeepSeek / OpenAI adapter 零改动。仍是一次 Analyze → 一个选定 Provider → 0 retry → 0 fallback → 一份合并 proposal。
+- **Source contract：** `ExtractedSource { displayName, fileType, text }` 不变，未加入 productCode、页码、Sheet、路径、UUID 或文件名。
+- **AI 可读格式：** TXT / CSV / TSV = true；PDF / DOCX / XLSX / Images = false。
+- **UI：** 0 个 `.vue` / CSS 改动；无新徽标、字段、开关或确认步骤，guard 默认自动生效。
+
+### 五、测试
+
+新增 `tests/productModelRelevanceGuard.test.ts`（43 条）：
+- **身份块：** 有 code；无 code（null、undefined、空串、纯空格、仅不可见字符）时整行不写。
+- **Guard 语义：** 十项安全语义逐条匹配（不做整段字符串相等）；preamble 原文在前、guard 紧随其后；guard 只在共享合同中定义。
+- **真实 DeepSeek adapter + stub 的 `fetch`：**
+  - TXT / CSV / TSV 三份多型号资料 → 恰好 1 次请求；请求体 `instructions` 含 guard，`input` 以当前产品身份开头，各型号原文仍完整送达；
+  - 部分来源失败仍是 1 次请求；全部不可读 0 次；
+  - Provider 失败只有 1 次请求，无重试、无 fallback。
+- **清洗：** product code 带换行、伪造 `--- Source:` 分隔符和指令；控制 / 零宽 / 双向字符；超长截断。
+- **只读：** 引擎只 GET `name_en,product_code`，不读 `model_or_series`，所有 Directus 调用都是读。
+- **指纹：** 稳定性；LT-180C 与 LT-200C 不同；有无 code 不同；合同版本变化即不同。
+- **旧缓存：** 按旧指纹缓存的分析不被复用（Provider 被重新调用、`reused: false`）；按当前指纹缓存的分析仍可复用（对照组）。
+
+同步调整 2 个既有测试：`tests/aiStructuredProvider.test.ts`（产品名那一行现位于 "Current product:" 之下）、`tests/aiDuplicateGuard.test.ts`（指纹基础输入加上 `productCode` 与 `promptContractVersion`）。
+
+### 六、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1473 / 1473 通过**（35 个文件，本次 +43） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | Build complete（6.72 MB / 1.69 MB gzip） |
+
+**Windows `nuxt dev`：** 监听 3000 端口的进程 exe 实测为 Node 22.22.2。
+- 紧接 build 首次启动时，出现 6 条 `#app-manifest` pre-transform 报错，与 AI-SOURCE-CONTRACT-01 记录的 build / dev 共用 `.nuxt` 时序问题相同；干净重启后服务端 0 错误。
+- 全新标签页中，`/admin`（→ Product Center）、`/admin/product-workspace/3/ai-source-intake`、`/admin/product-workspace/3/ai-proposal-review` 均正常加载，console 0 条消息。
+
+**1440px：**
+- 三条路由均 `scrollWidth = clientWidth = 1425`（1440 减滚动条），无横向溢出。
+- AI Source Intake：11 张来源卡（4 个 TXT 可选）、`0 / 5 selected`、Analyze 禁用。
+- Proposal Review 空态："No active proposal. Return to AI Source Intake."
+- 限制：1440 模拟视口在面板中被缩放，ref 点击没有落到复选框上，因此选择交互改在 375px 用真实点击验证。
+
+**375px：**
+- AI Source Intake `scrollWidth = clientWidth = 375`。
+- 真实点击选中 `LT180C-test-electrical.txt` → `1 / 5 selected`、Analyze 可用、披露文案显示；再次点击取消 → `0 / 5 selected`、Analyze 禁用。
+- 选择与取消过程中没有 generate / apply 请求。
+- Proposal Review 空态正常、无溢出；console 0 条消息。
+
+`.claude/launch.json` 仅在浏览器验收期间临时加入 Node 22 启动配置，验收后已还原，与 HEAD 一致。
+
+### 七、边界
+
+**0 新 AI 可读格式 · 0 PDF / DOCX / XLSX / OCR / Vision 实现 · 0 产品数据写入 · 0 DB · 0 Directus schema · 0 package · 0 Docker · 0 Provider adapter 改动 · 0 真实 Provider 调用 · 0 API 费用 · 0 push · 0 deploy。**
+
+决策登记为 `08-decision-log.md` 的 **D-025 — Product Model Attribution Guard**。MASTER-ROADMAP 中本模块的状态行由 "NEXT CANDIDATE — NOT AUTHORIZED" 改为 "✅ COMPLETED"（仅该一行）。
+
+---
+
+```text
+PRODUCT-MODEL-RELEVANCE-GUARD-01 = COMPLETED
+
+Current Product identity: name_en + product_code when non-null
+model_or_series: NOT used as unique identity
+Multi-model attribution: guard active
+Ambiguous attribution: omit
+Fuzzy matching: not used
+Fingerprint: productCode + Prompt Contract Version
+Product writes: 0
+New AI-readable formats: 0
+Provider calls during module: 0 real calls
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+Current AI-readable: TXT / CSV / TSV only
+
+NEXT CANDIDATE: AI-PDF-SOURCE-01
+STATUS: NOT AUTHORIZED
+```
+
+*最后更新：2026-09-13，由 Claude Code 在"PRODUCT-MODEL-RELEVANCE-GUARD-01"任务中写入。*
