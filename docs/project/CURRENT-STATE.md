@@ -7009,3 +7009,211 @@ STATUS: NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"AI-PDF-SOURCE-01-CLOSEOUT-01"任务中写入。*
+
+---
+
+## AI-XLSX-SOURCE-01 = COMPLETED（2026-09-14）
+
+```text
+.xlsx → bounded ZIP (yauzl) → streaming XML (saxes) → exact product-code narrowing → structured text → ExtractedSource → existing Proposal Engine.
+AI-readable today: TXT / CSV / TSV / PDF (text-layer) / XLSX.
+```
+
+标准 `.xlsx` 工作簿在既有流程中成为 AI 来源：Media Library 上传 → products_files → AI Source Intake → Analyze → 服务端按可信文件大小预检 → 有界下载 → Nuxt 进程内有界 OOXML 流式读取（只读可见工作表，公式只取缓存值）→ 当前产品有编码时按 `product_code` 精确缩小 → 结构化文本 → 既有 `ExtractedSource` → 既有 Proposal Engine → 一个 Provider → 一份 proposal。原始工作簿从不发送给 AI Provider。
+
+**分支：** `review/ai-xlsx-source-01`，从 `55c600c` 创建，仅本地，未 push。
+
+### 一、当前事实
+
+| 项目 | 状态 |
+|---|---|
+| XLSX Media 上传 | ENABLED（官方 MIME 与 `.xlsx` 扩展名须同时匹配） |
+| XLSX AI 可读 | ENABLED（`aiReadableNow = true`，来源卡片类型 `Spreadsheet`） |
+| Legacy `.xls` / `.xlsm` | 不在 V1。上传拒绝，`.xls` 提示 "Legacy .xls files are not supported. Save as .xlsx and upload again."；伪装成 `.xlsx` 的宏 / 模板 / 加载项 / 二进制工作簿返回 `unsupported` |
+| AI 可读 | TXT / CSV / TSV / PDF / XLSX |
+| 仍不可读 | DOCX / Images（DOC / XLS 不在 V1） |
+| 原始 XLSX 发送给 Provider | NO |
+| 模块期间真实 Provider 调用 | 0 |
+| Production deployment | NOT AUTHORIZED |
+
+### 二、读取器（Nuxt 进程内，有界流式）
+
+- **`server/utils/ooxmlReader.ts`（通用安全层，以后 DOCX 可复用）：**
+  - `yauzl` 从内存字节读取 ZIP，不写磁盘、不解压到路径；最多 1,000 个 entry。
+  - entry 名称按原样与 NFKC 后各校验一次：绝对路径、盘符、`..`、反斜杠、NUL、空段一律 `malformed`；同名（不区分大小写）重复 part 直接 `malformed`，不选第一个或最后一个。
+  - OLE / CFB 文件头 → `encrypted`；entry 加密标志 → `encrypted`。
+  - 每个 part 边解压边计数实际字节（按 part 与整包），超限立即销毁流 → `too_complex`；ZIP 声明的大小从不作为限制。
+  - `saxes` 流式解析，任何 DOCTYPE → `malformed`（不定义、不展开实体）；深度 128，单个 token 1 MB；每个分片检查期限。
+  - 拒绝只带固定代码，不带 entry 名、XML 片段或解析器消息。
+- **`server/utils/xlsxExtraction.ts`：**
+  - 经 `[Content_Types].xml` 找到唯一的标准 workbook part；宏 / 模板 / 加载项 / 二进制内容类型、VBA 项目、Excel 4.0 宏表 → `unsupported`。
+  - 只打开需要的 part（workbook、关系、sharedStrings、styles、可见 worksheet），不打开 externalLinks、embeddings、drawings、charts、media、customXml。
+  - 只读可见工作表：hidden / veryHidden 工作表不读取；隐藏行、隐藏列、零高行、零宽列、`;;;` 格式隐藏的值不输出。
+  - 公式只取缓存 `<v>`，从不重算、从不输出公式文本或外部路径；无缓存值或错误值为空。
+  - 只按行保存非空可见单元格，不按坐标分配网格（`XFD1048576` 稀疏表正常处理）。合并单元格按锚点懒查找，从不继承上一行。
+  - 数字去掉浮点尾差；只解释明确百分比、"数字 + 一个带引号单位"、明确日期 / 时间（1900 / 1904 日期系统，含 1900 年 2 月 29 日特性）；其他格式输出存储值，不按显示精度四舍五入。
+- **`server/utils/productCodeMatch.ts`：**
+  - 规范化：NFKC → trim → 大写 → 去掉 Unicode 空白与 `-` `_` `.`。单元格按 `/ , ; | 、 ，` 与换行拆分，逐段完全相等才算匹配。无编辑距离、前后缀、包含、文件名 / 文件夹推断或 AI 调用。
+  - 编码须同时含字母和数字才用于缩小；`180`、`PRO` 这类可能等于普通单元格值的编码不筛选，与无编码相同。
+  - 列方向：表头命中、其左侧有标签列、且命中列下有数据 → 保留标签列 + 命中列；否则行方向：保留表头 + 含该编码的数据行；都不命中 → 整张表保留，交给 D-025 guard。实际缩小时文本写入 `Filtered to exact product code: <code>`。
+- **`server/utils/officeExtractionGate.ts`：** Office 解析全进程 1 个执行 + 3 个等待，再多返回 `busy`；等待到期即放弃，排队时间计入同一期限。
+
+结构化文本（测试实际输出，产品编码 `LT-180C`，三型号表）：
+
+```text
+Sheet: Specifications
+Filtered to exact product code: LT-180C
+Columns: Model | Aperture | Voltage | Power
+LT180C | 180 mm | 220 V | 0.45 kW
+```
+
+### 三、V1 限制
+
+| 项目 | 限制 |
+|---|---|
+| 文件 | 10 MB（可信元数据预检 + 下载流式计数 + 读取器复检） |
+| ZIP entries | 1,000 |
+| 实际解压 | sharedStrings 16 MB · 单个 worksheet 32 MB · styles 16 MB · 其他 part 4 MB · 整包 64 MB |
+| XML | 深度 128 · 单 token 1 MB · DOCTYPE / DTD / entity → `malformed` |
+| 工作表 | 总数 50 · 可见 10 |
+| 行 | 每表 5,000 · 总计 20,000（有值的行，含隐藏行） |
+| 列 | 可见非空已用列 100 |
+| 单元格 | 扫描非空 200,000 · 输出 20,000 · 单格 500 字符 |
+| sharedStrings | 100,000 条 · 4,000,000 字符 |
+| 合并单元格 | 1,000 个范围 · 单个 10,000 格 |
+| 文本 | 20,000 字符；多来源时不超过该来源在 60,000 总上限中的份额（1–3 个来源 20,000，4 个 15,000，5 个 12,000） |
+| 期限 | 8 秒，且不超过 60 秒读取预算的剩余时间（排队计入） |
+| 并发 | 1 个执行 + 3 个等待 |
+
+超过任一限制，整个工作簿以固定代码拒绝（`too_large` / `too_many_sheets` / `too_many_rows` / `too_many_cells` / `too_complex` / `timeout` / `busy`），不跳过可见工作表、不截断文本。`no_relevant_rows` 只表示可见工作表去掉表头后没有任何数据行，不表示编码未匹配。
+
+### 四、Nuxt 侧
+
+- **`utils/aiSourceFormats.ts`：** XLSX `mediaUploadSupported = true`、`aiReadableNow = true`、标签 `Spreadsheet`；新增失败代码 `no_relevant_rows`（"No data rows were found in this spreadsheet."）。AI Source Intake 的 "Supported formats" 与 Media & resources 选择面板提示随合同自动变为 "CSV, PDF, TSV, TXT, XLSX"。
+- **`server/utils/aiTextExtraction.ts`：** `readXlsxSource` 的期限 = min(8 秒, 剩余读取预算)；先取产品编码（取不到 → `unreadable`），经 Office gate 调用读取器；文本超出份额 → `too_complex`，不截断。
+- **`server/utils/aiProposalEngine.ts`：** 产品身份改为首次需要时读取，一次分析内复用（仍只有 1 次 `GET /items/products/{id}?fields=name_en,product_code`）；每个来源的字符份额 `min(20,000, floor(60,000 / 选择数))` 传给读取器。内容去重、指纹、60 秒读取预算、部分成功、全部失败 0 次调用、D-025 guard、单次 Provider 调用全部沿用。
+- **上传：** `server/api/admin/media/upload.post.ts` 白名单加入 XLSX MIME 与 `.xlsx`；拒绝提示集中到 `uploadRefusalMessage()`，只按 `.xls` 扩展名给出 legacy 提示（装有 Excel 的机器上浏览器可能把 CSV 标成 `application/vnd.ms-excel`，不能据此误报）。`pages/admin/media/index.vue` 的上传 `accept` 加入 `.xlsx` 与官方 MIME（不含 `.xls` / `.xlsm`），XLSX 卡片与 CSV / TSV 同色；`utils/mediaDisplay.ts` 的 `fileKind` 返回 `XLSX`。
+- **未改：** Media picker 类型筛选不新增 Spreadsheet（P2）；asset proxy 仍不代理 XLSX；document-extractor、PDF 路径、Provider adapter、Product 写接口均未改。
+- **依赖（exact pin）：** `yauzl` 3.4.0（MIT，ZIP 读取）· `saxes` 6.0.0（ISC，流式 XML）· devDependency `@types/yauzl` 3.4.0（MIT，yauzl 不自带类型）。传递依赖 `pend` 1.2.0、`xmlchars` 2.2.0（均 MIT）。构建产物中二者只在服务端（`.output/server/node_modules`），浏览器端产物 0 引用。
+
+### 五、测试
+
+新增 5 个测试文件 + 1 个 helper：
+
+- `tests/ooxmlReader.test.ts`（48）：ZIP bomb、整包总量、声明大小与实际不符、1,000 / 1,001 entries、路径穿越与全角名、重复 part、DOCTYPE / XXE / billion laughs、深度 128 / 129、token 1 MB / 1 MB + 1、期限、CFB、加密标志、损坏 ZIP。
+- `tests/xlsxExtraction.test.ts`（116）：结构化输出、隐藏数据、公式、数字与日期、合并单元格、精确缩小（LT180C / LT200C / LT300C）、各项上限、sharedStrings、稀疏表、宏 / 模板 / VBA、包结构拒绝、源码边界。
+- `tests/productCodeMatch.test.ts`（47）：规范化、非模糊、分隔符、可筛选编码。
+- `tests/officeExtractionGate.test.ts`（5）：1 执行 + 3 等待 + 第 5 个 `busy`、排队期限、失败释放。
+- `tests/aiXlsxSource.test.ts`（18）：XLSX + TXT、XLSX + PDF + TXT 一次调用、D-025 guard、身份只读 1 次、去重、部分成功、全部失败 0 次调用、10 MB 预检与下载上限、字符份额、Office 排队期限、真实 DeepSeek adapter + stub `fetch`（请求体无 ZIP 字节、base64、data URL、Media URL、原始 XML、公式或外部路径）、0 写入。
+- `tests/helpers/testOnlyXlsx.ts`：内存生成 TEST ONLY 工作簿（core.xml 标题带 TEST ONLY 标记），也能写出重复名、穿越名、假大小、加密标志等对抗 ZIP；测试断言生产代码不引用它。
+
+同步调整 8 个既有测试（XLSX 由不可读改为可读、上传白名单与提示、依赖清单）。
+
+对抗测试中，1,000 / 1,001 entries、深度、1 MB token、5,000 / 5,001 行、100 / 101 列、10 / 11 可见表、50 / 51 总表、单格 500 / 501 字符、合并面积与数量、10 MB、20,000 字符、DOCTYPE、CFB、稀疏表使用生产限制；ZIP bomb、整包总量、实际 XML 大小、增长中的 token、扫描 / 输出单元格、总行数、sharedStrings 条数与字符使用调低的测试限制，证明计数与停流逻辑而不占用大量内存。
+
+### 六、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1888 通过 + 18 跳过**（45 个文件；跳过的 1 个文件是默认不运行的 PDF 真实容器测试） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | Build complete（6.96 MB / 1.75 MB gzip） |
+| `npm ls yauzl saxes @types/yauzl` | yauzl@3.4.0 · saxes@6.0.0 · @types/yauzl@3.4.0 |
+
+- **Windows `nuxt dev`（3000 端口进程实测 Node 22.22.2）：** 紧接 build 启动，本次未出现 `#app-manifest` 报错，服务端 0 错误。无 cookie 请求：`/admin/login` 200，`/admin` 200（壳页面，客户端跳转 `/admin/products`），其余受保护页面 302 → `/admin/login`，无全站 500。
+- **构建产物实际启动：** Node 22.22.2 运行 `.output/server/index.mjs`，只监听 `127.0.0.1:3001`。`/admin/login` 200、`/admin` 200、`/admin/media` 与 `/admin/product-workspace/3/ai-source-intake` 302 → `/admin/login`，`/api/admin/products/3/ai/sources` 401，日志无错误。另用 Node 22.22.2 直接加载产物中的服务端 chunk：打包后的 `extractTextFromFile` 对 TEST ONLY 工作簿输出正确的精确缩小文本，DOCTYPE 与非 ZIP 均为 `malformed`；chunk 中 `yauzl` / `saxes` 解析到 `.output/server/node_modules`。未使用任何凭证。
+- **1440px（全新标签页，console 0 条错误，均无横向溢出）：**
+  - `/admin`（→ `/admin/products`）。
+  - `/admin/media`：上传 input `accept` 含 `.xlsx` 与官方 MIME，不含 `.xls` / `.xlsm` / Word。
+  - AI Source Intake：11 张来源卡、4 个 TXT 可选、`0 / 5 selected`、Analyze 禁用（与 PDF 模块时一致）。
+  - Media & resources：7 assets / 4 documents、Save changes 禁用。
+  - AI Proposal Review：空态 "No active proposal. Return to AI Source Intake."。
+- **375px（同一全新标签页，console 0 条错误，以上路由均 `scrollWidth = clientWidth = 375`）：**
+  - AI Source Intake：真实点击选中 TXT → `1 / 5 selected`、Analyze 可用、披露文案 "Original files are not sent to the AI provider." 显示；取消后恢复 `0 / 5`、Analyze 禁用。
+  - Media & resources：打开选择面板，提示为 "AI-readable marks the CSV, PDF, TSV, TXT, XLSX files AI Source Intake can analyze today. JPG, PNG, WebP files can be linked, but not analyzed."，类型筛选仍为 All formats / Image / PDF / Text；关闭面板未暂存任何更改，重新加载后仍为 7 / 4、Save changes 禁用。
+  - AI Proposal Review：空态正常。
+- 未上传真实 XLSX、未关联 XLSX、未设置或修改 Product 3 的 `product_code`；XLSX 可被选择由组件、端点合同与引擎测试证明。未点击 Analyze，0 次 generate / apply。
+- `.claude/launch.json` 仅在验收期间临时加入 Node 22 启动配置，验收后已还原，与 HEAD 一致。
+
+### 七、已知限制
+
+- 读取器在 Nuxt 进程内运行，没有 OS 级内存硬限制；8 秒是应用层期限。安全性来自：输入 10 MB、实际解压计数、流式 XML、不建 DOM、不载入整本工作簿、行 / 单元格 / 工作表计数、频繁期限检查与全进程单并发。
+- 不支持 legacy `.xls`、`.xlsm`；不重算公式；不复现复杂 Excel 格式（数字按存储值输出，不按显示小数位取整）；不重建多层表头（合并表头只按合并范围展开）；工作簿中的图片、图表不做 OCR。
+- 列方向缩小只保留一个标签列（左侧另有单位列等不保留）；编码必须同时含字母和数字才会缩小。
+- 选择 4–5 个来源时，工作簿份额降为 15,000 / 12,000 字符，超出则整份拒绝（`too_complex`），不截断。
+- 当前配置的 npm 镜像源不支持 `npm audit`，本模块未取得 npm 官方漏洞报告；两个依赖的许可证（MIT / ISC）与安全审查仍是生产发布门槛，本模块不作法律结论。
+
+### 八、边界
+
+**0 生产部署 · 0 push · 0 DB / Directus schema · 0 新 collection · 0 产品数据写入 · 0 Docker service · 0 document-extractor / PDF 架构改动 · 0 Provider adapter 改动 · 0 真实 Provider 调用 · 0 API 费用 · 0 DOCX / OCR / Vision / XLS / XLSM · 抽取文本 0 持久化。** 新增 npm package 仅为已授权的 `yauzl`、`saxes`（及 TypeScript 需要的 `@types/yauzl`）。
+
+决策登记为 `08-decision-log.md` 的 **D-027 — Bounded XLSX Extraction**。MASTER-ROADMAP 新增本模块的 ✅ COMPLETED 状态行，并从"规划中"的格式行删去 XLSX（仅这两处）。按 AI-PDF-SOURCE-01-CLOSEOUT-01 确立的方法，格式状态以 D-024 + 共享格式合同 + 本文件为准，Charter / Register 未改动。
+
+---
+
+```text
+AI-XLSX-SOURCE-01
+=
+COMPLETED
+
+XLSX Media upload:
+ENABLED
+
+XLSX AI-readable:
+ENABLED
+
+Parser:
+bounded in-process OOXML streaming
+
+Dependencies:
+exact pinned yauzl / saxes
+
+Product-code prefilter:
+exact normalized only
+
+Fuzzy model matching:
+NO
+
+Formula:
+cached value only
+no recalculation
+
+Hidden sheets/rows/columns:
+not sent to AI
+
+XLSX hard limits:
+10 MB
+10 visible sheets
+50 total sheets
+5000 rows/sheet
+20000 rows total
+100 used columns
+200000 scanned non-empty cells
+20000 output cells
+100000 shared strings
+4M shared-string characters
+20k extracted chars
+8s processing deadline
+
+Product writes:
+0
+
+Provider real calls:
+0
+
+DB/schema changes:
+0
+
+Still not AI-readable:
+DOCX / Images / DOC / XLS
+
+NEXT CANDIDATE:
+AI-DOCX-SOURCE-01
+
+STATUS:
+NOT AUTHORIZED
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"AI-XLSX-SOURCE-01"任务中写入。*

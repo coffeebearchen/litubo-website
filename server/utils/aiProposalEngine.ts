@@ -4,6 +4,7 @@ import {
   sanitizeDisplayNameForBrowser,
   capTotalCharacters,
   MAX_FILES_PER_REQUEST,
+  MAX_PER_FILE_CHARS,
   MAX_TOTAL_EXTRACTED_CHARS,
   type ExtractedSource,
   type SourceReaders,
@@ -62,6 +63,13 @@ import type { FetchFn } from './mediaLifecycle'
  * no more time than the stage has left, and a PDF becomes one more
  * `ExtractedSource` in the same dedupe, the same character cap and the same
  * single provider call as every other source.
+ *
+ * AI-XLSX-SOURCE-01 — an .xlsx workbook is read in this process by a bounded
+ * streaming reader that may narrow a sheet to the current product's exact code,
+ * so the product's identity is fetched as soon as a workbook needs it — still
+ * once per analysis. A workbook is also told the most text it may produce: its
+ * share of the combined character cap. The combined cap would otherwise cut its
+ * text, and a workbook's text is refused rather than cut.
  */
 
 /**
@@ -379,6 +387,13 @@ export async function runProposalEngine<TOutput>(
   let promptSourceCounter = 0
   // AI-SOURCE-CONTRACT-01 — one clock for the whole reading stage; see MAX_TOTAL_EXTRACTION_MS.
   const budget = createExtractionBudget()
+  // AI-XLSX-SOURCE-01 — read once, when first needed: a workbook asks for the
+  // code while it is being read, and the prompt needs the identity afterwards.
+  let identity: ReturnType<typeof fetchProductIdentity> | null = null
+  const productIdentity = () => (identity ??= fetchProductIdentity(fetch, params.productId))
+  // Each selected source's share of the combined cap. There are never more
+  // readable sources than selected ones, so text within this share is never cut.
+  const perSourceChars = Math.min(MAX_PER_FILE_CHARS, Math.floor(MAX_TOTAL_EXTRACTED_CHARS / mediaIds.length))
 
   for (const mediaId of mediaIds) {
     const row = rowById.get(mediaId)
@@ -441,10 +456,13 @@ export async function runProposalEngine<TOutput>(
     // The label is only consumed once the source is actually going into the
     // prompt, so a skipped duplicate does not leave a gap in "Source 1, 2, 3".
     const promptLabel = `Source ${promptSourceCounter + 1}`
-    // A reader outside this process (a PDF) gets no more than what the stage has left.
+    // A reader outside this process (a PDF) gets no more than what the stage has
+    // left, and neither does a workbook read inside it.
     const extraction = await extractTextFromFile(bytes, mime, promptLabel, {
       readers,
       timeoutMs: budget.remainingMs(),
+      productCode: async () => (await productIdentity()).productCode,
+      maxChars: perSourceChars,
     })
     // A read that ran into the end of the stage used up the analysis's time,
     // not its own: it is reported exactly like a download that did.
@@ -488,7 +506,7 @@ export async function runProposalEngine<TOutput>(
   }
 
   const cappedSources = capTotalCharacters(readableSources, MAX_TOTAL_EXTRACTED_CHARS)
-  const { productName, productCode } = await fetchProductIdentity(fetch, params.productId)
+  const { productName, productCode } = await productIdentity()
 
   const input: AiGenerationInput = {
     productName,

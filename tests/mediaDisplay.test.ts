@@ -22,8 +22,15 @@ describe('the label shown when there is no thumbnail', () => {
     ['text/csv', 'CSV'],
     ['text/tab-separated-values', 'TSV'],
     ['text/plain', 'TXT'],
+    ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'XLSX'],
   ])('%s → %s', (type, expected) => {
     expect(fileKind(type)).toBe(expected)
+  })
+
+  /** AI-XLSX-SOURCE-01 — a workbook card draws in the same spreadsheet colour as CSV and TSV. */
+  it('gives an XLSX card the spreadsheet colour', () => {
+    const source = readFileSync(resolve(process.cwd(), 'pages/admin/media/index.vue'), 'utf8')
+    expect(source).toMatch(/\.file-card__icon--tsv \.icon-kind,\r?\n\.file-card__icon--xlsx \.icon-kind \{ background: #1e7a52; \}/)
   })
 
   it('reads a content type that carries a charset parameter', () => {

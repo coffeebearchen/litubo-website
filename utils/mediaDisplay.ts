@@ -16,6 +16,7 @@ export function fileKind(type: string | null | undefined): string {
   if (t.startsWith('text/csv')) return 'CSV'
   if (t.startsWith('text/tab-separated-values')) return 'TSV'
   if (t.startsWith('text/')) return 'TXT'
+  if (t === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') return 'XLSX'
   return 'FILE'
 }
 

@@ -199,9 +199,9 @@ describe('the format filter includes Text, and the AI-readable note follows the 
     expect(wrapper.emitted('update-type-filter')).toEqual([['text']])
   })
 
-  it('names the formats AI can analyze (PDF included since AI-PDF-SOURCE-01) and the ones that can only be linked', () => {
+  it('names the formats AI can analyze (PDF since AI-PDF-SOURCE-01, XLSX since AI-XLSX-SOURCE-01) and the ones that can only be linked', () => {
     const text = mountPicker().text()
-    expect(text).toContain('marks the CSV, PDF, TSV, TXT files AI Source Intake can analyze today.')
+    expect(text).toContain('marks the CSV, PDF, TSV, TXT, XLSX files AI Source Intake can analyze today.')
     expect(text).toContain('JPG, PNG, WebP files can be linked, but not analyzed.')
     expect(text).not.toContain('PDF and images can be linked')
   })

@@ -6,6 +6,9 @@
  * and AI readability stay two separate facts, that every source failure is
  * worded once and safely, and that no AI code keeps a MIME list of its own
  * beside the contract.
+ *
+ * AI-XLSX-SOURCE-01 — standard .xlsx workbooks joined the readable formats once
+ * their bounded reader passed its own tests.
  */
 
 import { describe, it, expect, vi, beforeAll } from 'vitest'
@@ -23,6 +26,7 @@ import {
   type SourceFailureCode,
 } from '../utils/aiSourceFormats'
 import { extractTextFromFile } from '../server/utils/aiTextExtraction'
+import { tableXlsx } from './helpers/testOnlyXlsx'
 
 const repoFile = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8')
 
@@ -35,20 +39,20 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
 describe('A. what AI Source Intake can analyze today', () => {
-  it.each([TXT, CSV, TSV, PDF])('%s is AI-readable', (mime) => {
+  it.each([TXT, CSV, TSV, PDF, XLSX])('%s is AI-readable', (mime) => {
     expect(isAiSourceReadableNow(mime)).toBe(true)
     expect(aiSourceFormatRefusal(mime)).toBeNull()
   })
 
-  it.each([DOCX, XLSX, ...IMAGES])('%s is a planned format — listed, but NOT readable yet', (mime) => {
+  it.each([DOCX, ...IMAGES])('%s is a planned format — listed, but NOT readable yet', (mime) => {
     expect(aiSourceFormatFor(mime)).not.toBeNull()
     expect(isAiSourceReadableNow(mime)).toBe(false)
     expect(aiSourceFormatRefusal(mime)).toBe('not_enabled')
   })
 
   it.each([
-    'application/msword', 'application/vnd.ms-excel', 'video/mp4', 'application/zip',
-    'text/html', 'image/gif', 'application/octet-stream', '',
+    'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-excel.sheet.macroenabled.12', 'video/mp4',
+    'application/zip', 'text/html', 'image/gif', 'application/octet-stream', '',
   ])('%s is outside the contract, so it is simply unsupported', (mime) => {
     expect(aiSourceFormatFor(mime)).toBeNull()
     expect(isAiSourceReadableNow(mime)).toBe(false)
@@ -64,17 +68,18 @@ describe('A. what AI Source Intake can analyze today', () => {
   it('ignores letter case and a charset parameter, the way stored content types arrive', () => {
     expect(isAiSourceReadableNow('TEXT/PLAIN')).toBe(true)
     expect(isAiSourceReadableNow('text/csv; charset=utf-8')).toBe(true)
+    expect(isAiSourceReadableNow(XLSX.toUpperCase())).toBe(true)
     expect(aiSourceFormatRefusal('Application/PDF')).toBeNull()
     expect(aiSourceFormatRefusal('IMAGE/PNG')).toBe('not_enabled')
   })
 
-  /** AI-PDF-SOURCE-01 — PDF joined text once its isolated reader passed acceptance. No other format has. */
-  it('exactly two format families are readable: text, and text-layer PDF', () => {
-    expect(AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).map(f => f.key)).toEqual(['text', 'pdf'])
+  /** AI-PDF-SOURCE-01 and AI-XLSX-SOURCE-01 — each format joined text once its own reader passed acceptance. No other format has. */
+  it('exactly three format families are readable: text, text-layer PDF and .xlsx workbooks', () => {
+    expect(AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).map(f => f.key)).toEqual(['text', 'pdf', 'xlsx'])
   })
 
   it('the "Supported formats" copy lists exactly the readable formats', () => {
-    expect(AI_READABLE_FORMATS_LABEL).toBe('CSV, PDF, TSV, TXT')
+    expect(AI_READABLE_FORMATS_LABEL).toBe('CSV, PDF, TSV, TXT, XLSX')
   })
 
   it('the "can be linked, but not analyzed" copy lists exactly the stored-but-unreadable formats', () => {
@@ -98,12 +103,12 @@ describe('the contract itself', () => {
     expect(aiSourceTypeLabel(TXT)).toBe('Text')
     expect(aiSourceTypeLabel(CSV)).toBe('CSV')
     expect(aiSourceTypeLabel(TSV)).toBe('TSV')
+    expect(aiSourceTypeLabel(PDF)).toBe('PDF')
+    expect(aiSourceTypeLabel(XLSX)).toBe('Spreadsheet')
   })
 
   it('labels a source card for every other format without ever going blank', () => {
-    expect(aiSourceTypeLabel(PDF)).toBe('PDF')
     expect(aiSourceTypeLabel(DOCX)).toBe('Word')
-    expect(aiSourceTypeLabel(XLSX)).toBe('Excel')
     expect(aiSourceTypeLabel('image/png')).toBe('Image')
     expect(aiSourceTypeLabel('image/gif')).toBe('Image')
     expect(aiSourceTypeLabel('video/mp4')).toBe('Video')
@@ -122,10 +127,17 @@ describe('B. the server reads exactly what the shared contract marks readable', 
   /** A PDF is read through the document-extractor's reader, so the table gives it a PDF header and a stand-in reader. */
   const PDF_READER = { pdf: async () => ({ ok: true as const, text: 'Aperture: 180 mm' }) }
 
+  /** Real content for each format: a PDF header for a PDF, a TEST ONLY workbook for an .xlsx, plain text otherwise. */
+  const contentFor = (mime: string | null): ArrayBuffer => {
+    const key = aiSourceFormatFor(mime)?.key
+    const bytes = key === 'xlsx'
+      ? tableXlsx([['Parameter', 'Value'], ['Aperture', '180 mm']])
+      : new TextEncoder().encode(key === 'pdf' ? '%PDF-1.7\nAperture: 180 mm' : 'Aperture: 180 mm')
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+  }
+
   it.each(TABLE)('server extraction and isAiSourceReadableNow agree on %s', async (mime) => {
-    const content = aiSourceFormatFor(mime)?.key === 'pdf' ? '%PDF-1.7\nAperture: 180 mm' : 'Aperture: 180 mm'
-    const bytes = new TextEncoder().encode(content).buffer as ArrayBuffer
-    const result = await extractTextFromFile(bytes, mime, 'Source 1', { readers: PDF_READER })
+    const result = await extractTextFromFile(contentFor(mime), mime, 'Source 1', { readers: PDF_READER })
     expect(result.ok).toBe(isAiSourceReadableNow(mime))
   })
 
@@ -199,6 +211,13 @@ describe('C. Media Library storage and AI readability are separate facts', () =>
     expect(aiSourceFormatFor(PDF)?.maxBytes).toBe(20 * 1024 * 1024)
   })
 
+  it('XLSX: the Media Library stores it, and AI Source Intake can analyze it (AI-XLSX-SOURCE-01)', () => {
+    expect(isAllowedUpload('parameters.xlsx', XLSX)).toBe(true)
+    expect(aiSourceFormatFor(XLSX)?.mediaUploadSupported).toBe(true)
+    expect(isAiSourceReadableNow(XLSX)).toBe(true)
+    expect(aiSourceFormatFor(XLSX)?.maxBytes).toBe(10 * 1024 * 1024)
+  })
+
   it('Images: the Media Library can store them, AI cannot analyze them yet', () => {
     for (const [filename, mime] of [['nameplate.jpg', 'image/jpeg'], ['screenshot.png', 'image/png'], ['photo.webp', 'image/webp']]) {
       expect(isAllowedUpload(filename, mime)).toBe(true)
@@ -206,11 +225,17 @@ describe('C. Media Library storage and AI readability are separate facts', () =>
     }
   })
 
-  it('DOCX and XLSX: still not uploadable, and not analyzable — their own modules change that', () => {
+  it('DOCX: still not uploadable, and not analyzable — its own module changes that', () => {
     expect(isAllowedUpload('manual.docx', DOCX)).toBe(false)
-    expect(isAllowedUpload('parameters.xlsx', XLSX)).toBe(false)
+    expect(aiSourceFormatFor(DOCX)?.mediaUploadSupported).toBe(false)
     expect(isAiSourceReadableNow(DOCX)).toBe(false)
-    expect(isAiSourceReadableNow(XLSX)).toBe(false)
+  })
+
+  it('legacy .xls and macro-enabled .xlsm are neither stored nor analyzed', () => {
+    expect(isAllowedUpload('sheet.xls', 'application/vnd.ms-excel')).toBe(false)
+    expect(isAllowedUpload('macro.xlsm', 'application/vnd.ms-excel.sheet.macroEnabled.12')).toBe(false)
+    expect(aiSourceFormatFor('application/vnd.ms-excel')).toBeNull()
+    expect(aiSourceFormatFor('application/vnd.ms-excel.sheet.macroEnabled.12')).toBeNull()
   })
 })
 
@@ -218,7 +243,7 @@ describe('D. every source failure is worded once, safely', () => {
   const ALL_CODES: SourceFailureCode[] = [
     'not_associated', 'disabled', 'not_enabled', 'unsupported', 'too_large', 'empty', 'unreadable',
     'no_text', 'time_budget_exhausted', 'timeout', 'malformed', 'encrypted', 'too_complex',
-    'too_many_pages', 'too_many_sheets', 'too_many_rows', 'too_many_cells', 'too_many_pixels',
+    'too_many_pages', 'too_many_sheets', 'too_many_rows', 'too_many_cells', 'no_relevant_rows', 'too_many_pixels',
     'unavailable', 'ocr_unavailable', 'busy', 'unsafe_parse',
   ]
 
@@ -231,6 +256,11 @@ describe('D. every source failure is worded once, safely', () => {
     ['timeout', 'This file took too long to read and was stopped.'],
     ['time_budget_exhausted', 'Not read: the time limit for reading sources was reached.'],
     ['not_associated', 'One of the selected files could not be used for this product.'],
+    ['too_complex', 'This file is too complex to analyze safely. Save the relevant part as a smaller file.'],
+    ['too_many_sheets', 'This workbook has too many sheets to analyze.'],
+    ['too_many_rows', 'This spreadsheet has too many rows to analyze. Save the relevant sheet as a smaller file.'],
+    ['too_many_cells', 'This spreadsheet has too many cells to analyze.'],
+    ['no_relevant_rows', 'No data rows were found in this spreadsheet.'],
   ] as const)('%s → "%s"', (code, message) => {
     expect(sourceFailureMessage(code)).toBe(message)
   })

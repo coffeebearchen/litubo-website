@@ -4,8 +4,10 @@
  * TXT, CSV and TSV are decoded here, end to end. A PDF is never parsed in this
  * process (AI-PDF-SOURCE-01): it is checked for a PDF header and handed to an
  * injected reader — in production the isolated document-extractor sidecar,
- * here a stand-in. Every other format is refused. No network, no Directus, no
- * mock provider involved.
+ * here a stand-in. An .xlsx workbook goes to the bounded workbook reader
+ * (AI-XLSX-SOURCE-01; its own tests are `tests/xlsxExtraction.test.ts` and
+ * `tests/aiXlsxSource.test.ts`). Every other format is refused. No network, no
+ * Directus, no mock provider involved.
  *
  * AI-SOURCE-CONTRACT-01 — a refusal is now a failure code. Which formats are
  * readable, and the sentence each code becomes, are pinned against the shared
@@ -25,9 +27,11 @@ import {
 } from '../server/utils/aiTextExtraction'
 import type { PdfTextReadResult } from '../server/utils/documentExtractorClient'
 import { aiSourceFormatFor, sourceFailureMessage } from '../utils/aiSourceFormats'
+import { tableXlsx } from './helpers/testOnlyXlsx'
 
 /** The text family's own size contract — the only download limit in force today. */
 const TEXT_MAX_BYTES = aiSourceFormatFor('text/plain')!.maxBytes
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 function toArrayBuffer(buffer: Buffer): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
@@ -37,7 +41,6 @@ describe('extractTextFromFile — only what the shared contract marks readable i
   it('refuses a planned-but-not-readable format with not_enabled, before touching the bytes', async () => {
     const bytes = toArrayBuffer(Buffer.from('not a real document'))
     for (const mime of [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'image/jpeg', 'image/png', 'image/webp',
     ]) {
@@ -56,12 +59,16 @@ describe('extractTextFromFile — only what the shared contract marks readable i
     }
   })
 
-  it('an Excel workbook is refused as not yet enabled, distinct from a format that is simply unsupported', async () => {
+  /** AI-XLSX-SOURCE-01 — a workbook is read by the bounded workbook reader; bytes that only claim to be one are damaged, not unsupported. */
+  it('an .xlsx workbook is read into structured text, and bytes that only claim to be one are malformed', async () => {
+    const workbook = toArrayBuffer(Buffer.from(tableXlsx([['Parameter', 'Value'], ['Aperture', '180 mm']])))
+    expect(await extractTextFromFile(workbook, XLSX, 'Source 1')).toEqual({
+      ok: true,
+      source: { displayName: 'Source 1', fileType: 'Spreadsheet', text: 'Sheet: Specifications\nColumns: Parameter | Value\nAperture | 180 mm' },
+    })
     const bytes = toArrayBuffer(Buffer.from('not a real xlsx'))
-    const excel = await extractTextFromFile(bytes, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'sheet.xlsx')
-    const archive = await extractTextFromFile(bytes, 'application/zip', 'archive.zip')
-    expect(excel).toEqual({ ok: false, code: 'not_enabled' })
-    expect(archive).toEqual({ ok: false, code: 'unsupported' })
+    expect(await extractTextFromFile(bytes, XLSX, 'sheet.xlsx')).toEqual({ ok: false, code: 'malformed' })
+    expect(await extractTextFromFile(bytes, 'application/zip', 'archive.zip')).toEqual({ ok: false, code: 'unsupported' })
   })
 
   it('is case-insensitive and ignores a charset suffix', async () => {

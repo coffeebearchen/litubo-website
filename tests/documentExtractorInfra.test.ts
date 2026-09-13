@@ -131,12 +131,24 @@ describe('runtime configuration', () => {
   })
 })
 
-describe('no new npm package', () => {
-  it('dependencies and devDependencies are exactly the ones this repository had before AI-PDF-SOURCE-01', () => {
+describe('no npm package beyond the authorised ones', () => {
+  /**
+   * AI-PDF-SOURCE-01 added no package at all. AI-XLSX-SOURCE-01 was authorised
+   * exactly two runtime packages, yauzl and saxes, pinned to exact versions —
+   * plus @types/yauzl, because yauzl ships no types of its own.
+   */
+  it('dependencies and devDependencies are the pre-AI-PDF-SOURCE-01 set plus the authorised workbook packages', () => {
     const pkg = JSON.parse(repoFile('package.json')) as { dependencies: Record<string, string>, devDependencies: Record<string, string> }
-    expect(Object.keys(pkg.dependencies).sort()).toEqual(['@nuxtjs/i18n', '@types/sanitize-html', 'nodemailer', 'nuxt', 'sanitize-html', 'zod'])
+    expect(Object.keys(pkg.dependencies).sort()).toEqual(['@nuxtjs/i18n', '@types/sanitize-html', 'nodemailer', 'nuxt', 'sanitize-html', 'saxes', 'yauzl', 'zod'])
     expect(Object.keys(pkg.devDependencies).sort()).toEqual([
-      '@nuxt/eslint', '@types/node', '@types/nodemailer', '@vitejs/plugin-vue', '@vue/test-utils', 'happy-dom', 'typescript', 'vitest', 'vue-tsc',
+      '@nuxt/eslint', '@types/node', '@types/nodemailer', '@types/yauzl', '@vitejs/plugin-vue', '@vue/test-utils', 'happy-dom', 'typescript', 'vitest', 'vue-tsc',
     ])
+  })
+
+  it('pins the workbook packages to exact versions', () => {
+    const pkg = JSON.parse(repoFile('package.json')) as { dependencies: Record<string, string>, devDependencies: Record<string, string> }
+    for (const version of [pkg.dependencies.yauzl, pkg.dependencies.saxes, pkg.devDependencies['@types/yauzl']]) {
+      expect(version).toMatch(/^\d+\.\d+\.\d+$/)
+    }
   })
 })

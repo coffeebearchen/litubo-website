@@ -23,14 +23,20 @@ import { resolve } from 'node:path'
  */
 let isAllowedUpload: (filename: string, contentType: string) => boolean
 let ALLOWED_UPLOAD_LABEL: string
+let LEGACY_XLS_MESSAGE: string
 let uploadFailureMessage: (status: number | undefined) => string
+let uploadRefusalMessage: (filename: string, contentType: string) => string
+
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 beforeAll(async () => {
   vi.stubGlobal('defineEventHandler', (handler: unknown) => handler)
   const mod = await import('../server/api/admin/media/upload.post')
   isAllowedUpload = mod.isAllowedUpload
   ALLOWED_UPLOAD_LABEL = mod.ALLOWED_UPLOAD_LABEL
+  LEGACY_XLS_MESSAGE = mod.LEGACY_XLS_MESSAGE
   uploadFailureMessage = mod.uploadFailureMessage
+  uploadRefusalMessage = mod.uploadRefusalMessage
 })
 
 describe('Media Library upload — AI text sources are accepted', () => {
@@ -67,14 +73,31 @@ describe('Media Library upload — existing image and PDF behaviour is unchanged
   })
 })
 
+/** AI-XLSX-SOURCE-01 — a standard .xlsx workbook is stored like any other accepted source. */
+describe('Media Library upload — standard .xlsx workbooks are accepted', () => {
+  it('accepts .xlsx with its official content type, in any letter case', () => {
+    expect(isAllowedUpload('parameters.xlsx', XLSX)).toBe(true)
+    expect(isAllowedUpload('PARAMETERS.XLSX', XLSX.toUpperCase())).toBe(true)
+  })
+
+  it('still needs both halves: an .xlsx name with another type, or the type on another name, is refused', () => {
+    expect(isAllowedUpload('parameters.xlsx', 'application/vnd.ms-excel')).toBe(false)
+    expect(isAllowedUpload('parameters.xlsx', 'application/octet-stream')).toBe(false)
+    expect(isAllowedUpload('parameters.xlsm', XLSX)).toBe(false)
+    expect(isAllowedUpload('parameters.xls', XLSX)).toBe(false)
+  })
+})
+
 describe('Media Library upload — everything else is still refused', () => {
   it.each([
-    ['sheet.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
     ['sheet.xls', 'application/vnd.ms-excel'],
+    ['macro.xlsm', 'application/vnd.ms-excel.sheet.macroEnabled.12'],
+    ['template.xltx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.template'],
     ['archive.zip', 'application/zip'],
     ['script.js', 'text/javascript'],
     ['page.html', 'text/html'],
     ['doc.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    ['doc.doc', 'application/msword'],
     ['video.mp4', 'video/mp4'],
     ['unknown.bin', 'application/octet-stream'],
   ])('refuses %s (%s)', (filename, type) => {
@@ -95,27 +118,52 @@ describe('Media Library upload — everything else is still refused', () => {
 })
 
 describe('the refusal message names exactly what is accepted', () => {
-  it('lists all seven accepted formats and no longer claims only four', () => {
-    expect(ALLOWED_UPLOAD_LABEL).toBe('JPG、PNG、WebP、PDF、TXT、CSV、TSV')
+  it('lists all eight accepted formats', () => {
+    expect(ALLOWED_UPLOAD_LABEL).toBe('JPG、PNG、WebP、PDF、TXT、CSV、TSV、XLSX')
   })
 
   it('the handler builds its error message from that label rather than a hard-coded list', () => {
     const source = readFileSync(resolve(process.cwd(), 'server/api/admin/media/upload.post.ts'), 'utf8')
     expect(source).toContain('${ALLOWED_UPLOAD_LABEL}')
+    expect(source).toContain('uploadRefusalMessage(filename, ct)')
     expect(source).not.toContain('仅允许 JPG、PNG、WebP、PDF`')
+  })
+
+  /** AI-XLSX-SOURCE-01 — a legacy workbook is told what to do about it. */
+  it('tells a legacy .xls upload to save it as .xlsx, and every other refusal which formats are accepted', () => {
+    expect(LEGACY_XLS_MESSAGE).toBe('Legacy .xls files are not supported. Save as .xlsx and upload again.')
+    expect(uploadRefusalMessage('sheet.xls', 'application/vnd.ms-excel')).toBe(LEGACY_XLS_MESSAGE)
+    expect(uploadRefusalMessage('SHEET.XLS', 'application/octet-stream')).toBe(LEGACY_XLS_MESSAGE)
+    expect(uploadRefusalMessage('macro.xlsm', 'application/vnd.ms-excel.sheet.macroenabled.12'))
+      .toBe(`格式不支持（application/vnd.ms-excel.sheet.macroenabled.12）。仅允许 ${ALLOWED_UPLOAD_LABEL}`)
+    expect(uploadRefusalMessage('manual.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')).not.toBe(LEGACY_XLS_MESSAGE)
+    // A .csv that a browser labelled with the Excel type is not an .xls, and is not told it is one.
+    expect(uploadRefusalMessage('parameters.csv', 'application/vnd.ms-excel')).not.toBe(LEGACY_XLS_MESSAGE)
   })
 })
 
 describe('the Media Library file input offers the same set the server accepts', () => {
-  it('accept lists every new extension and MIME type, and keeps the existing ones', () => {
+  const acceptTokens = () => {
     const source = readFileSync(resolve(process.cwd(), 'pages/admin/media/index.vue'), 'utf8')
-    const accept = source.match(/accept="([^"]+)"/)?.[1] ?? ''
+    return (source.match(/accept="([^"]+)"/)?.[1] ?? '').split(',').map(token => token.trim())
+  }
 
+  it('accept lists every accepted extension and MIME type, .xlsx included', () => {
+    const accept = acceptTokens()
     for (const token of ['.txt', '.csv', '.tsv', 'text/plain', 'text/csv', 'text/tab-separated-values']) {
       expect(accept).toContain(token)
     }
     for (const token of ['.jpg', '.jpeg', '.png', '.webp', '.pdf', 'image/jpeg', 'image/png', 'image/webp', 'application/pdf']) {
       expect(accept).toContain(token)
+    }
+    expect(accept).toContain('.xlsx')
+    expect(accept).toContain(XLSX)
+  })
+
+  it('never offers a legacy, macro-enabled or Word file the server would refuse', () => {
+    const accept = acceptTokens()
+    for (const token of ['.xls', '.xlsm', '.xltx', '.doc', '.docx', 'application/vnd.ms-excel', 'application/msword']) {
+      expect(accept).not.toContain(token)
     }
   })
 })

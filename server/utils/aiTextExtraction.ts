@@ -5,9 +5,9 @@
  * `utils/aiSourceFormats.ts` is the one format contract the server and the
  * browser share: a file is read here only when that contract marks its format
  * readable, and every refusal is reported as a failure code rather than a
- * sentence of this module's own. Today the readable formats are TXT, CSV, TSV
- * and text-layer PDF. No OCR, no vision, and no external file API is used
- * anywhere in this module.
+ * sentence of this module's own. Today the readable formats are TXT, CSV, TSV,
+ * text-layer PDF and .xlsx workbooks. No OCR, no vision, and no external file
+ * API is used anywhere in this module.
  *
  * XLS/XLSX removed: PWS-AI-ENGINE-01's `xlsx` (SheetJS) dependency could not
  * be safely required on Windows `nuxt dev` (its `.mjs` entry crashed every
@@ -44,6 +44,14 @@
  * injected reader (`documentExtractorClient.ts`), which runs Poppler under
  * process and container resource limits. No reader configured → `unavailable`.
  *
+ * AI-XLSX-SOURCE-01 — .xlsx workbooks are read again, inside this process but
+ * never loaded whole: `xlsxExtraction.ts` streams the package through a bounded
+ * OOXML reader (`yauzl` for the ZIP, `saxes` for the XML) that counts the bytes
+ * it actually inflates and enforces every sheet, row, cell and character limit
+ * while parsing. One Office document is parsed at a time
+ * (`officeExtractionGate.ts`), and a workbook over a limit is refused, never
+ * cut. Legacy .xls and macro-enabled .xlsm remain unsupported.
+ *
  * File bytes and extracted text exist only for the lifetime of one request:
  * this module returns plain strings to its caller and keeps no cache, no
  * disk write, and no database write of its own.
@@ -56,6 +64,8 @@ import {
   type SourceFailureCode,
 } from '../../utils/aiSourceFormats'
 import { hasPdfHeader, type PdfTextReader, type PdfTextReadResult } from './documentExtractorClient'
+import { officeExtractionGate, type OfficeExtractionGate } from './officeExtractionGate'
+import { extractXlsxText, MAX_XLSX_PROCESSING_MS } from './xlsxExtraction'
 
 /** At most this many source files may be analyzed in a single Generate call. */
 export const MAX_FILES_PER_REQUEST = 5
@@ -137,6 +147,15 @@ export interface ExtractionOptions {
   readers?: SourceReaders
   /** How long reading this file may still take: what is left of the analysis's reading budget. */
   timeoutMs?: number
+  /**
+   * The current product's code, asked for only when a workbook is read, so an
+   * analysis without one never needs it. Null when the product has no code.
+   */
+  productCode?: () => Promise<string | null>
+  /** The most characters a workbook's text may have — at most MAX_PER_FILE_CHARS. A longer text is refused, never cut. */
+  maxChars?: number
+  /** The Office parse queue. Tests inject their own; everything else shares the process-wide gate. */
+  officeGate?: OfficeExtractionGate
 }
 
 /** One PDF is never read for longer than this, however much of the reading budget is left. */
@@ -162,9 +181,9 @@ export function isFileSizeSafeToDownload(knownSizeBytes: number | null | undefin
  * failure code naming only the problem category, never an internal error
  * message, stack trace, or any fragment of the file's own content.
  *
- * Only UTF-8 text formats are decoded here; there is no document parser in
- * this process at all, which is what makes the per-file character ceiling
- * meaningful rather than aspirational. A PDF goes to `options.readers.pdf`.
+ * UTF-8 text is decoded here, and an .xlsx workbook is streamed through the
+ * bounded workbook reader, which enforces its limits while parsing. No PDF
+ * parser runs in this process: a PDF goes to `options.readers.pdf`.
  */
 export async function extractTextFromFile(
   bytes: ArrayBuffer,
@@ -187,9 +206,12 @@ export async function extractTextFromFile(
   if (format.key === 'pdf') {
     return readPdfSource(new Uint8Array(bytes), mimeType, displayName, options)
   }
-  // Text and PDF are the only formats with a reader. A format marked readable
-  // before its own reader exists is still refused: its bytes are never decoded
-  // as text.
+  if (format.key === 'xlsx') {
+    return readXlsxSource(new Uint8Array(bytes), mimeType, displayName, options)
+  }
+  // Text, PDF and XLSX are the only formats with a reader. A format marked
+  // readable before its own reader exists is still refused: its bytes are never
+  // decoded as text.
   if (format.key !== 'text') {
     return { ok: false, code: 'not_enabled' }
   }
@@ -247,6 +269,50 @@ async function readPdfSource(
   return {
     ok: true,
     source: { displayName, fileType: aiSourceTypeLabel(mimeType), text },
+  }
+}
+
+/**
+ * AI-XLSX-SOURCE-01 — one workbook, read in this process by the bounded reader.
+ *
+ * It gets at most MAX_XLSX_PROCESSING_MS, or less when the analysis has less
+ * reading time left, and time spent waiting for the Office gate comes out of
+ * that same deadline. The product code is asked for first, so a sheet can be
+ * narrowed to this product's exact rows. The text is never cut: a workbook
+ * whose text would not fit `maxChars` is refused. Nothing here retries.
+ */
+async function readXlsxSource(
+  bytes: Uint8Array,
+  mimeType: string | null | undefined,
+  displayName: string,
+  options: ExtractionOptions,
+): Promise<ExtractionResult> {
+  const timeoutMs = Math.min(MAX_XLSX_PROCESSING_MS, options.timeoutMs ?? MAX_XLSX_PROCESSING_MS)
+  if (timeoutMs <= 0) return { ok: false, code: 'timeout' }
+  const deadline = Date.now() + timeoutMs
+  const maxChars = Math.min(MAX_PER_FILE_CHARS, options.maxChars ?? MAX_PER_FILE_CHARS)
+
+  let productCode: string | null
+  try {
+    productCode = options.productCode ? await options.productCode() : null
+  }
+  catch {
+    return { ok: false, code: 'unreadable' }
+  }
+
+  const gate = options.officeGate ?? officeExtractionGate
+  const outcome = await gate
+    .run(() => extractXlsxText(bytes, { deadline, productCode, maxChars }), { deadline })
+    .catch(() => null)
+  if (!outcome) return { ok: false, code: 'unreadable' }
+  if (!outcome.ok) return { ok: false, code: outcome.code }
+  const result = outcome.value
+  if (!result.ok) return { ok: false, code: result.code }
+  // The reader already refuses anything longer; checked again here, and refused rather than cut.
+  if (result.text.length > maxChars) return { ok: false, code: 'too_complex' }
+  return {
+    ok: true,
+    source: { displayName, fileType: aiSourceTypeLabel(mimeType), text: result.text },
   }
 }
 

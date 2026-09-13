@@ -89,12 +89,14 @@ export const AI_SOURCE_FORMATS: readonly AiSourceFormat[] = [
     aiReadableNow: false,
   },
   {
-    // Planned: visible cell values, read by a bounded streaming reader (AI-XLSX-SOURCE-01).
+    // Standard .xlsx workbooks, read by a bounded in-process OOXML reader
+    // (AI-XLSX-SOURCE-01): visible cells only, a formula's cached value only,
+    // nothing loaded whole. Legacy .xls and macro-enabled .xlsm are not this format.
     key: 'xlsx',
-    types: [{ mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', label: 'Excel', shortName: 'XLSX' }],
+    types: [{ mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', label: 'Spreadsheet', shortName: 'XLSX' }],
     maxBytes: 10 * MB,
-    mediaUploadSupported: false,
-    aiReadableNow: false,
+    mediaUploadSupported: true,
+    aiReadableNow: true,
   },
   {
     // Planned: local OCR, so only extracted text ever reaches a provider (AI-IMAGE-OCR-SOURCE-01).
@@ -157,7 +159,7 @@ export function aiSourceTypeLabel(mimeType: string | null | undefined): string {
   return 'File'
 }
 
-/** "CSV, TSV, TXT" — the formats that can be analyzed today, for help copy. Derived, so it can never advertise a format the server refuses. */
+/** "CSV, PDF, TSV, TXT, XLSX" — the formats that can be analyzed today, for help copy. Derived, so it can never advertise a format the server refuses. */
 export const AI_READABLE_FORMATS_LABEL = [...new Set(
   AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).flatMap(f => f.types.map(t => t.shortName)),
 )].sort().join(', ')
@@ -197,11 +199,13 @@ export type SourceFailureCode =
   | 'unavailable'
   | 'busy'
   | 'unsafe_parse'
-  // Reserved for later format modules
+  // Produced by the workbook reader (AI-XLSX-SOURCE-01), besides the codes above
   | 'too_complex'
   | 'too_many_sheets'
   | 'too_many_rows'
   | 'too_many_cells'
+  | 'no_relevant_rows'
+  // Reserved for later format modules
   | 'too_many_pixels'
   | 'ocr_unavailable'
 
@@ -227,6 +231,7 @@ const SOURCE_FAILURE_MESSAGES: Record<Exclude<SourceFailureCode, 'not_enabled'>,
   ocr_unavailable: 'Image text reading is unavailable right now. Other sources can still be analyzed.',
   busy: 'The document reader is busy. Try again in a moment.',
   unsafe_parse: 'This file could not be safely read.',
+  no_relevant_rows: 'No data rows were found in this spreadsheet.',
 }
 
 /** The honest refusal for each planned format while it cannot be read yet. */

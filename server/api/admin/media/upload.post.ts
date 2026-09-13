@@ -8,15 +8,24 @@ import { assertFolderAllowsUpload } from '~/server/utils/folderRegistry'
  * Text sources (TXT / CSV / TSV) were analysable but not uploadable, which left
  * no supported way to get one onto a product at all. Image and PDF handling is
  * unchanged; these three types are added alongside them.
+ *
+ * AI-XLSX-SOURCE-01 — standard .xlsx workbooks are accepted too. Legacy .xls and
+ * macro-enabled .xlsm are not: V1 reads neither, so storing one would only offer
+ * a source that can never be analyzed.
  */
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const ALLOWED_TYPES = new Set([
   'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf',
   'text/plain', 'text/csv', 'text/tab-separated-values',
+  XLSX_MIME,
 ])
-const ALLOWED_EXTS = /\.(jpe?g|png|webp|pdf|txt|csv|tsv)$/i
+const ALLOWED_EXTS = /\.(jpe?g|png|webp|pdf|txt|csv|tsv|xlsx)$/i
 
 /** Human-readable list of what is accepted, kept next to the rule it describes so the two cannot drift. */
-export const ALLOWED_UPLOAD_LABEL = 'JPG、PNG、WebP、PDF、TXT、CSV、TSV'
+export const ALLOWED_UPLOAD_LABEL = 'JPG、PNG、WebP、PDF、TXT、CSV、TSV、XLSX'
+
+/** A legacy workbook is told what to do about it, not only that it was refused. */
+export const LEGACY_XLS_MESSAGE = 'Legacy .xls files are not supported. Save as .xlsx and upload again.'
 
 /**
  * The upload rule itself, exported so it is asserted directly rather than
@@ -26,6 +35,16 @@ export const ALLOWED_UPLOAD_LABEL = 'JPG、PNG、WebP、PDF、TXT、CSV、TSV'
  */
 export function isAllowedUpload(filename: string, contentType: string): boolean {
   return ALLOWED_TYPES.has(contentType.toLowerCase().split(';')[0].trim()) && ALLOWED_EXTS.test(filename)
+}
+
+/**
+ * Why a file was refused. A legacy .xls workbook gets its own sentence. It is
+ * recognised by its name alone: a browser on a machine with Excel installed can
+ * label a .csv file `application/vnd.ms-excel` too, and that file is no .xls.
+ */
+export function uploadRefusalMessage(filename: string, contentType: string): string {
+  if (/\.xls$/i.test(filename)) return LEGACY_XLS_MESSAGE
+  return `格式不支持（${contentType}）。仅允许 ${ALLOWED_UPLOAD_LABEL}`
 }
 /**
  * A safe, actionable reason for a storage failure, derived from the HTTP
@@ -76,7 +95,7 @@ export default defineEventHandler(async (event) => {
     const ct = (part.type ?? '').toLowerCase().split(';')[0].trim() || 'application/octet-stream'
 
     if (!isAllowedUpload(filename, ct)) {
-      errors.push({ filename, message: `格式不支持（${ct}）。仅允许 ${ALLOWED_UPLOAD_LABEL}` })
+      errors.push({ filename, message: uploadRefusalMessage(filename, ct) })
       continue
     }
 

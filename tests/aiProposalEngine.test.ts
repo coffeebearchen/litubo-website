@@ -229,13 +229,13 @@ describe('runProposalEngine — honest per-file outcomes', () => {
     }
   })
 
-  it('an Excel file gets its own distinct "not supported yet" reason, not the generic one', async () => {
+  it('a Word document gets its own distinct "not supported yet" reason, not the generic one', async () => {
     const fetch = mockFetch({
-      productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-xls', filename_download: 'sheet.xlsx', type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filesize: SMALL_SIZE } }],
+      productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-docx', filename_download: 'manual.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filesize: SMALL_SIZE } }],
     })
     const result = await runProposalEngine(fetch, mockRegistry(), specificationsTarget, { productId: 1, providerId: 'deepseek', mediaIds: [1] })
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.fileResults[0].reason).toBe('Excel files are not supported for source analysis yet.')
+    if (!result.ok) expect(result.fileResults[0].reason).toBe('Word documents are not supported for source analysis yet.')
   })
 
   /**
