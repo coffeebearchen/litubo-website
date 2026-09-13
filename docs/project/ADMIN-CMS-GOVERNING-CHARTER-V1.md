@@ -883,19 +883,20 @@ TEST ONLY 数据（product_code=NULL 或 ID=3）不得进入 published，且 seo
 
 ## H. AI 与导入治理合同
 
-### H.1 当前状态（如实记录，2026-09-13 同步）
+### H.1 当前状态（如实记录，2026-09-14 同步）
 
 **当前已交付并签收的 AI 只有单产品 AI V1（`AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF`，详见 `CURRENT-STATE.md`）。除此之外，不得把任何 AI 流程表述为"已完成"。**
 
 当前已有（均限于一个产品及该产品的同一个 Product Draft）：
 
 - AI Source Intake：只分析本产品已关联且已启用的资料；
+- 型号归属保护（D-025）：分析时标明当前产品；资料描述多个型号时，只采用明确归属当前产品的值，归属不明确即省略，不做模糊型号匹配；
 - Proposal Review：AI 只生成 Specifications 建议；人工逐项 Accept / Edit / Reject，支持批量审核；多份资料互相矛盾时进入来源冲突审核，由人工选定取值或拒绝；
 - Apply to Draft：只把人工已接受的建议写入同一个产品 Draft，非 Draft 产品由服务端拒绝写入。
 
-当前 AI 可读格式：**TXT / CSV / TSV**。
+**AI 可读来源格式不在本 Charter 中逐项维护。** 某个格式当前是否可读，以 `08-decision-log.md` D-024（统一来源抽取合同）及其共享格式合同（`utils/aiSourceFormats.ts`）为准，模块级签收记录见 `CURRENT-STATE.md`；每个格式只有在自己的实施模块通过验收后才变为可读。截至 AI-PDF-SOURCE-01（D-026），带文字层（text-layer）的 PDF 抽取已实现：由隔离的 document-extractor 读取，只有有界文本进入同一个 Proposal Engine，原始 PDF 不发送给 AI Provider；生产部署仍须单独授权。
 
-当前尚未实现：PDF 抽取、DOCX 抽取、XLSX 抽取、图片 OCR、Vision、旧版 DOC / XLS；Specifications 以外的 AI Target；专用 AI 任务 Worker / 队列（当前在 Nitro 服务层内同步处理，见 E.3）；多产品 AI 与批量导入（H.3）。
+截至 AI-PDF-SOURCE-01 仍未实现：扫描 PDF 的 OCR、DOCX 抽取、XLSX 抽取、图片 OCR、Vision、旧版 DOC / XLS；Specifications 以外的 AI Target；专用 AI 任务 Worker / 队列（当前在 Nitro 服务层内同步处理，见 E.3）；多产品 AI 与批量导入（H.3）；自动发布。
 
 AI 不得自动发布（Published），不得绕过人工审核，不得未经人工确认覆盖真实资料。
 

@@ -6926,3 +6926,86 @@ STATUS: NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"AI-PDF-SOURCE-01"任务中写入。*
+
+---
+
+## AI-PDF-SOURCE-01-CLOSEOUT-01 = COMPLETED（2026-09-14）
+
+```text
+Clean 1440px evidence + governance drift closeout.
+Docs / validation only · 0 runtime changes · 0 code changes.
+```
+
+AI-PDF-SOURCE-01（`f42613d`）的最小收口，关闭上一节记录的"待后续治理同步"（该段原文保留）。
+
+**分支：** `review/ai-pdf-source-01-closeout`，从 `f42613d` 创建，仅本地，未 push。
+
+### 一、全新标签页 1440px 验证 = PASS
+
+Windows `nuxt dev`，3000 端口进程实测为 Node 22.22.2。紧接 build 首次启动时出现已知的 `#app-manifest` 报错，干净重启后服务端 0 错误；之后新开标签页验收，没有使用经历过重启的旧标签页。document-extractor、gateway、Postgres 均 healthy，Directus 运行中，配置未改。
+
+| 路由 | console error | 横向溢出 | 结果 |
+|---|---|---|---|
+| `/admin`（→ `/admin/products`） | 0 | 无（`scrollWidth = clientWidth = 1425`） | PASS |
+| `/admin/media` | 0 | 无（1440 = 1440） | PASS |
+| `/admin/product-workspace/3/ai-source-intake` | 0 | 无（1425 = 1425） | PASS — 11 张来源卡、4 个 TXT 可选、`0 / 5 selected`、Analyze 禁用 |
+| `/admin/product-workspace/3/ai-proposal-review` | 0 | 无（1425 = 1425） | PASS — 空态 "No active proposal. Return to AI Source Intake." |
+| `/admin/product-workspace/3/media-resources` | 0 | 无（1425 = 1425） | PASS — 7 assets / 4 documents、Save changes 禁用 |
+
+- **超出视口的元素：** 都在各自的裁剪容器内，属于既有设计。Media & resources 的 documents 表格在自身 `overflow-x: auto` 容器内滚动；`/admin/media` 卡片里的长文件夹路径被 `overflow: hidden` 截断。
+- **1440 未点击选择来源：** 面板把 1440×900 页面约按 0.19 倍绘制，复选框在点击坐标中只有约 3px，点击不可靠。该交互已在 AI-PDF-SOURCE-01 的 375px 验收中用真实点击验证。本轮 0 次点击、0 次 generate / apply 请求、0 次 Analyze。
+- **截图：** 1440 面板截图不可辨认（区域放大在 Browser 面板中不支持），结论以 DOM 几何与 console 为准。
+- **375px：** N/A — closeout 无 runtime / UI 改动。
+
+### 二、治理文档同步
+
+- **Charter H.1：**
+  - 新增已交付条目"型号归属保护（D-025）"。
+  - 原"当前 AI 可读格式：TXT / CSV / TSV"改为引用 D-024 共享格式合同与本文件，并写明截至 AI-PDF-SOURCE-01 text-layer PDF 抽取已实现（生产部署仍须单独授权）。
+  - "尚未实现"改为锚定"截至 AI-PDF-SOURCE-01"，仍列扫描 PDF OCR、DOCX、XLSX、图片 OCR、Vision、DOC / XLS、Specifications 以外的 Target、Worker / 队列、多产品 AI 与批量导入、自动发布。
+  - FD-004 条文（含"PDF 恢复"一句）是框架决定原文，未改。
+- **Register AI-01（§12.1i）：**
+  - Missing：删除逐格式清单与"product-model relevance checking 为后续模块"。
+  - Implementation status：改为引用 D-024 共享合同与本文件，并记录 text-layer PDF 已有仓库确认的实现；状态仍为 `AUTOMATED_CHECKED`。
+  - Reusable：注明共享 Prompt 合同含 D-025 guard。
+  - Evidence status：追加本次同步说明。
+  - Acceptance 仍为叙述式功能签收，**不是** `VISUALLY_VERIFIED`。
+- **少返工规则：** 格式当前是否可读，不再在 Charter / Register 逐项维护，以 D-024 + `utils/aiSourceFormats.ts` + 本文件为准。以后格式模块完成时，默认不再需要同步这两份治理文档。
+- **Register §13：**
+  - 属于情形 3，即已批准的施工单依据已验证的交付证据更新该行。
+  - 不影响母版、路由、数据/API 合同与 Gate；纯文档，回滚即 revert 本次 commit。
+  - MASTER-ROADMAP 已正确显示 AI-PDF-SOURCE-01 ✅ COMPLETED，未改。
+  - `08-decision-log.md`（D-022 / D-024 / D-025 / D-026）与 Implementation Blueprint 未改。
+
+### 三、未改变
+
+- **Gate：** `CH-DG-07` 未授权；`CH-DG-08`、`BP-DG-11`、`BP-DG-06` 仍 unresolved；其他 Gate 不变。
+- **决定：** D-022 仍有效；D-026 仍只是 document-extractor 安全 sidecar 的窄范围例外。
+- **验证：** `git diff --check` 与文本核对 1–10 用于确认本次文档改动；未运行 npm test / vue-tsc / lint / build，因为 0 runtime / code 改动。
+
+**0 runtime · 0 code · 0 UI · 0 Docker · 0 package · 0 Provider · 0 产品数据 · 0 DB · 0 Directus · 0 API 调用 · 0 API 费用 · 0 push · 0 deploy。**
+
+---
+
+```text
+AI-PDF-SOURCE-01-CLOSEOUT-01 = COMPLETED
+
+Fresh 1440px clean-tab validation: PASS
+Console errors: 0
+Horizontal overflow: 0
+Charter stale PDF / relevance wording: synchronized
+Register stale PDF / relevance wording: synchronized
+Source-format status duplication: reduced (D-024 + shared contract + CURRENT-STATE)
+Gates: unchanged
+Runtime / code behavior: unchanged
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+AI-PDF-SOURCE-01 = COMPLETED
+AI-readable: TXT / CSV / TSV / PDF (text-layer only)
+XLSX / DOCX / Images: NOT IMPLEMENTED
+
+NEXT CANDIDATE: AI-XLSX-SOURCE-01
+STATUS: NOT AUTHORIZED
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"AI-PDF-SOURCE-01-CLOSEOUT-01"任务中写入。*
