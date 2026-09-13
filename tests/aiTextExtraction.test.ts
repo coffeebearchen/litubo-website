@@ -2,90 +2,89 @@
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — text-only source extraction.
  *
  * PDF is deliberately no longer supported: its parser could not be given a
- * real memory ceiling in-process, so it is refused with its own honest reason
- * rather than parsed unsafely. These tests cover the formats that ARE
- * supported (TXT, CSV, TSV) end to end, plus the refusal behaviour for every
- * dropped format. No network, no Directus, no mock provider involved.
+ * real memory ceiling in-process, so it is refused rather than parsed unsafely.
+ * These tests cover the formats that ARE supported (TXT, CSV, TSV) end to end,
+ * plus the refusal behaviour for every other format. No network, no Directus,
+ * no mock provider involved.
+ *
+ * AI-SOURCE-CONTRACT-01 — a refusal is now a failure code. Which formats are
+ * readable, and the sentence each code becomes, are pinned against the shared
+ * contract in `tests/aiSourceFormats.test.ts`.
  */
 
 import { describe, it, expect } from 'vitest'
 import {
   extractTextFromFile,
   sanitizeDisplayNameForBrowser,
-  isSupportedTextSourceMime,
-  isFormerlyUnsupportedTextSourceMime,
   isFileSizeSafeToDownload,
   capTotalCharacters,
   MAX_FILES_PER_REQUEST,
-  MAX_FILE_BYTES,
   MAX_TOTAL_EXTRACTED_CHARS,
   MAX_PER_FILE_CHARS,
-  MAX_PROCESSING_MS,
 } from '../server/utils/aiTextExtraction'
+import { aiSourceFormatFor, sourceFailureMessage } from '../utils/aiSourceFormats'
+
+/** The text family's own size contract — the only download limit in force today. */
+const TEXT_MAX_BYTES = aiSourceFormatFor('text/plain')!.maxBytes
 
 function toArrayBuffer(buffer: Buffer): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
 }
 
-describe('isSupportedTextSourceMime — first-version allowlist', () => {
-  it('accepts exactly CSV, TSV, TXT — PDF is no longer in the allowlist', () => {
-    expect(isSupportedTextSourceMime('application/pdf')).toBe(false)
-    expect(isSupportedTextSourceMime('text/csv')).toBe(true)
-    expect(isSupportedTextSourceMime('text/tab-separated-values')).toBe(true)
-    expect(isSupportedTextSourceMime('text/plain')).toBe(true)
-  })
-
-  it('rejects images, video, Word, archives, and unknown types — never faking support', () => {
+describe('extractTextFromFile — only what the shared contract marks readable is ever read', () => {
+  it('refuses a planned-but-not-readable format with not_enabled, before touching the bytes', async () => {
+    const bytes = toArrayBuffer(Buffer.from('not a real document'))
     for (const mime of [
-      'image/jpeg', 'image/png', 'image/webp',
-      'video/mp4', 'application/zip',
-      'application/msword',
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/octet-stream', null, undefined,
+      'image/jpeg', 'image/png', 'image/webp',
     ]) {
-      expect(isSupportedTextSourceMime(mime)).toBe(false)
+      expect(await extractTextFromFile(bytes, mime, 'Source 1')).toEqual({ ok: false, code: 'not_enabled' })
     }
   })
 
-  it('is case-insensitive and ignores a charset suffix', () => {
-    expect(isSupportedTextSourceMime('TEXT/PLAIN')).toBe(true)
-    expect(isSupportedTextSourceMime('text/plain; charset=utf-8')).toBe(true)
-  })
-})
-
-describe('isFormerlyUnsupportedTextSourceMime — XLS/XLSX honestly dropped, not lumped in with "never supported"', () => {
-  it('flags exactly the two Excel MIME types', () => {
-    expect(isFormerlyUnsupportedTextSourceMime('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')).toBe(true)
-    expect(isFormerlyUnsupportedTextSourceMime('application/vnd.ms-excel')).toBe(true)
-    expect(isFormerlyUnsupportedTextSourceMime('application/pdf')).toBe(true)
-    expect(isFormerlyUnsupportedTextSourceMime('image/jpeg')).toBe(false)
+  it('refuses video, archives, legacy Office and unknown types as unsupported — never faking support', async () => {
+    const bytes = toArrayBuffer(Buffer.from('anything at all'))
+    for (const mime of [
+      'video/mp4', 'application/zip',
+      'application/msword', 'application/vnd.ms-excel',
+      'application/octet-stream', null, undefined,
+    ]) {
+      expect(await extractTextFromFile(bytes, mime, 'Source 1')).toEqual({ ok: false, code: 'unsupported' })
+    }
   })
 
-  it('extractTextFromFile gives Excel a distinct reason from a generically unsupported type', async () => {
+  it('an Excel workbook is refused as not yet enabled, distinct from a format that is simply unsupported', async () => {
     const bytes = toArrayBuffer(Buffer.from('not a real xlsx'))
-    const excelResult = await extractTextFromFile(bytes, 'application/vnd.ms-excel', 'sheet.xls')
-    const imageResult = await extractTextFromFile(bytes, 'image/jpeg', 'photo.jpg')
-    expect(excelResult).toEqual({ ok: false, reason: 'Excel files are not supported for text-source analysis yet.' })
-    expect(imageResult).toEqual({ ok: false, reason: 'This file type is not supported for text-source analysis yet.' })
-    expect(excelResult).not.toEqual(imageResult)
+    const excel = await extractTextFromFile(bytes, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'sheet.xlsx')
+    const archive = await extractTextFromFile(bytes, 'application/zip', 'archive.zip')
+    expect(excel).toEqual({ ok: false, code: 'not_enabled' })
+    expect(archive).toEqual({ ok: false, code: 'unsupported' })
+  })
+
+  it('is case-insensitive and ignores a charset suffix', async () => {
+    const bytes = toArrayBuffer(Buffer.from('Rated power: 220V'))
+    expect((await extractTextFromFile(bytes, 'TEXT/PLAIN', 'notes.txt')).ok).toBe(true)
+    expect((await extractTextFromFile(bytes, 'text/plain; charset=utf-8', 'notes.txt')).ok).toBe(true)
   })
 })
 
 describe('isFileSizeSafeToDownload — trusted-metadata pre-check, before any download', () => {
-  it('accepts a known size at or under the limit', () => {
-    expect(isFileSizeSafeToDownload(1000)).toBe(true)
-    expect(isFileSizeSafeToDownload(MAX_FILE_BYTES)).toBe(true)
+  it('accepts a known size at or under the format limit', () => {
+    expect(isFileSizeSafeToDownload(1000, TEXT_MAX_BYTES)).toBe(true)
+    expect(isFileSizeSafeToDownload(TEXT_MAX_BYTES, TEXT_MAX_BYTES)).toBe(true)
   })
 
-  it('rejects a known size over the limit', () => {
-    expect(isFileSizeSafeToDownload(MAX_FILE_BYTES + 1)).toBe(false)
+  it('rejects a known size over the format limit', () => {
+    expect(isFileSizeSafeToDownload(TEXT_MAX_BYTES + 1, TEXT_MAX_BYTES)).toBe(false)
   })
 
   it('rejects conservatively when size is unknown — never assumes small', () => {
-    expect(isFileSizeSafeToDownload(null)).toBe(false)
-    expect(isFileSizeSafeToDownload(undefined)).toBe(false)
-    expect(isFileSizeSafeToDownload(Number.NaN)).toBe(false)
-    expect(isFileSizeSafeToDownload(-1)).toBe(false)
+    expect(isFileSizeSafeToDownload(null, TEXT_MAX_BYTES)).toBe(false)
+    expect(isFileSizeSafeToDownload(undefined, TEXT_MAX_BYTES)).toBe(false)
+    expect(isFileSizeSafeToDownload(Number.NaN, TEXT_MAX_BYTES)).toBe(false)
+    expect(isFileSizeSafeToDownload(-1, TEXT_MAX_BYTES)).toBe(false)
   })
 })
 
@@ -102,14 +101,15 @@ describe('extractTextFromFile — TXT (real extraction, no mocking)', () => {
 
   it('rejects an empty file with an honest, short reason', async () => {
     const result = await extractTextFromFile(toArrayBuffer(Buffer.from('')), 'text/plain', 'empty.txt')
-    expect(result).toEqual({ ok: false, reason: 'This file is empty.' })
+    expect(result).toEqual({ ok: false, code: 'empty' })
+    expect(sourceFailureMessage('empty')).toBe('This file is empty.')
   })
 
   it('rejects whitespace-only content as "no extractable text"', async () => {
     const bytes = toArrayBuffer(Buffer.from('   \n\t  '))
     const result = await extractTextFromFile(bytes, 'text/plain', 'blank.txt')
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.reason).toContain('No extractable text')
+    expect(result).toEqual({ ok: false, code: 'no_text' })
+    expect(sourceFailureMessage('no_text')).toContain('No extractable text')
   })
 })
 
@@ -132,24 +132,16 @@ describe('extractTextFromFile — CSV/TSV (real extraction, no mocking)', () => 
   })
 })
 
-describe('extractTextFromFile — PDF is refused with its own honest reason', () => {
-  it('a real PDF byte stream is refused, not parsed', async () => {
+describe('extractTextFromFile — PDF is refused, not parsed', () => {
+  it('a real PDF byte stream is refused, and the sentence for it names PDF — never Excel', async () => {
     const bytes = toArrayBuffer(Buffer.from('%PDF-1.4 anything at all'))
     const result = await extractTextFromFile(bytes, 'application/pdf', 'datasheet.pdf')
 
-    expect(result.ok).toBe(false)
-    if (!result.ok) {
-      expect(result.reason).toContain('PDF is not supported for text-source analysis yet')
-      // Distinct from the generic "never supported" message and from Excel's.
-      expect(result.reason).not.toBe('This file type is not supported for text-source analysis yet.')
-      expect(result.reason).not.toContain('Excel')
-    }
-  })
-
-  it('the refusal reason explains that an isolated parser is what is missing', async () => {
-    const result = await extractTextFromFile(toArrayBuffer(Buffer.from('%PDF-1.4')), 'application/pdf', 'x.pdf')
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.reason).toContain('memory limit')
+    expect(result).toEqual({ ok: false, code: 'not_enabled' })
+    const message = sourceFailureMessage('not_enabled', 'application/pdf')
+    expect(message).toBe('PDF is not supported for source analysis yet.')
+    expect(message).not.toContain('Excel')
+    expect(message).not.toBe(sourceFailureMessage('unsupported'))
   })
 
   it('no PDF parser is reachable from this module at all', async () => {
@@ -166,16 +158,11 @@ describe('extractTextFromFile — PDF is refused with its own honest reason', ()
   })
 })
 
-describe('extractTextFromFile — unsupported and oversized inputs never fake success', () => {
-  it('refuses an image outright, before ever touching the bytes', async () => {
-    const result = await extractTextFromFile(toArrayBuffer(Buffer.from([0xff, 0xd8, 0xff])), 'image/jpeg', 'photo.jpg')
-    expect(result).toEqual({ ok: false, reason: 'This file type is not supported for text-source analysis yet.' })
-  })
-
-  it('a file larger than MAX_FILE_BYTES is refused before extraction is attempted', async () => {
-    const bytes = toArrayBuffer(Buffer.alloc(MAX_FILE_BYTES + 1, 'a'))
+describe('extractTextFromFile — oversized inputs never fake success', () => {
+  it('a file larger than its format limit is refused before extraction is attempted', async () => {
+    const bytes = toArrayBuffer(Buffer.alloc(TEXT_MAX_BYTES + 1, 'a'))
     const result = await extractTextFromFile(bytes, 'text/plain', 'huge.txt')
-    expect(result).toEqual({ ok: false, reason: 'This file is too large to analyze.' })
+    expect(result).toEqual({ ok: false, code: 'too_large' })
   })
 })
 
@@ -256,15 +243,18 @@ describe('sanitizeDisplayNameForBrowser — PWS-AI-ENGINE-01R2-SAFETY-01', () =>
 // lived here was removed along with the implementation it covered; it could
 // only prove the caller stopped waiting, never that the parse stopped running.
 // The terminable PDF worker that briefly replaced it is gone as well: PDF is
-// disabled outright (see `TEMPORARILY_UNSUPPORTED_MIME_REASONS`), so there is
-// no PDF parse left to time out and no worker test to point at.
+// disabled outright (the shared format contract marks it not readable), so
+// there is no PDF parse left to time out and no worker test to point at.
+//
+// AI-SOURCE-CONTRACT-01 — `MAX_PROCESSING_MS` was declared here but never
+// enforced by anything. The reading stage's real time limit is the engine's
+// `MAX_TOTAL_EXTRACTION_MS`, tested in `tests/aiProposalEngine.test.ts`.
 
 describe('PWS-AI-ENGINE-01R explicit, tested limits exist', () => {
   it('all limits are finite, positive numbers', () => {
     expect(MAX_FILES_PER_REQUEST).toBeGreaterThan(0)
-    expect(MAX_FILE_BYTES).toBeGreaterThan(0)
+    expect(TEXT_MAX_BYTES).toBeGreaterThan(0)
     expect(MAX_TOTAL_EXTRACTED_CHARS).toBeGreaterThan(0)
     expect(MAX_PER_FILE_CHARS).toBeGreaterThan(0)
-    expect(MAX_PROCESSING_MS).toBeGreaterThan(0)
   })
 })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { MAX_FILES_PER_REQUEST, SUPPORTED_TEXT_SOURCE_FORMATS_LABEL, type AiIntakeSource } from '~/utils/aiProposal'
+import { MAX_FILES_PER_REQUEST, type AiIntakeSource } from '~/utils/aiProposal'
+import { AI_READABLE_FORMATS_LABEL } from '~/utils/aiSourceFormats'
 
 interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
 interface FileOutcome { displayName: string, status: 'read' | 'unsupported' | 'unreadable', reason?: string }
@@ -66,7 +67,7 @@ const canAnalyze = computed(() =>
 <template>
   <section class="ws-ai-intake" aria-labelledby="ws-ai-intake-heading">
     <p class="ws-scope-hint">
-      Selecting a file never calls an AI model or writes anything. Only clicking "Analyze selected sources" below sends the selected text sources to the configured AI provider.
+      Selecting a file never calls an AI model or writes anything. Only clicking "Analyze selected sources" below sends text extracted from the selected sources to the configured AI provider.
     </p>
 
     <!-- 4-step flow indicator - Select sources is the current step -->
@@ -124,7 +125,7 @@ const canAnalyze = computed(() =>
 
       <p v-else-if="!hasAnyAnalyzableSource" class="ws-empty ws-empty--no-readable">
         None of this product&apos;s linked files can be analyzed as text yet — they may all be images, disabled for this product, or another unsupported format.
-        Supported formats: {{ SUPPORTED_TEXT_SOURCE_FORMATS_LABEL }}.
+        Supported formats: {{ AI_READABLE_FORMATS_LABEL }}.
         <NuxtLink :to="mediaResourcesHref">Go to Media &amp; resources</NuxtLink> to link a readable file.
       </p>
 
@@ -157,7 +158,7 @@ const canAnalyze = computed(() =>
 
       <div class="ws-analyze-row">
         <p v-if="selectedRefs.length > 0" class="ws-analyze-note">
-          Selected text sources will be sent to the configured AI provider to create draft specification proposals. Nothing will be written or published.
+          Extracted text from the selected sources will be sent to the configured AI provider for analysis. Original files are not sent to the AI provider. Nothing will be written or published.
         </p>
         <button
           type="button"

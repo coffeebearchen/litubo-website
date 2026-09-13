@@ -63,24 +63,25 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
         displayName: 'photo.jpg',
         typeLabel: 'Image',
         analyzable: false,
-        unavailableReason: 'Not available for text-source analysis yet.',
+        unavailableReason: 'Images are not supported for source analysis yet.',
       })],
     })
     expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).disabled).toBe(true)
-    expect(wrapper.text()).toContain('Not available for text-source analysis yet.')
+    expect(wrapper.text()).toContain('Images are not supported for source analysis yet.')
   })
 
   it('renders whatever specific reason the server supplied, rather than deriving one in the browser', () => {
     const wrapper = mountIntake({
       ...BASE_PROPS,
       sources: [source({
-        sourceRef: 'ref-xls',
-        displayName: 'sheet.xls',
+        sourceRef: 'ref-xlsx',
+        displayName: 'sheet.xlsx',
+        typeLabel: 'Excel',
         analyzable: false,
-        unavailableReason: 'Excel files are not supported for text-source analysis yet.',
+        unavailableReason: 'Excel files are not supported for source analysis yet.',
       })],
     })
-    expect(wrapper.text()).toContain('Excel files are not supported for text-source analysis yet.')
+    expect(wrapper.text()).toContain('Excel files are not supported for source analysis yet.')
   })
 
   it('a disabled association shows the disabled reason and cannot be selected', () => {
@@ -153,13 +154,13 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
     const wrapper = mountIntake({
       ...BASE_PROPS,
       sources: [
-        source({ sourceRef: 'a', typeLabel: 'Image', analyzable: false, unavailableReason: 'Not available for text-source analysis yet.' }),
-        source({ sourceRef: 'b', typeLabel: 'Image', analyzable: false, unavailableReason: 'Not available for text-source analysis yet.' }),
+        source({ sourceRef: 'a', typeLabel: 'Image', analyzable: false, unavailableReason: 'Images are not supported for source analysis yet.' }),
+        source({ sourceRef: 'b', typeLabel: 'PDF', analyzable: false, unavailableReason: 'PDF is not supported for source analysis yet.' }),
       ],
     })
-    expect(wrapper.text()).toContain('CSV')
-    expect(wrapper.text()).toContain('TXT')
-    // PDF is deliberately absent now — the copy must not advertise a format the server refuses.
+    // Derived from the shared format contract, so it lists exactly what the server reads today.
+    expect(wrapper.text()).toContain('Supported formats: CSV, TSV, TXT.')
+    // PDF is deliberately absent — the copy must not advertise a format the server refuses.
     expect(wrapper.text()).not.toContain('PDF (with extractable text)')
     expect(wrapper.find('a').exists()).toBe(true)
   })
@@ -205,6 +206,42 @@ describe('WorkspaceAiSourceIntake — nothing sensitive is required to render it
     // Nothing resembling a Directus identifier can appear, because none is passed.
     expect(html).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
     expect(html).not.toContain('directus_files_id')
+  })
+})
+
+/**
+ * AI-SOURCE-CONTRACT-01 — what Analyze sends has to be described in terms that
+ * stay true for every format.
+ *
+ * The old sentence ("Selected text sources will be sent…") only held while
+ * every readable file was a text file. What actually leaves the server is the
+ * text extracted from each selected file — for a TXT file today, and for a PDF,
+ * a workbook or an image once their modules exist. The original file is never
+ * sent to the provider.
+ */
+describe('WorkspaceAiSourceIntake — Analyze discloses exactly what is sent', () => {
+  function mountWithSelection() {
+    return mountIntake({ ...BASE_PROPS, sources: [source({ sourceRef: 'a' })], selectedRefs: ['a'] })
+  }
+
+  it('says extracted text is sent, original files are not, and nothing is written', () => {
+    const note = mountWithSelection().find('.ws-analyze-note')
+    expect(note.exists()).toBe(true)
+    expect(note.text()).toContain('Extracted text from the selected sources will be sent to the configured AI provider for analysis.')
+    expect(note.text()).toContain('Original files are not sent to the AI provider.')
+    expect(note.text()).toContain('Nothing will be written or published.')
+  })
+
+  it('the page intro describes the same thing — text extracted from the sources, not the sources themselves', () => {
+    const wrapper = mountWithSelection()
+    expect(wrapper.find('.ws-scope-hint').text()).toContain('sends text extracted from the selected sources to the configured AI provider')
+    expect(wrapper.text()).not.toContain('Selected text sources will be sent')
+    expect(wrapper.text()).not.toContain('sends the selected text sources')
+  })
+
+  it('with nothing selected there is nothing to disclose yet', () => {
+    const wrapper = mountIntake({ ...BASE_PROPS, sources: [source({ sourceRef: 'a' })], selectedRefs: [] })
+    expect(wrapper.find('.ws-analyze-note').exists()).toBe(false)
   })
 })
 

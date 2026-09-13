@@ -453,7 +453,7 @@ describe('/api/admin/products/:id/ai/sources — the browser receives no Directu
     expect(result[2]).toMatchObject({ analyzable: false })
     expect(String(result[2].unavailableReason)).toContain('disabled for this product')
     expect(result[3]).toMatchObject({ analyzable: false })
-    expect(String(result[3].unavailableReason)).toContain('Not available for text-source analysis yet')
+    expect(String(result[3].unavailableReason)).toContain('Images are not supported for source analysis yet')
     expect(result[4]).toMatchObject({ analyzable: false })
     expect(String(result[4].unavailableReason)).toContain('PDF is not supported')
   })

@@ -709,7 +709,7 @@ const MIXED_FILE_RESULTS: SourceFileOutcome[] = [
   { displayName: 'LT-180C-spec.txt', status: 'read' },
   { displayName: 'LT-180C-electrical.txt', status: 'read' },
   { displayName: 'LT-180C-spec-copy.txt', status: 'duplicate', reason: 'Duplicate content excluded from analysis.' },
-  { displayName: 'LT-180C-photo.jpg', status: 'unsupported', reason: 'Not available for text-source analysis yet.' },
+  { displayName: 'LT-180C-photo.jpg', status: 'unsupported', reason: 'Images are not supported for source analysis yet.' },
 ]
 
 function mountConflict(overrides: Partial<typeof BASE_PROPS> = {}) {
@@ -838,6 +838,48 @@ describe('the source summary says what this analysis actually used', () => {
     expect(summary).not.toMatch(/[0-9a-f]{64}/)
     expect(summary).not.toContain('/assets/')
     expect(summary).not.toContain('directus_files_id')
+  })
+})
+
+/**
+ * AI-SOURCE-CONTRACT-01 — disagreements are only found among the sources that
+ * were actually read. When one was not, the reviewer is told so where the
+ * sources are summarised, so an empty conflict list is never taken to mean that
+ * every selected document agreed.
+ */
+describe('a source that was not analyzed is called out beside the source summary', () => {
+  const WARNING = 'Some selected sources were not analyzed — any conflicting values they contain are not shown.'
+
+  it('shows the warning when at least one selected source was not analyzed', () => {
+    const summary = mountConflict().find('.ws-source-summary')
+    expect(summary.find('.ws-source-warning').exists()).toBe(true)
+    expect(summary.find('.ws-source-warning').text()).toBe(WARNING)
+  })
+
+  it('stays hidden when every selected source was analyzed', () => {
+    const wrapper = mountReview()
+    expect(wrapper.find('.ws-source-warning').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain(WARNING)
+  })
+
+  it('stays hidden when the only other source was a duplicate — a duplicate was read, not skipped', () => {
+    const wrapper = mountReview({
+      fileResults: [
+        { displayName: 'LT-180C-spec.txt', status: 'read' },
+        { displayName: 'LT-180C-spec-copy.txt', status: 'duplicate', reason: 'Duplicate content excluded from analysis.' },
+      ],
+    })
+    expect(wrapper.find('.ws-source-warning').exists()).toBe(false)
+  })
+
+  it('also appears when a source was left unread by the reading time limit', () => {
+    const wrapper = mountReview({
+      fileResults: [
+        { displayName: 'LT-180C-spec.txt', status: 'read' },
+        { displayName: 'LT-180C-manual.txt', status: 'unreadable', reason: 'Not read: the time limit for reading sources was reached.' },
+      ],
+    })
+    expect(wrapper.find('.ws-source-warning').text()).toBe(WARNING)
   })
 })
 

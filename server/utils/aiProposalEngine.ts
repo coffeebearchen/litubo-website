@@ -1,15 +1,13 @@
 import {
   extractTextFromFile,
-  isSupportedTextSourceMime,
-  isFormerlyUnsupportedTextSourceMime,
   isFileSizeSafeToDownload,
   sanitizeDisplayNameForBrowser,
   capTotalCharacters,
   MAX_FILES_PER_REQUEST,
-  MAX_FILE_BYTES,
   MAX_TOTAL_EXTRACTED_CHARS,
   type ExtractedSource,
 } from './aiTextExtraction'
+import { aiSourceFormatFor, aiSourceFormatRefusal, sourceFailureMessage, type SourceFailureCode } from '../../utils/aiSourceFormats'
 import { digestSourceText, buildAnalysisFingerprint } from './aiProposalReplayGuard'
 import { isAiProviderId, type AiProviderId, type AiProviderRegistry } from './aiProviderRegistry'
 import type { AiGenerationInput, TargetDefinition } from './aiTargetContract'
@@ -49,6 +47,14 @@ import type { FetchFn } from './mediaLifecycle'
  * instruction or a `--- Source: ... ---` delimiter-injection vector. The
  * (separately sanitized) real name is only ever used for the browser-facing
  * `fileResults` summary, never for anything sent to a model.
+ *
+ * AI-SOURCE-CONTRACT-01 — which formats may be read, how large each may be,
+ * and the sentence a person sees when a source is not read all come from the
+ * shared format contract (`utils/aiSourceFormats.ts`); this engine keeps no
+ * format list and no refusal wording of its own. The reading stage of one
+ * analysis also runs on a single clock (`MAX_TOTAL_EXTRACTION_MS`): a source
+ * that clock does not reach is reported as not read, and whatever was read
+ * still goes to the provider.
  */
 
 /**
@@ -144,6 +150,38 @@ async function fetchProductName(fetch: FetchFn, productId: number): Promise<stri
 export const MAX_ASSET_DOWNLOAD_MS = 15_000
 
 /**
+ * AI-SOURCE-CONTRACT-01 — the reading stage of one analysis, taken as a whole,
+ * may not run longer than this.
+ *
+ * Sources are downloaded and read one after another, and each download already
+ * has its own deadline — but five of them back to back could still outlast the
+ * Generate endpoint's single-flight slot (`MAX_INFLIGHT_MS`, 120 s). Once that
+ * slot counts as abandoned, a second paid analysis of the same product can
+ * start while the first is still running. Sixty seconds of reading plus the
+ * provider's own call deadline stays inside the slot with room to spare, a
+ * relationship `tests/aiProposalEngine.test.ts` checks against both provider
+ * adapters.
+ *
+ * A source the clock does not reach is reported as not read; the sources that
+ * were read still go to the analysis, exactly as with any other unreadable file.
+ */
+export const MAX_TOTAL_EXTRACTION_MS = 60_000
+
+export interface ExtractionBudget {
+  /** Milliseconds left in this analysis's reading stage — zero once spent, never negative. */
+  remainingMs(): number
+}
+
+/** Starts the reading-stage clock. `now` is injectable so the arithmetic can be tested without waiting. */
+export function createExtractionBudget(
+  totalMs: number = MAX_TOTAL_EXTRACTION_MS,
+  now: () => number = () => Date.now(),
+): ExtractionBudget {
+  const deadline = now() + totalMs
+  return { remainingMs: () => Math.max(0, deadline - now()) }
+}
+
+/**
  * Streams an asset, counting bytes as they arrive and aborting the request
  * the instant the ceiling is passed or the deadline expires.
  *
@@ -152,13 +190,18 @@ export const MAX_ASSET_DOWNLOAD_MS = 15_000
  * this process buffer an arbitrarily large response before anything objected;
  * the "deadline" likewise only stopped the caller waiting, while the transfer
  * continued in the background. Now an `AbortController` cancels the HTTP
- * request itself in both cases, and no more than `MAX_FILE_BYTES` is ever
- * held. `tests/aiProposalEngine.test.ts` asserts the abort signal actually
- * fires and that reading stops mid-stream rather than draining the source.
+ * request itself in both cases, and no more than the format's own `maxBytes`
+ * is ever held. `tests/aiProposalEngine.test.ts` asserts the abort signal
+ * actually fires and that reading stops mid-stream rather than draining the
+ * source.
  */
 const DOWNLOAD_TIMED_OUT = Symbol('asset-download-timed-out')
 
-async function downloadSourceBytes(fetch: FetchFn, fileUuid: string): Promise<ArrayBuffer | null> {
+async function downloadSourceBytes(
+  fetch: FetchFn,
+  fileUuid: string,
+  limits: { maxBytes: number, timeoutMs: number },
+): Promise<ArrayBuffer | null> {
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
 
@@ -169,7 +212,7 @@ async function downloadSourceBytes(fetch: FetchFn, fileUuid: string): Promise<Ar
     timer = setTimeout(() => {
       controller.abort()
       resolve(DOWNLOAD_TIMED_OUT)
-    }, MAX_ASSET_DOWNLOAD_MS)
+    }, limits.timeoutMs)
   })
 
   try {
@@ -201,7 +244,7 @@ async function downloadSourceBytes(fetch: FetchFn, fileUuid: string): Promise<Ar
         if (done) break
         if (!value) continue
         received += value.byteLength
-        if (received > MAX_FILE_BYTES) {
+        if (received > limits.maxBytes) {
           // Stop the transfer rather than read on to discover how big it was.
           // `cancel()` is not awaited for the same reason as above.
           controller.abort()
@@ -232,8 +275,20 @@ const NOT_FOUND_ERROR = 'Product not found.'
 const NOT_CONFIGURED_ERROR = 'AI provider is not configured.'
 const NO_SELECTION_ERROR = 'Select at least one source file to analyze.'
 const NO_READABLE_SOURCES_ERROR = 'None of the selected files could be read as text. Nothing was sent to the AI provider.'
-const NOT_ASSOCIATED_REASON = 'One of the selected files could not be used for this product.'
 const DUPLICATE_CONTENT_REASON = 'Duplicate content excluded from analysis.'
+
+/**
+ * A source that did not reach the analysis. Its reason is worded by the shared
+ * contract, never here; a format refusal reads as `unsupported`, anything else
+ * as `unreadable`.
+ */
+function notAnalyzed(displayName: string, code: SourceFailureCode, mimeType?: string | null): SourceFileOutcome {
+  return {
+    displayName,
+    status: code === 'unsupported' || code === 'not_enabled' ? 'unsupported' : 'unreadable',
+    reason: sourceFailureMessage(code, mimeType),
+  }
+}
 
 /**
  * The single generation entry point, for whichever `TargetDefinition` the
@@ -296,12 +351,14 @@ export async function runProposalEngine<TOutput>(
   // positional label ("Source 1", "Source 2", ...) is what the AI provider
   // sees in place of the real filename; see the module docstring above.
   let promptSourceCounter = 0
+  // AI-SOURCE-CONTRACT-01 — one clock for the whole reading stage; see MAX_TOTAL_EXTRACTION_MS.
+  const budget = createExtractionBudget()
 
   for (const mediaId of mediaIds) {
     const row = rowById.get(mediaId)
     if (!row || !row.directus_files_id) {
       // Deliberately generic — never echoes the requested media id back to the caller.
-      fileResults.push({ displayName: 'Selected file', status: 'unreadable', reason: NOT_ASSOCIATED_REASON })
+      fileResults.push(notAnalyzed('Selected file', 'not_associated'))
       continue
     }
     // Browser-facing only — sanitized real name (or a generic fallback for
@@ -310,30 +367,48 @@ export async function runProposalEngine<TOutput>(
     const browserDisplayName = sanitizeDisplayNameForBrowser(row.directus_files_id.filename_download)
     const mime = row.directus_files_id.type
 
-    if (isFormerlyUnsupportedTextSourceMime(mime)) {
-      fileResults.push({ displayName: browserDisplayName, status: 'unsupported', reason: 'Excel files are not supported for text-source analysis yet.' })
+    // The format decides first: a file that could never be analyzed says so,
+    // however much reading time is left.
+    const refusal = aiSourceFormatRefusal(mime)
+    if (refusal) {
+      fileResults.push(notAnalyzed(browserDisplayName, refusal, mime))
       continue
     }
-    if (!isSupportedTextSourceMime(mime)) {
-      fileResults.push({ displayName: browserDisplayName, status: 'unsupported', reason: 'Not available for text-source analysis yet.' })
-      continue
-    }
+    // A format the contract does not refuse is always one of its entries.
+    const format = aiSourceFormatFor(mime)!
 
     // Trusted-metadata size pre-check — happens BEFORE any byte is downloaded.
     const knownSize = row.directus_files_id.filesize == null ? null : Number(row.directus_files_id.filesize)
-    if (!isFileSizeSafeToDownload(knownSize)) {
-      fileResults.push({ displayName: browserDisplayName, status: 'unreadable', reason: 'This file is too large to analyze, or its size could not be confirmed.' })
+    if (!isFileSizeSafeToDownload(knownSize, format.maxBytes)) {
+      fileResults.push(notAnalyzed(browserDisplayName, 'too_large'))
+      continue
+    }
+
+    const remainingMs = budget.remainingMs()
+    if (remainingMs === 0) {
+      fileResults.push(notAnalyzed(browserDisplayName, 'time_budget_exhausted'))
       continue
     }
 
     let bytes: ArrayBuffer | null
     try {
-      bytes = await downloadSourceBytes(fetch, row.directus_files_id.id)
+      // A download never outlives the reading stage: its deadline is its own
+      // limit or the time the stage has left, whichever comes first.
+      bytes = await downloadSourceBytes(fetch, row.directus_files_id.id, {
+        maxBytes: format.maxBytes,
+        timeoutMs: Math.min(MAX_ASSET_DOWNLOAD_MS, remainingMs),
+      })
     } catch {
       bytes = null
     }
+    // Once the stage's time is spent nothing more is read — not even bytes
+    // that happened to arrive at the last moment.
+    if (budget.remainingMs() === 0) {
+      fileResults.push(notAnalyzed(browserDisplayName, 'time_budget_exhausted'))
+      continue
+    }
     if (!bytes) {
-      fileResults.push({ displayName: browserDisplayName, status: 'unreadable', reason: 'This file could not be read.' })
+      fileResults.push(notAnalyzed(browserDisplayName, 'unreadable'))
       continue
     }
 
@@ -342,7 +417,7 @@ export async function runProposalEngine<TOutput>(
     const promptLabel = `Source ${promptSourceCounter + 1}`
     const extraction = await extractTextFromFile(bytes, mime, promptLabel)
     if (!extraction.ok) {
-      fileResults.push({ displayName: browserDisplayName, status: 'unreadable', reason: extraction.reason })
+      fileResults.push(notAnalyzed(browserDisplayName, extraction.code, mime))
       continue
     }
 

@@ -1,11 +1,8 @@
 import { createError, getRouterParam, setResponseHeader } from 'h3'
 import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
-import {
-  isSupportedTextSourceMime,
-  sanitizeDisplayNameForBrowser,
-  temporarilyUnsupportedReason,
-} from '~/server/utils/aiTextExtraction'
+import { sanitizeDisplayNameForBrowser } from '~/server/utils/aiTextExtraction'
 import { createSourceRef, SourceRefUnavailableError } from '~/server/utils/aiSourceRef'
+import { aiSourceFormatRefusal, aiSourceTypeLabel, sourceFailureMessage } from '~/utils/aiSourceFormats'
 
 /**
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — the AI Source Intake screen's own,
@@ -44,30 +41,23 @@ interface ProductFileRow {
   } | null
 }
 
-function typeLabel(mime: string | null): string {
-  if (!mime) return 'Unknown'
-  const type = mime.toLowerCase().split(';')[0].trim()
-  if (type === 'text/csv') return 'CSV'
-  if (type === 'text/tab-separated-values') return 'TSV'
-  if (type === 'text/plain') return 'Text'
-  if (type === 'application/pdf') return 'PDF'
-  if (type.startsWith('image/')) return 'Image'
-  if (type.startsWith('video/')) return 'Video'
-  return 'File'
-}
-
 function roleLabel(role: string | null): string {
   if (!role) return 'Role not set'
   return role.replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-/** Why this file cannot be analyzed, in the order the reasons actually apply. */
+/**
+ * Why this file cannot be analyzed, in the order the reasons actually apply.
+ *
+ * AI-SOURCE-CONTRACT-01 — the format decision and its wording both come from the
+ * shared source contract, the same one the engine reads the file with, so this
+ * list can never offer a file the engine would refuse.
+ */
 function unavailableReasonFor(row: ProductFileRow): string | null {
   const mime = row.directus_files_id?.type ?? null
-  const droppedFormat = temporarilyUnsupportedReason(mime)
-  if (droppedFormat) return droppedFormat
-  if (!isSupportedTextSourceMime(mime)) return 'Not available for text-source analysis yet.'
-  if (row.enabled !== true) return 'This file is disabled for this product, so it cannot be analyzed. Enable it in Media & resources first.'
+  const refusal = aiSourceFormatRefusal(mime)
+  if (refusal) return sourceFailureMessage(refusal, mime)
+  if (row.enabled !== true) return sourceFailureMessage('disabled')
   return null
 }
 
@@ -97,7 +87,7 @@ export default defineEventHandler(async (event): Promise<AiIntakeSource[]> => {
       return {
         sourceRef: createSourceRef(row.id, { productId, adminUserId }),
         displayName: sanitizeDisplayNameForBrowser(row.directus_files_id?.filename_download ?? null),
-        typeLabel: typeLabel(row.directus_files_id?.type ?? null),
+        typeLabel: aiSourceTypeLabel(row.directus_files_id?.type ?? null),
         roleLabel: roleLabel(row.file_role),
         analyzable: reason === null,
         unavailableReason: reason,

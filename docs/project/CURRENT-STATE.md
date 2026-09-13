@@ -6338,3 +6338,157 @@ NEXT MODULE = NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-13，由 Claude Code 在"MEDIA-AI-LINK-PICKER-01-R1"任务中写入。*
+
+---
+
+## AI-SOURCE-CONTRACT-01 = COMPLETED（2026-09-13）
+
+```text
+Unified AI Source Extraction Contract established.
+AI-readable today: TXT / CSV / TSV only.
+```
+
+AI Document / Image Source V1 的基础合同模块，前置为 AI-DOCUMENT-SOURCE-V1-PREFLIGHT = PASS WITH ARCHITECTURE DECISIONS（只读预审，未改文档，结论经 ChatGPT 审查）。本模块**不实现任何新格式**，只建立 PDF / DOCX / XLSX / Image 以后必须共用的一个合同。
+
+**分支：** `review/ai-source-contract-01`，从 `7ce9507` 创建，仅本地，未 push。
+
+**治理文档状态差异（已在开工声明中如实报告，未修改治理文档）：**
+- Register 的 AI-01 行停在 2026-09-07，仍记 `NOT_STARTED` / DoR NOT MET；
+- Charter H.1 / H.4 仍写"当前未接入任何 AI"；
+- 两者都没有同步 FD-004 之后已交付并签收的单产品 AI 主线。
+
+本模块依据 Codex 施工单的正式授权施工，沿用本文件第 2684 行的先例（窄范围的明确授权，不代表 Register 状态本身改变），且不扩大 AI 能力：0 新可读格式、0 prompt 变更、0 provider 变更。建议 Codex 另排治理文档同步。
+
+### 一、统一格式合同（`utils/aiSourceFormats.ts`，新建）
+
+纯共享模块：不依赖 server-only 模块、Vue、Directus 或 provider。服务端抽取、AI Source Intake 来源列表、Media picker 的 AI-readable 标记和测试，都从这一处取值。
+
+| 格式 | MIME | Media Library 上传 | AI 可读（现在） | 大小合同 | 计划读取方式 |
+|---|---|---|---|---:|---|
+| TXT / CSV / TSV | `text/plain` · `text/csv` · `text/tab-separated-values` | ✅ | ✅ | 8 MB（生效中） | 进程内 UTF-8 解码（现状） |
+| PDF | `application/pdf` | ✅ | ❌ | 20 MB | 隔离的 document-extractor（AI-PDF-SOURCE-01） |
+| DOCX | `…wordprocessingml.document` | ❌ | ❌ | 10 MB | 有界流式读取器（AI-DOCX-SOURCE-01） |
+| XLSX | `…spreadsheetml.sheet` | ❌ | ❌ | 10 MB | 有界流式读取器（AI-XLSX-SOURCE-01） |
+| Image | `image/jpeg` · `image/jpg` · `image/png` · `image/webp` | ✅ | ❌ | 20 MB | 本地 OCR（AI-IMAGE-OCR-SOURCE-01） |
+
+- **两个独立事实：** `mediaUploadSupported` 只描述上传路由的现状，由测试逐项绑定真实的 `isAllowedUpload()`，**不授予、也不改变上传权限**；`aiReadableNow` 表示 AI 现在能否读取。本模块未开放 DOCX / XLSX 上传。
+- **启用规则：** 计划格式可以登记，但 `aiReadableNow` 只能由该格式自己的实施模块在验收后改为 true。DOC / XLS 不在 V1，合同中不存在，按 unsupported 处理。
+- **抽取层兜底：** 即使某格式被误标为可读，只要该格式没有读取器，抽取仍返回 `not_enabled`，字节不会被当作文本解码。
+- **删除的重复定义（漂移源）：**
+  - 服务端：`isSupportedTextSourceMime`、`isFormerlyUnsupportedTextSourceMime`、`temporarilyUnsupportedReason`；
+  - 客户端：`isTextSourceMime`、`isFormerlyTextSourceMime`、`SUPPORTED_TEXT_SOURCE_FORMATS_LABEL`；
+  - `MAX_FILE_BYTES`：改为按格式的 `maxBytes`，文本仍为 8 MB；
+  - `MAX_PROCESSING_MS`：声明了但从未生效。
+- **"Supported formats" 文案：** 改为从合同派生，仍显示 `CSV, TSV, TXT`，可见文字不变。
+
+### 二、ExtractedSource 与 Provider
+
+- **`ExtractedSource { displayName, fileType, text }` 不变。** 可读格式的 `fileType` 标签（Text / CSV / TSV）逐字保持，prompt 输入不变。
+- **Provider 行为不变：** DeepSeek / OpenAI adapter、prompt、`specificationsTarget`、replay guard、single-flight 均未修改。仍是一次 Analyze → 一个 provider → 0 retry → 0 fallback → 一份 proposal。
+
+### 三、失败码 → 固定安全文案
+
+映射只有一处，在共享合同里。抽取和引擎只返回失败码，文案统一由 `sourceFailureMessage()` 给出；不回传 stack、路径、stderr、UUID、token 或资料片段。
+
+| 失败码 | 文案 | 现状 |
+|---|---|---|
+| `not_associated` | One of the selected files could not be used for this product. | 使用中 |
+| `disabled` | This file is disabled for this product, so it cannot be analyzed. Enable it in Media & resources first. | 使用中 |
+| `not_enabled` | PDF is not supported for source analysis yet.（Word / Excel / Images 各自按格式命名） | 使用中 |
+| `unsupported` | This file type is not supported for source analysis. | 使用中 |
+| `too_large` | This file is too large to analyze, or its size could not be confirmed. | 使用中 |
+| `empty` | This file is empty. | 使用中 |
+| `unreadable` | This file could not be read. | 使用中 |
+| `no_text` | No extractable text was found in this file. | 使用中 |
+| `time_budget_exhausted` | Not read: the time limit for reading sources was reached. | 使用中（新增） |
+| `timeout` · `malformed` · `encrypted` · `too_complex` · `too_many_pages` · `too_many_sheets` · `too_many_rows` · `too_many_cells` · `too_many_pixels` · `unavailable` · `ocr_unavailable` · `busy` · `unsafe_parse` | 固定文案已在合同中定好 | 预留给格式模块，当前不会产生 |
+
+**PDF 文案缺陷已修：**
+- **原问题：** 引擎对所有"曾支持"格式都返回 Excel 文案，所以 PDF 进入 Generate 时会得到 "Excel files are not supported…"。
+- **现在：** PDF 返回 "PDF is not supported for source analysis yet."，有引擎级回归测试。
+- **连带修改：** 图片和其他格式的原因文案也从 "…text-source analysis…" 改为按格式命名的 "…source analysis…"。
+
+### 四、总读取预算 `MAX_TOTAL_EXTRACTION_MS = 60,000`
+
+- **一个时钟：** 一次 Analyze 的读取阶段（所有来源的下载 + 抽取）共用一个时钟，逐个来源串行消耗。
+- **单个下载：** 截止时间取 `min(15 s, 剩余预算)`。
+- **预算耗尽：** 剩余来源不再下载，记为 Not analyzed（`time_budget_exhausted`）。下载恰好在预算耗尽时才结束的来源，同样不再读取。
+- **与 single-flight 的关系：** 测试直接从两个 provider adapter 源码读出调用截止时间再计算：60 s 读取 + 35 s provider 调用截止 + 20 s 余量 < `MAX_INFLIGHT_MS`（120 s）。
+- **测试方式：** fake timers 加可注入时钟，不真实等待 60 秒。
+
+### 五、部分失败行为（保持不变，已有测试证明）
+
+- **部分失败、部分可读 → 继续分析可读来源。** 测试场景：5 个来源，来源 1 在第 7 s 读到；来源 2–4 各卡满 15 s；来源 5 只剩 8 s，在第 60 s 被中止。provider 恰好调用 1 次，输入只含 Source 1。
+- **全部不可读 → 0 次 provider 调用。** 测试场景：5 个来源全部卡住；第 4 个在第 60 s 被预算截断；第 5 个根本没有下载。
+
+### 六、界面文案
+
+- **AI Source Intake 页首说明：** "Selecting a file never calls an AI model or writes anything. Only clicking "Analyze selected sources" below sends text extracted from the selected sources to the configured AI provider."
+- **Analyze 前披露（有选择时显示）：** "Extracted text from the selected sources will be sent to the configured AI provider for analysis. Original files are not sent to the AI provider. Nothing will be written or published."
+  - 对当前的 TXT 也如实：下载 → 抽取 → 只发送文本。
+- **Proposal Review：** Not analyzed > 0 时，在 Sources in this analysis 卡内显示 "Some selected sources were not analyzed — any conflicting values they contain are not shown."
+  - 轻量暖色提示；只有 Duplicate 时不显示。
+
+### 七、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1430 / 1430 通过**（34 个文件，本次 +104，新增 `tests/aiSourceFormats.test.ts`） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | Build complete |
+
+**Windows `nuxt dev`（Node 22.22.2）：**
+- 以下路由均正常打开，console 0 error，无全站 500：`/admin`、`/admin/media`、`/admin/product-workspace/3/ai-source-intake`、`/ai-proposal-review`（空态）、`/media-resources`。
+- **`#app-manifest` 报错：** 紧接 `npm run build` 之后首次启动 dev 时，出现 6 条 Vite pre-transform 报错，不影响页面。干净重启后为 0 条（启动与访问管理页均无服务端报错）。原因是 build 与 dev 共用 `.nuxt` 的启动时序，与本次改动无关。
+
+**375px（AI Source Intake）：**
+- **布局：** `scrollWidth = clientWidth = 375`，无横向溢出；11 张来源卡均为 301px，无越界。
+- **来源卡：** 4 个 TXT 可选（Type 为 Text）；7 张图片禁用，并显示 "Images are not supported for source analysis yet."。
+- **披露：** 选中 1 个 TXT 后披露文案完整显示（宽 301px，右缘 338px），仍无溢出。
+- **网络：** 选择 / 取消过程中 0 次 fetch / XHR。
+- **console：** 0 error。
+
+**1440px：**
+- **AI Source Intake：** 无横向溢出（1425 = 1425）；来源卡 3 列 × 4 行，每张 271px；选择、披露、取消均正常；console 0 error。
+- **Media picker Text 视图：**
+  - 共 24 个文件，全部为 TXT，全部带 AI-readable；0 个非文本文件带标记；
+  - 0 个 CORRUPTED 归档副本；4 个 Already linked；
+  - 请求为 `GET …/media/files?…&archived=exclude&type=text`，0 次写请求。
+
+**Proposal Review 提示：** 没有持久会话，也不得为此真实 Analyze，因此以组件挂载测试验收：
+- Not analyzed > 0：显示；
+- 全部 Analyzed：不显示；
+- 只有 Duplicate：不显示；
+- 有预算跳过的来源：显示。
+
+产品 3 当前未关联 PDF，PDF 原因文案以自动化测试验收，未新建测试数据。
+
+### 八、边界
+
+**0 新 AI 可读格式 · 0 PDF / DOCX / XLSX / OCR 实现 · 0 package · 0 Docker · 0 DB · 0 Directus schema · 0 prompt · 0 provider adapter · 0 上传白名单变更 · 0 Provider 调用 · 0 API 费用 · 0 push · 0 deploy。**
+
+`.claude/launch.json` 仅在浏览器验收期间临时加入 Node 22 启动配置，验收后已还原到 HEAD。
+
+---
+
+```text
+AI-SOURCE-CONTRACT-01 = COMPLETED
+
+Current AI-readable: TXT / CSV / TSV only
+PDF / DOCX / XLSX / Images: NOT YET ENABLED
+
+Unified Source Contract: established
+MAX_TOTAL_EXTRACTION_MS: 60,000
+ExtractedSource: unchanged
+Provider behavior: unchanged
+Product relevance guard: NOT STARTED
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+
+NEXT CANDIDATE: PRODUCT-MODEL-RELEVANCE-GUARD-01
+STATUS: NOT AUTHORIZED
+```
+
+*最后更新：2026-09-13，由 Claude Code 在"AI-SOURCE-CONTRACT-01"任务中写入。*

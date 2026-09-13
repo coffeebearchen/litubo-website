@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import type { FileRole } from '~/types/product-cms'
 import { fileRoleLabel, sourceFileTypeLabel, workspaceMediaThumbUrl, workspaceMediaIsImage } from '~/utils/productWorkspace'
-import { isTextSourceMime } from '~/utils/aiProposal'
+import { isAiSourceReadableNow } from '~/utils/aiSourceFormats'
 import {
   directChildFolders,
   fileKind,
@@ -455,7 +455,7 @@ function pickerFilePath(f: LibraryFile): string {
                         <span v-if="f.title && f.title !== f.filename_download" class="ws-lib-card__title">{{ f.title }}</span>
                         <span class="ws-lib-card__meta">
                           {{ fileKind(f.type) }} · {{ formatSize(f.filesize) }}
-                          <span v-if="isTextSourceMime(f.type)" class="ws-lib-card__ai">AI-readable</span>
+                          <span v-if="isAiSourceReadableNow(f.type)" class="ws-lib-card__ai">AI-readable</span>
                         </span>
                         <span v-if="pickerFilePath(f)" class="ws-lib-card__path">{{ pickerFilePath(f) }}</span>
                       </span>

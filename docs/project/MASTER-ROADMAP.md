@@ -264,6 +264,17 @@ AI Source Intake                      ✅ 已交付
 - no credential leakage（不泄露凭证）；
 - no uncontrolled AI cost loop（无失控 AI 费用循环）。
 
+### AI Document Source V1（2026-09-13 起）
+
+用户确认的 V1 来源格式范围为 TXT / CSV / TSV / PDF / DOCX / XLSX / Images，全部接入同一个 Proposal Engine（一次 Analyze → 一次 provider 调用 → 一份 proposal）。每一步须单独授权；PDF 与 Image OCR 另需基础设施授权。统一合同见 `08-decision-log.md` D-024，事实状态见 `CURRENT-STATE.md`。
+
+```text
+AI-DOCUMENT-SOURCE-V1-PREFLIGHT      ✅ PASS WITH ARCHITECTURE DECISIONS
+→ AI-SOURCE-CONTRACT-01              ✅ COMPLETED（统一格式合同；AI 可读仍仅 TXT / CSV / TSV）
+→ PRODUCT-MODEL-RELEVANCE-GUARD-01   NEXT CANDIDATE — NOT AUTHORIZED
+→ 各格式实施模块（XLSX / DOCX / PDF / Image OCR）与混合来源 Beta — 规划中，逐项授权
+```
+
 ### 禁止（M5）
 
 - 连接真实 OpenAI / DeepSeek Key，除非用户在 M5 开始时单独授权

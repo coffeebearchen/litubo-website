@@ -507,6 +507,14 @@ async function applyAccepted() {
         <div><dt>Duplicate excluded</dt><dd>{{ duplicateCount }}</dd></div>
         <div><dt>Not analyzed</dt><dd>{{ notAnalyzedCount }}</dd></div>
       </dl>
+      <!--
+        AI-SOURCE-CONTRACT-01 — disagreements are only found among the sources
+        that were actually read. Whenever one was not, say so, so that an empty
+        conflict list is never taken to mean every selected document agreed.
+      -->
+      <p v-if="notAnalyzedCount > 0" class="ws-source-warning" role="note">
+        Some selected sources were not analyzed — any conflicting values they contain are not shown.
+      </p>
     </section>
 
     <!-- Where the product's own documents disagree. Never auto-resolved. -->
@@ -797,6 +805,13 @@ async function applyAccepted() {
 .ws-source-counts > div { display: flex; align-items: baseline; gap: var(--space-2); }
 .ws-source-counts dt { font-size: var(--text-xs); color: var(--color-ink-muted); }
 .ws-source-counts dd { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
+
+/* AI-SOURCE-CONTRACT-01 — a quiet caution, not an error: part of the selection is not in this analysis. */
+.ws-source-warning {
+  margin: 0; font-size: var(--text-xs); line-height: 1.5; max-width: 72ch;
+  color: #8A5A00; background: #FFF7E6; border: 1px solid #F0D9A8;
+  border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
+}
 
 .ws-card--conflict { border-color: #F0D9A8; background: #FFFCF5; }
 .ws-conflict { padding: var(--space-3) 0; border-top: 1px solid var(--color-line); }

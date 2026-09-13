@@ -22,8 +22,7 @@ import {
   UNCLASSIFIED_FOLDER,
   type LibraryBrowseState,
 } from '../utils/mediaDisplay'
-import { isTextSourceMime } from '../utils/aiProposal'
-import { isSupportedTextSourceMime } from '../server/utils/aiTextExtraction'
+import { AI_SOURCE_FORMATS, isAiSourceReadableNow } from '../utils/aiSourceFormats'
 import { listArchivedFileIds } from '../server/utils/mediaLifecycle'
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
@@ -195,22 +194,26 @@ describe('Text means exactly what AI Source Intake can analyze today', () => {
     'application/msword', null,
   ]
 
-  it('every format in the Text filter is one the AI engine accepts', () => {
-    for (const mime of TEXT_FILTER_MIME_TYPES) expect(isSupportedTextSourceMime(mime)).toBe(true)
+  it('every format in the Text filter is one the shared source contract marks AI-readable', () => {
+    for (const mime of TEXT_FILTER_MIME_TYPES) expect(isAiSourceReadableNow(mime)).toBe(true)
   })
 
-  it.each(TABLE)('the filter, the AI engine and the picker badge agree on %s', (mime) => {
-    const engine = isSupportedTextSourceMime(mime)
+  /** AI-SOURCE-CONTRACT-01 — the filter is pinned to the contract's own text family, not to a copy of it. */
+  it('the Text filter is exactly the contract\'s text family', () => {
+    const textFamily = AI_SOURCE_FORMATS.find(f => f.key === 'text')!.types.map(t => t.mime)
+    expect([...TEXT_FILTER_MIME_TYPES].sort()).toEqual([...textFamily].sort())
+  })
+
+  it.each(TABLE)('the filter and the one AI-readable decision (engine and picker badge alike) agree on %s', (mime) => {
+    const readable = isAiSourceReadableNow(mime)
     const filter = mime !== null && TEXT_FILTER_MIME_TYPES.some(t => mime.toLowerCase().startsWith(t))
-    expect(filter).toBe(engine)
-    expect(isTextSourceMime(mime)).toBe(engine)
+    expect(filter).toBe(readable)
   })
 
   /** A Text filter must not suggest PDF can be analyzed — it cannot, until an isolated parser exists. */
   it('PDF is neither in the Text filter nor AI-readable', () => {
     expect(TEXT_FILTER_MIME_TYPES).not.toContain('application/pdf')
-    expect(isSupportedTextSourceMime('application/pdf')).toBe(false)
-    expect(isTextSourceMime('application/pdf')).toBe(false)
+    expect(isAiSourceReadableNow('application/pdf')).toBe(false)
   })
 })
 

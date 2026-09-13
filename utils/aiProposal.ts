@@ -1,48 +1,16 @@
 /**
  * PWS-AI-ENGINE-01 — client-side helpers shared by AI Source Intake and AI
- * Proposal Review. `isTextSourceMime()` mirrors the server's supported-type
- * allowlist (`server/utils/aiTextExtraction.ts`) for display purposes only —
- * it decides which checkboxes are enabled, never what the server actually
- * accepts; the server independently re-validates every file regardless of
- * what the client sends.
- */
-
-const TEXT_SOURCE_MIME_TYPES = new Set([
-  'text/csv',
-  'text/tab-separated-values',
-  'text/plain',
-])
-
-/**
- * Formats that were supported once and are deliberately refused now, each with
- * its own honest reason rather than "never supported".
+ * Proposal Review.
  *
- * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — PDF joined the deliberately-dropped list:
- * its parser could not be given a real memory ceiling in-process, so it is
- * refused with its own reason rather than supported unsafely. Mirrors
- * `server/utils/aiTextExtraction.ts`.
+ * AI-SOURCE-CONTRACT-01 — which formats can be analyzed is no longer mirrored
+ * here. The browser and the server both read `utils/aiSourceFormats.ts`, so
+ * there is no second list to drift away from the first. Anything the browser
+ * shows is still only a hint: the server independently re-validates every file
+ * regardless of what the client sends.
  */
-const FORMERLY_TEXT_SOURCE_MIME_TYPES = new Set([
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel',
-  'application/pdf',
-])
-
-export function isTextSourceMime(mimeType: string | null): boolean {
-  if (!mimeType) return false
-  return TEXT_SOURCE_MIME_TYPES.has(mimeType.toLowerCase().split(';')[0].trim())
-}
-
-export function isFormerlyTextSourceMime(mimeType: string | null): boolean {
-  if (!mimeType) return false
-  return FORMERLY_TEXT_SOURCE_MIME_TYPES.has(mimeType.toLowerCase().split(';')[0].trim())
-}
 
 /** Mirrors `server/utils/aiTextExtraction.ts`'s `MAX_FILES_PER_REQUEST` for client-side display/gating only — the server independently re-enforces this. */
 export const MAX_FILES_PER_REQUEST = 5
-
-/** Human-readable list of currently-supported text-source formats, for empty-state and help copy. */
-export const SUPPORTED_TEXT_SOURCE_FORMATS_LABEL = 'CSV, TSV, TXT'
 
 /** A filename this long is anomalous regardless of content. Mirrors the server's own ceiling. */
 const MAX_SAFE_DISPLAY_NAME_LENGTH = 120

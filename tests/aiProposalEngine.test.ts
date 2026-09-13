@@ -9,11 +9,22 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { runProposalEngine, MAX_ASSET_DOWNLOAD_MS } from '../server/utils/aiProposalEngine'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import {
+  runProposalEngine,
+  createExtractionBudget,
+  MAX_ASSET_DOWNLOAD_MS,
+  MAX_TOTAL_EXTRACTION_MS,
+} from '../server/utils/aiProposalEngine'
+import { MAX_INFLIGHT_MS } from '../server/utils/aiGenerateRateLimit'
 import type { FetchFn } from '../server/utils/mediaLifecycle'
 import type { AiProviderRegistry, AiProviderSummary, AiStructuredProvider } from '../server/utils/aiProviderRegistry'
 import { specificationsTarget, type SpecificationProposal } from '../server/utils/aiTargets/specificationsTarget'
-import { MAX_FILE_BYTES } from '../server/utils/aiTextExtraction'
+import { aiSourceFormatFor } from '../utils/aiSourceFormats'
+
+/** The text family's size contract from the shared source contract — the download limit in force today. */
+const TEXT_MAX_BYTES = aiSourceFormatFor('text/plain')!.maxBytes
 
 const VALID_PROPOSAL: SpecificationProposal = {
   groups: [{ group: 'Detection performance', items: [{ parameter: 'Detection sensitivity (Fe)', value: '0.8 mm' }] }],
@@ -92,7 +103,7 @@ function textBytes(s: string): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
 }
 
-const SMALL_SIZE = 100 // well under MAX_FILE_BYTES
+const SMALL_SIZE = 100 // well under TEXT_MAX_BYTES
 
 describe('runProposalEngine — product and provider validation', () => {
   it('fails safely when the product does not exist', async () => {
@@ -213,7 +224,7 @@ describe('runProposalEngine — honest per-file outcomes', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.fileResults).toEqual([
-        { displayName: 'photo.jpg', status: 'unsupported', reason: 'Not available for text-source analysis yet.' },
+        { displayName: 'photo.jpg', status: 'unsupported', reason: 'Images are not supported for source analysis yet.' },
       ])
     }
   })
@@ -224,7 +235,24 @@ describe('runProposalEngine — honest per-file outcomes', () => {
     })
     const result = await runProposalEngine(fetch, mockRegistry(), specificationsTarget, { productId: 1, providerId: 'deepseek', mediaIds: [1] })
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.fileResults[0].reason).toBe('Excel files are not supported for text-source analysis yet.')
+    if (!result.ok) expect(result.fileResults[0].reason).toBe('Excel files are not supported for source analysis yet.')
+  })
+
+  /**
+   * AI-SOURCE-CONTRACT-01 — the engine used to answer every deliberately dropped
+   * format with the Excel sentence, so a PDF selected for analysis was reported
+   * as "Excel files are not supported". Each format now names itself.
+   */
+  it('a PDF gets its own "not supported yet" reason — never the Excel one', async () => {
+    const fetch = mockFetch({
+      productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-pdf', filename_download: 'datasheet.pdf', type: 'application/pdf', filesize: SMALL_SIZE } }],
+    })
+    const result = await runProposalEngine(fetch, mockRegistry(), specificationsTarget, { productId: 1, providerId: 'deepseek', mediaIds: [1] })
+    expect(result.ok).toBe(false)
+    expect(result.fileResults).toEqual([
+      { displayName: 'datasheet.pdf', status: 'unsupported', reason: 'PDF is not supported for source analysis yet.' },
+    ])
+    expect(JSON.stringify(result)).not.toContain('Excel')
   })
 
   it('a file that cannot be downloaded is reported unreadable, never throws out of the engine', async () => {
@@ -263,7 +291,7 @@ describe('runProposalEngine — honest per-file outcomes', () => {
     if (result.ok) {
       expect(result.fileResults).toEqual(expect.arrayContaining([
         { displayName: 'notes.txt', status: 'read' },
-        { displayName: 'photo.jpg', status: 'unsupported', reason: 'Not available for text-source analysis yet.' },
+        { displayName: 'photo.jpg', status: 'unsupported', reason: 'Images are not supported for source analysis yet.' },
       ]))
     }
   })
@@ -538,7 +566,7 @@ describe('runProposalEngine — asset downloads are bounded (PWS-AI-ENGINE-01R2-
       { displayName: 'notes.txt', status: 'unreadable', reason: 'This file could not be read.' },
     ])
     // Stopped as soon as the ceiling was crossed, rather than draining the body…
-    expect(chunksPulled).toBeLessThanOrEqual(Math.ceil(MAX_FILE_BYTES / CHUNK) + 2)
+    expect(chunksPulled).toBeLessThanOrEqual(Math.ceil(TEXT_MAX_BYTES / CHUNK) + 2)
     // …and the stop was a real cancellation, not just an abandoned promise.
     expect(cancelled).toBe(true)
     expect(observedSignal?.aborted).toBe(true)
@@ -602,4 +630,152 @@ describe('runProposalEngine — oversized mediaIds array is rejected before any 
     expect(fetchCalls).toBe(0)
     expect(generate).not.toHaveBeenCalled()
   })
+})
+
+// ── AI-SOURCE-CONTRACT-01 — one reading budget for the whole analysis ──
+
+describe('createExtractionBudget — the reading-stage clock', () => {
+  it('starts full, counts down, and stops at zero rather than going negative', () => {
+    let now = 1_000
+    const budget = createExtractionBudget(60_000, () => now)
+    expect(budget.remainingMs()).toBe(60_000)
+    now += 25_000
+    expect(budget.remainingMs()).toBe(35_000)
+    now += 35_000
+    expect(budget.remainingMs()).toBe(0)
+    now += 10_000
+    expect(budget.remainingMs()).toBe(0)
+  })
+
+  it('defaults to MAX_TOTAL_EXTRACTION_MS, which is sixty seconds in V1', () => {
+    expect(MAX_TOTAL_EXTRACTION_MS).toBe(60_000)
+    expect(createExtractionBudget(undefined, () => 5).remainingMs()).toBe(MAX_TOTAL_EXTRACTION_MS)
+  })
+})
+
+describe('the reading budget keeps a whole analysis inside the Generate single-flight window', () => {
+  /** Everything outside reading and the provider call: Directus lookups, dedupe, validation, the reuse store. */
+  const OVERHEAD_ALLOWANCE_MS = 20_000
+
+  it.each(['server/utils/deepseekStructuredProvider.ts', 'server/utils/openaiStructuredProvider.ts'])(
+    'reading budget + the %s call deadline + overhead stays under MAX_INFLIGHT_MS',
+    (rel) => {
+      // Read from the adapter itself rather than restated here, so a changed
+      // provider deadline re-runs this arithmetic instead of silently passing.
+      const source = readFileSync(resolve(process.cwd(), rel), 'utf8')
+      const request = /const REQUEST_TIMEOUT_MS = ([\d_]+)/.exec(source)
+      const margin = /const CALL_DEADLINE_MS = REQUEST_TIMEOUT_MS \+ ([\d_]+)/.exec(source)
+      expect(request, 'REQUEST_TIMEOUT_MS').not.toBeNull()
+      expect(margin, 'CALL_DEADLINE_MS').not.toBeNull()
+      const providerCallDeadlineMs = Number(request![1].replace(/_/g, '')) + Number(margin![1].replace(/_/g, ''))
+
+      expect(providerCallDeadlineMs).toBeGreaterThan(0)
+      expect(MAX_TOTAL_EXTRACTION_MS + providerCallDeadlineMs + OVERHEAD_ALLOWANCE_MS).toBeLessThan(MAX_INFLIGHT_MS)
+    },
+  )
+})
+
+/** Five selected text files, each linked to its own asset. */
+const FIVE_TEXT_ROWS = [1, 2, 3, 4, 5].map(id => ({
+  id,
+  directus_files_id: { id: `uuid-${id}`, filename_download: `source-${id}.txt`, type: 'text/plain', filesize: SMALL_SIZE },
+}))
+
+const TIME_LIMIT_REASON = 'Not read: the time limit for reading sources was reached.'
+const COULD_NOT_READ = 'This file could not be read.'
+
+describe('runProposalEngine — the reading stage runs on one clock (AI-SOURCE-CONTRACT-01)', () => {
+  it('when nothing arrives in time, the sources the clock does not reach are reported as not read and the provider is never called', async () => {
+    vi.useFakeTimers({ now: 0 })
+    try {
+      const generate = vi.fn()
+      const base = mockFetch({ productsFilesRows: FIVE_TEXT_ROWS })
+      const assetCalls: string[] = []
+      const stallingFetch = (async <T>(path: string, opts?: Record<string, unknown>): Promise<T> => {
+        if (path.startsWith('/assets/')) {
+          assetCalls.push(path)
+          // Never delivers a byte and never closes.
+          return new ReadableStream<Uint8Array>({ start() {} }) as T
+        }
+        return base<T>(path, opts)
+      }) as FetchFn
+
+      const promise = runProposalEngine(stallingFetch, mockRegistry({ generateStructured: generate }), specificationsTarget, {
+        productId: 1, providerId: 'deepseek', mediaIds: [1, 2, 3, 4, 5],
+      })
+      await vi.advanceTimersByTimeAsync(MAX_TOTAL_EXTRACTION_MS + 1_000)
+      vi.useRealTimers()
+      const result = await promise
+
+      expect(result.fileResults).toEqual([
+        // Each stalls for its own full 15 s — done at 15, 30 and 45 s.
+        { displayName: 'source-1.txt', status: 'unreadable', reason: COULD_NOT_READ },
+        { displayName: 'source-2.txt', status: 'unreadable', reason: COULD_NOT_READ },
+        { displayName: 'source-3.txt', status: 'unreadable', reason: COULD_NOT_READ },
+        // Cut off at exactly 60 s, when the stage's time ran out.
+        { displayName: 'source-4.txt', status: 'unreadable', reason: TIME_LIMIT_REASON },
+        // Never started: there was no time left to download it.
+        { displayName: 'source-5.txt', status: 'unreadable', reason: TIME_LIMIT_REASON },
+      ])
+      expect(assetCalls).toEqual(['/assets/uuid-1', '/assets/uuid-2', '/assets/uuid-3', '/assets/uuid-4'])
+      expect(result.ok).toBe(false)
+      if (!result.ok) expect(result.error).toBe('None of the selected files could be read as text. Nothing was sent to the AI provider.')
+      expect(generate).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  }, 20_000)
+
+  it('a source read in time is still analyzed — alone, in one provider call — and the last download gets only the time that is left', async () => {
+    vi.useFakeTimers({ now: 0 })
+    try {
+      const generate = vi.fn(async (_providerId: unknown, _target: unknown, _input: unknown) => ({ ok: true as const, output: VALID_PROPOSAL }))
+      const base = mockFetch({ productsFilesRows: FIVE_TEXT_ROWS })
+      let lastDownloadAbortedAt: number | null = null
+      const slowFetch = (async <T>(path: string, opts?: Record<string, unknown>): Promise<T> => {
+        if (path === '/assets/uuid-1') {
+          // Arrives after seven seconds — well inside its own deadline.
+          return new ReadableStream<Uint8Array>({
+            start(controller) {
+              setTimeout(() => {
+                controller.enqueue(new Uint8Array(Buffer.from('Aperture: 180 mm')))
+                controller.close()
+              }, 7_000)
+            },
+          }) as T
+        }
+        if (path.startsWith('/assets/')) {
+          if (path === '/assets/uuid-5') {
+            (opts?.signal as AbortSignal).addEventListener('abort', () => { lastDownloadAbortedAt = Date.now() })
+          }
+          return new ReadableStream<Uint8Array>({ start() {} }) as T
+        }
+        return base<T>(path, opts)
+      }) as FetchFn
+
+      const promise = runProposalEngine(slowFetch, mockRegistry({ generateStructured: generate }), specificationsTarget, {
+        productId: 1, providerId: 'deepseek', mediaIds: [1, 2, 3, 4, 5],
+      })
+      await vi.advanceTimersByTimeAsync(MAX_TOTAL_EXTRACTION_MS + 1_000)
+      vi.useRealTimers()
+      const result = await promise
+
+      // Source 1 is read at 7 s; sources 2–4 each stall their full 15 s (22, 37, 52 s).
+      // Source 5 is left 8 s, not a fresh 15 s — so its download is aborted at exactly 60 s.
+      expect(lastDownloadAbortedAt).toBe(MAX_TOTAL_EXTRACTION_MS)
+      expect(result.fileResults).toEqual([
+        { displayName: 'source-1.txt', status: 'read' },
+        { displayName: 'source-2.txt', status: 'unreadable', reason: COULD_NOT_READ },
+        { displayName: 'source-3.txt', status: 'unreadable', reason: COULD_NOT_READ },
+        { displayName: 'source-4.txt', status: 'unreadable', reason: COULD_NOT_READ },
+        { displayName: 'source-5.txt', status: 'unreadable', reason: TIME_LIMIT_REASON },
+      ])
+      expect(result.ok).toBe(true)
+      expect(generate).toHaveBeenCalledTimes(1)
+      const input = generate.mock.calls[0][2] as { extractedSourceTexts: Array<{ displayName: string, text: string }> }
+      expect(input.extractedSourceTexts).toEqual([{ displayName: 'Source 1', text: 'Aperture: 180 mm' }])
+    } finally {
+      vi.useRealTimers()
+    }
+  }, 20_000)
 })

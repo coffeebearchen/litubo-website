@@ -1,10 +1,13 @@
 /**
- * PWS-AI-ENGINE-01R — server-only, text-only source extraction.
+ * PWS-AI-ENGINE-01R — server-only source extraction.
  *
- * Supported, strictly enforced by `isSupportedTextSourceMime()`: CSV, TSV and
- * TXT. Everything else — PDF (see below), XLS/XLSX, images, Word, video,
- * archives — is refused, never faked. No OCR, no vision, no external file API
- * is used anywhere in this module.
+ * AI-SOURCE-CONTRACT-01 — this module no longer decides which formats it reads.
+ * `utils/aiSourceFormats.ts` is the one format contract the server and the
+ * browser share: a file is read here only when that contract marks its format
+ * readable, and every refusal is reported as a failure code rather than a
+ * sentence of this module's own. Today the readable formats are TXT, CSV and
+ * TSV. No OCR, no vision, and no external file API is used anywhere in this
+ * module.
  *
  * XLS/XLSX removed: PWS-AI-ENGINE-01's `xlsx` (SheetJS) dependency could not
  * be safely required on Windows `nuxt dev` (its `.mjs` entry crashed every
@@ -40,61 +43,21 @@
  * disk write, and no database write of its own.
  */
 
+import {
+  aiSourceFormatFor,
+  aiSourceFormatRefusal,
+  aiSourceTypeLabel,
+  type SourceFailureCode,
+} from '../../utils/aiSourceFormats'
+
 /** At most this many source files may be analyzed in a single Generate call. */
 export const MAX_FILES_PER_REQUEST = 5
-
-/** A single file larger than this is refused before any download is attempted. */
-export const MAX_FILE_BYTES = 8 * 1024 * 1024 // 8 MB
 
 /** Hard ceiling on the combined extracted text sent to any provider in one call. */
 export const MAX_TOTAL_EXTRACTED_CHARS = 60_000
 
 /** Hard ceiling on the text extracted from any single file — enforced while parsing, not after. */
 export const MAX_PER_FILE_CHARS = 20_000
-
-/** A single file's extraction is aborted (safely, honestly) if it runs longer than this. */
-export const MAX_PROCESSING_MS = 10_000
-
-const SUPPORTED_MIME_TYPES = new Set([
-  'text/csv',
-  'text/tab-separated-values',
-  'text/plain',
-])
-
-/**
- * Formats this module used to support and deliberately stopped supporting.
- * Each gets its own honest reason in the UI, never lumped in with "this file
- * type was never supported".
- */
-const TEMPORARILY_UNSUPPORTED_MIME_REASONS = new Map<string, string>([
-  ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Excel files are not supported for text-source analysis yet.'],
-  ['application/vnd.ms-excel', 'Excel files are not supported for text-source analysis yet.'],
-  ['application/pdf', 'PDF is not supported for text-source analysis yet — it needs an isolated parser with a real memory limit.'],
-])
-
-export function isSupportedTextSourceMime(mimeType: string | null | undefined): boolean {
-  if (!mimeType) return false
-  return SUPPORTED_MIME_TYPES.has(mimeType.toLowerCase().split(';')[0].trim())
-}
-
-/** True only for a format this module deliberately stopped supporting — used to show a distinct, honest UI reason. */
-export function isFormerlyUnsupportedTextSourceMime(mimeType: string | null | undefined): boolean {
-  return temporarilyUnsupportedReason(mimeType) !== null
-}
-
-/** The specific, honest reason a deliberately-dropped format is refused, or null if this type was simply never supported. */
-export function temporarilyUnsupportedReason(mimeType: string | null | undefined): string | null {
-  if (!mimeType) return null
-  return TEMPORARILY_UNSUPPORTED_MIME_REASONS.get(mimeType.toLowerCase().split(';')[0].trim()) ?? null
-}
-
-function friendlyFileType(mimeType: string): string {
-  const mime = mimeType.toLowerCase()
-  if (mime === 'text/csv') return 'CSV'
-  if (mime === 'text/tab-separated-values') return 'TSV'
-  if (mime === 'text/plain') return 'Text'
-  return 'File'
-}
 
 export interface ExtractedSource {
   displayName: string
@@ -149,30 +112,33 @@ export function sanitizeDisplayNameForBrowser(rawName: string | null | undefined
   return name
 }
 
-
+/**
+ * AI-SOURCE-CONTRACT-01 — a refusal is a code. The sentence a person sees is
+ * chosen once, by `sourceFailureMessage()` in the shared contract.
+ */
 export type ExtractionResult =
   | { ok: true, source: ExtractedSource }
-  | { ok: false, reason: string }
+  | { ok: false, code: SourceFailureCode }
 
 /**
  * Trusted, server-known file size check — must run BEFORE any byte of the
  * file is downloaded. `knownSizeBytes` must come from Directus' own file
- * metadata (`directus_files.filesize`), never from a client-supplied value.
+ * metadata (`directus_files.filesize`), never from a client-supplied value;
+ * `maxBytes` is that file's own format limit from the shared contract.
  * An unknown size (`null`/`undefined`) is rejected conservatively rather
  * than allowed through on the hope it turns out small — this project must
  * never download a full file just to find out it was too large.
  */
-export function isFileSizeSafeToDownload(knownSizeBytes: number | null | undefined): boolean {
+export function isFileSizeSafeToDownload(knownSizeBytes: number | null | undefined, maxBytes: number): boolean {
   if (typeof knownSizeBytes !== 'number' || !Number.isFinite(knownSizeBytes) || knownSizeBytes < 0) return false
-  return knownSizeBytes <= MAX_FILE_BYTES
+  return knownSizeBytes <= maxBytes
 }
 
 /**
  * Extracts plain text from one already-downloaded file's bytes. Never
  * throws — any failure (corrupt file, unreadable stream, etc.) becomes a
- * short, safe `{ ok: false, reason }` result naming only the problem
- * category, never an internal error message, stack trace, or any fragment of
- * the file's own content.
+ * failure code naming only the problem category, never an internal error
+ * message, stack trace, or any fragment of the file's own content.
  *
  * Only UTF-8 text formats are decoded here; there is no document parser in
  * this process at all, which is what makes the per-file character ceiling
@@ -184,37 +150,38 @@ export async function extractTextFromFile(
   displayName: string,
 ): Promise<ExtractionResult> {
   if (bytes.byteLength === 0) {
-    return { ok: false, reason: 'This file is empty.' }
+    return { ok: false, code: 'empty' }
   }
-  if (bytes.byteLength > MAX_FILE_BYTES) {
-    return { ok: false, reason: 'This file is too large to analyze.' }
+  const refusal = aiSourceFormatRefusal(mimeType)
+  if (refusal) {
+    return { ok: false, code: refusal }
   }
-  const droppedFormatReason = temporarilyUnsupportedReason(mimeType)
-  if (droppedFormatReason) {
-    return { ok: false, reason: droppedFormatReason }
+  // A format the contract does not refuse is always one of its entries.
+  const format = aiSourceFormatFor(mimeType)!
+  if (bytes.byteLength > format.maxBytes) {
+    return { ok: false, code: 'too_large' }
   }
-  if (!isSupportedTextSourceMime(mimeType)) {
-    return { ok: false, reason: 'This file type is not supported for text-source analysis yet.' }
+  // Text is the only format with a reader here. A format marked readable before
+  // its own reader exists is still refused: its bytes are never decoded as text.
+  if (format.key !== 'text') {
+    return { ok: false, code: 'not_enabled' }
   }
-
-  const mime = mimeType!.toLowerCase().split(';')[0].trim()
 
   let text = ''
   try {
-    // text/csv, text/tab-separated-values, text/plain
     text = Buffer.from(bytes).toString('utf-8')
   } catch {
-    return { ok: false, reason: 'This file could not be read.' }
+    return { ok: false, code: 'unreadable' }
   }
 
   text = text.trim().slice(0, MAX_PER_FILE_CHARS)
   if (!text) {
-    return { ok: false, reason: 'No extractable text was found in this file.' }
+    return { ok: false, code: 'no_text' }
   }
 
   return {
     ok: true,
-    source: { displayName, fileType: friendlyFileType(mime), text },
+    source: { displayName, fileType: aiSourceTypeLabel(mimeType), text },
   }
 }
 

@@ -13,7 +13,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { workspaceAiProposalReviewRoute } from '../utils/productCentre'
-import { isTextSourceMime, isFormerlyTextSourceMime, safeSourceDisplayName } from '../utils/aiProposal'
+import { safeSourceDisplayName } from '../utils/aiProposal'
+import { isAiSourceReadableNow } from '../utils/aiSourceFormats'
 import { aiIntakeFileDisplayName } from '../utils/productWorkspace'
 import { sanitizeDisplayNameForBrowser } from '../server/utils/aiTextExtraction'
 
@@ -39,19 +40,20 @@ describe('workspaceAiProposalReviewRoute', () => {
   })
 })
 
-describe('isTextSourceMime / isFormerlyTextSourceMime (client mirrors of the server allowlist)', () => {
-  it('agrees with the server allowlist on the currently-supported types', () => {
+describe('the AI screens take format decisions from the shared contract, not a browser mirror (AI-SOURCE-CONTRACT-01)', () => {
+  it('the browser helpers no longer keep a MIME list of their own', async () => {
+    const mod = await import('../utils/aiProposal')
+    expect(mod).not.toHaveProperty('isTextSourceMime')
+    expect(mod).not.toHaveProperty('isFormerlyTextSourceMime')
+    expect(mod).not.toHaveProperty('SUPPORTED_TEXT_SOURCE_FORMATS_LABEL')
+  })
+  it('the shared contract gives the browser the same answers the server reads with', () => {
     for (const mime of ['text/csv', 'text/tab-separated-values', 'text/plain']) {
-      expect(isTextSourceMime(mime)).toBe(true)
+      expect(isAiSourceReadableNow(mime)).toBe(true)
     }
-  })
-  it('rejects images and other unsupported types', () => {
-    expect(isTextSourceMime('image/jpeg')).toBe(false)
-    expect(isTextSourceMime(null)).toBe(false)
-  })
-  it('flags Excel as formerly-supported, not the same bucket as images', () => {
-    expect(isFormerlyTextSourceMime('application/vnd.ms-excel')).toBe(true)
-    expect(isTextSourceMime('application/vnd.ms-excel')).toBe(false)
+    expect(isAiSourceReadableNow('image/jpeg')).toBe(false)
+    expect(isAiSourceReadableNow('application/vnd.ms-excel')).toBe(false)
+    expect(isAiSourceReadableNow(null)).toBe(false)
   })
 })
 
