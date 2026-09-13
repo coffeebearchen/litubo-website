@@ -26,7 +26,7 @@ import { createOfficeExtractionGate, officeExtractionGate, type OfficeExtraction
 import { MAX_XLSX_PROCESSING_MS, XLSX_LIMITS } from '../server/utils/xlsxExtraction'
 import { aiSourceFormatFor } from '../utils/aiSourceFormats'
 import { buildTextPdf, TEST_ONLY_MARK } from './helpers/testOnlyPdf'
-import { tableXlsx, type CellInput } from './helpers/testOnlyXlsx'
+import { buildXlsx, tableXlsx, type CellInput } from './helpers/testOnlyXlsx'
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const MB = 1024 * 1024
@@ -204,6 +204,38 @@ describe('the relevance guard, and exact product-code narrowing before it', () =
 
     expect(generate).toHaveBeenCalledTimes(1)
     expect(calls.filter(call => call.path.startsWith('/items/products/'))).toEqual([{ path: IDENTITY_PATH, options: undefined }])
+  })
+
+  it('a column-oriented workbook reaches the provider with its unit column and the value Excel shows, in one call', async () => {
+    const workbook: Row = {
+      ...XLSX_ROW,
+      bytes: buildXlsx({
+        numberFormats: [{ id: 164, code: '0.0' }],
+        cellFormats: [0, 164],
+        sheets: [{
+          name: 'Specifications',
+          rows: [
+            ['Parameter', 'Unit', 'LT180C', 'LT200C'],
+            ['Pressure', 'bar', 6, 8],
+            ['Power', 'kW', { value: 0.45, style: 1 }, { value: 0.55, style: 1 }],
+          ],
+        }],
+      }),
+    }
+    const { fetch } = directus([workbook], { name_en: PRODUCT_NAME, product_code: 'LT-180C' })
+    const { registry, generate } = capturingRegistry()
+    const result = await analyze(fetch, registry, [1])
+
+    expect(result.ok).toBe(true)
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(inputOf(generate).extractedSourceTexts).toEqual([{
+      displayName: 'Source 1',
+      text: 'Sheet: Specifications\nFiltered to exact product code: LT-180C\nColumns: Parameter | Unit | LT180C\nPressure | bar | 6\nPower | kW | 0.5',
+    }])
+    const prompt = specificationsTarget.buildUserInput(inputOf(generate))
+    expect(prompt).toContain('Power | kW | 0.5')
+    // Neither the precision Excel hides nor another model's column reaches the provider.
+    expect(prompt).not.toMatch(/0\.45|Power \| 0|LT200C|0\.6|\| 8/)
   })
 })
 

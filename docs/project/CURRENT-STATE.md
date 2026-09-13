@@ -7217,3 +7217,204 @@ NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"AI-XLSX-SOURCE-01"任务中写入。*
+
+---
+
+## AI-XLSX-SOURCE-01-R1 = COMPLETED（2026-09-14）
+
+```text
+XLSX semantic fidelity correction: visible simple-number decimals + column-oriented descriptor preservation.
+AI-readable today: TXT / CSV / TSV / PDF (text-layer) / XLSX.
+```
+
+AI-XLSX-SOURCE-01 的最小 P1 修正：只改 XLSX 读取器的输出语义，不涉及重新设计、新架构、新预检或新格式。修正两项已确认的技术参数准确性风险：
+
+- **P1-A：** 数字按存储精度输出，与 Excel 显示值不一致。例如存储值 0.45、格式 `0.0" kW"`，Excel 显示 `0.5 kW`，旧输出却是 `0.45 kW`。
+- **P1-B：** 列方向多型号表缩小时只保留一个标签列，左侧的单位等描述列丢失。
+
+决策登记为 `08-decision-log.md` 的 **D-028 — XLSX Semantic Fidelity Correction**。D-028 只修正 D-027 (10)(11) 中的这两点，D-027 其余条款不变。
+
+**分支：** `review/ai-xlsx-source-01-r1`，从 `3151230` 创建，仅本地，未 push。
+
+### 一、修正前后（真实输出）
+
+同一份 TEST ONLY 工作簿字节，分别用 `3151230` 的读取器与本模块读取器读取：
+
+| 存储值 / 格式 | 修正前 | 修正后（= Excel 显示值） |
+|---|---|---|
+| 0.45 / `0.0" kW"` | `0.45 kW` | `0.5 kW` |
+| 0.456 / `0.00" kW"` | `0.456 kW` | `0.46 kW` |
+| 0.45 / `0.0` | `0.45` | `0.5` |
+| 0.45 / `0.00` | `0.45` | `0.45` |
+| -0.45 / `0.0` | `-0.45` | `-0.5` |
+| 0.456 / 内置 2（`0.00`） | `0.456` | `0.46` |
+| 0.456 / 内置 10（`0.00%`） | `45.6%` | `45.60%` |
+| 缓存公式值 0.45 / `0.0` | `0.45` | `0.5` |
+| 180 / `0" mm"` | `180 mm` | `180 mm`（不变） |
+| 45000 / 内置 14（日期） | `2023-03-15` | `2023-03-15`（不变） |
+
+列方向示例：`product_code` 为 `LT-180C`，表头为 `Parameter | Unit | LT180C | LT200C`，Power 格式为 `0.0`。
+
+```text
+修正前                              修正后
+Columns: Parameter | LT180C         Columns: Parameter | Unit | LT180C
+Pressure | 6                        Pressure | bar | 6
+Power | 0.45                        Power | kW | 0.5
+```
+
+行方向三型号表（LT180C / LT200C / LT300C）修正前后输出完全相同。
+
+### 二、当前规则
+
+- **数字显示精度（P1-A）：**
+  - **支持的简单格式：**
+    - 纯数字：`0` `0.0` `0.00` `0.000`，带千分位的 `#,##0` `#,##0.0` `#,##0.00`，内置格式 1–4 与 37–40。
+    - 百分比：`0%` `0.0%` `0.00%`，内置 9 / 10。
+    - 以上数字格式后跟一个带引号的简单单位：`0" mm"` `0.0" kW"` `0.00" kg"` `#,##0.0" bar"`。
+  - **小数位：** 按格式声明输出。`0` 位始终输出，`#` 位只在不是末尾零时输出。最多读取 30 位小数，更长的按存储值输出，防止恶意格式码撑大每个单元格。
+  - **舍入：** 普通十进制舍入，一半远离零，作用于 Excel 保留的 15 位有效数字，而不是二进制值。例如 0.35 / `0.0` → `0.4`，1.005 / `0.00` → `1.01`，与 Excel 一致。只跟随显示精度：不增加精度，不重算。
+  - **千分位与小数点：** 不插入千分位，小数点固定为 `.`。同一格式在西语 / 葡语 Excel 中显示为 `1.500` / `0,5`，取决于查看者的区域设置，而不是工作簿。负数始终写出负号。
+  - **公式：** 仍只取缓存值、不重算；缓存数值同样按上述格式输出。
+  - **不变：**
+    - 1900 / 1904 日期与时间、`;;;` 隐藏值。
+    - 其他所有格式按存储值输出，包括货币、科学计数、分数、条件、多个语义分段、经过时间、`_)` 占位、区域专用格式码。
+    - 不复现 Excel 格式引擎。
+- **列方向描述列（P1-B）：**
+  - 表头精确命中当前编码时，保留第一个命中列左侧的全部可见描述列（参数、单位、范围等），加上所有表头精确命中的列。描述列按位置判断，不解读表头文字。只输出命中列下有值的行。
+  - 第一个命中列右侧只保留表头精确命中的列；其他型号列、夹在型号列之间的列（如 Note）一律不保留。
+  - 隐藏列（含零宽列）仍不输出；在表头和保留行中都没有值的列不输出。
+  - 按位置判断的已知后果：当前产品列左侧若还有其他型号列（如 `Parameter | Unit | LT150C | LT180C`），该列会作为描述上下文保留，并带着自己的表头；归属由 D-025 guard 与人工审核决定。
+- **不变：**
+  - **匹配与缩小：**
+    - 行方向规则；精确匹配，不做模糊、编辑距离、前后缀、包含、文件名 / 文件夹推断或 AI 调用。
+    - 编码须同时含字母和数字才会缩小。这是 V1 保守规则，不满足时回到完整有界工作簿 + D-025，以后真实企业数据证明需要时再单独评估。
+    - `Filtered to exact product code:`；不命中时保留整表。
+  - **合同与调用：** D-025；`ExtractedSource`；共享 prompt 合同与 `PROMPT_CONTRACT_VERSION`；一次 Provider 调用。
+  - **摘要：** 抽取文本变化后，内容摘要与 fingerprint 会随之改变。
+
+### 三、改动与测试
+
+- **生产代码：** 只改 `server/utils/xlsxExtraction.ts`，涉及三处：
+  - 数字格式分类加入小数位，并支持内置格式 1–4 / 37–40；
+  - 十进制舍入；
+  - 列方向描述列。
+- **`tests/xlsxExtraction.test.ts`：116 → 172（+56）：**
+  - 格式分类表新增 16 行：纯数字格式、`#` 小数位、30 / 31 位、`00` 与 `_)` 兜底。既有百分比 / 单位行的期望值加上小数位。
+  - 新增 R1 数字组 33 项：
+    - 32 行纯函数表：0.45 → `0.5` / `0.45` / `0`、`0.46 kW`、`180 mm`、负数、0.35、1.005、2.5、9.96、百分比、千分位、大数、`#` 小数位等；
+    - 1 个经真实解析器的工作簿：自定义格式、内置 2 / 3 / 4 / 10、缓存公式值、日期、General。
+  - 新增列方向组 7 项：Parameter + Unit + 显示值、多个描述列、隐藏描述列、两个精确命中列、夹在型号之间的列、左侧其他型号列、未命中保留整表。
+  - 既有用例调整：`0.45` / `0.0" kW"` → `0.5 kW`；内置 `0.00%` → `45.60%`；内置格式 id 断言带小数位。
+  - 1900 / 1904 日期、百分比、行方向三型号、隐藏表 Internal Cost、标签列用例全部保留并通过。
+- **`tests/aiXlsxSource.test.ts`：18 → 19（+1）：** 列方向工作簿经引擎进入 Provider 输入，一次调用。文本为 `Columns: Parameter | Unit | LT180C` / `Pressure | bar | 6` / `Power | kW | 0.5`，不含 `0.45`、LT200C 及其数值。
+
+### 四、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1945 通过 + 18 跳过**（45 个文件；跳过的 1 个为默认不运行的 PDF 真实容器测试） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | Build complete（6.97 MB / 1.75 MB gzip） |
+| 依赖 | 0 新增；`package.json` / `package-lock.json` 未改；`yauzl@3.4.0` · `saxes@6.0.0` · `@types/yauzl@3.4.0` |
+
+- **构建产物实际启动：**
+  - Node 22.22.2（pid 40872）运行 `.output/server/index.mjs`，只监听 `127.0.0.1:3001`。
+  - 路由：`/admin/login` 200、`/admin` 200；`/admin/media`、`/admin/product-workspace/3/ai-source-intake`、`/admin/product-workspace/3/media-resources` 302 → `/admin/login`；`/api/admin/products/3/ai/sources` 401。日志只有 `Listening`。
+  - 另用 Node 22.22.2 直接加载产物服务端 chunk，打包后的 `extractTextFromFile` 输出与第一节"修正后"一致：`0.5 kW`、`0.46 kW`、`-0.5`、`45.60%`、缓存公式 `0.5`、`Parameter | Unit | LT180C` / `Power | kW | 0.5`。
+  - 行方向与隐藏表回归不变，DOCTYPE 与非 ZIP 仍为 `malformed`。
+  - `.output/public` 中 yauzl / saxes 引用为 0，测试 helper 不在产物中。未使用任何凭证。
+- **Windows `nuxt dev`（3000 端口）：**
+  - build 后首次启动出现已知的 `#app-manifest` Pre-transform 报错。按规则确认端口释放后干净重启一次，重启后日志无任何错误。
+  - 进程实测 Node 22.22.2（pid 42628）。
+  - 无 cookie 请求：`/admin/login` 200、`/admin` 200；Media、AI Source Intake、Media & resources、AI Proposal Review 均 302 → `/admin/login`。无全站 500。
+- **1440px（重启稳定后全新标签页，console 0 条错误，均无横向溢出）：**
+  - `/admin/media`：54 张文件卡，`scrollWidth = clientWidth = 1440`。
+  - 以下页面均为 `scrollWidth = clientWidth = 1425`（纵向滚动条占 15px）：
+    - `/admin`（→ `/admin/products`）；
+    - AI Source Intake：11 张来源卡、4 个 TXT 可选、`0 / 5 selected`；
+    - Media & resources：7 assets / 4 documents、Save changes 禁用；
+    - AI Proposal Review：空态。
+- **375px（同一标签页，console 0 条错误，以上路由均 `scrollWidth = clientWidth = 375`）：**
+  - AI Source Intake：
+    - 真实点击选中 `LT-180C-BETA-SYNTHETIC-SOURCE.txt` → `1 / 5 selected`，"Analyze selected sources" 可用，披露文案 "Original files are not sent to the AI provider." 显示。
+    - 再次点击取消 → `0 / 5 selected`，Analyze 禁用。
+    - 网络缓冲中无 generate 请求。
+  - Media & resources：
+    - 打开 "+ Select from Media Library"，提示为 "AI-readable marks the CSV, PDF, TSV, TXT, XLSX files AI Source Intake can analyze today. JPG, PNG, WebP files can be linked, but not analyzed."，类型筛选仍为 All formats / Image / PDF / Text (TXT, CSV, TSV)。
+    - 关闭面板未暂存；重新加载后仍为 7 / 4，Save changes 禁用。
+  - AI Proposal Review：空态 "No active proposal. Return to AI Source Intake."。
+- **未做与还原：**
+  - 未点击 Analyze，0 次 generate / apply。
+  - 未上传或关联 XLSX；Product 3 与其 `product_code` 未改。
+  - `.claude/launch.json` 仅在验收期间临时加入 Node 22 启动配置，验收后已还原，与 HEAD 一致。
+
+### 五、已知限制
+
+- **数字：**
+  - 只覆盖上面列出的简单格式；不插入千分位。
+  - 复杂格式仍输出存储值，可能比屏幕显示多出小数位。
+  - General 格式按存储值输出，不复现 Excel 按列宽截断显示的情况；不复现 Excel 格式引擎。
+- **列方向：** 描述列按位置判断，当前产品列左侧的其他型号列会作为带表头的上下文保留；多层表头不重建。
+- **编码：** 须同时含字母和数字才会缩小（V1 保守规则，维持不变）。
+- **与上一模块的关系：** AI-XLSX-SOURCE-01 第七节中，本模块关闭两项："数字按存储值输出，不按显示小数位取整"，"列方向只保留一个标签列"。该节其他限制不变：进程内无 OS 级内存硬限制、不支持 XLS / XLSM、不重算公式、不做 OCR、4–5 个来源时的字符份额、`npm audit` 不可用。
+
+### 六、边界
+
+**XLSX semantic correction only · 0 新格式 · 0 DOCX / OCR / Vision / XLS / XLSM · 0 PDF 改动 · 0 新依赖 · 0 DB / Directus schema · 0 产品数据写入 · 0 Provider adapter 改动 · 0 真实 Provider 调用 · 0 API 费用 · 0 push · 0 部署。**
+
+- **Charter / Register：** 未改，格式状态以 D-024 + 共享格式合同 + 本文件为准。
+- **MASTER-ROADMAP：** 未改。AI-XLSX-SOURCE-01 已是 ✅ COMPLETED，R1 不新增路线行。
+
+---
+
+```text
+AI-XLSX-SOURCE-01-R1
+=
+COMPLETED
+
+Visible simple numeric formatting:
+corrected
+
+0.45 with 0.0:
+0.5
+
+Simple quoted-unit precision:
+honored
+
+Column-oriented descriptor preservation:
+all visible descriptor columns before first matched model column
+
+Unit-loss risk:
+closed
+
+Hidden columns:
+still excluded
+
+Row-oriented filtering:
+unchanged
+
+D-025:
+unchanged
+
+D-027:
+clarified by D-028
+
+AI-readable:
+TXT / CSV / TSV / PDF / XLSX
+
+Still not AI-readable:
+DOCX / Images / DOC / XLS / XLSM
+
+Real provider calls:
+0
+
+NEXT CANDIDATE:
+AI-DOCX-SOURCE-01
+
+STATUS:
+NOT AUTHORIZED
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"AI-XLSX-SOURCE-01-R1"任务中写入。*

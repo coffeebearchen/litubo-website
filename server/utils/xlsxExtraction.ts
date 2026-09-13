@@ -9,18 +9,21 @@
  *
  * What reaches the text is what a reviewer sees in Excel. Hidden and very hidden
  * sheets, hidden rows and hidden columns never leave this module — they often
- * hold costs, internal notes or lookup tables. A formula contributes the value
- * Excel last saved for it, never the formula itself, and nothing is ever
- * recalculated. Each row stays a row under its column headers, so a model's
- * values stay attached to that model.
+ * hold costs, internal notes or lookup tables. A number under a simple format is
+ * written with the decimals that format shows, so 0.45 under `0.0` is 0.5, as on
+ * screen (AI-XLSX-SOURCE-01-R1). A formula contributes the value Excel last saved
+ * for it, never the formula itself, and nothing is ever recalculated. Each row
+ * stays a row under its column headers, so a model's values stay attached to
+ * that model.
  *
  * When the current product has a code, a sheet that names that exact code — in
- * a column header, or in a cell of a data row — is narrowed to the column or the
- * rows that name it (`productCodeMatch.ts`). That only shrinks the context; the
- * D-025 relevance guard in the prompt still decides what may be extracted. A
- * sheet that does not name the code is kept whole, because a single-model
- * workbook often has no model column at all — and so is every sheet when the
- * product has no code, or a code without both a letter and a digit.
+ * a column header, or in a cell of a data row — is narrowed to the columns or
+ * the rows that name it (`productCodeMatch.ts`), together with the columns that
+ * describe each row. That only shrinks the context; the D-025 relevance guard in
+ * the prompt still decides what may be extracted. A sheet that does not name the
+ * code is kept whole, because a single-model workbook often has no model column
+ * at all — and so is every sheet when the product has no code, or a code without
+ * both a letter and a digit.
  *
  * No external link, embedded object, drawing or macro part is ever opened, and a
  * macro-enabled, template or binary workbook is refused.
@@ -407,32 +410,50 @@ async function readStyles(pkg: OoxmlPackage, part: string, ctx: ReadContext): Pr
 
 // ── Number formats ───────────────────────────────────────────────────────────
 
+/**
+ * How many decimals a number format shows: every `0` place, and a `#` place only
+ * when its digit is not a trailing zero — `0.0#` shows one or two.
+ */
+export interface DecimalPlaces {
+  min: number
+  max: number
+}
+
 export type NumberFormatKind =
   | { kind: 'general' }
   | { kind: 'hidden' }
-  | { kind: 'percent' }
-  | { kind: 'unit', suffix: string }
+  | { kind: 'number', decimals: DecimalPlaces }
+  | { kind: 'percent', decimals: DecimalPlaces }
+  | { kind: 'unit', suffix: string, decimals: DecimalPlaces }
   | { kind: 'datetime', date: boolean, time: boolean }
   /** A built-in East Asian date or time format, whose exact pattern depends on the locale. */
   | { kind: 'localeDatetime' }
 
-const BUILT_IN_PERCENT = new Set([9, 10])
+/** Built-in number formats and the decimals each shows: `0`, `0.00`, `#,##0`, `#,##0.00`, and the last two with negatives in parentheses (37–40). */
+const BUILT_IN_NUMBER = new Map([[1, 0], [2, 2], [3, 0], [4, 2], [37, 0], [38, 0], [39, 2], [40, 2]])
+/** `0%` and `0.00%`. */
+const BUILT_IN_PERCENT = new Map([[9, 0], [10, 2]])
 const BUILT_IN_DATE = new Set([14, 15, 16, 17])
 const BUILT_IN_TIME = new Set([18, 19, 20, 21, 45])
 const BUILT_IN_DATE_TIME = new Set([22])
 /** Date or time formats in every East Asian locale, each locale with its own pattern (年/月/日, 時/分, eras). */
 const BUILT_IN_LOCALE_DATE_TIME = new Set([27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 50, 51, 52, 53, 54, 55, 56, 57, 58])
 
+const fixedDecimals = (places: number): DecimalPlaces => ({ min: places, max: places })
+
 /**
  * How a number stored under a format is written out. Only unambiguous cases are
- * interpreted: percentages, a number followed by one quoted unit, and plain date
- * or time patterns. Everything else is the stored number itself — no attempt is
- * made to reproduce Excel's formatting engine, and a number is never rounded to
- * the decimals a format displays.
+ * interpreted: a plain number, a percentage and a number followed by one quoted
+ * unit — each written with the decimals its format shows, as Excel shows it —
+ * and plain date or time patterns. Everything else is the stored number itself:
+ * no attempt is made to reproduce Excel's formatting engine.
  */
 export function classifyNumberFormat(numFmtId: number, formatCode: string | undefined): NumberFormatKind {
   if (formatCode !== undefined) return classifyFormatCode(formatCode)
-  if (BUILT_IN_PERCENT.has(numFmtId)) return { kind: 'percent' }
+  const number = BUILT_IN_NUMBER.get(numFmtId)
+  if (number !== undefined) return { kind: 'number', decimals: fixedDecimals(number) }
+  const percent = BUILT_IN_PERCENT.get(numFmtId)
+  if (percent !== undefined) return { kind: 'percent', decimals: fixedDecimals(percent) }
   if (BUILT_IN_DATE.has(numFmtId)) return { kind: 'datetime', date: true, time: false }
   if (BUILT_IN_TIME.has(numFmtId)) return { kind: 'datetime', date: false, time: true }
   if (BUILT_IN_DATE_TIME.has(numFmtId)) return { kind: 'datetime', date: true, time: true }
@@ -442,7 +463,13 @@ export function classifyNumberFormat(numFmtId: number, formatCode: string | unde
 
 /** Colour and locale tags change how a value looks, never what it is. */
 const DISPLAY_TAGS = /\[(?:black|blue|cyan|green|magenta|red|white|yellow|color\s?\d{1,2}|\$-[0-9a-f]{1,8})\]/gi
-const NUMBER_PLACEHOLDER = '(?:#,##)?0(?:\\.[0#]+)?'
+/**
+ * `0`, `#,##0.00`, `0.0#` — with the decimal places captured. At most 30 are read,
+ * the most Excel's number dialog offers, so a hostile format code cannot make
+ * each cell's text grow without end; a longer run is left as the stored number.
+ */
+const NUMBER_PLACEHOLDER = '(?:#,##)?0(?:\\.([0#]{1,30}))?'
+const NUMBER_CODE = new RegExp(`^${NUMBER_PLACEHOLDER}$`)
 const PERCENT_CODE = new RegExp(`^${NUMBER_PLACEHOLDER}%$`)
 const UNIT_CODE = new RegExp(`^${NUMBER_PLACEHOLDER}"([^"]{1,24})"$`)
 
@@ -481,9 +508,12 @@ export function classifyFormatCode(formatCode: string): NumberFormatKind {
   // An empty positive section shows nothing for a number: ";;;" is a common way to hide a value.
   if (sections > 1 && code === '') return { kind: 'hidden' }
   if (code === '' || code.toLowerCase() === 'general') return { kind: 'general' }
-  if (PERCENT_CODE.test(code)) return { kind: 'percent' }
+  const number = NUMBER_CODE.exec(code)
+  if (number) return { kind: 'number', decimals: decimalPlacesOf(number[1]) }
+  const percent = PERCENT_CODE.exec(code)
+  if (percent) return { kind: 'percent', decimals: decimalPlacesOf(percent[1]) }
   const unit = UNIT_CODE.exec(code)
-  if (unit) return { kind: 'unit', suffix: unit[1]! }
+  if (unit) return { kind: 'unit', suffix: unit[2]!, decimals: decimalPlacesOf(unit[1]) }
   const pattern = code
     .replace(/"[^"]*"/g, '')
     .replace(/\\./g, '')
@@ -534,6 +564,48 @@ export function excelSerialToText(serial: number, date1904: boolean, parts: { da
   return parts.date ? date : time
 }
 
+/** `0.0#` shows one decimal at least and two at most; a `#` with a `0` after it is shown like a `0`. */
+function decimalPlacesOf(placeholders: string | undefined): DecimalPlaces {
+  return placeholders ? { min: placeholders.lastIndexOf('0') + 1, max: placeholders.length } : fixedDecimals(0)
+}
+
+/** A run of decimal digits plus one: `"0999"` → `"1000"`, `""` → `"1"`. */
+function incrementDigits(digits: string): string {
+  const places = [...digits]
+  for (let index = places.length - 1; index >= 0; index -= 1) {
+    if (places[index] !== '9') {
+      places[index] = String(Number(places[index]) + 1)
+      return places.join('')
+    }
+    places[index] = '0'
+  }
+  return `1${places.join('')}`
+}
+
+/**
+ * A number as a simple format shows it: rounded half away from zero to
+ * `decimals.max` places, then trailing zeros dropped down to `decimals.min`.
+ * Rounding works on the 15 significant digits Excel keeps, never on the binary
+ * value — the double nearest 0.35 is 0.34999…, yet Excel shows 0.4 under `0.0`,
+ * and so does this. `shift` moves the decimal point right, for a percentage.
+ * No thousands separator is written and the decimal mark is always `.`: both
+ * come from the reader's locale, not from the workbook. A negative number keeps
+ * its sign even when it rounds to zero, as in Excel.
+ */
+function formatDecimalPlaces(value: number, decimals: DecimalPlaces, shift = 0): string {
+  const [mantissa = '0', exponent = '0'] = Math.abs(value).toExponential(14).split('e')
+  const significant = mantissa.replace('.', '')
+  // Digits in front of the rounding position: none, or fewer, when the value is below the last place shown.
+  const kept = 1 + Number(exponent) + shift + decimals.max
+  let digits = kept > 0 ? significant.slice(0, kept).padEnd(kept, '0') : ''
+  if (kept >= 0 && (significant[kept] ?? '0') >= '5') digits = incrementDigits(digits)
+  digits = digits.padStart(decimals.max + 1, '0')
+  const integer = digits.slice(0, digits.length - decimals.max).replace(/^0+(?=\d)/, '')
+  let fraction = digits.slice(digits.length - decimals.max)
+  while (fraction.length > decimals.min && fraction.endsWith('0')) fraction = fraction.slice(0, -1)
+  return `${value < 0 ? '-' : ''}${integer}${fraction ? `.${fraction}` : ''}`
+}
+
 export function formatCellNumber(raw: string, format: NumberFormatKind, date1904: boolean): string {
   const trimmed = raw.trim()
   const value = Number(trimmed)
@@ -541,10 +613,12 @@ export function formatCellNumber(raw: string, format: NumberFormatKind, date1904
   switch (format.kind) {
     case 'hidden':
       return ''
+    case 'number':
+      return formatDecimalPlaces(value, format.decimals)
     case 'percent':
-      return `${stableNumber(value * 100)}%`
+      return `${formatDecimalPlaces(value, format.decimals, 2)}%`
     case 'unit':
-      return `${stableNumber(value)}${format.suffix}`
+      return `${formatDecimalPlaces(value, format.decimals)}${format.suffix}`
     case 'datetime':
       return excelSerialToText(value, date1904, format) ?? stableNumber(value)
     case 'localeDatetime': {
@@ -879,9 +953,12 @@ interface RowEntry {
  * With a product code, a sheet is narrowed in one of two ways, and only when the
  * narrowing still keeps a data row:
  *
- *   - column-oriented — the header names the code in a column that has a label
- *     column to its left: that label column and every column headed by the code
- *     are kept, for the rows with a value under the code;
+ *   - column-oriented — the header names the code, and a visible column left of
+ *     the first column it names holds a value: every such column (a parameter,
+ *     a unit, a range — kept by position, never by what its header says) and
+ *     every column headed by the code are kept, for the rows with a value under
+ *     the code. Right of the first match, a column is kept only when its header
+ *     names the code, so another model's column or a note between models is not;
  *   - row-oriented — otherwise, the data rows with a cell naming the code.
  *
  * A sheet that does not name the code is kept whole.
@@ -934,12 +1011,13 @@ function renderSheet(name: string, grid: SheetGrid, state: RenderState, ctx: Rea
   let filtered = false
   if (state.normalizedCode) {
     const matched = [...columnsOf(header)].filter(column => namesCode(header, column)).sort((a, b) => a - b)
-    const label = matched.length > 0 ? usedColumns(entries)[0] : undefined
     const underMatched = data.filter(entry => matched.some(column => valueAt(entry, column) !== ''))
-    if (label !== undefined && label < matched[0]! && underMatched.length > 0) {
-      // Column-oriented: the label column, then every column headed by this exact code.
+    // Every visible column left of the first match describes each row — a parameter, a unit, a range — by position alone.
+    const descriptors = underMatched.length > 0 ? usedColumns([header, ...underMatched]).filter(column => column < matched[0]!) : []
+    if (descriptors.length > 0) {
+      // Column-oriented: the descriptor columns, then every column headed by this exact code, and no other.
       kept = underMatched
-      columns = [label, ...matched]
+      columns = [...descriptors, ...matched]
       filtered = true
     }
     else {

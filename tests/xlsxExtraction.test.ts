@@ -18,10 +18,12 @@ import {
   columnLetters,
   excelSerialToText,
   extractXlsxText,
+  formatCellNumber,
   parseCellRange,
   parseCellReference,
   resolvePartTarget,
   stableNumber,
+  type NumberFormatKind,
   type XlsxExtractionOptions,
   type XlsxExtractionResult,
 } from '../server/utils/xlsxExtraction'
@@ -291,7 +293,7 @@ describe('xlsxExtraction — numbers', () => {
         ['percent', { value: 0.45, style: style(9) }],
         ['percent decimals', { value: 0.456, style: style(10) }],
         ['unit mm', { value: 180, style: style(164) }],
-        ['unit kW', { value: 0.5, style: style(165) }],
+        ['unit kW', { value: 0.45, style: style(165) }],
         ['custom percent', { value: 0.456, style: style(166) }],
         ['conditional format', { value: 1500, style: style(167) }],
         ['CJK date format', { value: 45_000, style: style(168) }],
@@ -306,7 +308,7 @@ describe('xlsxExtraction — numbers', () => {
     }],
   })
 
-  it('writes stable numbers, explicit percentages, simple units and unambiguous dates — and the raw value otherwise', async () => {
+  it('writes stable numbers, percentages and simple units with the decimals their format shows, unambiguous dates — and the raw value otherwise', async () => {
     expect(await textOf(numbersWorkbook())).toBe([
       'Sheet: Numbers',
       'Columns: Case | Value',
@@ -314,7 +316,7 @@ describe('xlsxExtraction — numbers', () => {
       'float sum | 0.3',
       'negative zero | 0',
       'percent | 45%',
-      'percent decimals | 45.6%',
+      'percent decimals | 45.60%',
       'unit mm | 180 mm',
       'unit kW | 0.5 kW',
       'custom percent | 45.6%',
@@ -359,33 +361,145 @@ describe('xlsxExtraction — numbers', () => {
     expect(excelSerialToText(serial, date1904, wanted)).toBe(expected)
   })
 
+  const describeFormat = (kind: NumberFormatKind): string => {
+    const places = ({ min, max }: { min: number, max: number }) => (min === max ? `${max}` : `${min}-${max}`)
+    switch (kind.kind) {
+      case 'number':
+      case 'percent':
+        return `${kind.kind}:${places(kind.decimals)}`
+      case 'unit':
+        return `unit:${kind.suffix}:${places(kind.decimals)}`
+      case 'datetime':
+        return [kind.date && 'date', kind.time && 'time'].filter(Boolean).join('+')
+      default:
+        return kind.kind
+    }
+  }
+
   it.each([
     [';;;', 'hidden'], [';;', 'hidden'], [';;;@', 'hidden'],
     ['', 'general'], ['General', 'general'], ['@', 'general'],
-    ['0%', 'percent'], ['0.00%', 'percent'], ['#,##0.0%', 'percent'], ['[Red]0.0%', 'percent'], ['0.0%;[Red]-0.0%', 'percent'],
-    ['0" mm"', 'unit: mm'], ['#,##0.00" kW"', 'unit: kW'], ['0"℃"', 'unit:℃'],
+    ['0', 'number:0'], ['0.0', 'number:1'], ['0.00', 'number:2'], ['0.000', 'number:3'],
+    ['#,##0', 'number:0'], ['#,##0.0', 'number:1'], ['#,##0.00', 'number:2'],
+    ['0.0#', 'number:1-2'], ['#,##0.##', 'number:0-2'], ['[Blue]0.00;[Red]-0.00', 'number:2'],
+    [`0.${'0'.repeat(30)}`, 'number:30'], [`0.${'0'.repeat(31)}`, 'general'],
+    ['0%', 'percent:0'], ['0.00%', 'percent:2'], ['#,##0.0%', 'percent:1'], ['[Red]0.0%', 'percent:1'], ['0.0%;[Red]-0.0%', 'percent:1'],
+    ['0" mm"', 'unit: mm:0'], ['0.0" kW"', 'unit: kW:1'], ['0.00" kg"', 'unit: kg:2'], ['#,##0.0" bar"', 'unit: bar:1'], ['0"℃"', 'unit:℃:0'],
     ['0.00E+00', 'general'], ['# ?/?', 'general'], ['"$"#,##0', 'general'], ['0,"K"', 'general'], ['[>=1000]0', 'general'],
+    ['00', 'general'], ['#,##0.00_);(#,##0.00)', 'general'],
     ['yyyy-mm-dd', 'date'], ['yyyy"年"m"月"d"日"', 'date'], ['[$-804]yyyy/m/d', 'date'],
     ['h:mm AM/PM', 'time'], ['上午/下午h"时"mm"分"', 'time'], ['yyyy-mm-dd hh:mm:ss', 'date+time'],
     ['[h]:mm:ss', 'general'], ['mm:ss.0', 'general'], ['m', 'general'],
   ])('format code %j is %s', (code, expected) => {
-    const kind = classifyFormatCode(code)
-    const described = kind.kind === 'unit'
-      ? `unit:${kind.suffix}`
-      : kind.kind === 'datetime'
-        ? [kind.date && 'date', kind.time && 'time'].filter(Boolean).join('+')
-        : kind.kind
-    expect(described).toBe(expected)
+    expect(describeFormat(classifyFormatCode(code))).toBe(expected)
   })
 
   it('knows the built-in formats by id and lets a workbook-defined code override one', () => {
-    expect(classifyNumberFormat(9, undefined)).toEqual({ kind: 'percent' })
+    const fixed = (places: number) => ({ min: places, max: places })
+    for (const [id, places] of [[1, 0], [2, 2], [3, 0], [4, 2], [37, 0], [38, 0], [39, 2], [40, 2]] as const) {
+      expect(classifyNumberFormat(id, undefined)).toEqual({ kind: 'number', decimals: fixed(places) })
+    }
+    expect(classifyNumberFormat(9, undefined)).toEqual({ kind: 'percent', decimals: fixed(0) })
+    expect(classifyNumberFormat(10, undefined)).toEqual({ kind: 'percent', decimals: fixed(2) })
     expect(classifyNumberFormat(14, undefined)).toEqual({ kind: 'datetime', date: true, time: false })
     expect(classifyNumberFormat(57, undefined)).toEqual({ kind: 'localeDatetime' })
     expect(classifyNumberFormat(0, undefined)).toEqual({ kind: 'general' })
-    expect(classifyNumberFormat(14, '0.0%')).toEqual({ kind: 'percent' })
+    expect(classifyNumberFormat(11, undefined)).toEqual({ kind: 'general' })
+    expect(classifyNumberFormat(14, '0.0%')).toEqual({ kind: 'percent', decimals: fixed(1) })
     expect(stableNumber(0.1 + 0.2)).toBe('0.3')
     expect(stableNumber(-0)).toBe('0')
+  })
+})
+
+describe('xlsxExtraction — the decimals a simple number format shows (AI-XLSX-SOURCE-01-R1)', () => {
+  it.each([
+    // Stored value, format code, and the text Excel shows for it.
+    ['0.45', '0.0', '0.5'],
+    ['0.45', '0.00', '0.45'],
+    ['0.45', '0', '0'],
+    ['0.5', '0.00', '0.50'],
+    ['0.45', '0.0" kW"', '0.5 kW'],
+    ['0.456', '0.00" kW"', '0.46 kW'],
+    ['180', '0" mm"', '180 mm'],
+    ['180.4', '0" mm"', '180 mm'],
+    ['6.25', '#,##0.0" bar"', '6.3 bar'],
+    ['-0.45', '0.0', '-0.5'],
+    ['-0.456', '0.00" kW"', '-0.46 kW'],
+    ['-0.04', '0.0', '-0.0'],
+    ['0.35', '0.0', '0.4'],
+    ['1.005', '0.00', '1.01'],
+    ['2.5', '0', '3'],
+    ['-2.5', '0', '-3'],
+    ['9.96', '0.0', '10.0'],
+    ['0.004', '0.00', '0.00'],
+    ['0.005', '0.00', '0.01'],
+    ['0', '0.00', '0.00'],
+    ['0.45000000000000001', '0.00', '0.45'],
+    ['1500', '#,##0', '1500'],
+    ['1234.5', '#,##0.00', '1234.50'],
+    ['123456789012345678', '0', '123456789012346000'],
+    ['0.5', '0.0#', '0.5'],
+    ['0.456', '0.0#', '0.46'],
+    ['1', '#,##0.##', '1'],
+    ['0.456', '0%', '46%'],
+    ['0.456', '0.0%', '45.6%'],
+    ['0.456', '0.00%', '45.60%'],
+    ['0', '0%', '0%'],
+    ['-0.0045', '0.0%', '-0.5%'],
+  ])('%s under %j is written %j', (raw, code, expected) => {
+    expect(formatCellNumber(raw, classifyFormatCode(code), false)).toBe(expected)
+  })
+
+  it('reads the decimals from custom codes, built-in formats and cached formula values, and leaves dates and General alone', async () => {
+    const bytes = buildXlsx({
+      numberFormats: [
+        { id: 164, code: '0.0' },
+        { id: 165, code: '0.00' },
+        { id: 166, code: '0.00" kW"' },
+        { id: 167, code: '0" mm"' },
+        { id: 168, code: '#,##0.0" bar"' },
+      ],
+      // Style index → numFmtId: 1–5 are the codes above, then built-in 0.00, #,##0.00, #,##0, 0.00% and a date.
+      cellFormats: [0, 164, 165, 166, 167, 168, 2, 4, 3, 10, 14],
+      sheets: [{
+        name: 'Display',
+        rows: [
+          ['Case', 'Value'],
+          ['one decimal', { value: 0.45, style: 1 }],
+          ['two decimals', { value: 0.45, style: 2 }],
+          ['unit, two decimals', { value: 0.456, style: 3 }],
+          ['unit, no decimals', { value: 180, style: 4 }],
+          ['negative', { value: -0.45, style: 1 }],
+          ['unit with a thousands separator', { value: 6.25, style: 5 }],
+          ['built-in two decimals', { value: 0.456, style: 6 }],
+          ['built-in thousands, two decimals', { value: 1_234.5, style: 7 }],
+          ['built-in thousands', { value: 1_500.4, style: 8 }],
+          ['built-in percent', { value: 0.456, style: 9 }],
+          ['cached formula', { value: 0.45, formula: 'ROUND(B9*0.9,2)', style: 1 }],
+          ['date', { value: 45_000, style: 10 }],
+          ['General', 0.456],
+        ],
+      }],
+    })
+    const text = await textOf(bytes)
+    expect(text).toBe([
+      'Sheet: Display',
+      'Columns: Case | Value',
+      'one decimal | 0.5',
+      'two decimals | 0.45',
+      'unit, two decimals | 0.46 kW',
+      'unit, no decimals | 180 mm',
+      'negative | -0.5',
+      'unit with a thousands separator | 6.3 bar',
+      'built-in two decimals | 0.46',
+      'built-in thousands, two decimals | 1234.50',
+      'built-in thousands | 1500',
+      'built-in percent | 45.60%',
+      'cached formula | 0.5',
+      'date | 2023-03-15',
+      'General | 0.456',
+    ].join('\n'))
+    expect(text).not.toContain('ROUND')
   })
 })
 
@@ -507,6 +621,83 @@ describe('xlsxExtraction — exact product-code narrowing', () => {
   it('keeps the whole sheet when the product\'s column holds no value', async () => {
     const rows: CellInput[][] = [['Parameter', 'LT180C', 'LT200C'], ['Aperture', null, 200]]
     expect(await textOf(tableXlsx(rows), { productCode: 'LT180C' })).toBe('Sheet: Specifications\nColumns: Parameter | LT180C | LT200C\nAperture |  | 200')
+  })
+
+  describe('a column-oriented sheet keeps the columns that describe each row (AI-XLSX-SOURCE-01-R1)', () => {
+    it('keeps the parameter and unit columns, and writes the value Excel shows', async () => {
+      const bytes = buildXlsx({
+        numberFormats: [{ id: 164, code: '0.0' }],
+        cellFormats: [0, 164],
+        sheets: [{
+          name: 'Specifications',
+          rows: [
+            ['Parameter', 'Unit', 'LT180C', 'LT200C'],
+            ['Pressure', 'bar', 6, 8],
+            ['Power', 'kW', { value: 0.45, style: 1 }, { value: 0.55, style: 1 }],
+          ],
+        }],
+      })
+      const text = await textOf(bytes, { productCode: 'LT-180C' })
+      expect(text).toBe([
+        'Sheet: Specifications',
+        'Filtered to exact product code: LT-180C',
+        'Columns: Parameter | Unit | LT180C',
+        'Pressure | bar | 6',
+        'Power | kW | 0.5',
+      ].join('\n'))
+      expect(text).not.toMatch(/LT200C|\| 8|0\.6|0\.45/)
+    })
+
+    it('keeps every descriptor column left of the product\'s column', async () => {
+      const rows: CellInput[][] = [
+        ['Parameter', 'Unit', 'Range', 'LT180C', 'LT200C'],
+        ['Pressure', 'bar', '0–10', 6, 8],
+        ['Temperature', '°C', '0–40', 25, 30],
+      ]
+      expect(await textOf(tableXlsx(rows), { productCode: 'LT180C' })).toBe([
+        'Sheet: Specifications',
+        'Filtered to exact product code: LT180C',
+        'Columns: Parameter | Unit | Range | LT180C',
+        'Pressure | bar | 0–10 | 6',
+        'Temperature | °C | 0–40 | 25',
+      ].join('\n'))
+    })
+
+    it('still leaves a hidden descriptor column out', async () => {
+      const bytes = buildXlsx({
+        sheets: [{ name: 'Specifications', rows: [['Parameter', 'Unit', 'LT180C', 'LT200C'], ['Pressure', 'bar', 6, 8]], hiddenColumns: [[2, 2]] }],
+      })
+      const text = await textOf(bytes, { productCode: 'LT180C' })
+      expect(text).toBe('Sheet: Specifications\nFiltered to exact product code: LT180C\nColumns: Parameter | LT180C\nPressure | 6')
+      expect(text).not.toMatch(/Unit|bar/)
+    })
+
+    it('keeps every column headed by the exact code, and no other model\'s column', async () => {
+      const rows: CellInput[][] = [['Parameter', 'Unit', 'LT180C', 'LT180C', 'LT200C'], ['Pressure', 'bar', 6, 7, 8]]
+      const text = await textOf(tableXlsx(rows), { productCode: 'LT-180C' })
+      expect(text).toBe('Sheet: Specifications\nFiltered to exact product code: LT-180C\nColumns: Parameter | Unit | LT180C | LT180C\nPressure | bar | 6 | 7')
+      expect(text).not.toMatch(/LT200C|\| 8/)
+    })
+
+    it('does not carry a column that sits between model columns', async () => {
+      const rows: CellInput[][] = [['Parameter', 'Unit', 'LT180C', 'Note', 'LT200C'], ['Pressure', 'bar', 6, 'LT200C only', 8]]
+      const text = await textOf(tableXlsx(rows), { productCode: 'LT180C' })
+      expect(text).toBe('Sheet: Specifications\nFiltered to exact product code: LT180C\nColumns: Parameter | Unit | LT180C\nPressure | bar | 6')
+      expect(text).not.toMatch(/Note|only|LT200C|\| 8/)
+    })
+
+    it('keeps a column left of the first match by position whatever its header says — another model\'s keeps its own header, for the guard', async () => {
+      const rows: CellInput[][] = [['Parameter', 'Unit', 'LT150C', 'LT180C', 'LT200C'], ['Pressure', 'bar', 5, 6, 8]]
+      const text = await textOf(tableXlsx(rows), { productCode: 'LT180C' })
+      expect(text).toBe('Sheet: Specifications\nFiltered to exact product code: LT180C\nColumns: Parameter | Unit | LT150C | LT180C\nPressure | bar | 5 | 6')
+      expect(text).not.toMatch(/LT200C|\| 8/)
+    })
+
+    it('keeps a column-oriented sheet that does not name the code whole', async () => {
+      const rows: CellInput[][] = [['Parameter', 'Unit', 'LT200C', 'LT300C'], ['Pressure', 'bar', 8, 9]]
+      expect(await textOf(tableXlsx(rows), { productCode: 'LT-180C' }))
+        .toBe('Sheet: Specifications\nColumns: Parameter | Unit | LT200C | LT300C\nPressure | bar | 8 | 9')
+    })
   })
 
   it('does not narrow at all without a product code', async () => {
