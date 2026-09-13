@@ -6492,3 +6492,153 @@ STATUS: NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-13，由 Claude Code 在"AI-SOURCE-CONTRACT-01"任务中写入。*
+
+---
+
+## GOV-AI-STATE-SYNC-01 = COMPLETED（2026-09-13）
+
+```text
+AI governance documents synchronized with delivered facts.
+Docs only · 0 runtime changes · 0 AI capability changes.
+```
+
+纯文档的治理事实同步模块。它关闭了上一节 AI-SOURCE-CONTRACT-01 记录的"治理文档状态差异"（该段原文保留）。
+
+**过程：** 首轮完整阅读后发现，Register 的状态枚举里没有能表示"功能已签收"的正式值，因此按施工单 STOP 并报告，未改任何文件。ChatGPT / 项目控制方随后授权 AI-01 的 Acceptance 采用 Register 既有的叙述式写法（PC-01 / PC-02 / PW-03 / PW-06 先例），本轮据此完成。
+
+**分支：** `review/gov-ai-state-sync-01`，从 `ac3295a` 创建，仅本地，未 push。
+
+### 一、Charter（`ADMIN-CMS-GOVERNING-CHARTER-V1.md`）
+
+| 位置 | 之前 | 之后 |
+|---|---|---|
+| H.1 | "当前未接入任何 AI 功能" | 单产品 AI V1 已交付并签收：Source Intake、Proposal Review（逐项与批量审核、来源冲突审核）、人工 Accept / Edit / Reject、Apply 到同一 Draft；AI 可读仅 TXT / CSV / TSV；列出尚未实现项；保留"除此之外不得表述为已完成" |
+| H.2 | "（当前均为待实现）" | 规则代码块原样保留；下方逐项标注已落实 / 部分落实 / 未实现 |
+| H.4 | — | Gate 条件原样保留，只新增一段事实说明（见下） |
+
+**H.4 事实说明的内容：**
+- V1 依据逐个明确、窄范围的模块授权（2026-09-08 起）及 FD-004（2026-09-09 生效）实施并签收；
+- 条件不因此视为已满足，DG-07 / DG-08 / DG-09 / DG-15 状态不变；
+- 未来扩大格式、Provider / 数据出境、基础设施、生产部署、自动发布，仍受现有 Gate 约束。
+
+措辞没有照抄"依据 FD-004 及后续模块授权"：最早的 AI 模块 PWS-AI-01-FAST-01（2026-09-08）早于 FD-004（2026-09-09），所以写成两者并列。
+
+**Charter 未改的部分：**
+- E.3"AI 编排与任务 Worker（待实现）"：专用 Worker / 队列确实未实现，H.1 已说明当前在 Nitro 内同步处理；
+- M.1 变更日志：本次是事实同步，不是框架变更；
+- M.2 Gate 表；
+- M.3 追溯矩阵：整张表为 V1.1 时点记录；
+- FD-001 / FD-002 历史条文。
+
+### 二、Register AI-01（`ADMIN-CMS-VISUAL-DATA-CONFORMANCE-REGISTER-V1.md` §12.1i）
+
+同一行的 17 个字段按仓库事实 1:1 替换，表格结构不变；Next step 保持"等待 Codex 决定"。
+
+| 字段 | 之前 | 之后 |
+|---|---|---|
+| Source Asset ID | 仅 `VM1-LOGIC01` | `PW-AI-01` / `PW-AI-02`（PRIMARY，仅桌面 1440px）+ `VM1-LOGIC01`（FUTURE-REFERENCE）；批量审核参考 `admin-ai-proposal-review-batch-v1/` 只按路径引用，未建 Source Asset ID，未改 §4 |
+| Target / Current route | None | `/admin/product-workspace/:id/ai-source-intake`、`/admin/product-workspace/:id/ai-proposal-review`，两者均存在 |
+| Pages | None | 2 个页面 + `WorkspaceAiSourceIntake.vue` / `WorkspaceAiProposalReview.vue` |
+| server API | None；"No AI provider adapter" | 6 个端点（见下）；DeepSeek / OpenAI structured adapter 存在；provider policy 未改 |
+| types / data | None | DTO 所在位置；读取 `products_files`；Apply 只经 `productSpecWriter.ts` 写 `product_spec_items`（必要时建 `product_spec_groups`）；无 Directus AI 集合，限流与重放防护为单实例内存 |
+| Missing | 含已存在的 provider adapter 与人工决定 | 只列真正缺失的项（见下） |
+| Charter / Blueprint Gate | §H.4、BP-DG-11 unresolved | 同上，并补列 CH-DG-07、CH-DG-08、BP-DG-06，均 unresolved |
+| English-first | Not applicable | 2 个页面 + 2 个 AI 组件含 0 个汉字（仓库 grep） |
+| Desktop / Mobile evidence | 不存在 / 不适用 | 6 个模块的 1440 / 375 浏览器 DOM 验收记录；真实 Beta 的 live proposal 未在 1440 / 375 截取；无 §4 登记的 375px PRIMARY 母版 |
+| Implementation | `NOT_STARTED` | `AUTOMATED_CHECKED`（仅单产品 AI V1 范围） |
+| Evidence | `REPOSITORY_CONFIRMED` | `REPOSITORY_CONFIRMED` + 自动化测试 + 浏览器验收 + 真实 Beta 功能签收引用；`RUNTIME_NOT_PROVEN` 仍适用 |
+| Acceptance | `NOT_REVIEWED` | 叙述式：功能签收已记录；不是 `VISUALLY_VERIFIED`，也不是对 PW-AI-01 / PW-AI-02 的像素级签收；live-proposal 1440 / 375 截图未取得 |
+| DoR | NOT MET | 完整 AI-01 Dossier 范围仍 NOT MET（原条件原样保留）；V1 交付不豁免条件、不关闭任何 Gate |
+
+**Missing 字段现列：**
+- 冻结 Source Snapshot、页码 / Sheet 定位、逐条来源与 provenance、已确认字段锁定；
+- PDF / DOCX / XLSX / OCR / Vision、Specifications 以外的 Target、型号相关性检查；
+- provider / 预算 / 出境 / 留存策略、Worker / 队列、多产品 AI 与导入。
+
+**端点数更正：** 首轮 STOP 报告写的是 5 个 AI 端点，即 `products/[id]/ai/` 下的 context / hero / sources / generate / apply。复核仓库后为 **6 个**：另有 `server/api/admin/ai/providers.get.ts`，是 AI Source Intake 使用的只读 provider 状态端点。Register 按 6 个写入。
+
+### 三、Acceptance 的含义
+
+```text
+Functional sign-off              = recorded
+VISUALLY_VERIFIED                = NOT claimed
+Pixel-level 1440/375 sign-off    = NOT claimed
+Live-proposal screenshots        = NOT captured
+375px PRIMARY master             = does not exist (not claimed)
+```
+
+### 四、Gate 与决定
+
+- `CH-DG-07` 未授权；`CH-DG-08` / `CH-DG-09` / `CH-DG-15` 状态不变；
+- `BP-DG-11`、`BP-DG-06` 仍 unresolved，Implementation Blueprint 未改；
+- `D-022` 仍为 Confirmed、未改；未新增 Decision；document-extractor 未获任何提前批准。
+
+### 五、Register §13 变更说明
+
+- **原因：** 属于 §13 第 3 种情形——已批准的施工单依据已验证的交付证据更新该行。纯事实同步，不改框架、母版或验收标准。
+- **影响：** `PW-AI-01` / `PW-AI-02` / `VM1-LOGIC01` 的权威等级不变；路由与 API 只登记既有事实；Gate 全部不变。
+- **兼容 / 回滚：** 纯文档，无运行时影响；回滚即 revert 本次 commit。
+- **交叉引用：**
+  - Charter H.1 / H.2 / H.4 已同步；本节即 CURRENT-STATE 记录；
+  - MASTER-ROADMAP 第 11、34 行已记载 AI 交付，没有新矛盾，未改；
+  - Implementation Blueprint 未改。
+
+### 六、有意保留未改
+
+| 位置 | 原因 |
+|---|---|
+| Register §8 LOGIC-01 | V-0.5.1 时点核查记录，属于历史 |
+| Register §4.4 / §4.5 / §4.6 | 母版登记与权威等级，本次不改 |
+| Register §6.2"AI dossier — Future only" | 目标数据合同规划表 |
+| Child Blueprint §12"Future AI-01" | 阶段交付顺序规划表；"Future"与"Future PW-07"一样是排序标签，不是当前状态陈述 |
+| Child Blueprint §10"AI is a future Workspace capability" | 同属施工前的设计规划 |
+| Charter E.3 / M.3 | 见第一节 |
+| MASTER-ROADMAP、08-decision-log、Implementation Blueprint | 无直接矛盾 / 无新决定 |
+
+### 七、验证
+
+| 检查 | 结果 |
+|---|---|
+| `git diff --check` | 通过（exit 0，仅 Windows LF/CRLF 提示） |
+| `git diff --name-only` | Charter、Register、CURRENT-STATE 共 3 个文件 |
+| 文本核对 1–10 | 全部通过（见下） |
+| npm test / build / 浏览器 | 未运行：DOCS ONLY，仓库没有免安装的文档校验命令 |
+
+**文本核对：**
+1. Charter 不再含"当前未接入任何 AI"和"当前均为待实现"；
+2. AI-01 行 0 处 `NOT_STARTED`；
+3. AI-01 行 0 个 None 单元格；"No AI provider adapter"只剩 §8 LOGIC-01 的历史记录；
+4. Acceptance 写明 functional sign-off；
+5. `VISUALLY_VERIFIED` 只以否定形式出现；
+6. DG-07 仍为"未授权"，BP-DG-06 / BP-DG-11 原文未变；
+7. D-022 未变；
+8. Charter 中 AI 可读格式只写 TXT / CSV / TSV；
+9. PDF / DOCX / XLSX / OCR / Vision 只出现在"尚未实现"；
+10. FD-001 / FD-002 历史条文与 Register §8 原样保留。
+
+**1440px / 375px：** N/A — docs-only; zero runtime/UI files changed.
+
+### 八、边界
+
+**0 code · 0 UI · 0 runtime · 0 test code · 0 package · 0 Docker · 0 DB · 0 Directus · 0 AI prompt · 0 Provider · 0 Media · 0 product data · 0 API 调用 · 0 API 费用 · 0 push · 0 deploy。** 6 个历史 untracked 路径原样保留，未暂存。
+
+---
+
+```text
+GOV-AI-STATE-SYNC-01 = COMPLETED
+
+Charter H.1 / H.2 / H.4: synchronized
+Register AI-01: NOT_STARTED → AUTOMATED_CHECKED (single-product AI V1 scope)
+Acceptance: functional sign-off recorded (not VISUALLY_VERIFIED)
+Unresolved Gates: unchanged (CH-DG-07 / CH-DG-08 / BP-DG-11 / BP-DG-06)
+D-022: unchanged
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+Current AI-readable: TXT / CSV / TSV only
+PDF / DOCX / XLSX / Image OCR / Vision: NOT IMPLEMENTED
+
+NEXT CANDIDATE: PRODUCT-MODEL-RELEVANCE-GUARD-01
+STATUS: NOT AUTHORIZED
+```
+
+*最后更新：2026-09-13，由 Claude Code 在"GOV-AI-STATE-SYNC-01"任务中写入。*

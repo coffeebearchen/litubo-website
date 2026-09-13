@@ -883,13 +883,25 @@ TEST ONLY 数据（product_code=NULL 或 ID=3）不得进入 published，且 seo
 
 ## H. AI 与导入治理合同
 
-### H.1 当前状态（如实记录）
+### H.1 当前状态（如实记录，2026-09-13 同步）
 
-**当前未接入任何 AI 功能。不得把任何 AI 流程表述为"已完成"。**
+**当前已交付并签收的 AI 只有单产品 AI V1（`AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF`，详见 `CURRENT-STATE.md`）。除此之外，不得把任何 AI 流程表述为"已完成"。**
+
+当前已有（均限于一个产品及该产品的同一个 Product Draft）：
+
+- AI Source Intake：只分析本产品已关联且已启用的资料；
+- Proposal Review：AI 只生成 Specifications 建议；人工逐项 Accept / Edit / Reject，支持批量审核；多份资料互相矛盾时进入来源冲突审核，由人工选定取值或拒绝；
+- Apply to Draft：只把人工已接受的建议写入同一个产品 Draft，非 Draft 产品由服务端拒绝写入。
+
+当前 AI 可读格式：**TXT / CSV / TSV**。
+
+当前尚未实现：PDF 抽取、DOCX 抽取、XLSX 抽取、图片 OCR、Vision、旧版 DOC / XLS；Specifications 以外的 AI Target；专用 AI 任务 Worker / 队列（当前在 Nitro 服务层内同步处理，见 E.3）；多产品 AI 与批量导入（H.3）。
+
+AI 不得自动发布（Published），不得绕过人工审核，不得未经人工确认覆盖真实资料。
 
 ### H.2 未来单品号 Dossier AI 规则
 
-以下规则在 AI 功能施工时必须严格遵守（当前均为待实现）：
+以下规则在 AI 功能施工时必须严格遵守（当前落实情况见代码块下方）：
 
 ```text
 一项 AI 任务 = 一个 product_code + 一个 Product Draft + 一个冻结的 Source Snapshot；
@@ -900,6 +912,12 @@ AI 只生成带来源的建议版本（Candidate/Suggestion）；
 AI 不可自动发布、删除或移动正式媒体；
 所有写入必须经服务端规则和人工确认。
 ```
+
+**当前落实情况（单产品 AI V1，2026-09-13 同步）：**
+
+- 已落实：一次分析只针对一个产品，结果只 Apply 到同一个产品 Draft；只读取本产品已关联且已启用的资料；AI 只生成建议，不直接写入；人工可 Accept / Edit / Reject；AI 不发布、不删除、不移动媒体；唯一的写入（Apply）经服务端校验，且只写人工已接受的条目。
+- 部分落实：AI 不能自行覆盖既有参数，既有值只有在管理员对该行明确接受并点击 Apply 后才会更新；但尚无"已确认字段锁定"机制。
+- 未实现：冻结的 Source Snapshot；页码 / Sheet 范围；逐条标注来源的建议、建议版本记录与完整来源追溯（provenance）。
 
 ### H.3 未来多品号导入规则
 
@@ -930,6 +948,8 @@ Source Snapshot 冻结机制已实现（DG-08）；
 AI 模型供应商、费用预算、数据出境范围已由用户明确确认（DG-07，须单独授权）；
 导入模板字段与错误修复规则已确认（DG-15）。
 ```
+
+**事实说明（2026-09-13）：** 单产品 AI V1 已依据逐个明确、窄范围的模块授权（2026-09-08 起）及 FD-004（2026-09-09 生效）实施，并已完成签收（见 H.1）。上述条件本身不变，不因此视为已满足；M.2 中 DG-07 / DG-08 / DG-09 / DG-15 的状态也不变。未来扩大资料格式、Provider / 数据出境、基础设施、生产部署或自动发布，仍受现有 Gate 约束。
 
 ---
 
