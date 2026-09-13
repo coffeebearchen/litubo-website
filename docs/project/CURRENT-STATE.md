@@ -6236,3 +6236,105 @@ NEXT MODULE = NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-13，由 Claude Code 在"MEDIA-AI-LINK-PICKER-01"任务中写入。*
+
+---
+
+## MEDIA-AI-LINK-PICKER-01-R1 = COMPLETED（2026-09-13）
+
+```text
+Archived Media is excluded from new Product Media picker selections.
+```
+
+MEDIA-AI-LINK-PICKER-01 的最小安全收口。上一轮已报告的遗留问题：**Select from Media Library** 仍会列出已归档文件，包括 11 个 CORRUPTED 修复前 TXT 副本，而且带 AI-readable 标记。这样一个已停用的文件可以被新关联到产品，再经此进入 AI Source Intake。
+
+### 一、归档过滤的实际规则
+
+- **只有一处归档状态：** `media_file_lifecycle.archived = true`。这与 `lifecycle.get.ts`、`getLifecycleRecord()` 读取的是同一规则；restore 会把它改回 false。**没有新建第二套归档状态。**
+- **为什么按 id 排除：** 已读 schema 快照确认 `media_file_lifecycle.file_id` 是普通 `uuid` 字段（`special: null`），不是 relation。不改 schema 就无法用关系过滤，所以采用 id 排除。
+- **新增读取函数：** `server/utils/mediaLifecycle.ts` 新增 `listArchivedFileIds()`，一次读出全部归档文件（`limit=-1`），只保留合法 UUID，防止异常值被拼进 Directus filter。
+- **结果层排除，不是 CSS 隐藏：** `/api/admin/media/files` 新增可选参数 `archived=exclude`，对应 `filter[id][_nin]=…`。排除发生在 Directus 返回的结果里，列表、计数和每一页都不含归档文件。
+- **读不到就失败：** 如果归档列表读取失败，整个请求失败，picker 显示 "Files could not be loaded" + Retry；绝不退回到未过滤的结果。
+- **只有 picker 使用该参数：** `buildLibraryFilesQuery` 每次都发送 `archived=exclude`。主 Media Library 不发送，All files 仍然显示归档文件和徽标，行为不变。
+- **未改动：** Archive / Restore 零改动；既有 `products_files` 关联零改动。
+
+### 二、实测
+
+**API（真实 Directus，同一请求带与不带 `archived=exclude` 对比）：**
+
+| 范围 | 不排除 | 排除 | 排除后结果中的归档文件 |
+|---|---|---|---|
+| 全库 | 54 | 37 | 0（减少 17 = 归档总数） |
+| 搜索 `CORRUPTED` | 11 | **0** | 0 |
+| Text | 40 | 24 | 0 |
+| Unclassified | 22 | 13 | 0 |
+| SKU + Text | 5 | 5 | 0 |
+| SKU + Text + search `electrical` | 1 | 1 | 0 |
+
+不带参数时仍然返回归档文件，证明主 Media Library 语义不变。
+
+**浏览器（全新标签页）：**
+- **1440px：** picker 里搜索 `CORRUPTED` 得到 0 个文件，提示 "No matching files in Media Library."。根目录 Text 为 24 个，其中没有 CORRUPTED。Products → Checkweigher → SKU 目录浏览正常，SKU 内 5 个文件，其中 3 个 Already linked 并禁用。SKU 内 Text 为 5 个，Text + search 为 1 个。各状态均无横向溢出，**console 0 error**。
+- **375px：** modal 宽 343px。搜索 `CORRUPTED` 得到 0 个文件和同样的空态提示。SKU + Text 为 5 行（2 个可选、3 个 Already linked），文件卡没有越出 modal，无横向溢出，**console 0 error**。
+
+### 三、已关联后又被归档的文件（只读核对，未修改）
+
+- **当前数据里没有：** 17 个归档文件逐个查询 references（覆盖 products_files / product_sections / product_source_records），查询 0 失败，**被任何产品引用的数量为 0**。
+- **按现有流程也不会出现：** archive 端点对任何被引用的文件都拒绝归档（`can_archive = total === 0`），所以「先关联、后归档」无法通过受支持的流程发生。
+- **产品 3 与 AI Source Intake：** 产品 3 的 11 个关联中没有归档文件；AI Source Intake 显示的 11 项里也没有。
+- **遗留缺口（本轮未修改）：** `POST /api/admin/products/:id/media` 和 `ai/sources.get.ts` 本身都不检查归档状态。「先归档、再关联」的 UI 入口已由本轮关闭，目前唯一剩下的途径是绕过 UI 直接调用 POST。
+
+### 四、TEST ONLY — NOT FOR PUBLICATION 标识（只读核对，未修改任何数据）
+
+- **有标识：**
+  - 产品 3 名称 `[TEST ONLY — NOT FOR PUBLICATION] LT-180C Free-Fall Metal Detector`（Draft）
+  - SKU 目录内的 `ZZ-HOTFIX02-375 / 1440 TEST ONLY — NOT FOR PUBLICATION.txt`（文件名和 Title 都有）
+  - 产品 3 关联的 `ZZ-ML-CLOUD-V1FINAL REFERENCED TEST ONLY — NOT FOR PUBLICATION.jpg` 与 `TEST ONLY — NOT FOR PUBLICATION — UI UPLOAD.png`
+  - 17 个归档文件名均带 TEST ONLY 标识
+- **没有标识：**
+  - SKU 目录 `products/checkweigher/LT180C AI BETA`
+  - 3 个 AI Beta 来源 `LT180C-test-general / electrical / environment.txt`（Title 与文件名相同，Description 为空）
+  - `LT-180C-BETA-SYNTHETIC-SOURCE.txt`
+  - 产品 3 关联的图片 `180C3.png`、`180C3=-=.jpg`、`XR-180C-2-.jpg`、`XR-180C-2-=-.jpg`、`XR-180C-2=--.jpg`
+- **判定：PASS。** 测试产品本身仍带清楚标识，整条测试数据链并未丢失标识。
+- **如需补齐（需用户授权）：** 重命名该 SKU 目录，并为上述 4 个 TXT 来源和 5 张图片补上 Title（或文件名）标识。
+
+### 五、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1326 / 1326 通过**（33 个文件，本次 +7） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+新测试覆盖：
+- picker 始终请求排除归档文件
+- 归档文件按 id 从 Directus 结果中移除，同时 folder / Text / search 仍然生效
+- 没有归档文件时不添加排除条件
+- 归档列表从唯一的归档状态完整读取（`limit=-1`）
+- 非 UUID 的条目被丢弃
+- 读取失败时整个请求失败，不退回未过滤结果
+- 只有 picker 使用该参数，主 Media Library 不使用
+
+原有测试继续通过，覆盖 active 文件仍然出现、folder / Text / search 正常、Already linked、stage / Save 模型不变。
+
+### 六、已知限制
+
+- **归档数量上限（估算）：** `filter[id][_nin]` 的长度随归档文件数量增长。估计超过约 400 个归档文件后，请求会超出 Directus / Node 的请求头上限；届时 picker 会读取失败并显示错误 + Retry，不会漏出归档文件。当前为 17 个。
+
+### 七、边界
+
+**0 DB · 0 Directus schema · 0 Folder Governance · 0 Media UUID semantics · 0 archive/restore behavior · 0 AI engine / provider / prompt / Apply · 0 Provider 调用 · 0 push · 0 deploy。**
+
+---
+
+```text
+MEDIA-AI-LINK-PICKER-01-R1 = COMPLETED
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+
+NEXT MODULE = NOT AUTHORIZED
+```
+
+*最后更新：2026-09-13，由 Claude Code 在"MEDIA-AI-LINK-PICKER-01-R1"任务中写入。*

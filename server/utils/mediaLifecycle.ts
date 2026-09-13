@@ -157,3 +157,23 @@ export async function restoreLifecycleRecord(
   })
   return now
 }
+
+const FILE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * MEDIA-AI-LINK-PICKER-01-R1 — every file currently archived, by id.
+ *
+ * The same rule `lifecycle.get.ts` and `getLifecycleRecord()` read:
+ * `media_file_lifecycle.archived = true`. Restoring flips that flag back, so
+ * this is the whole of "archived" — there is no second archive state.
+ *
+ * `limit=-1` because excluding only the first page of archived files would
+ * quietly offer the rest. An entry that is not a UUID cannot be a file id, and
+ * is dropped rather than spliced into a Directus filter.
+ */
+export async function listArchivedFileIds(fetch: FetchFn): Promise<string[]> {
+  const res = await fetch<{ data: Array<{ file_id: string | null }> }>(
+    '/items/media_file_lifecycle?filter[archived][_eq]=true&fields=file_id&limit=-1',
+  )
+  return (res.data ?? []).map(r => r.file_id ?? '').filter(id => FILE_UUID_RE.test(id))
+}

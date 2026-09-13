@@ -1,5 +1,6 @@
 import { getQuery } from 'h3'
 import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { listArchivedFileIds } from '~/server/utils/mediaLifecycle'
 
 const MAX_LIMIT = 200
 const FIELDS = [
@@ -25,8 +26,12 @@ export const TEXT_FILTER_MIME_TYPES = ['text/plain', 'text/csv', 'text/tab-separ
  * The Directus `/files` query for one request. Folder, format and search are
  * independent conditions that Directus ANDs together, which is what lets the
  * Product Workspace picker search inside a single folder.
+ *
+ * MEDIA-AI-LINK-PICKER-01-R1 — `excludeFileIds` removes files by id. The picker
+ * uses it to leave archived files out of the result itself, so they are absent
+ * from the list, the count and every page — not merely hidden on screen.
  */
-export function buildFilesDirectusQuery(q: Record<string, unknown>): string {
+export function buildFilesDirectusQuery(q: Record<string, unknown>, excludeFileIds: readonly string[] = []): string {
   const limit = Math.min(MAX_LIMIT, Math.max(1, Number(q.limit ?? 100)))
   const offset = Math.max(0, Number(q.offset ?? 0))
 
@@ -54,6 +59,10 @@ export function buildFilesDirectusQuery(q: Record<string, unknown>): string {
     })
   }
 
+  if (excludeFileIds.length > 0) {
+    parts.push(`filter[id][_nin]=${excludeFileIds.join(',')}`)
+  }
+
   if (q.search) {
     parts.push(`search=${encodeURIComponent(String(q.search).slice(0, 100))}`)
   }
@@ -61,6 +70,17 @@ export function buildFilesDirectusQuery(q: Record<string, unknown>): string {
   return parts.join('&')
 }
 
+/**
+ * `archived=exclude` is opt-in. Media Library's own views show archived files
+ * with their badge and keep doing so; only a caller that must never offer an
+ * archived file — the Product Workspace picker — asks for it.
+ *
+ * Fails closed: if the archived list cannot be read, the request fails rather
+ * than returning a result that might contain archived files.
+ */
 export default defineEventHandler(async (event) => {
-  return adminFetch(event, `/files?${buildFilesDirectusQuery(getQuery(event))}`)
+  const q = getQuery(event)
+  const fetch = <T>(path: string, opts?: Record<string, unknown>) => adminFetch<T>(event, path, opts)
+  const excludeFileIds = q.archived === 'exclude' ? await listArchivedFileIds(fetch) : []
+  return adminFetch(event, `/files?${buildFilesDirectusQuery(q, excludeFileIds)}`)
 })

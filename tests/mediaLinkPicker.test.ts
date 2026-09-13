@@ -24,12 +24,13 @@ import {
 } from '../utils/mediaDisplay'
 import { isTextSourceMime } from '../utils/aiProposal'
 import { isSupportedTextSourceMime } from '../server/utils/aiTextExtraction'
+import { listArchivedFileIds } from '../server/utils/mediaLifecycle'
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 const WRITE_METHOD_RE = /method:\s*['"](POST|PATCH|PUT|DELETE)['"]/
 
 /** The route module calls `defineEventHandler` at module scope — a Nitro auto-import — so it is stubbed first. */
-let buildFilesDirectusQuery: (q: Record<string, unknown>) => string
+let buildFilesDirectusQuery: (q: Record<string, unknown>, excludeFileIds?: readonly string[]) => string
 let TEXT_FILTER_MIME_TYPES: readonly string[]
 
 beforeAll(async () => {
@@ -134,17 +135,17 @@ describe('the picker never lists the whole library blind', () => {
 
   it('sends the open folder to the existing files endpoint', () => {
     expect(buildLibraryFilesQuery({ ...root, folder: 'lt180c', limit: 60, offset: 0 }))
-      .toEqual({ limit: '60', offset: '0', folder: 'lt180c' })
+      .toEqual({ limit: '60', offset: '0', archived: 'exclude', folder: 'lt180c' })
   })
 
   it('combines folder and search, so a search inside LT180C stays inside LT180C', () => {
     expect(buildLibraryFilesQuery({ folder: 'lt180c', search: '  electrical ', type: '', limit: 60, offset: 0 }))
-      .toEqual({ limit: '60', offset: '0', folder: 'lt180c', search: 'electrical' })
+      .toEqual({ limit: '60', offset: '0', archived: 'exclude', folder: 'lt180c', search: 'electrical' })
   })
 
   it('combines folder and format', () => {
     expect(buildLibraryFilesQuery({ folder: 'lt180c', search: '', type: 'text', limit: 60, offset: 120 }))
-      .toEqual({ limit: '60', offset: '120', folder: 'lt180c', type: 'text' })
+      .toEqual({ limit: '60', offset: '120', archived: 'exclude', folder: 'lt180c', type: 'text' })
   })
 
   it('a search at the root covers the whole library — no folder is sent', () => {
@@ -210,6 +211,67 @@ describe('Text means exactly what AI Source Intake can analyze today', () => {
     expect(TEXT_FILTER_MIME_TYPES).not.toContain('application/pdf')
     expect(isSupportedTextSourceMime('application/pdf')).toBe(false)
     expect(isTextSourceMime('application/pdf')).toBe(false)
+  })
+})
+
+/**
+ * MEDIA-AI-LINK-PICKER-01-R1 — archived files are never offered for a new link.
+ *
+ * Archiving means a file is no longer in use. The picker used to list archived
+ * files anyway — including the CORRUPTED pre-hotfix TXT copies, which carried
+ * an AI-readable mark — so a retired file could be linked to a product and from
+ * there reach AI Source Intake. The exclusion happens in the files result
+ * itself, so an archived file is absent from the list, the count and every
+ * page, not hidden on screen.
+ */
+describe('archived files are never offered for a new link', () => {
+  const ARCHIVED = ['d1e61fd1-0000-4000-8000-000000000001', '13f6fd6a-0000-4000-8000-000000000002']
+
+  it('the picker always asks the files endpoint to leave archived files out', () => {
+    expect(buildLibraryFilesQuery({ folder: null, search: 'corrupted', type: '', limit: 60, offset: 0 }).archived).toBe('exclude')
+    expect(buildLibraryFilesQuery({ folder: 'lt180c', search: '', type: 'text', limit: 60, offset: 0 }).archived).toBe('exclude')
+  })
+
+  it('removes archived files from the Directus result by id, while folder, Text and search still apply', () => {
+    const query = buildFilesDirectusQuery({ folder: 'lt180c', type: 'text', search: 'electrical' }, ARCHIVED)
+    expect(query).toContain(`filter[id][_nin]=${ARCHIVED.join(',')}`)
+    expect(query).toContain('filter[folder][_eq]=lt180c')
+    expect(query).toContain('filter[_or][0][type][_starts_with]=text/plain')
+    expect(query).toContain('search=electrical')
+  })
+
+  it('adds no exclusion when nothing is archived', () => {
+    expect(buildFilesDirectusQuery({ folder: 'lt180c' }, [])).not.toContain('_nin')
+  })
+
+  it('reads the archived list from the one existing archive state, in full', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce({ data: [{ file_id: ARCHIVED[0] }, { file_id: ARCHIVED[1] }] })
+    await expect(listArchivedFileIds(fetch)).resolves.toEqual(ARCHIVED)
+    const [path] = fetch.mock.calls[0] as [string]
+    expect(path).toContain('/items/media_file_lifecycle?')
+    expect(path).toContain('filter[archived][_eq]=true')
+    expect(path).toContain('limit=-1')
+  })
+
+  it('drops an entry that is not a file id, rather than splicing it into a filter', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce({
+      data: [{ file_id: ARCHIVED[0] }, { file_id: 'x&filter[id][_eq]=y' }, { file_id: null }],
+    })
+    await expect(listArchivedFileIds(fetch)).resolves.toEqual([ARCHIVED[0]])
+  })
+
+  it('fails closed: a failed archived-list read fails the request instead of returning archived files', async () => {
+    const fetch = vi.fn().mockRejectedValueOnce(new Error('Directus unavailable'))
+    await expect(listArchivedFileIds(fetch)).rejects.toThrow('Directus unavailable')
+    const handler = read('server/api/admin/media/files.get.ts')
+    // The read is awaited before the files query is built — no catch that would fall back to an unfiltered result.
+    expect(handler).toContain('q.archived === \'exclude\' ? await listArchivedFileIds(fetch) : []')
+    expect(handler).not.toMatch(/catch/)
+  })
+
+  it('only the picker opts in — Media Library\'s own views keep showing archived files with their badge', () => {
+    expect(read('pages/admin/media/index.vue')).not.toMatch(/archived:\s*'exclude'/)
+    expect(read('pages/admin/product-workspace/[id]/media-resources.vue')).toContain('buildLibraryFilesQuery(')
   })
 })
 

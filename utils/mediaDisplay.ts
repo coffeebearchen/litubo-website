@@ -220,11 +220,19 @@ export function libraryShowsFiles(state: LibraryBrowseState): boolean {
  * The query the picker sends to the existing `/api/admin/media/files`. Folder,
  * search and format narrow together: a search inside LT180C finds matches in
  * LT180C, not across the library. At the root a search covers everything.
+ *
+ * MEDIA-AI-LINK-PICKER-01-R1 — it always asks for archived files to be left out.
+ * Archiving means a file is no longer in use, so it must not be offered as a
+ * new link — and therefore not as a new AI source either.
  */
 export function buildLibraryFilesQuery(
   state: LibraryBrowseState & { limit: number, offset: number },
 ): Record<string, string> {
-  const query: Record<string, string> = { limit: String(state.limit), offset: String(state.offset) }
+  const query: Record<string, string> = {
+    limit: String(state.limit),
+    offset: String(state.offset),
+    archived: 'exclude',
+  }
   if (state.folder !== null) query.folder = state.folder
   if (state.type) query.type = state.type
   const search = state.search.trim()
