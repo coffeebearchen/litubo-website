@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import type { AdminProduct, ProductMedia, FileRole } from '~/types/product-cms'
+import type { FolderNode } from '~/server/api/admin/media/folders.get'
 import { workspaceHeroUrl } from '~/utils/productWorkspace'
+import {
+  buildLibraryFilesQuery,
+  flattenFolderTree,
+  libraryShowsFiles,
+  UNCLASSIFIED_FOLDER,
+  type LibraryTypeFilter,
+} from '~/utils/mediaDisplay'
 
 interface LibraryFile {
   id: string
@@ -10,6 +18,12 @@ interface LibraryFile {
   filesize: number | null
   width: number | null
   height: number | null
+  /**
+   * MEDIA-AI-LINK-PICKER-01 — where the file sits, so a match can be told apart
+   * from its copies in other folders. Discovery only: nothing reads it to decide
+   * which product a file belongs to.
+   */
+  folder: string | null
 }
 
 /**
@@ -111,51 +125,105 @@ watch(isDirty, (dirty: boolean) => {
 const libraryOpen = ref(false)
 const libraryFiles = ref<LibraryFile[]>([])
 const libraryLoading = ref(false)
+const libraryError = ref(false)
 const libraryTotal = ref(0)
 const librarySearch = ref('')
-const libraryTypeFilter = ref<'' | 'image' | 'pdf'>('')
+const libraryTypeFilter = ref<LibraryTypeFilter>('')
 const LIB_PAGE = 60
 const libraryOffset = ref(0)
+let librarySearchTimer: ReturnType<typeof setTimeout>
+
+/**
+ * MEDIA-AI-LINK-PICKER-01 — the picker browses the Media Library tree instead of
+ * listing every file in the library newest-first.
+ *
+ * `libraryFolder` is where it is looking: `null` is the library root,
+ * `UNCLASSIFIED_FOLDER` the files in no folder, anything else a folder id. It
+ * survives closing the picker, because linking three sources for one model
+ * otherwise means walking back down to the same folder three times.
+ */
+const libraryFolder = ref<string | null>(null)
+const libraryFolders = ref<FolderNode[]>([])
+const libraryFoldersError = ref(false)
+
+/**
+ * Only the newest request may fill the list. Clicking through folders makes it
+ * easy to move on before a slow response arrives, and without this the previous
+ * folder's files could land under the new folder's breadcrumb.
+ */
+let libraryRequest = 0
 
 async function loadLibraryFiles(reset = false) {
-  if (reset) { libraryOffset.value = 0; libraryFiles.value = [] }
+  const request = ++libraryRequest
+  if (reset) { libraryOffset.value = 0; libraryFiles.value = []; libraryTotal.value = 0 }
+  libraryError.value = false
+  const state = { folder: libraryFolder.value, search: librarySearch.value, type: libraryTypeFilter.value }
+  // At the root with nothing narrowed there is no honest file list to show — only folders.
+  if (!libraryShowsFiles(state)) {
+    libraryLoading.value = false
+    return
+  }
   libraryLoading.value = true
   try {
-    const params: Record<string, string> = { limit: String(LIB_PAGE), offset: String(libraryOffset.value) }
-    if (libraryTypeFilter.value) params.type = libraryTypeFilter.value
-    if (librarySearch.value.trim()) params.search = librarySearch.value.trim()
-    const res = await $fetch<{ data: LibraryFile[], meta?: { filter_count: number } }>('/api/admin/media/files', { query: params })
+    const res = await $fetch<{ data: LibraryFile[], meta?: { filter_count: number } }>('/api/admin/media/files', {
+      query: buildLibraryFilesQuery({ ...state, limit: LIB_PAGE, offset: libraryOffset.value }),
+    })
+    if (request !== libraryRequest) return
     libraryFiles.value = reset ? (res.data ?? []) : [...libraryFiles.value, ...(res.data ?? [])]
     libraryTotal.value = res.meta?.filter_count ?? res.data?.length ?? 0
     libraryOffset.value += res.data?.length ?? 0
+  } catch {
+    if (request === libraryRequest) libraryError.value = true
   } finally {
-    libraryLoading.value = false
+    if (request === libraryRequest) libraryLoading.value = false
   }
 }
 
-function openLibrary() {
+/** The whole folder tree, re-read on every open so a folder created or renamed in Media Library meanwhile is current. */
+async function loadLibraryFolders() {
+  libraryFoldersError.value = false
+  try {
+    libraryFolders.value = await $fetch<FolderNode[]>('/api/admin/media/folders')
+  } catch {
+    libraryFoldersError.value = true
+  }
+}
+
+async function openLibrary() {
   libraryOpen.value = true
   loadLibraryFiles(true)
+  await loadLibraryFolders()
+  // A remembered folder that no longer exists cannot be browsed; fall back to the root.
+  const folderId = libraryFolder.value
+  if (folderId !== null && folderId !== UNCLASSIFIED_FOLDER && !libraryFoldersError.value
+    && !flattenFolderTree(libraryFolders.value).some(f => f.id === folderId)) {
+    libraryFolder.value = null
+  }
 }
 
 function closeLibrary() {
   libraryOpen.value = false
 }
 
+function navigateLibraryFolder(folderId: string | null) {
+  // The folder watcher reloads with the current search, so a pending search reload is redundant.
+  clearTimeout(librarySearchTimer)
+  libraryFolder.value = folderId
+}
+
 function updateLibrarySearch(value: string) {
   librarySearch.value = value
 }
 
-function updateLibraryTypeFilter(value: '' | 'image' | 'pdf') {
+function updateLibraryTypeFilter(value: LibraryTypeFilter) {
   libraryTypeFilter.value = value
 }
 
-let librarySearchTimer: ReturnType<typeof setTimeout>
 watch(librarySearch, () => {
   clearTimeout(librarySearchTimer)
   librarySearchTimer = setTimeout(() => loadLibraryFiles(true), 350)
 })
-watch(libraryTypeFilter, () => loadLibraryFiles(true))
+watch([libraryFolder, libraryTypeFilter], () => loadLibraryFiles(true))
 
 const existingFileIds = computed(() => new Set(mediaRows.value.map((r: EditableMedia) => r.directus_files_id)))
 
@@ -249,13 +317,20 @@ async function handleSave() {
       :library-open="libraryOpen"
       :library-files="libraryFiles"
       :library-loading="libraryLoading"
+      :library-error="libraryError"
       :library-total="libraryTotal"
       :library-search="librarySearch"
       :library-type-filter="libraryTypeFilter"
+      :library-folders="libraryFolders"
+      :library-folders-error="libraryFoldersError"
+      :library-folder-id="libraryFolder"
       @open-library="openLibrary"
       @close-library="closeLibrary"
       @update-search="updateLibrarySearch"
       @update-type-filter="updateLibraryTypeFilter"
+      @navigate-folder="navigateLibraryFolder"
+      @retry-folders="loadLibraryFolders"
+      @retry-files="loadLibraryFiles(true)"
       @load-more="loadLibraryFiles(false)"
       @pick-file="stageLink"
       @unlink="unstage"

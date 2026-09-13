@@ -6137,3 +6137,102 @@ NEXT MODULE = NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-10，由 Claude Code 在"ML-CLOUD-MOBILE-VISUAL-ALIGN-01-R2"任务中写入。*
+
+---
+
+## MEDIA-AI-LINK-PICKER-01 = COMPLETED（2026-09-13）
+
+解决 `MEDIA-LIBRARY-AI-READINESS-AUDIT-01` 的 **P1-1**：Product Workspace → Media & resources → **Select from Media Library** 此前是全库平铺（按上传时间倒序）、不显示 folder path、不能按 folder 浏览、格式筛选没有 Text。Media Library 已建好的目录层级到不了唯一给 AI 供料的这块屏。
+
+```text
+Product Workspace Media picker now supports
+folder-based browsing/filtering,
+folder path visibility,
+and Text filtering.
+
+Product association remains explicit via products_files.
+Folder path is discovery only, not Product truth.
+```
+
+### 一、开工前 STOP 条件核验（先验证、后施工）
+
+施工单要求确认现有 endpoint 能否组合 folder + search。**实测既有 `/api/admin/media/files`（未改动前）：**
+
+| 查询 | 结果 |
+|---|---|
+| `folder = LT180C AI BETA` | 5 |
+| `search = electrical`（全库） | 8 |
+| `folder + search` | **1** |
+
+Directus 对 folder 与 search 取 AND，**无需改写 files API**，未触发 STOP。
+
+### 二、实现
+
+**Picker 流程：**
+
+```text
+Product
+→ Select from Media Library
+→ Media Library（根：顶层 folder + Unclassified files 入口，不列文件）
+→ Products → Checkweigher → SKU → 子目录（每层只显示 direct children）
+→ 选择文件（行内显示 filename / 格式 / 大小 / folder path / AI-readable / Already linked）
+→ stage（本地行 "New — not saved yet"，不写服务器）
+→ Save changes
+→ POST /api/admin/products/:id/media
+→ products_files
+→ AI Source Intake
+```
+
+- **目录浏览复用既有规则**：folder 树来自既有 `/api/admin/media/folders`；每层子目录由 R1 的 `directChildFolders()` 计算，没有第二套「直接子级」定义。
+- **根不再盲目平铺**：在根且未搜索、未选格式时只显示 folder 与提示，不请求文件；打开 folder、输入搜索或选择格式才列文件。根部搜索覆盖全库，且每条结果显示 path。
+- **search 作用于当前目录**：在 SKU 中搜索只返回该目录内的匹配项。
+- **Text 筛选**：`files.get.ts` 新增 `type=text` 这一个窄分支 → `text/plain`、`text/csv`、`text/tab-separated-values`（`_starts_with`，兼容 charset 参数）。该列表以 parity 测试锁定到 AI 引擎的 `isSupportedTextSourceMime()`，**未修改任何 AI 文件**。Image / PDF / Unclassified 过滤保持原样。
+- **AI-readable 标记**复用既有客户端镜像 `isTextSourceMime()`（`utils/aiProposal.ts`，只读引用）。picker 内明确写出：PDF 与图片可关联，但不能分析。
+- **记住上次位置**：关闭再打开 picker 回到同一 folder（为一个 SKU 连续关联多个来源）。已删除的 folder 自动回到根。
+- **只接受最新响应**：快速切换 folder 时，旧请求的结果不会落到新面包屑下。
+- **错误态**：folder 树或文件加载失败均显示原因与 Retry。
+- **stage / Save 模型未变**：`stageLink` / `unstage` / `handleSave` 零改动；`Already linked` 仍禁用；点击文件只 stage，只有 Save 写 `products_files`。
+
+### 三、实测（真实 Directus + 真实 TEST ONLY 数据，未新建任何测试数据）
+
+**Text 筛选对真实库：** `folder + text` = 5，`folder + text + search` = 1；全库 `text 40 + pdf 1 + image 13 = 54`（总数 54），三类恰好划分全库，无交叉泄漏。
+
+**1440px（全新标签页）：** modal 880px，folder 栏 240px | 文件栏 584 / 569px；根 → Products（6 个直接子级）→ Checkweigher（1 个子目录 + 该类目自身的 1 个文件，path 为 `products / checkweigher`，可与 SKU 内同名副本区分）→ SKU（5 个文件，3 个 Beta 来源为 Already linked 且禁用）；SKU 内 `search electrical` = 1、PDF = 0、Text = 5；无横向溢出；**console 0 error**。
+
+**375px（全新标签页）：** modal 343px；根部 7 个 folder 行均为 **44px** 触控高度；根 / Products / Checkweigher / SKU / Text + search 各状态 `scrollWidth ≤ clientWidth`，modal 内无越界元素，文件名未被截断；**console 0 error**。
+
+**No-write 证据：** 网络日志完整保留整段 375 picker 会话（`files?folder=…`、`…&type=text`、`…&type=text&search=electrical` 均在其中）；随后执行 pick + discard，**`/api/admin/products/3/media` 无任何写请求**。pick 后 modal 关闭、行显示 "New — not saved yet"，discard 后该行消失，产品未被修改。
+
+### 四、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1319 / 1319 通过**（33 文件，本次 +65，新增 2 个测试文件） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | 成功 |
+
+新测试覆盖施工单 §十九 全部 12 项：folder state、`LibraryFile.folder`、folder 传入既有 endpoint、folder + search、folder + type、Text 映射（含与 AI 引擎的 parity）、direct children 不 flatten、Already linked 禁用、stage 不写服务器、Save 才写 `products_files`、不会自动关联其他产品的文件、folder 名不成为 Product identity（含 `ai/sources.get.ts` 只按 `products_id` 读取、从不读 folder）。
+
+### 五、已知限制（未处理）
+
+- **Load more 未能实测。** 仅当一个视图超过 60 个文件时出现；当前真实数据最大视图为全库 Text（40 个），不新建测试数据就无法触发。分页逻辑沿用原实现。
+- **1440 截图在 Browser 面板中不可辨认**（800×500、约 1/3 比例），1440 结论以 DOM 几何与 console 为准。
+- **picker 仍会列出已归档文件**（原有行为，picker 从未按归档状态过滤）。例如已归档的 CORRUPTED TXT 副本在搜索时会出现，并带 AI-readable 标记。归档语义不在本模块范围内，**未修改**，建议另行决策。
+
+### 六、边界
+
+**0 DB · 0 Directus schema · 0 Folder Governance · 0 AI engine / parser / provider / prompt / Apply · 0 Provider 调用 · 0 push · 0 deploy。**
+
+---
+
+```text
+MEDIA-AI-LINK-PICKER-01 = COMPLETED
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+
+NEXT MODULE = NOT AUTHORIZED
+```
+
+*最后更新：2026-09-13，由 Claude Code 在"MEDIA-AI-LINK-PICKER-01"任务中写入。*

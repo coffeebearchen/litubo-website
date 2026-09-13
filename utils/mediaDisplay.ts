@@ -141,3 +141,93 @@ export function directChildFolders<T extends { id: string, depth: number }>(
   if (contextId === null) return folders.filter(f => f.depth === 0)
   return folders.filter(f => parentOf[f.id] === contextId)
 }
+
+// ── MEDIA-AI-LINK-PICKER-01: browsing the tree from the Product Workspace ────
+
+/** What the picker's format filter can narrow to. `text` is the formats AI Source Intake can analyze. */
+export type LibraryTypeFilter = '' | 'image' | 'pdf' | 'text'
+
+/**
+ * The files endpoint's existing value for "files in no folder". It is a filter,
+ * not a folder id: Unclassified is a view of the library, never a place.
+ */
+export const UNCLASSIFIED_FOLDER = 'root'
+
+/** `products/checkweigher/LT180C` → `products / checkweigher / LT180C`, the form Media Library file cards use. */
+export function folderPathLabel(fullPath: string | null | undefined): string {
+  return (fullPath ?? '').split('/').filter(Boolean).join(' / ')
+}
+
+/**
+ * The folder tree as a flat list, each entry carrying its depth — so the picker
+ * can ask `directChildFolders()` for a level instead of keeping a second
+ * definition of "direct children" that could disagree with Media Library's.
+ */
+export function flattenFolderTree<T extends { id: string, children: readonly T[] }>(
+  roots: readonly T[],
+): Array<T & { depth: number }> {
+  const out: Array<T & { depth: number }> = []
+  const walk = (nodes: readonly T[], depth: number) => {
+    for (const node of nodes) {
+      out.push({ ...node, depth })
+      walk(node.children, depth + 1)
+    }
+  }
+  walk(roots, 0)
+  return out
+}
+
+/**
+ * The chain from the library root down to `folderId`, root first. Empty at the
+ * root, at Unclassified, and for an id the tree does not contain.
+ */
+export function folderTrail<T extends { id: string, parent: string | null }>(
+  folders: readonly T[],
+  folderId: string | null,
+): T[] {
+  if (!folderId || folderId === UNCLASSIFIED_FOLDER) return []
+  const byId = new Map(folders.map(f => [f.id, f]))
+  const chain: T[] = []
+  const seen = new Set<string>()
+  let current = byId.get(folderId)
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id)
+    chain.unshift(current)
+    current = current.parent ? byId.get(current.parent) : undefined
+  }
+  return chain
+}
+
+export interface LibraryBrowseState {
+  folder: string | null
+  search: string
+  type: LibraryTypeFilter
+}
+
+/**
+ * Whether the picker should list files at all.
+ *
+ * At the library root with nothing narrowed, the only answer to "which files?"
+ * is every file in the library, newest first — the blind list this replaces.
+ * So the root shows folders and waits: opening a folder, searching, or choosing
+ * a format is what asks for files.
+ */
+export function libraryShowsFiles(state: LibraryBrowseState): boolean {
+  return state.folder !== null || state.search.trim() !== '' || state.type !== ''
+}
+
+/**
+ * The query the picker sends to the existing `/api/admin/media/files`. Folder,
+ * search and format narrow together: a search inside LT180C finds matches in
+ * LT180C, not across the library. At the root a search covers everything.
+ */
+export function buildLibraryFilesQuery(
+  state: LibraryBrowseState & { limit: number, offset: number },
+): Record<string, string> {
+  const query: Record<string, string> = { limit: String(state.limit), offset: String(state.offset) }
+  if (state.folder !== null) query.folder = state.folder
+  if (state.type) query.type = state.type
+  const search = state.search.trim()
+  if (search) query.search = search
+  return query
+}
