@@ -8,7 +8,8 @@ import { resolveSourceRefs, SourceRefUnavailableError } from '~/server/utils/aiS
 import { claimGenerateSlot, releaseGenerateSlot } from '~/server/utils/aiGenerateRateLimit'
 import { lookupAnalysis, rememberAnalysis } from '~/server/utils/aiProposalReplayGuard'
 import type { SpecificationProposal } from '~/utils/aiProposal'
-import { MAX_FILES_PER_REQUEST } from '~/server/utils/aiTextExtraction'
+import { MAX_FILES_PER_REQUEST, MAX_PER_FILE_CHARS } from '~/server/utils/aiTextExtraction'
+import { createPdfTextReader } from '~/server/utils/documentExtractorClient'
 
 /**
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — a legitimate body here is
@@ -109,6 +110,13 @@ export default defineEventHandler(async (event) => {
     deepseek: { apiKey: config.deepseekApiKey, model: config.deepseekModel },
   })
 
+  // AI-PDF-SOURCE-01 — PDFs are read by the isolated document-extractor sidecar,
+  // never in this process. An unset or unreachable URL makes each PDF report
+  // "unavailable"; the other selected sources are still analyzed.
+  const readers = {
+    pdf: createPdfTextReader({ baseUrl: config.documentExtractorUrl, maxTextChars: MAX_PER_FILE_CHARS }),
+  }
+
   try {
     /**
      * PWS-AI-DUP-GUARD-01 — the reuse hooks. The engine still downloads,
@@ -145,7 +153,7 @@ export default defineEventHandler(async (event) => {
       // Storing happens below, where the reference is minted with it, so the
       // analysis and its proposalRef can never exist independently.
       store: () => {},
-    })
+    }, readers)
 
     if (!result.ok) {
       return { ok: false, error: result.error, fileResults: result.fileResults }

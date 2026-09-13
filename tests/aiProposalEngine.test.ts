@@ -242,15 +242,19 @@ describe('runProposalEngine — honest per-file outcomes', () => {
    * AI-SOURCE-CONTRACT-01 — the engine used to answer every deliberately dropped
    * format with the Excel sentence, so a PDF selected for analysis was reported
    * as "Excel files are not supported". Each format now names itself.
+   *
+   * AI-PDF-SOURCE-01 — PDF is readable now, through a PDF reader the caller
+   * injects. With none wired in, the PDF is reported unavailable.
    */
-  it('a PDF gets its own "not supported yet" reason — never the Excel one', async () => {
+  it('a PDF with no PDF reader wired in is reported unavailable — never refused with the Excel sentence', async () => {
     const fetch = mockFetch({
       productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-pdf', filename_download: 'datasheet.pdf', type: 'application/pdf', filesize: SMALL_SIZE } }],
+      assetBytesByUuid: { 'uuid-pdf': textBytes('%PDF-1.7\n%TEST ONLY — NOT FOR PUBLICATION\n') },
     })
     const result = await runProposalEngine(fetch, mockRegistry(), specificationsTarget, { productId: 1, providerId: 'deepseek', mediaIds: [1] })
     expect(result.ok).toBe(false)
     expect(result.fileResults).toEqual([
-      { displayName: 'datasheet.pdf', status: 'unsupported', reason: 'PDF is not supported for source analysis yet.' },
+      { displayName: 'datasheet.pdf', status: 'unreadable', reason: 'The document reader is unavailable right now. Other sources can still be analyzed.' },
     ])
     expect(JSON.stringify(result)).not.toContain('Excel')
   })

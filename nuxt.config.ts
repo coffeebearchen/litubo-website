@@ -94,6 +94,12 @@ export default defineNuxtConfig({
     openaiModel: process.env.OPENAI_MODEL ?? '',
     deepseekApiKey: process.env.DEEPSEEK_API_KEY ?? '',
     deepseekModel: process.env.DEEPSEEK_MODEL ?? '',
+    // AI-PDF-SOURCE-01 — where the server reaches the document-extractor sidecar that
+    // reads text-layer PDFs. Server-side only, never runtimeConfig.public: the browser
+    // never talks to it. Not a secret. The default is the loopback port docker-compose.yml
+    // publishes for a host-process Nuxt; a containerized Nuxt would use
+    // http://document-extractor:8787.
+    documentExtractorUrl: process.env.DOCUMENT_EXTRACTOR_URL ?? 'http://127.0.0.1:8787',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://litubo.com',
       publishedLocales: ['en'],

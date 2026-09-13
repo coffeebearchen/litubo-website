@@ -55,6 +55,85 @@ services:
     networks:
       - litubo-internal
 
+  # AI-PDF-SOURCE-01 — document-extractor security-isolation sidecar.
+  # Untrusted PDF bytes in, bounded text out. No secrets, no env_file, no
+  # volumes, no Directus / Postgres / AI-provider access. It joins only its own
+  # internal network, which has no route to the Internet, the host or Directus,
+  # and it publishes no port.
+  # Host-process Nuxt reaches it through document-extractor-gateway below, at
+  # http://127.0.0.1:8787. A future containerized Nuxt would join
+  # document-extractor-internal and use http://document-extractor:8787 directly.
+  document-extractor:
+    build:
+      context: ./document-extractor
+    image: litubo-document-extractor:local
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 1.0
+    pids_limit: 64
+    networks:
+      - document-extractor-internal
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz',{signal:AbortSignal.timeout(2000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # AI-PDF-SOURCE-01 — loopback gateway for document-extractor.
+  # Docker publishes no port for a container that is only on an internal
+  # network, so this container (same image, gateway.mjs) bridges the two: it
+  # publishes 127.0.0.1:8787 and pipes each TCP connection, unread, to the one
+  # fixed address document-extractor:8787. It parses nothing and stores nothing;
+  # the PDF parser itself never gets a route out.
+  document-extractor-gateway:
+    build:
+      context: ./document-extractor
+    image: litubo-document-extractor:local
+    command: ["node", "gateway.mjs"]
+    depends_on:
+      document-extractor:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 96m
+    memswap_limit: 96m
+    cpus: 0.5
+    pids_limit: 32
+    ports:
+      # Bound to loopback only — never 0.0.0.0.
+      - "127.0.0.1:8787:8787"
+    networks:
+      - document-extractor-internal
+      - document-extractor-edge
+    healthcheck:
+      # Passes through the gateway to the extractor, so it checks the whole path.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz',{signal:AbortSignal.timeout(2000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
 networks:
   litubo-internal:
+    driver: bridge
+  document-extractor-internal:
+    driver: bridge
+    internal: true
+  # Only the gateway joins this one: it is what lets Docker publish the loopback port.
+  document-extractor-edge:
     driver: bridge

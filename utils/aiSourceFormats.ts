@@ -15,7 +15,9 @@
  *     permission.
  *   - `aiReadableNow` — AI Source Intake can turn this format into text today.
  *
- * PDF is why they differ: it can be uploaded and linked, but not yet analyzed.
+ * Images are why they differ: they can be uploaded and linked, but not yet
+ * analyzed. (PDF was the first such format; AI-PDF-SOURCE-01 made text-layer
+ * PDFs readable.)
  *
  * A planned format is listed so that its label, its size contract and its
  * honest refusal already exist — but it stays unreadable until its own
@@ -69,12 +71,14 @@ export const AI_SOURCE_FORMATS: readonly AiSourceFormat[] = [
     aiReadableNow: true,
   },
   {
-    // Planned: text-layer PDFs, read by an isolated extractor service (AI-PDF-SOURCE-01).
+    // Read today: text-layer PDFs only, by the isolated document-extractor
+    // sidecar, never inside the Nuxt process (AI-PDF-SOURCE-01). No OCR — a
+    // scanned PDF has no text layer and reports no_text.
     key: 'pdf',
     types: [{ mime: 'application/pdf', label: 'PDF', shortName: 'PDF' }],
     maxBytes: 20 * MB,
     mediaUploadSupported: true,
-    aiReadableNow: false,
+    aiReadableNow: true,
   },
   {
     // Planned: paragraphs, headings and tables, read by a bounded streaming reader (AI-DOCX-SOURCE-01).
@@ -158,6 +162,11 @@ export const AI_READABLE_FORMATS_LABEL = [...new Set(
   AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).flatMap(f => f.types.map(t => t.shortName)),
 )].sort().join(', ')
 
+/** "JPG, PNG, WebP" — formats the Media Library stores but AI cannot analyze yet, for help copy. Derived the same way. */
+export const MEDIA_ONLY_FORMATS_LABEL = [...new Set(
+  AI_SOURCE_FORMATS.filter(f => f.mediaUploadSupported && !f.aiReadableNow).flatMap(f => f.types.map(t => t.shortName)),
+)].sort().join(', ')
+
 /**
  * Why one selected source did not reach the analysis.
  *
@@ -166,7 +175,7 @@ export const AI_READABLE_FORMATS_LABEL = [...new Set(
  * cannot each invent their own wording — or pass an internal error message,
  * a path or a fragment of the file through to the screen.
  *
- * The second group is not produced by anything yet. It is here so the format
+ * The last group is not produced by anything yet. It is here so the format
  * modules that will need those failures inherit one reviewed wording.
  */
 export type SourceFailureCode =
@@ -180,20 +189,21 @@ export type SourceFailureCode =
   | 'unreadable'
   | 'no_text'
   | 'time_budget_exhausted'
-  // Reserved for the format modules
+  // Produced by the PDF reader (AI-PDF-SOURCE-01)
   | 'timeout'
   | 'malformed'
   | 'encrypted'
-  | 'too_complex'
   | 'too_many_pages'
+  | 'unavailable'
+  | 'busy'
+  | 'unsafe_parse'
+  // Reserved for later format modules
+  | 'too_complex'
   | 'too_many_sheets'
   | 'too_many_rows'
   | 'too_many_cells'
   | 'too_many_pixels'
-  | 'unavailable'
   | 'ocr_unavailable'
-  | 'busy'
-  | 'unsafe_parse'
 
 const SOURCE_FAILURE_MESSAGES: Record<Exclude<SourceFailureCode, 'not_enabled'>, string> = {
   not_associated: 'One of the selected files could not be used for this product.',
@@ -228,11 +238,19 @@ const NOT_ENABLED_MESSAGES: Record<Exclude<AiSourceFormatKey, 'text'>, string> =
 }
 
 /**
+ * AI-PDF-SOURCE-01 — a PDF with no text layer is almost always a scan, and V1
+ * reads no scans (no OCR). Saying so tells the reader what to do about it.
+ */
+const PDF_NO_TEXT_MESSAGE = 'No extractable text was found in this PDF. Scanned PDFs are not supported yet.'
+
+/**
  * The fixed sentence for one failure code. `not_enabled` names the format it is
  * about, so it takes the file's MIME type; with no planned format to name, it
- * falls back to the generic unsupported sentence.
+ * falls back to the generic unsupported sentence. `no_text` for a PDF points at
+ * the likely cause, a scan.
  */
 export function sourceFailureMessage(code: SourceFailureCode, mimeType?: string | null): string {
+  if (code === 'no_text' && aiSourceFormatFor(mimeType)?.key === 'pdf') return PDF_NO_TEXT_MESSAGE
   if (code === 'not_enabled') {
     const key = aiSourceFormatFor(mimeType)?.key
     return key && key !== 'text' ? NOT_ENABLED_MESSAGES[key] : SOURCE_FAILURE_MESSAGES.unsupported

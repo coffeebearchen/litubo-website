@@ -5,9 +5,9 @@
  * `utils/aiSourceFormats.ts` is the one format contract the server and the
  * browser share: a file is read here only when that contract marks its format
  * readable, and every refusal is reported as a failure code rather than a
- * sentence of this module's own. Today the readable formats are TXT, CSV and
- * TSV. No OCR, no vision, and no external file API is used anywhere in this
- * module.
+ * sentence of this module's own. Today the readable formats are TXT, CSV, TSV
+ * and text-layer PDF. No OCR, no vision, and no external file API is used
+ * anywhere in this module.
  *
  * XLS/XLSX removed: PWS-AI-ENGINE-01's `xlsx` (SheetJS) dependency could not
  * be safely required on Windows `nuxt dev` (its `.mjs` entry crashed every
@@ -22,8 +22,8 @@
  * bounded parser, XLS/XLSX is left unsupported until a safe, streaming-
  * capable replacement is found.
  *
- * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — PDF is temporarily NOT supported, and
- * the parser has been removed rather than left in place behind a caveat.
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — PDF was disabled, and the in-process
+ * parser was removed rather than left in place behind a caveat (history below).
  *
  * The previous implementation ran pdf.js in a `worker_threads` worker with
  * `resourceLimits`, and this file claimed that bounded its memory. Review
@@ -38,6 +38,12 @@
  * isolation (an out-of-process parser with an OS-enforced memory cap), which
  * is a separate, separately scheduled piece of work — not a flag flip here.
  *
+ * AI-PDF-SOURCE-01 — that isolation now exists, and text-layer PDFs are read
+ * again. There is still no PDF parser in this process: this module checks the
+ * PDF header and hands the bytes to the document-extractor sidecar through an
+ * injected reader (`documentExtractorClient.ts`), which runs Poppler under
+ * process and container resource limits. No reader configured → `unavailable`.
+ *
  * File bytes and extracted text exist only for the lifetime of one request:
  * this module returns plain strings to its caller and keeps no cache, no
  * disk write, and no database write of its own.
@@ -49,6 +55,7 @@ import {
   aiSourceTypeLabel,
   type SourceFailureCode,
 } from '../../utils/aiSourceFormats'
+import { hasPdfHeader, type PdfTextReader, type PdfTextReadResult } from './documentExtractorClient'
 
 /** At most this many source files may be analyzed in a single Generate call. */
 export const MAX_FILES_PER_REQUEST = 5
@@ -120,6 +127,21 @@ export type ExtractionResult =
   | { ok: true, source: ExtractedSource }
   | { ok: false, code: SourceFailureCode }
 
+/** Readers for formats that are never decoded in this process. */
+export interface SourceReaders {
+  /** Text-layer PDFs, read by the document-extractor sidecar. Without one, a PDF reports `unavailable`. */
+  pdf?: PdfTextReader
+}
+
+export interface ExtractionOptions {
+  readers?: SourceReaders
+  /** How long reading this file may still take: what is left of the analysis's reading budget. */
+  timeoutMs?: number
+}
+
+/** One PDF is never read for longer than this, however much of the reading budget is left. */
+export const MAX_PDF_READ_MS = 15_000
+
 /**
  * Trusted, server-known file size check — must run BEFORE any byte of the
  * file is downloaded. `knownSizeBytes` must come from Directus' own file
@@ -142,12 +164,13 @@ export function isFileSizeSafeToDownload(knownSizeBytes: number | null | undefin
  *
  * Only UTF-8 text formats are decoded here; there is no document parser in
  * this process at all, which is what makes the per-file character ceiling
- * meaningful rather than aspirational.
+ * meaningful rather than aspirational. A PDF goes to `options.readers.pdf`.
  */
 export async function extractTextFromFile(
   bytes: ArrayBuffer,
   mimeType: string | null | undefined,
   displayName: string,
+  options: ExtractionOptions = {},
 ): Promise<ExtractionResult> {
   if (bytes.byteLength === 0) {
     return { ok: false, code: 'empty' }
@@ -161,8 +184,12 @@ export async function extractTextFromFile(
   if (bytes.byteLength > format.maxBytes) {
     return { ok: false, code: 'too_large' }
   }
-  // Text is the only format with a reader here. A format marked readable before
-  // its own reader exists is still refused: its bytes are never decoded as text.
+  if (format.key === 'pdf') {
+    return readPdfSource(new Uint8Array(bytes), mimeType, displayName, options)
+  }
+  // Text and PDF are the only formats with a reader. A format marked readable
+  // before its own reader exists is still refused: its bytes are never decoded
+  // as text.
   if (format.key !== 'text') {
     return { ok: false, code: 'not_enabled' }
   }
@@ -179,6 +206,44 @@ export async function extractTextFromFile(
     return { ok: false, code: 'no_text' }
   }
 
+  return {
+    ok: true,
+    source: { displayName, fileType: aiSourceTypeLabel(mimeType), text },
+  }
+}
+
+/**
+ * AI-PDF-SOURCE-01 — one PDF, read outside this process.
+ *
+ * The declared content type is a claim, so the PDF header is checked before
+ * the bytes go anywhere. The reader gets at most MAX_PDF_READ_MS, or less when
+ * the analysis has less reading time left. Whatever comes back is either a
+ * fixed failure code or text, and the text is held to the same per-file
+ * ceiling as any other source. Nothing here retries, and nothing falls back to
+ * another reader.
+ */
+async function readPdfSource(
+  bytes: Uint8Array,
+  mimeType: string | null | undefined,
+  displayName: string,
+  options: ExtractionOptions,
+): Promise<ExtractionResult> {
+  if (!hasPdfHeader(bytes)) return { ok: false, code: 'malformed' }
+  const reader = options.readers?.pdf
+  if (!reader) return { ok: false, code: 'unavailable' }
+
+  const timeoutMs = Math.min(MAX_PDF_READ_MS, options.timeoutMs ?? MAX_PDF_READ_MS)
+  let result: PdfTextReadResult
+  try {
+    result = await reader(bytes, { timeoutMs })
+  }
+  catch {
+    return { ok: false, code: 'unavailable' }
+  }
+  if (!result.ok) return { ok: false, code: result.code }
+
+  const text = result.text.trim().slice(0, MAX_PER_FILE_CHARS)
+  if (!text) return { ok: false, code: 'no_text' }
   return {
     ok: true,
     source: { displayName, fileType: aiSourceTypeLabel(mimeType), text },

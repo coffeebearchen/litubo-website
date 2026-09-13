@@ -6788,3 +6788,141 @@ STATUS: NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-13，由 Claude Code 在"PRODUCT-MODEL-RELEVANCE-GUARD-01"任务中写入。*
+
+---
+
+## AI-PDF-SOURCE-01 = COMPLETED（2026-09-14）
+
+```text
+Text-layer PDF → isolated document-extractor → bounded text → existing Proposal Engine.
+AI-readable today: TXT / CSV / TSV / PDF (text-layer only).
+```
+
+带文字层的 PDF 在既有流程中成为 AI 来源：Media Library → products_files → AI Source Intake → Analyze → 服务端按可信文件大小预检 → 有界下载 → document-extractor（`pdfinfo` → 页数 / 加密检查 → `pdftotext`）→ 有界文本 → 既有 `ExtractedSource` → 既有 Proposal Engine → 一个 Provider → 一份 proposal。PDF 从不在 Nuxt 进程内解析，原始 PDF 从不发送给 AI Provider。
+
+**分支：** `review/ai-pdf-source-01`，从 `6cf3f9f` 创建，仅本地，未 push。
+
+### 一、当前事实
+
+| 项目 | 状态 |
+|---|---|
+| PDF V1 | 仅 text-layer PDF |
+| AI 可读 | TXT / CSV / TSV / PDF |
+| 仍不可读 | DOCX / XLSX / Images（DOC / XLS 不在 V1） |
+| 扫描 PDF OCR | NOT IMPLEMENTED（返回 `no_text`） |
+| document-extractor | 已实现（本地 Docker） |
+| 原始 PDF 发送给 Provider | NO |
+| 模块期间真实 Provider 调用 | 0 |
+| Production deployment | NOT AUTHORIZED |
+| Production RAM / CPU | NOT YET VERIFIED |
+
+### 二、document-extractor（安全隔离 sidecar）
+
+- **位置：** `document-extractor/`（`Dockerfile`、`extractor.mjs`、`server.mjs`、`gateway.mjs`）。镜像 `litubo-document-extractor:local`（约 366 MB），基础镜像 `node:22.22.2-bookworm-slim`（按 digest 固定），只安装 Debian `poppler-utils`（Poppler 22.12.0）与 `util-linux`（提供 `prlimit`）。无 npm 依赖。
+- **只有两个接口：** `GET /healthz`、`POST /extract/pdf`（请求体为 PDF 原始字节，`Content-Type: application/pdf`）。成功返回 `{ ok: true, text }`；失败只返回一个固定代码：`too_large` / `too_many_pages` / `encrypted` / `no_text` / `timeout` / `malformed` / `unsafe_parse` / `busy`。不返回 stderr、路径或堆栈。
+- **解析：** `pdfinfo` 读页数与加密状态 → 超过 50 页直接拒绝（`too_many_pages`，不截断）→ `pdftotext -layout -enc UTF-8 -eol unix -l 50 <file> -`。参数数组、`shell: false`、无重试、无后备解析器。换页符转为换行，不加页码标记；文本上限 20,000 字符，读取时即截断，UTF-8 增量解码。
+- **临时文件：** 只写入 tmpfs `/tmp`，文件名由服务生成（UUID），任务结束即删除。日志只有 `{event, result, ms}`。
+- **队列：** 1 个执行 + 3 个等待，再多返回 `busy`；排队时间计入 15 秒总期限。
+
+### 三、隔离（配置 + docker inspect 实测）
+
+两层硬限制：
+
+| 层 | 限制 |
+|---|---|
+| 进程 | 每个 Poppler 进程经 `prlimit --as=402653184 --core=0` 启动（384 MB 地址空间、无 core dump）。`pdfinfo` 与 `pdftotext` 共用一个 15 秒总期限，到点 SIGKILL，实测进程随即消失 |
+| 容器 | Memory 512 MB · MemorySwap 512 MB（无额外 swap）· 1 CPU · PidsLimit 64 · 只读根文件系统 · tmpfs `/tmp` 64 MB（noexec, nosuid, nodev）· CapDrop ALL · no-new-privileges · 非 root（uid 1000 `node`）· init · 无 volume / bind mount · 无 env_file、无项目 secret |
+
+- **网络：** extractor 只连接 `document-extractor-internal`（`internal: true`）。容器内实测：外网 ENETUNREACH、DNS 解析失败、`host.docker.internal:8055`（Directus）不可达、`postgres` 不可达。
+- **为什么多一个 gateway 容器：** Docker（本机 29.1.3）不会为只连接 internal 网络的容器发布端口；实测 `enable_ip_masquerade=false`、routed 模式、普通 bridge 仍然可以出网，而 `gateway_mode_ipv4=isolated` 只允许用于 internal 网络。因此采用最小替代方案：`document-extractor-gateway`（同一镜像，`gateway.mjs` 纯 TCP 转发，不解析任何内容）同时连接 internal 与 `document-extractor-edge` 网络，只发布 `127.0.0.1:8787`，只转发到固定地址 `document-extractor:8787`。gateway 自身限制：96 MB 内存 / 0.5 CPU / PidsLimit 32 / 只读根 / CapDrop ALL / no-new-privileges / 非 root。extractor 的隔离边界没有降低。
+- **未来容器化 Nuxt：** 直接使用 `http://document-extractor:8787`，不需要 gateway 端口。
+- **Directus / Postgres：** `litubo-internal` 网络仍只有 directus + postgres；`docker-compose.yml` 只新增两个服务和两个网络。
+
+### 四、Nuxt 侧
+
+- `server/utils/documentExtractorClient.ts`（仅服务端）：`POST` PDF 字节、`redirect: 'error'`、响应体上限 256 KB、响应格式严格校验，任何异常都归为 `unavailable`。
+- `server/utils/aiTextExtraction.ts`：先在前 1024 字节内检查 `%PDF-` 头，没有则 `malformed`、不发送给 sidecar；读取超时 = min(15 秒, 60 秒读取预算的剩余时间)。
+- `aiProposalEngine.ts` / `generate.post.ts`：只把 PDF reader 注入既有引擎。内容去重、分析指纹、每文件 20,000 / 总计 60,000 字符上限、60 秒读取预算、部分成功、全部失败时 0 次 Provider 调用、D-025 型号归属保护全部沿用。没有 PDF 专用的 AI 引擎、Prompt、Provider 或数据表。
+- **配置：** 非公开 runtimeConfig `documentExtractorUrl`（环境变量 `DOCUMENT_EXTRACTOR_URL`，默认 `http://127.0.0.1:8787`），`.env.example` 已补说明。sidecar 未运行时 PDF 显示 `unavailable`，TXT / CSV / TSV 不受影响。
+- **共享格式合同** `utils/aiSourceFormats.ts`：PDF `aiReadableNow = true`；扫描 PDF 提示 "No extractable text was found in this PDF. Scanned PDFs are not supported yet."；Media & resources 选择面板提示改为 "AI-readable marks the CSV, PDF, TSV, TXT files AI Source Intake can analyze today. JPG, PNG, WebP files can be linked, but not analyzed."
+- **限制：** 20 MB（Nuxt 按可信文件元数据预检并在流式下载时计数；sidecar 再按 Content-Length 和流式计数检查）· 50 页 · 20,000 字符 · 15 秒总期限。
+
+### 五、真实 Poppler 验证（本机容器）
+
+合成的 TEST ONLY PDF 经真实客户端 → gateway → extractor：
+- 文字 PDF、Unicode（Type0 + ToUnicode）→ 文本正确；50 页通过，51 页 `too_many_pages`。
+- 纯图片 PDF → `no_text`；需要用户密码的加密 PDF 与仅设 owner 密码的加密 PDF → 均为 `encrypted`；截断 / 非 PDF → `malformed`；`%PDF-` 头前有少量前缀 → 正常读取。
+- 每次请求后 `/tmp` 为空；容器内 `/proc/self/limits` 显示 384 MB 地址空间；`dd` 申请 512 MB 被拒、16 MB 通过；到期被杀的进程 `/proc/<pid>` 已不存在；uid 1000，根文件系统只读。
+- **停止 / 重启回归：** `docker compose stop document-extractor` 期间 PDF → `unavailable`，Postgres healthy、Directus ping 正常；`start` 与 `restart` 后 PDF 立即恢复读取。
+- `docker stats`：extractor 约 14 MiB / 512 MiB，gateway 约 9 MiB / 96 MiB。
+
+### 六、测试
+
+新增 5 个测试文件 + 1 个 helper：
+- `tests/documentExtractorSidecar.test.ts`（67）：HTTP 接口、各项限制、队列、期限、客户端断开、日志；真实子进程的 kill / abort / 输出上限 / UTF-8 / 不经 shell。
+- `tests/documentExtractorClient.test.ts`（50）：端点、响应校验、超时、响应上限。
+- `tests/aiPdfSource.test.ts`（14）：PDF + TXT 同一次分析；部分成功；全部失败 0 次调用；sidecar 不可用时 TXT 仍被分析；guard 继承；指纹；去重；字符上限；读取预算；真实 DeepSeek adapter + stub `fetch`，请求体中没有 `%PDF`、base64、data URL、UUID 或文件路径。
+- `tests/documentExtractorInfra.test.ts`（13）：Compose 限制、Dockerfile、目录内容、runtimeConfig 非公开、浏览器代码不引用 extractor、依赖列表不变。
+- `tests/documentExtractorIntegration.test.ts`（18）：真实容器测试，需设置 `DOCUMENT_EXTRACTOR_TEST_URL` 与 `DOCUMENT_EXTRACTOR_TEST_CONTAINER`，否则跳过（CI 无 Docker）。本机实测 18 / 18 通过。
+- `tests/helpers/testOnlyPdf.ts`：在内存中生成 TEST ONLY PDF（文字、多页、纯图片、加密）。
+- 同步调整 7 个既有测试（PDF 由不可读改为可读）。
+
+### 七、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **1635 通过 + 18 跳过**（40 个文件；跳过的 1 个文件是默认不运行的真实容器测试） |
+| 真实容器测试 | 18 / 18 通过 |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | Build complete（6.74 MB / 1.7 MB gzip） |
+
+**浏览器（Windows `nuxt dev`，监听 3000 端口的进程为 Node 22.22.2）：**
+- 紧接 build 首次启动时出现 `#app-manifest` pre-transform 报错，与之前记录的 build / dev 共用 `.nuxt` 时序问题相同；干净重启后服务端 0 错误。
+- **1440px：** `/admin`（→ Product Center）、`/admin/media`、AI Source Intake、AI Proposal Review、Media & resources 均无横向溢出。
+- **375px（全新标签页，console 0 条错误）：** 以上路由均 `scrollWidth = clientWidth = 375`。AI Source Intake 共 11 张来源卡（4 个 TXT 可选）、`0 / 5 selected`；真实点击选中 TXT → `1 / 5 selected`、Analyze 可用、披露文案（含 "Original files are not sent to the AI provider."）显示；取消后恢复 `0 / 5`、Analyze 禁用；没有 generate / apply 请求。
+- Media & resources 的选择面板显示新的 AI-readable 提示；打开面板没有暂存任何更改，重新加载后仍为 7 个 assets / 4 个 documents、Save changes 禁用。
+- 没有在 Directus 中创建 PDF 数据或关联；PDF 可被选择由组件测试证明。未点击 Analyze。
+- `.claude/launch.json` 仅在验收期间临时加入 Node 22 启动配置，验收后已还原，与 HEAD 一致。
+
+### 八、已知限制
+
+- sidecar 流式收到超过 20 MB 的请求体时立即停止读取，并回复 413 + `Connection: close`；客户端可能先看到连接被关闭而不是 413。两种情况都不会运行解析器，Nuxt 都按不可读处理。
+- V1 中任何加密 PDF（包括只设置 owner 权限密码、本可正常打开的 PDF）都返回 `encrypted`。
+- 生产环境 Nuxt 的运行方式（宿主进程或容器）尚未确定，两种地址都已在 `.env.example` 说明。
+- 生产服务器 RAM / CPU 容量尚未核实。Poppler（GPL）与 util-linux（混合许可证）在生产发布前的许可证审查尚未进行，本模块不作法律结论。
+- 本机没有使用外部镜像扫描服务（避免把镜像数据发往外部），因此未证明镜像不存在未修复的高危 CVE。
+
+### 九、边界
+
+**0 生产部署 · 0 push · 0 DB / Directus schema · 0 产品数据写入 · 0 npm package · 0 Provider adapter 改动 · 0 真实 Provider 调用 · 0 API 费用 · 0 OCR / Vision / DOCX / XLSX · 0 公网端口（仅 127.0.0.1）。**
+
+决策登记为 `08-decision-log.md` 的 **D-026 — Isolated PDF Extraction**。MASTER-ROADMAP 新增本模块的 ✅ COMPLETED 状态行，并从"规划中"的格式行删去 PDF（仅这两处）。Charter / Register 未改动。
+
+**待后续治理同步（仅记录，未修改）：** Charter 中记录当前 AI 事实的一行（"当前尚未实现：PDF 抽取、DOCX 抽取……"）和 Register AI-01 行中列为尚未交付的 "AI-readable PDF / DOCX / XLSX"，关于 PDF 的部分已与本模块事实不一致。按施工单要求，本模块不重新启动治理同步，只在此处与模块报告中说明。
+
+---
+
+```text
+AI-PDF-SOURCE-01 = COMPLETED
+
+PDF V1: text-layer PDF only
+AI-readable: TXT / CSV / TSV / PDF
+Still not AI-readable: DOCX / XLSX / Images
+document-extractor: implemented
+Isolation: container + process hard limits
+Original PDF to Provider: NO
+PDF limits: 20 MB / 50 pages / 20,000 chars / 15 s whole-task deadline
+Scanned PDF OCR: NOT IMPLEMENTED
+Provider real calls during module: 0
+Production deployment: NOT AUTHORIZED
+Production RAM/CPU: NOT YET VERIFIED
+
+AI ONE-CLICK FILL V1 = COMPLETED / SIGNED OFF
+
+NEXT CANDIDATE: AI-XLSX-SOURCE-01
+STATUS: NOT AUTHORIZED
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"AI-PDF-SOURCE-01"任务中写入。*

@@ -272,7 +272,8 @@ AI Source Intake                      ✅ 已交付
 AI-DOCUMENT-SOURCE-V1-PREFLIGHT      ✅ PASS WITH ARCHITECTURE DECISIONS
 → AI-SOURCE-CONTRACT-01              ✅ COMPLETED（统一格式合同；AI 可读仍仅 TXT / CSV / TSV）
 → PRODUCT-MODEL-RELEVANCE-GUARD-01   ✅ COMPLETED（当前产品型号归属保护；AI 可读仍仅 TXT / CSV / TSV）
-→ 各格式实施模块（XLSX / DOCX / PDF / Image OCR）与混合来源 Beta — 规划中，逐项授权
+→ AI-PDF-SOURCE-01                   ✅ COMPLETED（text-layer PDF 经隔离 document-extractor 读取；AI 可读 TXT / CSV / TSV / PDF；未部署）
+→ 各格式实施模块（XLSX / DOCX / Image OCR）与混合来源 Beta — 规划中，逐项授权
 ```
 
 ### 禁止（M5）

@@ -155,14 +155,36 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
       ...BASE_PROPS,
       sources: [
         source({ sourceRef: 'a', typeLabel: 'Image', analyzable: false, unavailableReason: 'Images are not supported for source analysis yet.' }),
-        source({ sourceRef: 'b', typeLabel: 'PDF', analyzable: false, unavailableReason: 'PDF is not supported for source analysis yet.' }),
+        source({ sourceRef: 'b', typeLabel: 'PDF', analyzable: false, unavailableReason: 'This file is disabled for this product, so it cannot be analyzed. Enable it in Media & resources first.' }),
       ],
     })
-    // Derived from the shared format contract, so it lists exactly what the server reads today.
-    expect(wrapper.text()).toContain('Supported formats: CSV, TSV, TXT.')
-    // PDF is deliberately absent — the copy must not advertise a format the server refuses.
+    // Derived from the shared format contract, so it lists exactly what the server reads today — PDF included since AI-PDF-SOURCE-01.
+    expect(wrapper.text()).toContain('Supported formats: CSV, PDF, TSV, TXT.')
+    // Never a hand-written format description of its own.
     expect(wrapper.text()).not.toContain('PDF (with extractable text)')
     expect(wrapper.find('a').exists()).toBe(true)
+  })
+
+  /**
+   * AI-PDF-SOURCE-01 — TEST ONLY product 3 has no PDF linked, and none was
+   * created for browser acceptance, so the selectable-PDF path is proven here:
+   * a PDF the server marks analyzable behaves exactly like any other source.
+   */
+  it('a PDF the server marks analyzable is selectable like any other source, with no PDF-specific step', async () => {
+    const pdf = source({ sourceRef: 'pdf-1', displayName: 'LT180C datasheet.pdf', typeLabel: 'PDF', analyzable: true, unavailableReason: null })
+    const wrapper = mountIntake({ ...BASE_PROPS, sources: [pdf] })
+    const checkbox = wrapper.find('input[type="checkbox"]')
+    expect((checkbox.element as HTMLInputElement).disabled).toBe(false)
+    expect(wrapper.text()).not.toContain('PDF is not supported')
+    await checkbox.setValue(true)
+    expect(wrapper.emitted('toggle')).toEqual([['pdf-1']])
+
+    const selected = mountIntake({ ...BASE_PROPS, sources: [pdf], selectedRefs: ['pdf-1'] })
+    expect(selected.find('.ws-analyze-note').text()).toContain('Original files are not sent to the AI provider.')
+    const analyze = selected.findAll('button').find(button => button.text().includes('Analyze selected sources'))!
+    expect((analyze.element as HTMLButtonElement).disabled).toBe(false)
+    await analyze.trigger('click')
+    expect(selected.emitted('analyze')).toHaveLength(1)
   })
 })
 

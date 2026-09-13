@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import type { FileRole } from '~/types/product-cms'
 import { fileRoleLabel, sourceFileTypeLabel, workspaceMediaThumbUrl, workspaceMediaIsImage } from '~/utils/productWorkspace'
-import { isAiSourceReadableNow } from '~/utils/aiSourceFormats'
+import { AI_READABLE_FORMATS_LABEL, MEDIA_ONLY_FORMATS_LABEL, isAiSourceReadableNow } from '~/utils/aiSourceFormats'
 import {
   directChildFolders,
   fileKind,
@@ -420,10 +420,10 @@ function pickerFilePath(f: LibraryFile): string {
                 </div>
 
                 <p class="ws-lib-note">Selecting a file stages it here — nothing is sent until you click Save changes.</p>
-                <!-- Honest about today's AI scope: a PDF can be linked, but AI Source Intake cannot read it. -->
+                <!-- Honest about today's AI scope, derived from the shared format contract so it cannot drift from what the server reads. -->
                 <p class="ws-lib-note">
                   <span class="ws-lib-card__ai">AI-readable</span>
-                  marks the TXT, CSV and TSV files AI Source Intake can analyze today. PDF and images can be linked, but not analyzed.
+                  marks the {{ AI_READABLE_FORMATS_LABEL }} files AI Source Intake can analyze today. {{ MEDIA_ONLY_FORMATS_LABEL }} files can be linked, but not analyzed.
                 </p>
 
                 <p v-if="!pickerShowsFiles" class="ws-lib-prompt">

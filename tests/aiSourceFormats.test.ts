@@ -14,6 +14,7 @@ import { resolve } from 'node:path'
 import {
   AI_SOURCE_FORMATS,
   AI_READABLE_FORMATS_LABEL,
+  MEDIA_ONLY_FORMATS_LABEL,
   aiSourceFormatFor,
   aiSourceFormatRefusal,
   aiSourceTypeLabel,
@@ -34,12 +35,12 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
 describe('A. what AI Source Intake can analyze today', () => {
-  it.each([TXT, CSV, TSV])('%s is AI-readable', (mime) => {
+  it.each([TXT, CSV, TSV, PDF])('%s is AI-readable', (mime) => {
     expect(isAiSourceReadableNow(mime)).toBe(true)
     expect(aiSourceFormatRefusal(mime)).toBeNull()
   })
 
-  it.each([PDF, DOCX, XLSX, ...IMAGES])('%s is a planned format — listed, but NOT readable yet', (mime) => {
+  it.each([DOCX, XLSX, ...IMAGES])('%s is a planned format — listed, but NOT readable yet', (mime) => {
     expect(aiSourceFormatFor(mime)).not.toBeNull()
     expect(isAiSourceReadableNow(mime)).toBe(false)
     expect(aiSourceFormatRefusal(mime)).toBe('not_enabled')
@@ -63,15 +64,21 @@ describe('A. what AI Source Intake can analyze today', () => {
   it('ignores letter case and a charset parameter, the way stored content types arrive', () => {
     expect(isAiSourceReadableNow('TEXT/PLAIN')).toBe(true)
     expect(isAiSourceReadableNow('text/csv; charset=utf-8')).toBe(true)
-    expect(aiSourceFormatRefusal('Application/PDF')).toBe('not_enabled')
+    expect(aiSourceFormatRefusal('Application/PDF')).toBeNull()
+    expect(aiSourceFormatRefusal('IMAGE/PNG')).toBe('not_enabled')
   })
 
-  it('exactly one format family is readable, and it is text', () => {
-    expect(AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).map(f => f.key)).toEqual(['text'])
+  /** AI-PDF-SOURCE-01 — PDF joined text once its isolated reader passed acceptance. No other format has. */
+  it('exactly two format families are readable: text, and text-layer PDF', () => {
+    expect(AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).map(f => f.key)).toEqual(['text', 'pdf'])
   })
 
   it('the "Supported formats" copy lists exactly the readable formats', () => {
-    expect(AI_READABLE_FORMATS_LABEL).toBe('CSV, TSV, TXT')
+    expect(AI_READABLE_FORMATS_LABEL).toBe('CSV, PDF, TSV, TXT')
+  })
+
+  it('the "can be linked, but not analyzed" copy lists exactly the stored-but-unreadable formats', () => {
+    expect(MEDIA_ONLY_FORMATS_LABEL).toBe('JPG, PNG, WebP')
   })
 })
 
@@ -112,9 +119,13 @@ describe('B. the server reads exactly what the shared contract marks readable', 
     'application/vnd.ms-excel', 'application/msword', 'text/html', null,
   ]
 
+  /** A PDF is read through the document-extractor's reader, so the table gives it a PDF header and a stand-in reader. */
+  const PDF_READER = { pdf: async () => ({ ok: true as const, text: 'Aperture: 180 mm' }) }
+
   it.each(TABLE)('server extraction and isAiSourceReadableNow agree on %s', async (mime) => {
-    const bytes = new TextEncoder().encode('Aperture: 180 mm').buffer as ArrayBuffer
-    const result = await extractTextFromFile(bytes, mime, 'Source 1')
+    const content = aiSourceFormatFor(mime)?.key === 'pdf' ? '%PDF-1.7\nAperture: 180 mm' : 'Aperture: 180 mm'
+    const bytes = new TextEncoder().encode(content).buffer as ArrayBuffer
+    const result = await extractTextFromFile(bytes, mime, 'Source 1', { readers: PDF_READER })
     expect(result.ok).toBe(isAiSourceReadableNow(mime))
   })
 
@@ -181,10 +192,11 @@ describe('C. Media Library storage and AI readability are separate facts', () =>
     },
   )
 
-  it('PDF: the Media Library can store it, AI cannot analyze it yet', () => {
+  it('PDF: the Media Library stores it, and AI Source Intake can analyze it (AI-PDF-SOURCE-01)', () => {
     expect(isAllowedUpload('datasheet.pdf', PDF)).toBe(true)
     expect(aiSourceFormatFor(PDF)?.mediaUploadSupported).toBe(true)
-    expect(isAiSourceReadableNow(PDF)).toBe(false)
+    expect(isAiSourceReadableNow(PDF)).toBe(true)
+    expect(aiSourceFormatFor(PDF)?.maxBytes).toBe(20 * 1024 * 1024)
   })
 
   it('Images: the Media Library can store them, AI cannot analyze them yet', () => {
@@ -221,6 +233,12 @@ describe('D. every source failure is worded once, safely', () => {
     ['not_associated', 'One of the selected files could not be used for this product.'],
   ] as const)('%s → "%s"', (code, message) => {
     expect(sourceFailureMessage(code)).toBe(message)
+  })
+
+  it('no_text for a PDF names the likely cause — a scan — while every other format keeps the generic sentence', () => {
+    expect(sourceFailureMessage('no_text', PDF)).toBe('No extractable text was found in this PDF. Scanned PDFs are not supported yet.')
+    expect(sourceFailureMessage('no_text', TXT)).toBe('No extractable text was found in this file.')
+    expect(sourceFailureMessage('no_text')).toBe('No extractable text was found in this file.')
   })
 
   it.each([

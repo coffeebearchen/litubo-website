@@ -1,18 +1,18 @@
 /**
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — text-only source extraction.
  *
- * PDF is deliberately no longer supported: its parser could not be given a
- * real memory ceiling in-process, so it is refused rather than parsed unsafely.
- * These tests cover the formats that ARE supported (TXT, CSV, TSV) end to end,
- * plus the refusal behaviour for every other format. No network, no Directus,
- * no mock provider involved.
+ * TXT, CSV and TSV are decoded here, end to end. A PDF is never parsed in this
+ * process (AI-PDF-SOURCE-01): it is checked for a PDF header and handed to an
+ * injected reader — in production the isolated document-extractor sidecar,
+ * here a stand-in. Every other format is refused. No network, no Directus, no
+ * mock provider involved.
  *
  * AI-SOURCE-CONTRACT-01 — a refusal is now a failure code. Which formats are
  * readable, and the sentence each code becomes, are pinned against the shared
  * contract in `tests/aiSourceFormats.test.ts`.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   extractTextFromFile,
   sanitizeDisplayNameForBrowser,
@@ -21,7 +21,9 @@ import {
   MAX_FILES_PER_REQUEST,
   MAX_TOTAL_EXTRACTED_CHARS,
   MAX_PER_FILE_CHARS,
+  MAX_PDF_READ_MS,
 } from '../server/utils/aiTextExtraction'
+import type { PdfTextReadResult } from '../server/utils/documentExtractorClient'
 import { aiSourceFormatFor, sourceFailureMessage } from '../utils/aiSourceFormats'
 
 /** The text family's own size contract — the only download limit in force today. */
@@ -35,7 +37,6 @@ describe('extractTextFromFile — only what the shared contract marks readable i
   it('refuses a planned-but-not-readable format with not_enabled, before touching the bytes', async () => {
     const bytes = toArrayBuffer(Buffer.from('not a real document'))
     for (const mime of [
-      'application/pdf',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'image/jpeg', 'image/png', 'image/webp',
@@ -132,19 +133,79 @@ describe('extractTextFromFile — CSV/TSV (real extraction, no mocking)', () => 
   })
 })
 
-describe('extractTextFromFile — PDF is refused, not parsed', () => {
-  it('a real PDF byte stream is refused, and the sentence for it names PDF — never Excel', async () => {
-    const bytes = toArrayBuffer(Buffer.from('%PDF-1.4 anything at all'))
-    const result = await extractTextFromFile(bytes, 'application/pdf', 'datasheet.pdf')
+describe('extractTextFromFile — a PDF is read outside this process (AI-PDF-SOURCE-01)', () => {
+  const PDF_BYTES = toArrayBuffer(Buffer.from('%PDF-1.7\n%TEST ONLY — NOT FOR PUBLICATION\n', 'utf-8'))
 
-    expect(result).toEqual({ ok: false, code: 'not_enabled' })
-    const message = sourceFailureMessage('not_enabled', 'application/pdf')
-    expect(message).toBe('PDF is not supported for source analysis yet.')
-    expect(message).not.toContain('Excel')
-    expect(message).not.toBe(sourceFailureMessage('unsupported'))
+  function stubReader(result: PdfTextReadResult | Error) {
+    return vi.fn(async (_bytes: Uint8Array, _options: { timeoutMs: number }) => {
+      if (result instanceof Error) throw result
+      return result
+    })
+  }
+
+  it('hands the bytes to the PDF reader and returns its text as one more ExtractedSource', async () => {
+    const reader = stubReader({ ok: true, text: '  Model: LT180C\nAperture: 180 mm  ' })
+    const result = await extractTextFromFile(PDF_BYTES, 'application/pdf', 'Source 1', { readers: { pdf: reader } })
+
+    expect(result).toEqual({ ok: true, source: { displayName: 'Source 1', fileType: 'PDF', text: 'Model: LT180C\nAperture: 180 mm' } })
+    expect(reader).toHaveBeenCalledTimes(1)
+    const [bytes, options] = reader.mock.calls[0]
+    expect(Buffer.from(bytes).equals(Buffer.from(PDF_BYTES))).toBe(true)
+    expect(options).toEqual({ timeoutMs: MAX_PDF_READ_MS })
   })
 
-  it('no PDF parser is reachable from this module at all', async () => {
+  it('gives the reader no more than the time the caller has left, and never more than 15 s', async () => {
+    const reader = stubReader({ ok: true, text: 'Aperture: 180 mm' })
+    await extractTextFromFile(PDF_BYTES, 'application/pdf', 'Source 1', { readers: { pdf: reader }, timeoutMs: 4_000 })
+    await extractTextFromFile(PDF_BYTES, 'application/pdf', 'Source 1', { readers: { pdf: reader }, timeoutMs: 60_000 })
+    expect(reader.mock.calls.map(call => call[1].timeoutMs)).toEqual([4_000, 15_000])
+    expect(MAX_PDF_READ_MS).toBe(15_000)
+  })
+
+  it('bytes without a PDF header are malformed and never sent to the reader — a content type is only a claim', async () => {
+    const reader = stubReader({ ok: true, text: 'never used' })
+    const result = await extractTextFromFile(toArrayBuffer(Buffer.from('Model: LT180C')), 'application/pdf', 'Source 1', { readers: { pdf: reader } })
+    expect(result).toEqual({ ok: false, code: 'malformed' })
+    expect(reader).not.toHaveBeenCalled()
+  })
+
+  it('with no reader configured, a PDF is reported unavailable — never parsed some other way', async () => {
+    expect(await extractTextFromFile(PDF_BYTES, 'application/pdf', 'Source 1')).toEqual({ ok: false, code: 'unavailable' })
+  })
+
+  it.each(['too_many_pages', 'encrypted', 'no_text', 'timeout', 'malformed', 'unsafe_parse', 'busy', 'unavailable'] as const)(
+    'a reader failure "%s" passes through as that code and nothing else',
+    async (code) => {
+      const result = await extractTextFromFile(PDF_BYTES, 'application/pdf', 'Source 1', { readers: { pdf: stubReader({ ok: false, code }) } })
+      expect(result).toEqual({ ok: false, code })
+    },
+  )
+
+  it('a reader that throws is reported unavailable, without its error', async () => {
+    const reader = stubReader(new Error('connect ECONNREFUSED 127.0.0.1:8787 /tmp/3f2c.pdf'))
+    const result = await extractTextFromFile(PDF_BYTES, 'application/pdf', 'Source 1', { readers: { pdf: reader } })
+    expect(result).toEqual({ ok: false, code: 'unavailable' })
+  })
+
+  it('whitespace-only text is no_text, and text over the per-file ceiling is cut to it', async () => {
+    expect(await extractTextFromFile(PDF_BYTES, 'application/pdf', 'Source 1', { readers: { pdf: stubReader({ ok: true, text: ' \n\t ' }) } }))
+      .toEqual({ ok: false, code: 'no_text' })
+    const long = await extractTextFromFile(PDF_BYTES, 'application/pdf', 'Source 1', { readers: { pdf: stubReader({ ok: true, text: 'x'.repeat(MAX_PER_FILE_CHARS + 500) }) } })
+    expect(long.ok && long.source.text.length).toBe(MAX_PER_FILE_CHARS)
+  })
+
+  it('a PDF over its 20 MB contract is refused before the reader is asked', async () => {
+    const reader = stubReader({ ok: true, text: 'never used' })
+    const huge = new ArrayBuffer(aiSourceFormatFor('application/pdf')!.maxBytes + 1)
+    expect(await extractTextFromFile(huge, 'application/pdf', 'Source 1', { readers: { pdf: reader } })).toEqual({ ok: false, code: 'too_large' })
+    expect(reader).not.toHaveBeenCalled()
+  })
+
+  it('the no_text sentence for a PDF says scanned PDFs are not supported yet', () => {
+    expect(sourceFailureMessage('no_text', 'application/pdf')).toBe('No extractable text was found in this PDF. Scanned PDFs are not supported yet.')
+  })
+
+  it('no PDF parser is reachable from this module at all — reading is delegated, never done here', async () => {
     const { readFileSync } = await import('node:fs')
     const { resolve } = await import('node:path')
     const source = readFileSync(resolve(process.cwd(), 'server/utils/aiTextExtraction.ts'), 'utf8')
@@ -152,9 +213,9 @@ describe('extractTextFromFile — PDF is refused, not parsed', () => {
       .split(/\r?\n/)
       .filter(l => !l.trim().startsWith('*') && !l.trim().startsWith('//'))
       .join('\n')
-    expect(code).not.toContain('pdfjs')
-    expect(code).not.toContain('pdfExtractionWorker')
-    expect(code).not.toContain('extractPdfText')
+    for (const forbidden of ['pdfjs', 'pdfExtractionWorker', 'extractPdfText', 'unpdf', 'pdf-parse', 'child_process', 'pdftotext', 'worker_threads']) {
+      expect(code, forbidden).not.toContain(forbidden)
+    }
   })
 })
 
@@ -242,9 +303,10 @@ describe('sanitizeDisplayNameForBrowser — PWS-AI-ENGINE-01R2-SAFETY-01', () =>
 // PWS-AI-ENGINE-01R2-REVIEW-FIX-03 — the `Promise.race` timeout test that
 // lived here was removed along with the implementation it covered; it could
 // only prove the caller stopped waiting, never that the parse stopped running.
-// The terminable PDF worker that briefly replaced it is gone as well: PDF is
-// disabled outright (the shared format contract marks it not readable), so
-// there is no PDF parse left to time out and no worker test to point at.
+// The terminable PDF worker that briefly replaced it is gone as well. Since
+// AI-PDF-SOURCE-01 a PDF is parsed only inside the document-extractor sidecar,
+// whose real SIGKILL-at-deadline behaviour is tested in
+// `tests/documentExtractorSidecar.test.ts`.
 //
 // AI-SOURCE-CONTRACT-01 — `MAX_PROCESSING_MS` was declared here but never
 // enforced by anything. The reading stage's real time limit is the engine's

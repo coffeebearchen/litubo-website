@@ -204,16 +204,23 @@ describe('Text means exactly what AI Source Intake can analyze today', () => {
     expect([...TEXT_FILTER_MIME_TYPES].sort()).toEqual([...textFamily].sort())
   })
 
-  it.each(TABLE)('the filter and the one AI-readable decision (engine and picker badge alike) agree on %s', (mime) => {
-    const readable = isAiSourceReadableNow(mime)
+  /**
+   * AI-PDF-SOURCE-01 — the Text filter used to equal "AI-readable". PDF is
+   * AI-readable now but it is not text, so the filter is pinned to the text
+   * family instead, and everything it matches must still be readable.
+   */
+  it.each(TABLE)('the Text filter matches the contract\'s text family, and everything it matches is AI-readable, for %s', (mime) => {
+    const textFamily = AI_SOURCE_FORMATS.find(f => f.key === 'text')!.types.map(t => t.mime)
+    const inTextFamily = mime !== null && textFamily.some(t => mime.toLowerCase().startsWith(t))
     const filter = mime !== null && TEXT_FILTER_MIME_TYPES.some(t => mime.toLowerCase().startsWith(t))
-    expect(filter).toBe(readable)
+    expect(filter).toBe(inTextFamily)
+    if (filter) expect(isAiSourceReadableNow(mime)).toBe(true)
   })
 
-  /** A Text filter must not suggest PDF can be analyzed — it cannot, until an isolated parser exists. */
-  it('PDF is neither in the Text filter nor AI-readable', () => {
+  /** PDF keeps its own PDF filter; the picker's AI-readable badge marks it through the same contract. */
+  it('PDF is AI-readable, and stays out of the Text filter', () => {
     expect(TEXT_FILTER_MIME_TYPES).not.toContain('application/pdf')
-    expect(isAiSourceReadableNow('application/pdf')).toBe(false)
+    expect(isAiSourceReadableNow('application/pdf')).toBe(true)
   })
 })
 

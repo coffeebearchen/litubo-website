@@ -454,8 +454,8 @@ describe('/api/admin/products/:id/ai/sources — the browser receives no Directu
     expect(String(result[2].unavailableReason)).toContain('disabled for this product')
     expect(result[3]).toMatchObject({ analyzable: false })
     expect(String(result[3].unavailableReason)).toContain('Images are not supported for source analysis yet')
-    expect(result[4]).toMatchObject({ analyzable: false })
-    expect(String(result[4].unavailableReason)).toContain('PDF is not supported')
+    // AI-PDF-SOURCE-01 — an enabled PDF is analyzable now; the document-extractor reads it at Analyze time.
+    expect(result[4]).toMatchObject({ analyzable: true, unavailableReason: null })
   })
 
   it('is not cached — provider and source context must not outlive the session', async () => {

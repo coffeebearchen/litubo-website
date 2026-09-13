@@ -6,6 +6,7 @@ import {
   MAX_FILES_PER_REQUEST,
   MAX_TOTAL_EXTRACTED_CHARS,
   type ExtractedSource,
+  type SourceReaders,
 } from './aiTextExtraction'
 import { aiSourceFormatFor, aiSourceFormatRefusal, sourceFailureMessage, type SourceFailureCode } from '../../utils/aiSourceFormats'
 import { digestSourceText, buildAnalysisFingerprint } from './aiProposalReplayGuard'
@@ -55,6 +56,12 @@ import type { FetchFn } from './mediaLifecycle'
  * analysis also runs on a single clock (`MAX_TOTAL_EXTRACTION_MS`): a source
  * that clock does not reach is reported as not read, and whatever was read
  * still goes to the provider.
+ *
+ * AI-PDF-SOURCE-01 — a PDF is read by the document-extractor sidecar through
+ * the `readers` the caller passes in. That read spends the same clock: it gets
+ * no more time than the stage has left, and a PDF becomes one more
+ * `ExtractedSource` in the same dedupe, the same character cap and the same
+ * single provider call as every other source.
  */
 
 /**
@@ -320,6 +327,7 @@ export async function runProposalEngine<TOutput>(
   target: TargetDefinition<TOutput>,
   params: { productId: number, providerId: unknown, mediaIds: unknown },
   reuse?: ProposalReuseHooks<TOutput>,
+  readers?: SourceReaders,
 ): Promise<ProposalEngineResult<TOutput>> {
   const productExists = await assertProductExistsViaFetch(fetch, params.productId)
   if (!productExists) {
@@ -433,7 +441,17 @@ export async function runProposalEngine<TOutput>(
     // The label is only consumed once the source is actually going into the
     // prompt, so a skipped duplicate does not leave a gap in "Source 1, 2, 3".
     const promptLabel = `Source ${promptSourceCounter + 1}`
-    const extraction = await extractTextFromFile(bytes, mime, promptLabel)
+    // A reader outside this process (a PDF) gets no more than what the stage has left.
+    const extraction = await extractTextFromFile(bytes, mime, promptLabel, {
+      readers,
+      timeoutMs: budget.remainingMs(),
+    })
+    // A read that ran into the end of the stage used up the analysis's time,
+    // not its own: it is reported exactly like a download that did.
+    if (budget.remainingMs() === 0) {
+      fileResults.push(notAnalyzed(browserDisplayName, 'time_budget_exhausted'))
+      continue
+    }
     if (!extraction.ok) {
       fileResults.push(notAnalyzed(browserDisplayName, extraction.code, mime))
       continue
