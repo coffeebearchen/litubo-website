@@ -20,6 +20,8 @@
 
 **FD-004（2026-09-09）补充：** Governing Charter 新增 `FD-004 — Risk-Proportionate AI MVP Delivery`（用户确认，Effective，定义见 Charter §D.2）。当前 AI 主线重新聚焦为单产品 Draft 填表闭环；问题须先按 P0 / P1 / P2 分级再决定是否阻塞，非 P0 的 hardening 默认进入 backlog。**这是纯文档治理**：不降低任何 P0 安全边界，不授权 `PWS-AI-APPLY-DRAFT-01` 开工，Apply 仍为服务端 503 + UI disabled，`origin/master` 与部署状态不受影响。
 
+**CONTENT-CENTER-MODULE-FREEZE-01（2026-09-14）补充：** Content Center 视觉方向 ✅ APPROVED；Module Freeze ✅ COMPLETED（D-031，`docs/content-cms/CONTENT-CENTER-MODULE-FREEZE-V1.md`）；`CONTENT-CENTER-BLUEPRINT-01` 为 NEXT — NOT AUTHORIZED。纯文档治理：0 runtime、0 DB、0 Directus；`origin/master` 与部署状态不受影响。
+
 ---
 
 ## 总览
@@ -207,7 +209,16 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 
 #### M4-Next-5：Content Center
 
-内容运营中心（博文、资源、页面等综合管理）
+内容运营中心：一个统一 Content Center，V1 内容类型为 Technical Article、Application / Solution、Case Study、Resource / Download、News（D-031）。
+
+准入按能力型 Gate：Approved Visual → Module Freeze → Blueprint → 明确实施授权 → Draft / Public 安全 Gate → 生产发布 Gate。不以 M4 / M5 字面或真实产品试点作为规划与 Draft-only 建设的前提；真实产品试点与生产发布 Gate 只约束生产发布与公开暴露。本节编号仅为历史位置，不代表必须等 M4-Next-4 或 M5 全部完成。
+
+```text
+Content Center Visual Direction      ✅ APPROVED（2026-09-14）
+→ CONTENT-CENTER-MODULE-FREEZE-01    ✅ COMPLETED（2026-09-14，模块拓扑 / 路由意图 / 写入边界已冻结）
+→ CONTENT-CENTER-BLUEPRINT-01        NEXT — NOT AUTHORIZED
+→ Content Center implementation      未开始，须单独授权
+```
 
 #### M4-Next-6：真实产品资料录入与正式上线
 
@@ -278,7 +289,7 @@ AI-DOCUMENT-SOURCE-V1-PREFLIGHT      ✅ PASS WITH ARCHITECTURE DECISIONS
 → AI-IMAGE-OCR-SOURCE-01             ✅ COMPLETED（JPG / PNG / WebP 经现有隔离 document-extractor 本地 libvips + Tesseract OCR 读取可见文字；非 Vision；低置信度 [?]；每次 Analyze 最多 3 张；AI 可读 TXT / CSV / TSV / PDF / XLSX / DOCX / JPG / PNG / WebP；未部署）
 → AI-DOCUMENT-MIXED-SOURCE-BETA-01   ✅ COMPLETED（新建 TEST ONLY Draft 产品 LT-180C-MIXED-BETA-01 上 TXT / PDF / XLSX / DOCX / PNG 五来源一次真实 DeepSeek Analyze；无跨型号 / 隐藏表 / UNKNOWN 泄漏；Power supply 冲突人工选 220 V, 50 Hz；Apply 一次写入 4 条，仍为 Draft；未部署）
 → AI-DOCUMENT-SOURCE-V1-FINAL        ✅ FEATURE COMPLETE / SIGNED OFF（TXT / CSV / TSV / PDF text-layer / XLSX / DOCX / JPG / PNG / WebP OCR；一个 Proposal Engine；Human Review 必需；原始二进制不发往 Provider；Production release gates remain open — 生产发布未批准，不代表网站可上线）
-→ NEXT CANDIDATE：CONTENT CENTER PLANNING / BLUEPRINT（M4-Next-5：Content Center）— 未授权
+→ 后续主线转入 Content Center（M4-Next-5）：Module Freeze ✅ 已完成；CONTENT-CENTER-BLUEPRINT-01 NEXT — 未授权
 ```
 
 ### 禁止（M5）

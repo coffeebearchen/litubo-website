@@ -207,6 +207,17 @@ Claude must never:
 - Fill any unconfirmed Decision Gate with fabricated data, fake scores, fake percentages, or engineering guesses
 - Start a new module without receiving a complete, self-contained Codex work order for that specific module
 
+### Content Center execution contract
+
+Before any Content Center work, read: the approved visuals in `docs/design-reference/approved/admin-cms-content-center-v1/`, the current Module Freeze (`docs/content-cms/CONTENT-CENTER-MODULE-FREEZE-V1.md`), the current Content Center Blueprint once it exists, `CURRENT-STATE.md`, and Git facts.
+
+- Execution order: Approved Visual → Module Freeze → Blueprint → Implementation.
+- The repository's current Admin shell and navigation override incidental shell details drawn in visuals.
+- Content Center reuses the Media Library and the existing AI Source → Proposal → Human Review architecture.
+- If the repository, CURRENT-STATE, a visual, the Freeze or the Blueprint conflict: STOP and report. Do not guess.
+- Every successful authorized module: validate → update CURRENT-STATE → update the Register → update MASTER-ROADMAP only when a milestone changed → update the Decision Log only for new long-term decisions → local commit → report evidence → STOP.
+- Never begin the next module without explicit authorization.
+
 ### FD-003 reading tiers (Tier A / B / C)
 
 `FD-003 — Context-Efficient Execution` (registered in `ADMIN-CMS-GOVERNING-CHARTER-V1.md`, effective 2026-09-06) sets three reading tiers so repeated reading cost does not grow with every small task. A tier only lowers how much must be *re-read* — it never lowers what must be *satisfied*. The applicable module's Gate, visual master, data/API contract, English-first rule, acceptance criteria, and stated no-touch scope apply in full at every tier.

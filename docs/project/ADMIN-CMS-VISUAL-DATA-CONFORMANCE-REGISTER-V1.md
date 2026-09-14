@@ -235,6 +235,57 @@ Rules:
 4. Blueprint §11's stage order (`J-3` through `J-6e`) is unchanged by this ruling; it governs sequence, and `PWS-*` numbering governs addressing only.
 5. `PWS-00` remains the gating prerequisite for `PWS-01`…`PWS-08` and both `PWS-AI-*` modules, exactly as `PW-00` gated `PW-01`…`PW-06`.
 
+### 4.7 Content Center Visual Masters — Approved Desktop Set (CONTENT-CENTER-MODULE-FREEZE-01, 2026-09-14)
+
+The user approved the following 8 images as the Content Center visual direction, and `CONTENT-CENTER-MODULE-FREEZE-01` registered them (reason: Content Center module freeze; long-term decision `D-031`). Documentation-only registration: it authorizes no route, page, schema, API, content data, media runtime or AI feature. Module shape, interpretation rules and exclusions are defined in `docs/content-cms/CONTENT-CENTER-MODULE-FREEZE-V1.md`.
+
+**Approved directory (tracked in Git; never modify, rename or overwrite):**
+
+```text
+docs/design-reference/approved/admin-cms-content-center-v1/
+```
+
+| Source Asset ID | File | `CC-*` module (§4.8) | Authority | Dimensions it may influence | May **not** decide |
+|---|---|---|---|---|---|
+| `CC-FLOW-01-FUNCTIONAL-FLOW-D1440` | `00-CC-FLOW-01-FUNCTIONAL-FLOW-D1440.png` | all (flow); partial basis for `CC-00` | `PRIMARY` flow reference (not a page layout) | Module set, module order, entry/exit direction | Engineering IDs (its drawn step labels are not IDs); data/API; any page layout on its own |
+| `CC-VIS-01-CONTENT-CENTER-OVERVIEW-D1440` | `01-CC-VIS-01-CONTENT-CENTER-OVERVIEW-D1440.png` | `CC-01` | `PRIMARY` (desktop 1440-class only) | Workspace shell, module rail, Overview panel structure | Data/API contract; permissions; publication; AI write authority; readiness scoring; global Admin shell; any 375px structure |
+| `CC-VIS-02-CONTENT-EDITOR-D1440` | `02-CC-VIS-02-CONTENT-EDITOR-D1440.png` | `CC-02` | `PRIMARY` (desktop 1440-class only) | Basic-information form, structured section list, outline panel | Same as above; block schema |
+| `CC-VIS-03-MEDIA-RELATIONS-D1440` | `03-CC-VIS-03-MEDIA-RELATIONS-D1440.png` | `CC-03` | `PRIMARY` (desktop 1440-class only) | Hero / inline / download / related-content layout | Same as above; any file storage outside the Media Library; relation schema |
+| `CC-VIS-04-SEO-LOCALES-D1440` | `04-CC-VIS-04-SEO-LOCALES-D1440.png` | `CC-04` | `PRIMARY` (desktop 1440-class only) | SEO / locale form and preview layout | Same as above; ES/PT activation; direct single-field AI overwrite |
+| `CC-AI-01-SOURCE-INTAKE-D1440` | `05-CC-AI-01-SOURCE-INTAKE-D1440.png` | `CC-AI-01` | `PRIMARY` (desktop 1440-class only) | Source table, filters, intake summary layout | Same as above; source limits (existing `MAX_FILES_PER_REQUEST = 5`, D-030 image limit stay); source picker / relation model |
+| `CC-AI-02-PROPOSAL-REVIEW-D1440` | `06-CC-AI-02-PROPOSAL-REVIEW-D1440.png` | `CC-AI-02` | `PRIMARY` (desktop 1440-class only) | Proposal table, evidence panel, review summary layout | Same as above; confidence scores; page-number citations not backed by real source metadata |
+| `CC-VIS-05-PREVIEW-PUBLISH-READINESS-D1440` | `07-CC-VIS-05-PREVIEW-PUBLISH-READINESS-D1440.png` | `CC-05` | `PRIMARY` (desktop 1440-class only) | Preview frame, readiness checklist, manual publish entry layout | Same as above; public site IA; Legal / Brand review; QR / distribution; numeric readiness |
+
+Image sizes: `00` is 1672×941px, `01`–`07` are 1586×992px. `D1440` means a 1440-class desktop target; acceptance runs in a 1440px viewport, and the PNG width is not a contract. **No `M375` mobile master exists**; every future `CC-*` code work order is accepted at 375px against the mobile contract in Freeze §22.
+
+**README status.** `docs/design-reference/approved/admin-cms-content-center-v1/README.md` is `SUPPLEMENTARY` — an operational manifest (status, file/ID/module mapping), not an independent governance authority.
+
+**Explicit scope limit.** Visual mock data is placeholder only; buttons, counts and badges shown in the images create no runtime authorization unless frozen by the Module Freeze or the Blueprint; the repository's global Admin shell is authoritative over navigation drawn in the images.
+
+### 4.8 CC work-order namespace and module register (fixed by CONTENT-CENTER-MODULE-FREEZE-01, 2026-09-14)
+
+Content Center work orders use the `CC-*` engineering module IDs below. This extends the §4.4 naming rule ("name both the engineering module ID and the Source Asset ID") to Content Center: a Content Center work order names a `CC-*` engineering ID **and** cites assets by full Source Asset ID (§4.7). The short form `CC-AI-01` / `CC-AI-02` always means the engineering module; the asset is always cited with its full stem (e.g. `CC-AI-01-SOURCE-INTAKE-D1440`). Gate references keep the existing `CH-DG-xx` / `BP-DG-xx` prefixes; no `CC-DG` namespace exists. `CC-*` collides with no existing ID.
+
+| `CC-*` ID | Module | Visual basis | Route intent | Visual | Module | Blueprint | Implementation | Acceptance |
+|---|---|---|---|---|---|---|---|---|
+| `CC-00` | Content Center List | None single-authoritative: existing Product Center collection/list pattern (`/admin/products`) + `CC-FLOW-01-FUNCTIONAL-FLOW-D1440` | `/admin/content-center` | `APPROVED` (flow) | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-01` | Workspace Overview | `CC-VIS-01-CONTENT-CENTER-OVERVIEW-D1440` | `/admin/content-center/:id/overview` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-02` | Content Editor | `CC-VIS-02-CONTENT-EDITOR-D1440` | `/admin/content-center/:id/editor` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-03` | Media & Relations | `CC-VIS-03-MEDIA-RELATIONS-D1440` | `/admin/content-center/:id/media-relations` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-04` | SEO & Locales | `CC-VIS-04-SEO-LOCALES-D1440` | `/admin/content-center/:id/seo-locales` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-AI-01` | AI Source Intake | `CC-AI-01-SOURCE-INTAKE-D1440` | `/admin/content-center/:id/ai-source-intake` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-AI-02` | AI Proposal Review | `CC-AI-02-PROPOSAL-REVIEW-D1440` | `/admin/content-center/:id/ai-proposal-review` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-05` | Preview & Publish Readiness | `CC-VIS-05-PREVIEW-PUBLISH-READINESS-D1440` | `/admin/content-center/:id/preview-publish` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-HIST` | Change History | No new master: existing Product Workspace history pattern (`PW-VIS-09-CHANGE-HISTORY-D1440`; the `PWS-08` runtime module is itself not built) | `/admin/content-center/:id/history` | reuse | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+
+Rules:
+
+1. **Column vocabulary.** `Visual` = `APPROVED` and `Module` = `FROZEN` are governance-state labels of the Content Center freeze (as §4.5 records "frozen"); they are not §3 implementation statuses. `Blueprint`, `Implementation` and `Acceptance` use §3 vocabulary.
+2. **No code authorization.** Definition of Ready (§10.1) is `NOT MET` for every row: the data/API contract does not exist until `CONTENT-CENTER-BLUEPRINT-01` is completed and implementation is separately authorized.
+3. **Sequence.** Content Center is a capability-gated track (Approved Visual → Module Freeze → Blueprint → explicit implementation authorization → Draft/Public safety gates → production release gates; `D-031`). It does not alter Blueprint §11 or Charter §J product-line stages.
+4. **Boundaries** (`D-031`): one unified Content Center; `product_sections` / `product_section_items` stay Product Workspace-owned and are not the Content Center store; `posts` / `site_content` require Blueprint inventory; Media Library references only; Content AI is scoped to one current Content Draft on the existing Proposal Engine and never publishes; publish is a manual human action.
+5. **Cross-references updated by this change** (§13): Charter §E.4 / §F.3 / §H.4 note / §J note / §M.1; Decision Log `D-031`; `CURRENT-STATE.md`; `MASTER-ROADMAP.md`; `MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md` Content Center entry conditions. Implementation Blueprint: no change. Compatibility / rollback: documentation only, no runtime consequence.
+
 ---
 
 ## 5. Shared visual and interaction contracts

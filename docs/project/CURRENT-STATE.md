@@ -8345,3 +8345,145 @@ NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"AI-DOCUMENT-SOURCE-V1-FINAL"任务中写入。*
+
+---
+
+## CONTENT-CENTER-MODULE-FREEZE-01 = COMPLETED（2026-09-14）
+
+```text
+Approved visuals → governance rulings → module freeze
+Docs / governance / approved design assets only · 0 runtime code · 0 DB · 0 Directus · 0 Provider calls
+```
+
+**分支：** `review/content-center-module-freeze-01`，从 `9fdc91b` 创建，仅本地，未 push。
+
+### 一、正式文件
+
+- 视觉母版：`docs/design-reference/approved/admin-cms-content-center-v1/`（8 张 PNG + `README.md`，本模块首次纳入 Git）
+- Module Freeze：`docs/content-cms/CONTENT-CENTER-MODULE-FREEZE-V1.md`
+- 长期决策：`08-decision-log.md` **D-031 — Unified Content Center Architecture and AI Scope**（Confirmed）
+- Register：新增 §4.7（Content Center 视觉母版）与 §4.8（`CC-*` 命名空间 + 9 行模块登记）
+- Charter：E.4 / F.3 / H.4 后说明 / J 节后说明 / M.1 最小修正（去除 Content Center 的 M4 / M5 字面排期与 `product_sections` 归属误导）
+- `MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md`：Content Center 准入条件改为能力型 Gate，原条件保留为历史
+- `CLAUDE.md`：新增简短 "Content Center execution contract"
+- Implementation Blueprint：0 修改（其 L15 规定修改须记录为 Framework Decision；本模块不需要）
+
+### 二、冻结结果
+
+```text
+Approved visual folder:
+docs/design-reference/approved/admin-cms-content-center-v1/
+
+Approved visual assets:
+8 + README
+
+Desktop:
+PRIMARY / 1440 target environment
+
+375:
+implementation contract frozen
+
+Content types:
+confirmed
+
+Module topology:
+FROZEN
+
+Route intent:
+FROZEN
+
+Write boundaries:
+FROZEN
+
+Unified Content Center:
+YES
+
+Separate CMS per type:
+NO
+
+Product data ownership:
+Product Workspace
+
+product_sections used as Content Center store:
+NO
+
+posts / site_content:
+BLUEPRINT INVENTORY REQUIRED
+
+Media Library reuse:
+YES
+
+Content AI scope:
+single current Content Draft + explicit sources
+
+Existing source limits preserved:
+YES
+
+AI confidence scores:
+NOT V1
+
+AI auto publish:
+NO
+
+Manual Publish:
+YES
+
+Legal/Brand workflow:
+NOT V1
+
+Distribution / QR:
+NOT V1
+
+Numeric readiness percentage:
+NOT V1
+
+Runtime code:
+0
+
+DB schema:
+0
+
+Directus:
+0
+
+Blueprint:
+NOT STARTED
+```
+
+**模块拓扑：** `CC-00` Content Center List · `CC-01` Workspace Overview · `CC-02` Content Editor · `CC-03` Media & Relations · `CC-04` SEO & Locales · `CC-AI-01` AI Source Intake · `CC-AI-02` AI Proposal Review · `CC-05` Preview & Publish Readiness · `CC-HIST` Change History。`CC-00` 是集合列表，`CC-01` 是单条内容的 Workspace Overview。
+
+**来源上限（代码核实）：** `MAX_FILES_PER_REQUEST = 5`（`server/utils/aiTextExtraction.ts`、`utils/aiProposal.ts`）、`MAX_IMAGES_PER_ANALYSIS = 3`（D-030）；视觉中的 "13 source files selected" 为占位。
+
+### 三、已记录、未修改的历史漂移
+
+- `docs/ADMIN-CMS-SPEC.md` / `docs/OPERATIONS-HANDBOOK.md`：以 Directus 原生后台为运营界面、`posts.content_type` 旧枚举（`blog/case_study/knowledge/faq/news` 与 `insight/case-study`）、`download_assets` / `company_content` 规划——作为 Blueprint 盘点输入，不作为 Content Center 规则。SPEC 的新建 Collection 预算审批规则仍有效，Blueprint 须遵守。
+- Charter：F.3 Global Admin Shell 仍写"ADM-02 DRAFT 母版"；H.1 "截至 AI-PDF-SOURCE-01 仍未实现"一句；G.1 / I 表"唯一状态机"字面只针对产品（内容生命周期由 Blueprint 定义）。
+- Register：L795 / L1018 登记的中文 tooltip（代码已为英文 "Available after Phase 9A-2"）。
+- 本文件 §1 "当前分支 `master`" 与实际 review 分支不符（既有）。
+- `docs/design-reference/approved/admin-cms-product-workspace-v1/` 仍 untracked，与 Workspace Blueprint L254 "must be version-controlled" 不一致（既有，本模块不纳入）。
+
+### 四、验证
+
+| 检查 | 结果 |
+|---|---|
+| `git diff --check` | 通过 |
+| governance 专项测试 | 仓库无文档 / 治理专项测试 |
+| Runtime tests / build / 浏览器 | N/A — docs / design / governance-only module |
+
+### 五、边界
+
+**0 Vue · 0 路由 · 0 API · 0 DB migration · 0 Directus collection · 0 AI runtime · 0 extractor · 0 Docker · 0 产品数据 · 0 Media runtime · 0 Provider 调用 · 0 deploy · 0 push。** 8 张 PNG 未修改、未重命名。6 个历史 untracked 路径原样保留，未暂存。
+
+```text
+CONTENT-CENTER-MODULE-FREEZE-01
+=
+COMPLETED
+
+NEXT:
+CONTENT-CENTER-BLUEPRINT-01
+
+STATUS:
+NOT AUTHORIZED
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"CONTENT-CENTER-MODULE-FREEZE-01"任务中写入。*

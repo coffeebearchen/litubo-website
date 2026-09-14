@@ -314,7 +314,16 @@ Product Dossier 引入"来源审核"后的扩展方向（概念，AI 阶段另�
 
 ### Content Center
 
-**准入条件：**
+> **已由 D-031（2026-09-14，CONTENT-CENTER-MODULE-FREEZE-01）修订。** 下方原准入条件保留为历史记录，不再作为 Content Center 规划与 Draft-only 建设的前提。
+
+**现行准入（能力型 Gate）：** Approved Visual → Module Freeze → Blueprint → 明确实施授权 → Draft / Public 安全 Gate → 生产发布 Gate。
+
+- 内容类型已由用户确认（V1）：Technical Article、Application / Solution、Case Study、Resource / Download、News——同一个 Content Center 的内容类型，不是五套 CMS。
+- 真实产品生产试点只阻塞生产发布、生产上线与公开暴露，不阻塞视觉、Module Freeze、Blueprint 与 Draft-only 实现。
+- 媒体：Content Center 只引用 Media Library 资产 UUID，不建第二套媒体文件系统（D-023）。
+- 模块形态：`docs/content-cms/CONTENT-CENTER-MODULE-FREEZE-V1.md`。
+
+**原准入条件（历史，已被上文取代）：**
 1. M4 阶段核心功能全部完成（含 9C-2 + 真实产品试点）
 2. 用户确认 Content Center 所需管理的内容类型（博文、资源、页面……）
 3. 用户单独授权

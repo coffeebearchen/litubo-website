@@ -481,9 +481,9 @@ Admin CMS 分四个功能域，各有独立职责边界：
 
 | 功能域 | 主要职责 | 核心数据 | 不可越界 |
 |--------|---------|---------|---------|
-| **Product Center** | 产品记录、规格、生命周期、完整度计算 | `products`、`product_categories`、`product_spec_*`、`product_faqs` | 不直接拥有媒体文件；不管理内容模块的最终发布 |
+| **Product Center** | 产品记录、规格、生命周期、完整度计算 | `products`、`product_categories`、`product_spec_*`、`product_faqs` | 不直接拥有媒体文件；不管理 Content Center 内容的发布（产品页内容模块 `product_sections` / `product_section_items` 仍归 Product Workspace，见 D-031） |
 | **Media Library** | 媒体 UUID 唯一资产、文件治理、文件夹管理、归档 | `directus_files`、`media_file_lifecycle`、Folder Registry | 只负责文件存储与引用；不复制文件到产品 |
-| **Content Center** | 页面模块、资源（博文/案例/FAQ）、内容发布 | `product_sections`、`product_section_items`、`posts`、内容模块 | 当前侧边栏禁用；待 M4 主体完成后排期 |
+| **Content Center** | 统一内容中心（V1 内容类型：Technical Article、Application / Solution、Case Study、Resource / Download、News）；内容 Draft、结构化内容、SEO / 多语言、人工发布 | 内容存储由 `CONTENT-CENTER-BLUEPRINT-01` 定义；`posts`、`site_content` 为遗留结构，须 Blueprint 盘点，不预设归属 | 不拥有产品事实，不以 `product_sections` / `product_section_items` 作为内容存储；只通过 Relations 引用产品；媒体只引用 Media Library UUID；AI 只 Apply 到当前 Content Draft，不得发布；按 D-031 能力型 Gate 推进，不以 M4 / M5 字面排期 |
 | **Settings** | 角色、规则、站点设置、审计日志、未来 AI 配置 | `site_settings`、`site_social_links`、角色/权限 | 不管理具体产品或媒体数据 |
 
 **关键边界声明（不可违反）：**
@@ -653,7 +653,7 @@ Directus 是数据存储、媒体治理与权限基础设施，不是前端业�
 
 #### Content Center / Settings
 
-- **Content Center：** 规划中，当前侧边栏禁用；等 M5 后排期
+- **Content Center：** 模块形态已冻结（`docs/content-cms/CONTENT-CENTER-MODULE-FREEZE-V1.md`，D-031）。按能力型 Gate 推进：Approved Visual → Module Freeze → Blueprint → 明确实施授权 → Draft / Public 安全 Gate → 生产发布 Gate。视觉、Freeze、Blueprint 与 Draft-only 实现可在真实产品生产发布之前推进；生产发布与公开暴露仍受 J-10 及相关 Gate 约束。侧边栏入口当前仍禁用，未来只在现有 Admin Shell 中启用。
 - **Settings：** `pages/admin/settings.vue` — 基础已实现；等 ADM-18/19 CONFIRMED 后扩展
 
 ### F.4 不可偷跑规则（No Premature Implementation）
@@ -952,6 +952,8 @@ AI 模型供应商、费用预算、数据出境范围已由用户明确确认�
 
 **事实说明（2026-09-13）：** 单产品 AI V1 已依据逐个明确、窄范围的模块授权（2026-09-08 起）及 FD-004（2026-09-09 生效）实施，并已完成签收（见 H.1）。上述条件本身不变，不因此视为已满足；M.2 中 DG-07 / DG-08 / DG-09 / DG-15 的状态也不变。未来扩大资料格式、Provider / 数据出境、基础设施、生产部署或自动发布，仍受现有 Gate 约束。
 
+**Content AI 适用范围（D-031，2026-09-14）：** H.2 / H.3 的 `product_code` 规则与 D-021 单产品范围继续只约束 Product Workspace AI 与导入。Content Center 的 AI 范围是"当前一个 Content Draft + 明确选择 / 关联的允许来源"，复用同一 Source → 有界抽取 → Proposal → Human Review → Apply to Draft 架构，沿用现有来源上限，AI 不得发布。Content AI 施工须先完成 Content Center Blueprint 并取得单独实施授权；FD-004.2 的全部 P0 边界同样适用。H.4 中以 Product Workspace 为对象的 J-3～J-6 验收条件不是 Content AI 的准入依据；Provider、费用与数据出境（DG-07）等通用条件继续适用。
+
 ---
 
 ## I. 保留 / 重构 / 新增决策表
@@ -1017,6 +1019,8 @@ J-8   Multi-model Import Review Queue（须 H.4 前置条件全部满足 + 单�
 J-9   合格真实资料审计与真实产品 Draft 录入（真实 LT-180C 等）
 J-10  前台 CMS 联动与发布验收（含 SEO、sitemap、多语言上线验收）
 ```
+
+**Content Center（D-031，2026-09-14）：** Content Center 是按能力型 Gate 推进的独立轨道（Approved Visual → Module Freeze → Blueprint → 明确实施授权 → Draft / Public 安全 Gate → 生产发布 Gate），不插入、也不改变上面的产品线 J 顺序。J-9 真实产品录入不阻塞 Content Center 的规划与 Draft-only 建设；J-10 与生产发布 Gate 仍约束其公开发布。
 
 ---
 
@@ -1126,6 +1130,7 @@ Checkpoint 是远程备份，不等于已验收、已发布或可部署。
 | V1.1 (FD-002) | 2026-09-06 | 新增 Framework Decision FD-002 — Master Authority & Responsive Adaptation（视觉母版权威与响应式适配裁定）。裁定 VM1 两张 ADM-02 母版为 J-2 主要实施依据；P2 inbox 图片降为视觉方向参考，不得单独决定路由/数据/API/交互/移动端；English-first 优先于母版中文；J-2 右侧采用 Product Control，AI 批量导入延后至 IMP-01；PC-01/PC-02 采用 375px 卡片列表原则，其余 Workspace 模块移动端阻塞；引入工程模块 ID 与 Source Asset ID 命名空间。解决 V-0.5.1 记录的 CF-1～CF-5 五项冲突。不授权 AI、导入、真实数据或发布 | 用户 |
 | V1.1 (FD-003) | 2026-09-06 | 新增 Framework Decision FD-003 — Context-Efficient Execution（高效分层阅读规则）。设立 A/B/C 三层阅读要求：新模块/框架变化/新 Session 接手/推送前最终验收须完整阅读；同模块后续子任务只读模块相关文件；纯机械验证只读当前施工单与 diff。层级只降低重复阅读成本，不降低任何 Gate、母版、数据/API 合同、English-first 或验收标准的适用范围，不构成框架变更 | 用户 |
 | V1.1 (FD-004) | 2026-09-09 | 新增 Framework Decision FD-004 — Risk-Proportionate AI MVP Delivery（AI MVP 风险比例与最小可用闭环原则）。确认当前 AI MVP 为工业设备资料 Draft 辅助填写，非安全控制、非高风险自动决策系统，工程复杂度与测试深度须与真实业务风险成比例。设立 P0 / P1 / P2 分级：只有触及跨产品混料、猜测技术参数、凭证泄露、未经人工确认写入、自动发布、不可恢复数据破坏、失控 AI 费用循环七项核心边界的问题才构成 blocker；Redis、分布式限流、多实例一致性、企业级 quota、完美 HTTP 语义、按格式独立解析容器、npm audit 清零、未来规模化基础设施等默认进入 backlog，不得自动阻塞当前闭环。固定第一闭环为「单产品 Draft → 选择已关联资料 → AI 提议 Specifications/Functions → 人工 Accept/Edit/Reject → Apply 到同一产品 Draft」。不取消 one-product isolation、human review、Draft-only、no auto publish、凭证保护、TEST ONLY 保护、Media Library 单一媒体源、不猜测技术参数；不授权部署、master 推送、真实 AI Key、真实付费调用、自动发布或绕过人工审核 | 用户 |
+| V1.1（Content Center 最小修正） | 2026-09-14 | 依据用户授权的 `CONTENT-CENTER-MODULE-FREEZE-01` 与 D-031，最小修正会误导 Content Center 的条款：E.4 Content Center 行（去除 `product_sections` / `product_section_items` / `posts` 归属与 M4 字面排期）及 Product Center 行边界说明；F.3 Content Center 排期（去除 M5 字面排期）；H.4 后新增 Content AI 适用范围说明；J 节后新增 Content Center 能力型 Gate 说明。未新增 FD；未改变产品线 J 顺序、G.1 产品生命周期、FD-004.2 P0 边界、no auto publish 与 J-10 生产门禁 | 用户 |
 
 ### M.2 Open Decision Gates（用户待确认事项）
 
