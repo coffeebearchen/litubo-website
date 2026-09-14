@@ -15,6 +15,7 @@ describe('getFileReferences', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce({ data: [] }) // products_files
       .mockResolvedValueOnce({ data: [] }) // product_source_records
+      .mockResolvedValueOnce({ data: [] }) // content_items_files (CC-IMP-04)
     const result = await getFileReferences(TEST_UUID, fetch)
 
     expect(result.total).toBe(0)
@@ -23,8 +24,8 @@ describe('getFileReferences', () => {
     expect(result.product_count).toBe(0)
     expect(result.section_count).toBe(0)
     expect(result.source_count).toBe(0)
-    // products_files + product_source_records; no section query when no junction rows
-    expect(fetch).toHaveBeenCalledTimes(2)
+    // products_files + product_source_records + content_items_files; no section query when no junction rows
+    expect(fetch).toHaveBeenCalledTimes(3)
   })
 
   it('returns can_archive:false when products_files references exist', async () => {
@@ -37,6 +38,7 @@ describe('getFileReferences', () => {
       })
       .mockResolvedValueOnce({ data: [], meta: { filter_count: 0 } }) // product_sections
       .mockResolvedValueOnce({ data: [] }) // product_source_records
+      .mockResolvedValueOnce({ data: [] }) // content_items_files
 
     const result = await getFileReferences(TEST_UUID, fetch)
 
@@ -56,6 +58,7 @@ describe('getFileReferences', () => {
       })
       .mockResolvedValueOnce({ data: [{ id: 99 }], meta: { filter_count: 1 } })
       .mockResolvedValueOnce({ data: [] }) // product_source_records
+      .mockResolvedValueOnce({ data: [] }) // content_items_files
 
     const result = await getFileReferences(TEST_UUID, fetch)
 
@@ -76,6 +79,7 @@ describe('getFileReferences', () => {
       })
       .mockResolvedValueOnce({ data: [], meta: { filter_count: 0 } })
       .mockResolvedValueOnce({ data: [] }) // product_source_records
+      .mockResolvedValueOnce({ data: [] }) // content_items_files
 
     const result = await getFileReferences(TEST_UUID, fetch)
 
@@ -91,6 +95,7 @@ describe('getFileReferences', () => {
       .mockResolvedValueOnce({
         data: [{ id: 7, product_id: { id: 9, name: 'LT-180C Free-Fall Metal Detector' } }],
       })
+      .mockResolvedValueOnce({ data: [] }) // content_items_files
 
     const result = await getFileReferences(TEST_UUID, fetch)
 
@@ -106,6 +111,7 @@ describe('getFileReferences', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce({ data: [] })
       .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] }) // content_items_files
 
     await getFileReferences(TEST_UUID, fetch)
 
@@ -119,6 +125,7 @@ describe('getFileReferences', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce({ data: [] })
       .mockResolvedValueOnce({ data: [{ id: 8, product_id: null }] })
+      .mockResolvedValueOnce({ data: [] }) // content_items_files
 
     const result = await getFileReferences(TEST_UUID, fetch)
 

@@ -32,6 +32,8 @@
 
 **CC-IMP-03（2026-09-15）补充：** ✅ COMPLETED（LOCAL COMPLETE）——`/admin/content-center/:id/editor`：默认 locale 的 title / slug / summary 与 text / key points / FAQ / CTA 结构化 section 编辑，一次 Save 一个带 `expectedDraftRevision` 的 PATCH，409 冲突保留本地编辑，未保存离开保护。0 schema、0 media / relations、0 AI、0 Publish；未 push、未部署。NEXT：`CC-IMP-04` Media & Relations — NOT AUTHORIZED。
 
+**CC-IMP-04（2026-09-15）补充：** ✅ COMPLETED（LOCAL COMPLETE）——`/admin/content-center/:id/media-relations`：hero / inline / download 经共享 Media Library 选择器引用（已归档文件在选择器与服务端双重拒绝），产品 / 内容关系只存 id，暂存 + 一次校验保存，`getFileReferences` 计入 Content Center 引用。0 schema、0 上传、0 SEO / AI / Publish；未 push、未部署。NEXT：`CC-IMP-05` SEO & Locales — NOT AUTHORIZED。
+
 ---
 
 ## 总览
@@ -230,8 +232,9 @@ Content Center Visual Direction      ✅ APPROVED（2026-09-14）
 → CC-IMP-01 Content Foundation       ✅ COMPLETED（2026-09-14，LOCAL COMPLETE；本地开发库 schema，未 push / 未部署）
 → CC-IMP-02 List, Shell & Overview   ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；首个可见 Content Center UI，未 push / 未部署）
 → CC-IMP-03 Content Editor           ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；结构化 Draft 编辑 + 原子保存 + 冲突安全，未 push / 未部署）
-→ CC-IMP-04 Media & Relations        NEXT — NOT AUTHORIZED
-→ CC-IMP-05 … CC-IMP-10              未开始，每个模块须单独授权（顺序见 Blueprint §34）
+→ CC-IMP-04 Media & Relations        ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；Media Library 引用 + 产品 / 内容关系，未 push / 未部署）
+→ CC-IMP-05 SEO & Locales            NEXT — NOT AUTHORIZED
+→ CC-IMP-06 … CC-IMP-10              未开始，每个模块须单独授权（顺序见 Blueprint §34）
 ```
 
 #### M4-Next-6：真实产品资料录入与正式上线
@@ -303,7 +306,7 @@ AI-DOCUMENT-SOURCE-V1-PREFLIGHT      ✅ PASS WITH ARCHITECTURE DECISIONS
 → AI-IMAGE-OCR-SOURCE-01             ✅ COMPLETED（JPG / PNG / WebP 经现有隔离 document-extractor 本地 libvips + Tesseract OCR 读取可见文字；非 Vision；低置信度 [?]；每次 Analyze 最多 3 张；AI 可读 TXT / CSV / TSV / PDF / XLSX / DOCX / JPG / PNG / WebP；未部署）
 → AI-DOCUMENT-MIXED-SOURCE-BETA-01   ✅ COMPLETED（新建 TEST ONLY Draft 产品 LT-180C-MIXED-BETA-01 上 TXT / PDF / XLSX / DOCX / PNG 五来源一次真实 DeepSeek Analyze；无跨型号 / 隐藏表 / UNKNOWN 泄漏；Power supply 冲突人工选 220 V, 50 Hz；Apply 一次写入 4 条，仍为 Draft；未部署）
 → AI-DOCUMENT-SOURCE-V1-FINAL        ✅ FEATURE COMPLETE / SIGNED OFF（TXT / CSV / TSV / PDF text-layer / XLSX / DOCX / JPG / PNG / WebP OCR；一个 Proposal Engine；Human Review 必需；原始二进制不发往 Provider；Production release gates remain open — 生产发布未批准，不代表网站可上线）
-→ 后续主线转入 Content Center（M4-Next-5）：Module Freeze ✅ · Blueprint ✅ · CC-IMP-01 ✅ · CC-IMP-02 ✅ · CC-IMP-03 ✅；CC-IMP-04 NEXT — 未授权
+→ 后续主线转入 Content Center（M4-Next-5）：Module Freeze ✅ · Blueprint ✅ · CC-IMP-01 ✅ · CC-IMP-02 ✅ · CC-IMP-03 ✅ · CC-IMP-04 ✅；CC-IMP-05 NEXT — 未授权
 ```
 
 ### 禁止（M5）

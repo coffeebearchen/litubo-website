@@ -7,14 +7,23 @@ export interface FileReference {
   file_role: string | null
 }
 
+/** CC-IMP-04 — a Content Center item that links the file (any role). Internal reference protection only. */
+export interface ContentFileReference {
+  content_item_id: number
+  content_title: string
+  file_role: string | null
+}
+
 export interface ReferencesResult {
   product_count: number
   section_count: number
   source_count: number
+  content_count: number
   other_count: number
   total: number
   can_archive: boolean
   references: FileReference[]
+  content_references: ContentFileReference[]
 }
 
 export interface LifecycleRecord {
@@ -75,10 +84,29 @@ async function querySourceRecords(fileUuid: string, fetch: FetchFn): Promise<Sou
   return res.data ?? []
 }
 
+interface ContentJunctionRow {
+  id: number
+  file_role: string | null
+  content_items_id: { id: number; locales?: Array<{ locale: string; title: string | null }> | null } | null
+}
+
+/**
+ * CC-IMP-04 (Blueprint §11, P1) — a file linked to a Content Center item is in use,
+ * in every role and whatever the item's status (an archived item can be restored).
+ */
+async function queryContentItemsFiles(fileUuid: string, fetch: FetchFn): Promise<ContentJunctionRow[]> {
+  const res = await fetch<{ data: ContentJunctionRow[] }>(
+    `/items/content_items_files?filter[directus_files_id][_eq]=${fileUuid}` +
+    `&fields=id,file_role,content_items_id.id,content_items_id.locales.locale,content_items_id.locales.title&limit=500`,
+  )
+  return res.data ?? []
+}
+
 export async function getFileReferences(fileUuid: string, fetch: FetchFn): Promise<ReferencesResult> {
   const junctionRows = await queryProductsFiles(fileUuid, fetch)
   const sectionCount = await querySectionCount(junctionRows.map(r => r.id), fetch)
   const sourceRows = await querySourceRecords(fileUuid, fetch)
+  const contentRows = await queryContentItemsFiles(fileUuid, fetch)
 
   const seenProducts = new Set<number>()
   const references: FileReference[] = []
@@ -103,16 +131,30 @@ export async function getFileReferences(fileUuid: string, fetch: FetchFn): Promi
     })
   }
 
+  const contentReferences: ContentFileReference[] = []
+  for (const row of contentRows) {
+    if (!row.content_items_id) continue
+    const locales = row.content_items_id.locales ?? []
+    const title = locales.find(l => l.locale === 'en')?.title ?? locales[0]?.title ?? null
+    contentReferences.push({
+      content_item_id: row.content_items_id.id,
+      content_title: title ?? `Content item ${row.content_items_id.id}`,
+      file_role: row.file_role,
+    })
+  }
+
   const sourceCount = sourceRows.length
-  const total = junctionRows.length + sectionCount + sourceCount
+  const total = junctionRows.length + sectionCount + sourceCount + contentRows.length
   return {
     product_count: seenProducts.size,
     section_count: sectionCount,
     source_count: sourceCount,
+    content_count: new Set(contentReferences.map(r => r.content_item_id)).size,
     other_count: 0,
     total,
     can_archive: total === 0,
     references,
+    content_references: contentReferences,
   }
 }
 

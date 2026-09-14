@@ -123,6 +123,8 @@ interface RefsResult {
   total: number
   can_archive: boolean
   references: Array<{ product_id: number; product_name: string; file_role: string | null }>
+  content_count?: number
+  content_references?: Array<{ content_item_id: number; content_title: string; file_role: string | null }>
 }
 const detailRefs = ref<RefsResult | null>(null)
 const detailArchived = ref(false)
@@ -1995,12 +1997,17 @@ const selectedFileFolderIsLegacy = computed(() => {
             <template v-else>
               <p class="refs-count">
                 Referenced {{ detailRefs.total }} time(s)
-                by {{ detailRefs.product_count }} product(s)
+                by {{ detailRefs.product_count }} product(s)<template v-if="detailRefs.content_count"> and {{ detailRefs.content_count }} content item(s)</template>
               </p>
               <p class="refs-note">ALT / caption / file_role are set in product or content references and cannot be edited here</p>
               <ul v-if="detailRefs.references.length" class="refs-list">
                 <li v-for="ref in detailRefs.references" :key="`${ref.product_id}-${ref.file_role}`">
                   {{ ref.product_name }} · <code>{{ ref.file_role ?? 'media' }}</code>
+                </li>
+              </ul>
+              <ul v-if="detailRefs.content_references?.length" class="refs-list">
+                <li v-for="ref in detailRefs.content_references" :key="`content-${ref.content_item_id}-${ref.file_role}`">
+                  Content: {{ ref.content_title }} · <code>{{ ref.file_role ?? 'media' }}</code>
                 </li>
               </ul>
             </template>
@@ -2020,7 +2027,7 @@ const selectedFileFolderIsLegacy = computed(() => {
               <button
                 class="btn-lifecycle btn-archive"
                 :disabled="lifecycleWorking || !detailRefs || !detailRefs.can_archive"
-                :title="detailRefs && !detailRefs.can_archive ? 'Referenced by a product — cannot archive' : (detailRefs ? '' : 'Reference information unavailable')"
+                :title="detailRefs && !detailRefs.can_archive ? 'Referenced by a product or content item — cannot archive' : (detailRefs ? '' : 'Reference information unavailable')"
                 @click="archiveConfirm = true"
               >Archive file</button>
             </template>

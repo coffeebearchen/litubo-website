@@ -43,7 +43,7 @@ export interface ContentWorkspaceModule {
 export const CONTENT_WORKSPACE_MODULES: readonly ContentWorkspaceModule[] = [
   { key: 'overview', label: 'Overview', icon: 'overview', enabled: true },
   { key: 'editor', label: 'Content editor', icon: 'page-content', enabled: true },
-  { key: 'media-relations', label: 'Media & relations', icon: 'media-resources', enabled: false, disabledReason: 'Not built yet' },
+  { key: 'media-relations', label: 'Media & relations', icon: 'media-resources', enabled: true },
   { key: 'seo-locales', label: 'SEO & locales', icon: 'seo-locales', enabled: false, disabledReason: 'Not built yet' },
   { key: 'ai-source-intake', label: 'AI Source Intake', icon: 'ai-source-intake', enabled: false, disabledReason: 'Not built yet' },
   { key: 'ai-proposal-review', label: 'AI Proposal Review', icon: 'sources-evidence', enabled: false, disabledReason: 'Not built yet' },
@@ -56,10 +56,16 @@ export function contentEditorRoute(id: number | string): string {
   return `/admin/content-center/${encodeURIComponent(String(id))}/editor`
 }
 
+/** CC-IMP-04 — CC-03 Media & Relations. */
+export function contentMediaRelationsRoute(id: number | string): string {
+  return `/admin/content-center/${encodeURIComponent(String(id))}/media-relations`
+}
+
 /** Routes exist only for enabled modules. */
 export function contentWorkspaceModuleRoute(key: string, id: number | string): string | null {
   if (key === 'overview') return contentOverviewRoute(id)
   if (key === 'editor') return contentEditorRoute(id)
+  if (key === 'media-relations') return contentMediaRelationsRoute(id)
   return null
 }
 

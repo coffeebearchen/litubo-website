@@ -1217,8 +1217,11 @@ describe('PWS-03-R1 duplicate protection is enforced both client-side (staging) 
   })
 
   it('the picker disables an already-linked file rather than allowing a second pick', () => {
+    // CC-IMP-04 — the picker markup moved unchanged into the shared MediaLibraryPicker;
+    // the Product component still passes every staged file as linked.
     const component = repoFile('components/admin/workspace/WorkspaceMediaResources.vue')
-    expect(component).toContain(':disabled="existingFileIds.has(f.id)"')
+    expect(component).toContain(':linked-file-ids="linkedFileIds"')
+    expect(repoFile('components/admin/media/MediaLibraryPicker.vue')).toContain(':disabled="existingFileIds.has(f.id)"')
   })
 
   it('every media read/write call is scoped to the route\'s own product id, never a second hardcoded product', () => {

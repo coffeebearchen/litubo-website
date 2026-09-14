@@ -66,20 +66,22 @@ describe('ContentWorkspaceNav — mounted', () => {
     expect(wrapper.find('.cc-nav-back').attributes('href')).toBe('/admin/content-center')
   })
 
-  it('enables Overview and Content editor; future modules are disabled buttons that link nowhere', () => {
+  it('enables the built modules; future modules are disabled buttons that link nowhere', () => {
     const active = wrapper.find('[aria-current="page"]')
     expect(active.text()).toBe('Overview')
     const disabled = wrapper.findAll('button.cc-nav-item--disabled')
     expect(disabled.map(b => b.find('.cc-nav-item-label').text())).toEqual([
-      'Media & relations', 'SEO & locales', 'AI Source Intake',
+      'SEO & locales', 'AI Source Intake',
       'AI Proposal Review', 'Preview & publish readiness', 'Change history',
     ])
     for (const button of disabled) {
       expect(button.attributes('disabled')).toBeDefined()
       expect(button.text()).toContain('Not built yet')
     }
-    // Only the back link and the built Content editor module are anchors.
-    expect(wrapper.findAll('a').map(a => a.attributes('href'))).toEqual(['/admin/content-center', '/admin/content-center/5/editor'])
+    // Only the back link and the built modules are anchors.
+    expect(wrapper.findAll('a').map(a => a.attributes('href'))).toEqual([
+      '/admin/content-center', '/admin/content-center/5/editor', '/admin/content-center/5/media-relations',
+    ])
   })
 
   it('offers a disclosure toggle for narrow viewports', async () => {
@@ -146,6 +148,7 @@ describe('ContentOverview — mounted', () => {
     const modules = card('Workspace modules').findAll('li').map(li => li.text())
     expect(modules[0]).toMatch(/Overview\s*Available/)
     expect(modules[1]).toMatch(/Content editor\s*Available/)
-    expect(modules.slice(2).every(text => text.includes('Not built yet'))).toBe(true)
+    expect(modules[2]).toMatch(/Media & relations\s*Available/)
+    expect(modules.slice(3).every(text => text.includes('Not built yet'))).toBe(true)
   })
 })

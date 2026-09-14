@@ -110,12 +110,14 @@ function listFiles(dir: string): string[] {
 describe('route surface', () => {
   const adminDir = join(ROOT, 'server', 'api', 'admin', 'content-center')
 
-  it('exposes only the Draft Foundation routes', () => {
+  it('exposes only the Draft Foundation and Media & Relations (CC-IMP-04) routes', () => {
     const files = listFiles(adminDir).map(f => relative(adminDir, f).split('\\').join('/')).sort()
     expect(files).toEqual([
       '[id].get.ts',
       '[id]/locales/[locale].patch.ts',
       '[id]/locales/index.post.ts',
+      '[id]/media-relations.get.ts',
+      '[id]/media-relations.put.ts',
       'index.get.ts',
       'index.post.ts',
     ])

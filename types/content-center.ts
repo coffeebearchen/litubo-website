@@ -49,6 +49,54 @@ export interface AdminContentDraftDetail extends AdminContentDraft {
   linkCounts: AdminContentLinkCounts
 }
 
+/** CC-IMP-04 — one Media Library file linked with a role this module manages. */
+export interface AdminContentMediaLink {
+  id: number
+  directus_files_id: string
+  file_role: 'hero' | 'inline' | 'download'
+  /** `alt_<locale>` / `caption_<locale>` for the requested locale. */
+  alt: string | null
+  caption: string | null
+  language: 'all' | 'en' | 'es' | 'pt' | null
+  version_label: string | null
+  file_date: string | null
+  enabled: boolean
+  sort: number | null
+  /** Referenced by an `image` block in any locale, so it cannot be unlinked here. */
+  used_by_image_blocks: boolean
+  file: {
+    filename_download: string | null
+    title: string | null
+    type: string | null
+    filesize: number | null
+    width: number | null
+    height: number | null
+    is_public: boolean
+    archived: boolean
+  }
+}
+
+/** CC-IMP-04 — a product or content relation, with the target read from its own collection. */
+export interface AdminContentRelation {
+  id: number
+  relation_kind: 'product' | 'content'
+  sort: number | null
+  product: { id: number, name_en: string | null, product_code: string | null, status: string | null } | null
+  content: { id: number, title: string | null, content_type: string | null, status: string | null } | null
+}
+
+/** CC-IMP-04 — `GET` / `PUT /api/admin/content-center/:id/media-relations`. */
+export interface AdminContentMediaRelations {
+  item: { id: number, content_type: ContentTypeId, status: ContentItemStatus, title: string | null }
+  locale: ContentLocale
+  media: AdminContentMediaLink[]
+  /** Links owned by other modules (SEO & Locales, AI Source Intake) — counted, never changed here. */
+  preserved_role_counts: { og_image: number, source_document: number }
+  relations: AdminContentRelation[]
+  /** Fingerprint of every file link and relation row; a save must send the one it loaded. */
+  inventory_version: string
+}
+
 export interface AdminContentListItem {
   id: number
   content_type: ContentTypeId

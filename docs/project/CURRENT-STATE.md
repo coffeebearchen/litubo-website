@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             CC-IMP-01 Content Foundation + CC-IMP-01-FIX-01-R1（accepted locally by the CC-IMP-02 work order · local commit 5a8a640 · not pushed）
-Latest completed module:            CC-IMP-03 — Content Editor（LOCAL COMPLETE · awaiting controller review）
-Active authorized module:           NONE（CC-IMP-03 已收口，等待下一份授权）
+Latest completed module:            CC-IMP-04 — Media & Relations（LOCAL COMPLETE · awaiting controller review）
+Active authorized module:           NONE（CC-IMP-04 已收口，等待下一份授权）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-04 — Media & Relations
+Next candidate:                     CC-IMP-05 — SEO & Locales
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：bde24a6）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：12fe880）
 Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9045,3 +9045,100 @@ CC-IMP-04:                  NOT STARTED · NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-03"任务中写入。*
+
+---
+
+## CC-IMP-04 — Media & Relations = COMPLETED（LOCAL COMPLETE，2026-09-15）
+
+```text
+TYPE A/B — Visual UX + bounded cross-domain runtime · A2 LOCAL_IMPLEMENTATION
+CC-03 Media & Relations: Media Library references (hero / inline / download) + product / content relations
+Schema: 0 · Upload in Content Center: 0 · Second media system: 0 · SEO: 0 · AI: 0 · Publish: 0 · Public: 0 · Production: 0 · Provider calls: 0 · push: 0 · deploy: 0
+```
+
+**分支：** `review/cc-imp-04-media-relations`，从 `12fe880` 创建，仅本地。
+
+```text
+CC-IMP-04:                       COMPLETED
+Hero:                            implemented
+Inline media:                    implemented
+Downloads:                       implemented
+Product relations:               implemented
+Content relations:               implemented according to eligibility
+Archived media linking:          REJECTED
+getFileReferences:               Content references included
+Second media system:             NO
+1440:                            PASS
+375:                             PASS
+Schema:                          0
+AI:                              0
+SEO:                             0
+Publish:                         0
+Public:                          0
+```
+
+### 一、实现
+
+| 项 | 内容 |
+|---|---|
+| 路由 / 导航 | `pages/admin/content-center/[id]/media-relations.vue`；Workspace 模块栏 Overview / Content editor / Media & relations 启用，其余 5 个仍 disabled；未创建未来模块路由 |
+| BFF | `GET /api/admin/content-center/:id/media-relations`（`locale` 可选）与 `PUT` 同路径；`server/utils/contentMediaRelations.ts` |
+| 管理范围 | 本模块只管理 `hero` / `inline` / `download` 文件关联与 `product` / `content` 关系；`og_image`（CC-IMP-05）与 `source_document`（CC-IMP-08）不可提交（422），已有行保存时原样保留（只计数显示） |
+| 保存合同 | 页面提交完整期望清单 + 加载时的 `inventory_version`（全部文件关联与关系行的指纹）；服务端先整体校验：条目存在且未归档、清单未变（否则 409）、字段 allowlist（mass assignment 422）、角色合法、文件存在、**新关联文件未归档**、hero/inline 必须为图片、hero 最多一个、同一 (文件, 角色) 不重复、download 元数据（language all/en/es/pt、version ≤60、`YYYY-MM-DD`）、alt ≤250 / caption ≤300、被 image block `fileLinkId` 引用的 inline 关联不可移除、关系目标唯一且存在、非自身、content 目标未归档；任一失败 → 422（错误列表）且不写入 |
+| 写入与原子性 | 通过校验后按 id 或 (文件, 角色) / 目标匹配（重复保存收敛、不重复创建），用 Directus 批量请求按 创建 → 更新 → 删除 顺序写入（每个批量请求为一个 Directus 事务；最多 6 个请求的整体**不是**单一事务）。首个写入之后失败 → 500 `partial:true`，版本已变，页面提示重新加载；首个写入前的唯一冲突 → 409。不写 content status / blocks / 文件生命周期 / 文件可见性 |
+| Metadata | alt / caption 按请求 locale（默认 en）写 `alt_<locale>` / `caption_<locale>`，其他 locale 值保留；download 另有 language / version / date；各角色 enabled；排序按角色内顺序写 `sort`，关系按列表顺序 |
+| 已归档文件 | Picker 查询带 `archived=exclude`（服务端排除）；服务端再次拒绝新关联的已归档文件；已关联后才被归档的文件保留并显示 "Archived — replace or remove" |
+| 引用保护 | `getFileReferences` 追加查询 `content_items_files`（任何角色、任何条目状态）：`content_count`、`content_references`（条目 id、标题、角色）计入 `total`，`can_archive=false`；查询失败时抛错（不放行归档）。Media Library 详情面板显示 content 引用；单个与批量归档沿用同一函数 |
+| Media Library 复用 | Product Workspace 选择器的弹窗原样抽出为共享 `components/admin/media/MediaLibraryPicker.vue`（class / emit 不变，Product 显式传入原有提示文案与 AI-readable 说明）；加载逻辑为共享 `composables/useMediaLibraryBrowser.ts`（同一端点、`buildLibraryFilesQuery`、最新请求优先），Content 使用；Product 页面的加载代码未改（其源码级测试逐行固定，采用共享 composable 登记为 P2）。无上传、无第二文件管理器、无本地路径 |
+| 关系 | `ContentRelationPicker.vue` 读取既有 `/api/admin/products`（名称 / 代码搜索）与 `/api/admin/content-center`；只保存 id；Draft 产品 / 内容可关联并显示状态与 "not shown publicly until published"；Blueprint §12 的"仅显示已发布目标"属于公开渲染（CC-IMP-10），本模块不放宽也不提前实现；自身与已归档内容不提供，服务端再次校验；Related Resources = 目标类型 `resource_download` 的 content 关系（无新表） |
+| 页面 | `ContentMediaRelations.vue`：Hero（选择 / Replace / Remove / 详情）、Inline（卡片、↑↓、Remove；被 image section 使用时禁用）、Downloads（行、↑↓、Remove）、Related content（Link product / Link content、↑↓、Remove）、右侧 Content media summary（真实计数与保留角色计数）与 Selected asset（文件名、类型、大小、尺寸、Media UUID、归档 / 可见性、角色、alt、caption、download 元数据、enabled）；缩略图用 Media Library 预览路由，加载失败退回类型标签；无 Ready / 百分比 / AI / Preview |
+| 暂存 / 离开保护 | 所有 Select / Replace / Remove / 排序 / 元数据只改本地暂存；一次 Save = 一次 PUT；冲突或部分失败保留暂存，Keep editing / 二次确认后 Reload latest；`onBeforeRouteLeave` + `beforeunload`；头部隐藏 Refresh |
+| Structured blocks | image / related_content / downloads block 不在本模块编辑：image 仍引用 inline 关联 id（保护其不被移除），related_content / downloads 渲染关系与 download 关联（Blueprint §9）；Editor 的 block 与 revision 均不被写入 |
+
+### 二、验证
+
+| 检查 | 结果 |
+|---|---|
+| 新增测试 | `contentMediaRelations` 30（读取、hero 选择 / 替换 / 移除 / 仅一个、非图片、归档与缺失文件、保留角色、mass assignment、inline 排序与 image block 保护、download 元数据与其他 locale 保留、幂等匹配、relations 各规则、过期版本 409、归档条目 409、部分失败、写入范围、getFileReferences content / product / source / 失败闭合、页面 helper）· `ContentMediaRelations.component` 9 |
+| 回归 | `mediaLifecycle` 12（仅为新增 content 查询补 mock，产品断言不变）· `mediaLinkPicker` 57 · `WorkspaceMediaResources.component` 16 · `productWorkspaceOverview` 240（一条源码断言改为读取共享 picker）· `aiSourceFormats` 114 · `productMediaLinks` 5 · `mediaBatchArchive` 12 · `contentCenterUi` 20 · `ContentWorkspace.component` 7 · `contentEditor` 18 · `ContentEditor.component` 15 · `contentDraftService` 63 · `contentFoundationRegistries`（route surface 增加 media-relations 两个路由） |
+| 全量 `vitest run`（含 DB 集成） | **2376 passed / 45 skipped**（61 文件） |
+| `npm run typecheck` / `npm run lint` / `npx nuxt build` | 0 / 0 / Build complete |
+| 真实 BFF 负向 | 已归档 TEST ONLY 图片作 hero、已归档 TEST ONLY 文件作 download、`og_image` 角色、自身关系、PDF 作 hero、`status` mass assignment → 422；过期版本 → 409；之后条目 6 关联仍为 0、版本不变 |
+| 真实 UI 保存（条目 6） | Hero 选择器自动限定 Image 且查询含 `archived=exclude`；hero `TEST ONLY — UI PICKER VERIFICATION.png`、inline `TEST ONLY 9C1-batch-test.jpg`、download `TEST ONLY 9C1-batch-test.pdf`（version / alt）、产品 3（TEST ONLY）、内容 2（TEST ONLY case study）→ 一次 PUT 200 → reload 全部持久化，排序正确 |
+| 引用保护（真实） | hero 文件 references：`content_count 1`、`can_archive false`、content_references 指向条目 6；归档请求 → 409，文件未归档 |
+| 数据库 | 条目 6：3 条文件关联 + 2 条关系；status draft、draft_revision 5、无快照、blocks md5 不变；所选文件 `is_public` 与归档状态不变；Directus activity：files create 3 + update 1、relations create 2（均有 revisions）；关联到已归档文件 0；已发布快照 0 |
+| 离开保护 | 暂存移除关系后点 Overview / Content editor / All content：confirm=false 均留在页面且暂存保留；beforeunload 拦截；confirm=true 离开；放弃的改动未写入 |
+| Product 回归（浏览器） | `/admin/product-workspace/3/media-resources` 打开共享 picker：文件夹、staging 提示、AI-readable 说明正常，关闭后无改动；console 0 error |
+| 1440 | `scrollWidth = clientWidth = 1425`；模块栏 220、主区 575、右栏 300；越界元素 0；Inline picker 限定 Image、13 个文件、已关联 1 个禁用、已归档 TEST ONLY 文件未出现；无 Ready / 百分比 / AI Fill / Preview；console 0 error（新标签页） |
+| 375 | 375 / 375；右栏堆叠在主区下方；按钮均在视口内；Download picker 宽 343、底部 796 < 812、搜索 319、关闭按钮可见、页面仍 375；真实键盘修改 download version → 保存栏 Save → reload 显示 "All languages · TEST v2 mobile"；console 0 error |
+| 截图 | 375 picker 与 Selected asset 截图清晰（会话内交付，未入 Git）；1440 截图在 Browser 面板缩放后不可辨认，以 DOM 几何测量为证据 |
+| 发现并修正 | 缩略图最初使用 `/api/admin/asset`，一张 TEST ONLY jpg 返回 502；改为 Media Library 预览路由（200）并在加载失败时显示类型标签 |
+| Node | 24.14.0（持久 Node 22.22.2 Release Gate 仍 OPEN） |
+
+### 三、测试数据
+
+| 项 | 值 |
+|---|---|
+| Content | 条目 **6**（TEST ONLY — NOT FOR PUBLICATION CC-IMP-03 editor），draft，无快照，rev 5 未变 |
+| Hero | `2288d4ef…` TEST ONLY — NOT FOR PUBLICATION — UI PICKER VERIFICATION.png（link 1） |
+| Inline | `ec4fed56…` TEST ONLY - NOT FOR PUBLICATION - 9C1-batch-test.jpg（link 2） |
+| Download | `cee597e6…` TEST ONLY - NOT FOR PUBLICATION - 9C1-batch-test.pdf（link 3，all / TEST v2 mobile / alt "TEST ONLY download alt"） |
+| Relations | 产品 3（[TEST ONLY — NOT FOR PUBLICATION] LT-180C，draft，relation 5）；内容 2（TEST ONLY race 1，draft，relation 6） |
+| 负向用文件 | 已归档 TEST ONLY `df058914…`（png）、`e9696716…`（txt）——仅用于被拒请求，未写入 |
+
+**文档：** Register CC-03 Implementation → `AUTOMATED_CHECKED`；MASTER-ROADMAP 最小更新。Blueprint、Freeze、Decision Log、Charter、CLAUDE.md、Protocol：0 修改。
+
+**记录（P2）：** Product Workspace 页面的 picker 加载代码可改用共享 composable（当前源码级测试逐行固定，本模块未动）；公开渲染时"仅显示已发布关系目标"在 CC-IMP-10 实现；Media & Relations 多请求保存非单一事务（已如实设计为可恢复）。原登记未处理项保持不变。
+
+```text
+CC-IMP-04 MEDIA & RELATIONS:   LOCAL COMPLETE
+MEDIA LIBRARY REUSE:           PASS
+ARCHIVED MEDIA GUARD:          PASS
+REFERENCE PROTECTION:          PASS
+PRODUCT RELATIONS:             PASS
+CONTENT RELATIONS:             PASS
+FOUNDATION / EDITOR:           REGRESSION PASS
+CC-IMP-05:                     NOT STARTED · NOT AUTHORIZED
+```
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-04"任务中写入。*

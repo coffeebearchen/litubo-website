@@ -164,7 +164,7 @@ const seo = computed(() => contentSeoSummary(primary.value))
       <p class="cc-count">
         <span class="cc-count-value">{{ draft.linkCounts.relations }}</span> related records
       </p>
-      <p class="cc-card-note">Linking is done in Media &amp; relations, which is not built yet.</p>
+      <p class="cc-card-note">Linking is done in Media &amp; relations.</p>
     </section>
 
     <section class="cc-card" aria-labelledby="cc-ai-heading">
