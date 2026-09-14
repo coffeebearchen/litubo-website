@@ -57,7 +57,7 @@ If any item conflicts with the Charter, the Charter wins. If this register appea
 
 ## 3. Status vocabulary
 
-Only the following statuses may be used in this register, Current State, a work order or an implementation report.
+Only the following implementation statuses may be used in this register, Current State, a work order or an implementation report. Governance-state labels are a separate class, defined at the end of this section.
 
 | Status | Meaning |
 |---|---|
@@ -78,6 +78,17 @@ Rules:
 - A route containing unresolved visible Chinese cannot be `VISUALLY_VERIFIED` for English Admin.
 - A master shown only by a global or unrelated page cannot be marked implemented.
 - Status changes require evidence, not optimistic planning language.
+
+**Governance-state labels** (defined by `PROJECT-EXECUTION-PROTOCOL-01`, 2026-09-14). They describe the governance state of a design or scope artefact, not implementation progress, and may appear only in columns explicitly named for them (for example the `Visual` and `Module` columns of §4.8):
+
+| Label | Meaning |
+|---|---|
+| `APPROVED` | The user approved a visual direction. It is not an implementation authorization. |
+| `FROZEN` | A Module Freeze fixed scope, page responsibilities, route intent and write boundaries. It is not a data/API contract and not an implementation authorization. |
+
+- A governance label never appears in an implementation or acceptance column, and an implementation status never appears in a governance column.
+- `APPROVED` or `FROZEN` never means Definition of Ready is met.
+- Change-control note (§13): these two terms were already used in §4.8 without a definition; this adds the definition only and changes no framework, row or gate.
 
 ---
 
@@ -280,7 +291,7 @@ Content Center work orders use the `CC-*` engineering module IDs below. This ext
 
 Rules:
 
-1. **Column vocabulary.** `Visual` = `APPROVED` and `Module` = `FROZEN` are governance-state labels of the Content Center freeze (as §4.5 records "frozen"); they are not §3 implementation statuses. `Blueprint`, `Implementation` and `Acceptance` use §3 vocabulary.
+1. **Column vocabulary.** `Visual` and `Module` use the governance-state labels defined in §3 (`APPROVED`, `FROZEN`); they are not implementation statuses. `Blueprint`, `Implementation` and `Acceptance` use the §3 implementation statuses.
 2. **No code authorization.** Definition of Ready (§10.1) is `NOT MET` for every row: the data/API contract does not exist until `CONTENT-CENTER-BLUEPRINT-01` is completed and implementation is separately authorized.
 3. **Sequence.** Content Center is a capability-gated track (Approved Visual → Module Freeze → Blueprint → explicit implementation authorization → Draft/Public safety gates → production release gates; `D-031`). It does not alter Blueprint §11 or Charter §J product-line stages.
 4. **Boundaries** (`D-031`): one unified Content Center; `product_sections` / `product_section_items` stay Product Workspace-owned and are not the Content Center store; `posts` / `site_content` require Blueprint inventory; Media Library references only; Content AI is scoped to one current Content Draft on the existing Proposal Engine and never publishes; publish is a manual human action.

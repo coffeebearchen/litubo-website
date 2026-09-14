@@ -30,14 +30,23 @@ The approved visual reference images are stored outside this repository during p
 - A minimal CMS is part of the first public release: product, media, resource/blog and form-submission management. Design components against a CMS-ready adapter.
 - Node 22.22.2 (user-confirmed 2026-09-09 as this project's runtime standard; pinned in `.nvmrc` and `package.json` `engines`, and used by CI), Docker Compose and Nginx on the existing US Tencent Cloud server. Cloudflare Free sits in front for DNS, TLS, caching and basic protection; it is not a second application server.
 
+## Project execution protocol
+
+All LITUBO work follows `docs/project/PROJECT-EXECUTION-PROTOCOL.md` (lifecycle, authorization levels A0–A5, session bootstrap, STOP conditions, closeout, Git / GitHub / release layering). Templates: `docs/project/templates/MODULE-WORK-ORDER-TEMPLATE.md` and `docs/project/templates/MODULE-CLOSEOUT-TEMPLATE.md`.
+
+- New sessions bootstrap from repository state (protocol §9), never from the previous conversation.
+- Only one explicitly authorized module may be active; a roadmap "next candidate" is not an authorization.
+- Within an authorized module, execute through validation, governance closeout and local commit without step-by-step confirmation. Then STOP.
+- Push, merge and deploy each require separate explicit authorization.
+
 ## Working protocol
 
 1. Work only on the module explicitly authorized by the user.
 2. Inspect existing files and `git status` before editing. Preserve unrelated changes.
 3. Implement the smallest complete change that satisfies the module acceptance criteria.
-4. Run lint, type-check, build, and relevant responsive browser checks.
+4. Run the validation the module type requires (protocol §12); code modules also follow the Module completion checklist below.
 5. Report: changed files, result of each verification, known limitations, and the next proposed module.
-6. Make a local Git commit only when the module is accepted or the user explicitly requests it. Never push without authorization.
+6. A local Git commit is part of an authorized module's closeout (protocol §11). Never push without authorization.
 7. Keep the governing principle visible in decisions: **framework before details; make the full flow work before optimizing; modular, upgradeable, flexible, and low rework.**
 
 ## Codex–Claude 完整施工单与模块闭环规则（固定）
@@ -118,6 +127,7 @@ The approved visual reference images are stored outside this repository during p
    - `git remote -v`
    - `docker compose ps`
 3. If the live state contradicts `CURRENT-STATE.md`, stop and report — do not guess, do not patch silently.
+4. The full recovery order, and what to do when no module is authorized, is in `PROJECT-EXECUTION-PROTOCOL.md` §9.
 
 ## Language rule
 
@@ -141,7 +151,7 @@ Before any Directus collection or field change:
 
 ## Module completion checklist
 
-Every module must complete all of the following before a local commit:
+Every code module must complete all of the following before a local commit (documentation / governance modules use the risk-based validation in `PROJECT-EXECUTION-PROTOCOL.md` §12):
 - `npm run typecheck` (or `npx vue-tsc --noEmit`) — 0 errors
 - `npm run lint` — 0 errors
 - `npx nuxt build` — build passes
@@ -191,6 +201,7 @@ Before starting any Admin/CMS code or document task, read in this order:
 | Visual & Data Conformance Register V1 | Master-to-route-to-evidence contract; bound by Charter and Blueprint; records target route, shell, API, English, DoR, DoD and status per ADM module |
 | CURRENT-STATE.md | Single source for verified progress and active blockers |
 | MASTER-ROADMAP.md | Milestone tracking; does not independently alter Blueprint sequence |
+| PROJECT-EXECUTION-PROTOCOL.md | Project-wide execution control: lifecycle, authorization levels, bootstrap, closeout, Git / release layering; bound by the Charter |
 | CLAUDE.md | Sole operative task entry; reading navigation only; not a second constitution |
 
 - If Implementation Blueprint conflicts with Governing Charter → Charter governs.
@@ -215,8 +226,7 @@ Before any Content Center work, read: the approved visuals in `docs/design-refer
 - The repository's current Admin shell and navigation override incidental shell details drawn in visuals.
 - Content Center reuses the Media Library and the existing AI Source → Proposal → Human Review architecture.
 - If the repository, CURRENT-STATE, a visual, the Freeze or the Blueprint conflict: STOP and report. Do not guess.
-- Every successful authorized module: validate → update CURRENT-STATE → update the Register → update MASTER-ROADMAP only when a milestone changed → update the Decision Log only for new long-term decisions → local commit → report evidence → STOP.
-- Never begin the next module without explicit authorization.
+- Module closeout, record updates and the STOP rule follow `PROJECT-EXECUTION-PROTOCOL.md` §11.
 
 ### FD-003 reading tiers (Tier A / B / C)
 

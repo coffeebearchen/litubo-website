@@ -2,6 +2,22 @@
 
 > 本文件是新 Claude 会话的首要阅读文件。读完此文件后，再读 `docs/ADMIN-CMS-SPEC.md` 和 `docs/OPERATIONS-HANDBOOK.md`，然后执行只读 Git/Docker 核对，再开始任何实施工作。
 
+## 0. PROJECT CONTROL SNAPSHOT
+
+> **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
+
+```text
+Latest accepted module:             CONTENT-CENTER-MODULE-FREEZE-01（accepted candidate · local commit 8ee1563 · not pushed）
+Latest completed module:            PROJECT-EXECUTION-PROTOCOL-01（COMPLETED · awaiting controller review）
+Active authorized module:           NONE（PROJECT-EXECUTION-PROTOCOL-01 已收口，等待下一份授权）
+Active module authorization level:  —
+Next candidate:                     CONTENT-CENTER-BLUEPRINT-01
+Next candidate authorized:          NO
+Production release:                 NOT APPROVED
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：8ee1563）
+origin/master:                      8f2e384（本地 review 分支均未 merge / push）
+```
+
 ---
 
 ## 1. 项目身份
@@ -8487,3 +8503,68 @@ NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"CONTENT-CENTER-MODULE-FREEZE-01"任务中写入。*
+
+---
+
+## PROJECT-EXECUTION-PROTOCOL-01 = COMPLETED（2026-09-14）
+
+```text
+TYPE C — Governance / Documentation · A1 GOVERNANCE_DOCS
+0 runtime code · 0 DB · 0 Directus · 0 Provider calls · 0 push · 0 deploy
+```
+
+**分支：** `review/project-execution-protocol-01`，从 `8ee1563` 创建，仅本地，未 push。
+
+### 一、正式文件
+
+- 协议：`docs/project/PROJECT-EXECUTION-PROTOCOL.md`（ACTIVE）
+- 模板：`docs/project/templates/MODULE-WORK-ORDER-TEMPLATE.md`、`docs/project/templates/MODULE-CLOSEOUT-TEMPLATE.md`
+- 既有等价资料：仓库无已跟踪的执行协议 / 模板；未跟踪资料包中的 `01_COLLABORATION_PROTOCOL.md` 与 `05_CLAUDE_MODULE_WORK_ORDER_TEMPLATE.md` 已被协议吸收，保留为历史资料，未修改、未纳入。
+
+### 二、协议要点
+
+- **控制原则：** Repository reality first · One authorized module at a time · Safe autopilot inside module · Human Gate between modules · No silent scope expansion。
+- **Authority Model：** Reality / Governance / Current State / Module Contract（Freeze · Blueprint · Approved Visual）/ Planning / Conversation；与 Charter §C.1 / §C.2 对应，不改变其顺序。
+- **模块类型：** A Visual/UX · B Runtime/Backend/Data/AI · C Governance/Docs · D Release · E Read-only；各自生命周期与 N/A 规则。
+- **授权等级：** A0 READ_ONLY · A1 GOVERNANCE_DOCS · A2 LOCAL_IMPLEMENTATION · A3 PUSH_REVIEW_BRANCH · A4 MERGE_TO_PRIMARY · A5 PRODUCTION_DEPLOY；不可自动升级。
+- **自动驾驶：** 授权模块内自动完成至本地 commit；模块之间必须人工授权；Next Candidate ≠ 授权。
+- **Git 分层：** local commit ≠ push ≠ merge ≠ deploy；Admin/CMS 代码模块 Local Complete 不等于 Charter §O.2 DoD（其中的 push 项须 A3 授权后完成）。
+- **Session Bootstrap：** 14 步仓库恢复顺序；无授权 Active 模块时只报告不开工。
+
+### 三、同步修改
+
+- `CURRENT-STATE.md`：顶部新增 §0 PROJECT CONTROL SNAPSHOT；文末追加本节。
+- `CLAUDE.md`：新增 "Project execution protocol" 小节；Working protocol 第 4 / 6 条与协议对齐（原第 6 条"只在模块 accepted 后才本地 commit"与"Codex–Claude 施工单闭环：自动本地 commit"互相矛盾，已统一为本地 commit 属于授权模块收口）；新会话交接指向协议 §9；Module completion checklist 明确适用于代码模块；权威表新增协议行；Content Center execution contract 的收口条目改为引用协议 §11（去重）。
+- Register §3：实施状态与治理标签分列，新增 `APPROVED` / `FROZEN` 定义；§4.8 规则 1 改为引用 §3。未登记本模块（Register 只登记 Admin/CMS 模块）。
+- `MASTER-ROADMAP.md`：最小补充一行。
+- Decision Log、Charter、Implementation Blueprint、Content Center Freeze：0 修改。
+
+### 四、已记录、未修改
+
+- Blueprint §14 固定循环把 "state and milestone updates" 写在 push 之后，实际做法（CLAUDE.md checklist）是本地 commit 前更新 CURRENT-STATE；按协议 §11 执行，Blueprint 未改。
+- CURRENT-STATE §1 "当前分支 `master`" 字段过时（既有）。
+
+### 五、验证
+
+| 检查 | 结果 |
+|---|---|
+| `git diff --check` / `git diff --cached --check` | 通过 |
+| 一致性检查 | CLAUDE.md 引用路径、协议引用的仓库文件、snapshot 字段、Roadmap 下一候选、模板与协议字段均一致 |
+| governance 专项测试 | 仓库无文档 / 治理专项测试 |
+| Runtime tests / build / 1440 / 375 | N/A — governance-only |
+
+```text
+PROJECT-EXECUTION-PROTOCOL-01
+=
+COMPLETED
+
+runtime changes = 0
+
+NEXT:
+CONTENT-CENTER-BLUEPRINT-01
+
+NEXT CANDIDATE AUTHORIZED:
+NO
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"PROJECT-EXECUTION-PROTOCOL-01"任务中写入。*

@@ -22,6 +22,8 @@
 
 **CONTENT-CENTER-MODULE-FREEZE-01（2026-09-14）补充：** Content Center 视觉方向 ✅ APPROVED；Module Freeze ✅ COMPLETED（D-031，`docs/content-cms/CONTENT-CENTER-MODULE-FREEZE-V1.md`）；`CONTENT-CENTER-BLUEPRINT-01` 为 NEXT — NOT AUTHORIZED。纯文档治理：0 runtime、0 DB、0 Directus；`origin/master` 与部署状态不受影响。
 
+**PROJECT-EXECUTION-PROTOCOL-01（2026-09-14）补充：** ✅ COMPLETED——全项目施工控制协议 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` 生效（授权等级 A0–A5、模块内自动驾驶、模块间人工授权、local commit ≠ push ≠ merge ≠ deploy）。里程碑顺序不变；`CONTENT-CENTER-BLUEPRINT-01` 仍为 NEXT — NOT AUTHORIZED。
+
 ---
 
 ## 总览
