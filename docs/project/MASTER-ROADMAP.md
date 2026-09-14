@@ -277,7 +277,8 @@ AI-DOCUMENT-SOURCE-V1-PREFLIGHT      ✅ PASS WITH ARCHITECTURE DECISIONS
 → AI-DOCX-SOURCE-01                  ✅ COMPLETED（.docx 经同一有界 OOXML 读取器与共享 Office gate 读取正文可见文字；不做型号预筛，归属由 D-025 判断；AI 可读 TXT / CSV / TSV / PDF / XLSX / DOCX；未部署）
 → AI-IMAGE-OCR-SOURCE-01             ✅ COMPLETED（JPG / PNG / WebP 经现有隔离 document-extractor 本地 libvips + Tesseract OCR 读取可见文字；非 Vision；低置信度 [?]；每次 Analyze 最多 3 张；AI 可读 TXT / CSV / TSV / PDF / XLSX / DOCX / JPG / PNG / WebP；未部署）
 → AI-DOCUMENT-MIXED-SOURCE-BETA-01   ✅ COMPLETED（新建 TEST ONLY Draft 产品 LT-180C-MIXED-BETA-01 上 TXT / PDF / XLSX / DOCX / PNG 五来源一次真实 DeepSeek Analyze；无跨型号 / 隐藏表 / UNKNOWN 泄漏；Power supply 冲突人工选 220 V, 50 Hz；Apply 一次写入 4 条，仍为 Draft；未部署）
-→ AI-DOCUMENT-SOURCE-V1-FINAL        — 下一阶段，未授权
+→ AI-DOCUMENT-SOURCE-V1-FINAL        ✅ FEATURE COMPLETE / SIGNED OFF（TXT / CSV / TSV / PDF text-layer / XLSX / DOCX / JPG / PNG / WebP OCR；一个 Proposal Engine；Human Review 必需；原始二进制不发往 Provider；Production release gates remain open — 生产发布未批准，不代表网站可上线）
+→ NEXT CANDIDATE：CONTENT CENTER PLANNING / BLUEPRINT（M4-Next-5：Content Center）— 未授权
 ```
 
 ### 禁止（M5）

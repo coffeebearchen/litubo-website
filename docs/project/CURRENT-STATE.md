@@ -8107,3 +8107,241 @@ NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"AI-DOCUMENT-MIXED-SOURCE-BETA-01"任务中写入。*
+
+---
+
+## AI-DOCUMENT-SOURCE-V1-FINAL = COMPLETED / SIGNED OFF（2026-09-14）
+
+```text
+AI Document Source V1: FEATURE COMPLETE / SIGNED OFF
+Production Release: NOT APPROVED
+Final review / acceptance / governance closeout only · 0 runtime code changes · 0 real Provider calls.
+```
+
+AI Document Source V1 的最终总审查与功能签收。本模块只做核验、分级与记录，不开发、不修复、不部署。
+
+**分支：** `review/ai-document-source-v1-final`，从 `a35eee5` 创建，仅本地，未 push。
+
+### 一、V1 功能矩阵（以 `utils/aiSourceFormats.ts` 与仓库实现为准）
+
+| 格式 | Media 上传 | AI 可读 | 抽取方式 | 主要限制 |
+|---|---|---|---|---|
+| TXT / CSV / TSV | ✅ | ✅ | Nuxt 进程内 UTF-8 解码 | 8 MB；单文件 20,000 字符 |
+| PDF | ✅ | ✅（仅文字层） | 隔离 document-extractor：`pdfinfo` + `pdftotext` | 20 MB · 50 页 · 20,000 字符 · 15 s |
+| XLSX | ✅ | ✅ | 进程内有界 OOXML 流式读取（yauzl + saxes），精确 product_code 缩小 | 10 MB · 可见表 10 / 总表 50 · 5,000 行/表 · 8 s |
+| DOCX | ✅ | ✅ | 同一 OOXML 读取器 + 共享 Office gate，最终可见结构化文字 | 10 MB · 5,000 段 · 100 表 · 5 s |
+| JPG / PNG / WebP | ✅ | ✅（仅可见文字 OCR） | 同一 document-extractor：libvips 预处理 + 本地 Tesseract `eng+chi_sim` | 20 MB · 12,000 px · 50 MP · 长边 3,000 · 8,000 字符 · 原始输出 4 MB · 20 s · 置信度阈值 40 · 每次最多 3 张 |
+
+**不在 V1：** Vision、扫描 PDF OCR、DOC、XLS、DOCM、XLSM、DOTX/DOTM、GIF / SVG / TIFF / BMP / HEIC / AVIF 等其他图片格式。
+
+### 二、统一架构与安全合同（代码核验）
+
+```text
+Media Library → products_files（enabled，当前产品）→ AI Source Intake（最多 5 个来源 / 3 张图片）
+→ 有界抽取（按格式）→ ExtractedSource { displayName, fileType, text }
+→ D-025 当前产品身份 + 型号归属 guard → ONE Proposal Engine → ONE 所选 Provider
+→ ONE 合并 proposal → Human Review（Accept / Edit / Reject，冲突人工选值）→ Apply 到同一 Draft
+```
+
+- **统一合同：** `ExtractedSource` 仍只有 `displayName / fileType / text`；无按格式的独立 AI engine。
+- **Provider：** registry 只调用明确指定的一个 adapter，不替换、不 fallback；DeepSeek / OpenAI adapter 均为单次 `fetch` + 30 s 超时，0 retry。当前默认且唯一已配置：DeepSeek。
+- **D-025：** Prompt 含 `name_en`，有值时含 `product_code`；`model_or_series` 不作身份；无模糊匹配；归属不清省略；不复制其他型号的值；`[?]` 不推断。`PROMPT_CONTRACT_VERSION = 2`（OCR 未改版本）。
+- **指纹：** 含 productId、targetId、providerId、productName、productCode、promptContractVersion 与来源内容摘要；跨产品身份或合同版本不重放。
+- **预算：** `MAX_TOTAL_EXTRACTION_MS = 60,000`；Generate in-flight 窗口 `MAX_INFLIGHT_MS = 120,000`；`MAX_FILES_PER_REQUEST = 5`；`MAX_IMAGES_PER_ANALYSIS = 3`（服务端下载前计数）。
+- **并发：** PDF 与图片共用 extractor admission 队列（`MAX_ACTIVE_TASKS = 1`、`MAX_QUEUED_TASKS = 3`，第 5 个 `busy`）；XLSX 与 DOCX 共用进程内唯一 `officeExtractionGate`（1 + 3，第 5 个 `busy`），无第二个 gate。
+- **部分失败 / 全部失败：** 可读来源继续分析；无可读来源时返回固定文案，0 次 Provider 调用（引擎代码 + 各格式测试）。
+- **Apply：** 只写已接受的规格行，只写路由中的产品，且必须 `status = draft`（review / published / archived 均 409、零写入，有自动化测试）；无删除、无发布、无状态变更；replay guard 保证一个 proposal 只写一次。
+- **Media 架构：** Media Library 仍是业务文件唯一入口；产品只通过 `products_files` 引用文件；无第二套文件系统。
+
+### 三、extractor 隔离（2026-09-14 docker inspect 实测）
+
+- **document-extractor：** ReadonlyRootfs true · tmpfs `/tmp` 64 MB noexec,nosuid,nodev · User `node`（uid 1000）· CapDrop ALL · no-new-privileges · Memory 512 MB = MemorySwap · 1 CPU · Pids 64 · Mounts 无 · 只连 `document-extractor-internal`（internal=true）· 无端口 · 环境变量仅 PATH / NODE_VERSION / YARN_VERSION / NODE_ENV（无项目 secret）。子进程 `prlimit --as` 384 MB、无 core。
+- **gateway：** ReadonlyRootfs true · CapDrop ALL · no-new-privileges · 96 MB · Pids 32 · 无挂载 · 只发布 `127.0.0.1:8787`。
+- **镜像：** `litubo-document-extractor:local` 633 MB；vips 8.14.1、pdfinfo 22.12.0、tesseract 语言 chi_sim / eng / osd。
+
+### 四、Mixed-source Real Beta 证据（AI-DOCUMENT-MIXED-SOURCE-BETA-01，本 Final 未再调用 Provider）
+
+| 项目 | 结果 |
+|---|---|
+| 产品 | id 6 · `LT-180C-MIXED-BETA-01` · TEST ONLY — NOT FOR PUBLICATION |
+| 来源 | TXT / PDF / XLSX / DOCX / PNG（5 个，全部 Analyzed） |
+| Provider | DeepSeek · Analyze 1 · 成功 1 · retry 0 · fallback 0 · 第二次 Analyze 0 |
+| 安全事实 | Aperture 180 mm · Rated power 0.45 kW · Net weight 45 kg |
+| 冲突 | Power supply 220 V, 50 Hz vs 380 V, 50 Hz，未被自动解决；人工选择 220 V, 50 Hz |
+| 陷阱 | 其他型号泄漏 NO · 隐藏表泄漏 NO · UNKNOWN / NOT VERIFIED / [?] 推断 NO |
+| Apply | 1 次 · 写入 4 条 · 会话清除 · 无重放 |
+
+**本 Final 复核（已登录新标签页，只读）：**
+- 产品 6：`draft` · `published_at = null` · `seo_noindex = true`；规格恰为 Aperture = 180 mm、Rated power = 0.45 kW、Net weight = 45 kg、Power supply = 220 V, 50 Hz（无重复、无陷阱值）。
+- 5 个 TEST ONLY 文件仍关联产品 6 且 enabled；未删除。
+- 管理端 `status=published` 查询：0 个产品（共 4 个产品）。
+- 产品 3 / 4 / 5：状态、`date_updated`、规格组数与条数与 Beta 前基线一致，且 0 个 Beta 文件关联。
+- Beta 中字节损坏的 XLSX（`cf2acb3b…`）：lifecycle `archived = true`（2026-09-14T05:58:09Z），引用 0，可恢复，未永久删除。归类为 Beta 操作产物，不是 AI Source 功能缺陷。
+
+### 五、Draft / 公开隔离与数据出境（证据强度分级）
+
+| 项目 | 结论 | 证据类型 |
+|---|---|---|
+| TEST ONLY 产品为 Draft | ✅ | 真实（管理 API） |
+| 已发布查询不含该产品 | ✅ | 真实（管理 API `status=published`） |
+| sitemap 只取已发布 | ✅ | 代码（`server/routes/sitemap.xml.ts` 过滤 `status = published` 且 `seo_noindex != true`）+ 早期模块真实验证（本文件第 607 行："Draft 撤回：分类列表消失、详情 404、sitemap 排除"）。**仓库中没有 sitemap 或公开 CMS 产品路由的自动化测试。** |
+| 公开产品路由排除 Draft | ✅（代码） | `server/api/cms/products/**` 均按 `status = published` 过滤；本地 dev 公开 CMS 读取 Directus 返回 401，本地 smoke 不具证明力 |
+| 外部搜索引擎提交 | 0 | — |
+| 原始 PDF / XLSX / DOCX / 图片 → Provider | NO | 实现（只有 `ExtractedSource.text` 进入 Provider 输入）+ 自动化出站测试（`aiPdfSource` / `aiXlsxSource` / `aiDocxSource` / `aiImageSource`，真实 adapter + stub fetch） |
+
+```text
+Draft state and publication filtering are verified.
+Public-route isolation is additionally supported by the publication-gate implementation (no dedicated automated test exists).
+A live public sitemap fetch against production was NOT performed.
+A production public-route test was not performed.
+Binary non-egress is supported by implementation + automated outbound tests;
+the one paid Beta request body itself was not independently captured.
+```
+
+### 六、验证（Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | 首次与真实容器回归、build 并发运行：**1 failed / 2141 passed / 45 skipped**（仅截取汇总，失败用例名未保存）；**无并发负载单独重跑：2142 passed / 45 skipped（51 个文件）** |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | Build complete |
+| 真实容器（顺序运行） | PDF 18 / 18 · 图片 OCR 27 / 27 · 结束后 `/tmp` 为空 |
+| 构建产物 | Node 22.22.2 运行 `.output/server/index.mjs`，只监听 127.0.0.1:3001，日志仅 `Listening`；无 cookie：`/`、`/admin/login`、`/admin` 200，受保护页面 302 → `/admin/login`，AI sources / providers API 401 |
+| Windows `nuxt dev` | 3000 端口进程实测 v22.22.2；build 后首次启动出现已知 `#app-manifest`，干净重启后 0 服务端错误；无 cookie 路由无 500 |
+
+**浏览器 smoke（管理员会话中途过期一次，用户重新登录后在全新标签页完成；0 Analyze / 0 Apply / 0 Save）：**
+- **1440px：** `/admin`（→ `/admin/products`，1425 = 1425）、`/admin/media`（1440 = 1440，上传 accept 为 9 种格式）、AI Source Intake（5 张卡全部可选、`0 / 5 selected`）、AI Proposal Review（空态）、Specifications（4 条值正确）、Media & resources（1 asset / 4 documents，Save 禁用）；均无横向溢出，console 0 error。
+- **375px：** 以上 6 个路由均 `scrollWidth = clientWidth = 375`，console 0 error。
+
+### 七、发现分级
+
+**P0：NONE · P1：NONE**
+
+**P2（记录，不阻塞）：**
+1. XLSX 列方向缩小时，当前型号列左侧的其他型号列会作为描述上下文保留（D-028，归属由 D-025 与人工审核）。
+2. DOCX 不输出列表编号；垂直合并单元格续行为空单元格。
+3. Media picker 类型筛选无 Word / Spreadsheet 专用项。
+4. 图片 OCR 不重建表格截图 / 多栏版面结构。
+5. `POST /products/:id/media` 与 `ai/sources` 不检查文件归档状态（MEDIA-AI-LINK-PICKER-01-R1 已记录）。
+6. 仓库中没有 sitemap / 公开 CMS 产品路由 publication gate 的自动化测试。
+7. `npm test` 在与真实容器回归、build 并发运行时出现 1 次失败（未保留用例名），无负载重跑全部通过；可能存在负载敏感测试。
+8. build 后首次 `nuxt dev` 的 `#app-manifest` 报错（既有，重启消失）。
+9. 文档债：Charter H.1 "截至 AI-PDF-SOURCE-01 仍未实现"一句、Register AI-01 证据列、MASTER-ROADMAP 第 238 行 "First single-product AI beta NEXT" 均滞后；本文件部分历史数字（归档文件数、失败码合同表"预留"标注）已过时。按施工单，本模块未修改 Charter / Register。
+
+**Accepted V1 Limitations：**
+- **PDF：** 仅文字层；无扫描 PDF OCR；任何加密 PDF 返回 `encrypted`。
+- **XLSX：** 无 XLS / XLSM；不重算公式；只支持简单数字格式；型号编码须含字母与数字才缩小；进程内无 OS 级内存上限。
+- **DOCX：** 无 DOC / DOCM；不读页眉页脚、批注、脚注尾注、嵌入 Office / OLE；altChunk / subDoc 整份拒绝；无页码 / 段落 provenance；无确定性型号章节过滤；进程内无 OS 级内存上限。
+- **Image：** 只做 OCR，不做 Vision；不理解技术图纸；不做物体识别；手写不保证；任意角度旋转不保证（只按 EXIF 转正，无 OSD）；表格截图不结构化重建。
+- **通用：** 4–5 个来源时单来源字符份额降为 15,000 / 12,000，超出整份拒绝；无冻结 Source Snapshot 与逐条 provenance；限流与重放为单实例内存状态。
+
+### 八、Open Release Gates（不阻塞功能签收）
+
+| Gate | 状态 | 说明 |
+|---|---|---|
+| Persistent Node 22.22.2 environment | OPEN | PATH 上为 Node 24.14.0，fnm 为 18.20.8；验证所用 22.22.2 为旧会话 Temp 便携版（`.nvmrc` 与 `engines` 已固定 22.22.2） |
+| Production RAM / CPU capacity | OPEN | extractor 镜像 633 MB，容器 512 MB / 1 CPU；生产服务器容量未核实 |
+| Native dependency license review | OPEN | Poppler、util-linux、libvips、Tesseract 及 eng / chi_sim 模型仅记录包内声明 |
+| Container / native package CVE review | OPEN | 未做正式扫描；npm audit 在当前镜像源不可用 |
+| Production extractor topology | OPEN | 生产 Nuxt 为宿主进程还是容器尚未确定（gateway vs 内网直连） |
+| Production public-route / sitemap smoke | OPEN | 未对生产执行；本地公开 CMS 读取 401 |
+
+另：部署、push、`origin/master` 更新仍须单独授权；CH-DG-07 / CH-DG-08、BP-DG-06 / BP-DG-11 状态不变。
+
+### 九、Decision Log / 治理
+
+- **D-031：不新增。** 理由：本模块是状态签收，不是新的架构决定；V1 的格式、统一引擎、Human Review、二进制不出境与限制已由 D-024 ~ D-030 冻结；Charter B.2 / Register §13 均不要求为功能签收新增 decision；"功能完成 ≠ 生产发布"在 FD-004.7、BP-DG-15、J-11 已有依据。
+- **Charter / Register：** 0 修改（格式状态以 D-024 + 共享合同 + 本文件为准；滞后措辞列入 P2 文档债）。
+- **MASTER-ROADMAP：** 最小同步。
+
+### 十、边界
+
+**0 新 AI 可读格式 · 0 真实 Provider 调用 · 0 API 费用 · 0 产品数据写入 · 0 Media 写入 · 0 DB / Directus schema · 0 runtime / parser / Provider adapter / prompt 改动 · 0 Docker 改动 · 0 push · 0 deploy。**
+
+`.claude/launch.json` 验收期间临时加入 Node 22 dev 与构建产物启动配置，已还原，与 HEAD 一致。6 个历史 untracked 路径原样保留。
+
+---
+
+```text
+AI-DOCUMENT-SOURCE-V1-FINAL
+=
+COMPLETED / SIGNED OFF
+
+AI Document Source V1:
+FEATURE COMPLETE
+
+Production Release:
+NOT APPROVED
+
+Supported AI-readable:
+TXT
+CSV
+TSV
+PDF text-layer
+XLSX
+DOCX
+JPG OCR
+PNG OCR
+WebP OCR
+
+Vision:
+NO
+
+Scanned PDF OCR:
+NO
+
+Human Review:
+REQUIRED
+
+Auto-publication:
+NO
+
+Original binary documents/images to text Provider:
+NO
+
+Mixed-source real Beta:
+PASS
+
+Real Provider Beta calls:
+1
+
+Retry:
+0
+
+Fallback:
+0
+
+Cross-model leakage:
+NO
+
+Unknown inference:
+NO
+
+Human-reviewed Apply:
+PASS
+
+Draft/Public isolation:
+feature gate verified
+production public smoke still open
+
+P0 / P1:
+NONE
+
+Open Release Gates:
+Persistent Node 22.22.2 environment
+Production RAM/CPU capacity
+Native dependency license review
+Container/native package CVE review
+Production extractor topology
+Production public-route/sitemap smoke
+
+NEXT CANDIDATE:
+CONTENT CENTER PLANNING / BLUEPRINT
+
+STATUS:
+NOT AUTHORIZED
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"AI-DOCUMENT-SOURCE-V1-FINAL"任务中写入。*
