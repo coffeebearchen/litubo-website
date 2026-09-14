@@ -279,8 +279,8 @@ Content Center work orders use the `CC-*` engineering module IDs below. This ext
 
 | `CC-*` ID | Module | Visual basis | Route intent | Visual | Module | Blueprint | Implementation | Acceptance |
 |---|---|---|---|---|---|---|---|---|
-| `CC-00` | Content Center List | None single-authoritative: existing Product Center collection/list pattern (`/admin/products`) + `CC-FLOW-01-FUNCTIONAL-FLOW-D1440` | `/admin/content-center` | `APPROVED` (flow) | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
-| `CC-01` | Workspace Overview | `CC-VIS-01-CONTENT-CENTER-OVERVIEW-D1440` | `/admin/content-center/:id/overview` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-00` | Content Center List | None single-authoritative: existing Product Center collection/list pattern (`/admin/products`) + `CC-FLOW-01-FUNCTIONAL-FLOW-D1440` | `/admin/content-center` | `APPROVED` (flow) | `FROZEN` | `FROZEN` | `AUTOMATED_CHECKED` | `NOT_STARTED` |
+| `CC-01` | Workspace Overview | `CC-VIS-01-CONTENT-CENTER-OVERVIEW-D1440` | `/admin/content-center/:id/overview` | `APPROVED` | `FROZEN` | `FROZEN` | `AUTOMATED_CHECKED` | `NOT_STARTED` |
 | `CC-02` | Content Editor | `CC-VIS-02-CONTENT-EDITOR-D1440` | `/admin/content-center/:id/editor` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
 | `CC-03` | Media & Relations | `CC-VIS-03-MEDIA-RELATIONS-D1440` | `/admin/content-center/:id/media-relations` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
 | `CC-04` | SEO & Locales | `CC-VIS-04-SEO-LOCALES-D1440` | `/admin/content-center/:id/seo-locales` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
@@ -297,6 +297,7 @@ Rules:
 4. **Boundaries** (`D-031`): one unified Content Center; `product_sections` / `product_section_items` stay Product Workspace-owned and are not the Content Center store; `posts` / `site_content` require Blueprint inventory; Media Library references only; Content AI is scoped to one current Content Draft on the existing Proposal Engine and never publishes; publish is a manual human action.
 5. **Cross-references updated by this change** (§13): Charter §E.4 / §F.3 / §H.4 note / §J note / §M.1; Decision Log `D-031`; `CURRENT-STATE.md`; `MASTER-ROADMAP.md`; `MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md` Content Center entry conditions. Implementation Blueprint: no change. Compatibility / rollback: documentation only, no runtime consequence.
 6. **Implementation modules** (Content Center Blueprint §34, `CONTENT-CENTER-BLUEPRINT-01`, 2026-09-14): `CC-00` + `CC-01` → `CC-IMP-02`; `CC-02` → `CC-IMP-03`; `CC-03` → `CC-IMP-04`; `CC-04` → `CC-IMP-05`; `CC-05` → `CC-IMP-06`; `CC-HIST` → `CC-IMP-07`; `CC-AI-01` → `CC-IMP-08`; `CC-AI-02` → `CC-IMP-09`. `CC-IMP-01` (foundation, backend-only) and `CC-IMP-10` (public delivery) have no row here and are tracked in `CURRENT-STATE.md`. All ten are `NOT_STARTED` and not authorized.
+7. **CC-IMP-02 update (2026-09-15).** `CC-00` and `CC-01` were implemented by the authorized `CC-IMP-02` work order (list, Create Draft, Content Workspace shell and module rail, read-only Overview; Admin shell entry enabled). Automated checks and Claude's 1440 / 375 browser verification passed (evidence in `CURRENT-STATE.md`); the rows stay `AUTOMATED_CHECKED` until the Controller / user accepts that evidence, following the existing rule that runtime provenance is not proven by a local session. All other `CC-*` rows are unchanged.
 
 ---
 

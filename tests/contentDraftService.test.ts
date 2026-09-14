@@ -13,6 +13,7 @@
 import { randomUUID } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  countContentLinks,
   createContentDraft,
   createLocaleDraft,
   getContentDraft,
@@ -38,6 +39,7 @@ class FakeDirectus {
   items = new Map<number, Row>()
   locales = new Map<number, Row>()
   files = new Map<number, Row>()
+  relations = new Map<number, Row>()
   writes: Array<{ method: string, path: string }> = []
   /** Simulates a pre-check that read before a concurrent request committed. */
   staleSlugReads = false
@@ -89,6 +91,16 @@ class FakeDirectus {
       if (q('filter[id][_eq]')) rows = rows.filter(r => r.id === Number(q('filter[id][_eq]')))
       if (q('filter[content_type][_eq]')) rows = rows.filter(r => r.content_type === q('filter[content_type][_eq]'))
       if (q('filter[status][_eq]')) rows = rows.filter(r => r.status === q('filter[status][_eq]'))
+      const localesOf = (id: number) => [...this.locales.values()].filter(l => l.content_items_id === id)
+      if (q('filter[locales][_some][locale][_eq]')) {
+        rows = rows.filter(r => localesOf(r.id).some(l => l.locale === q('filter[locales][_some][locale][_eq]')))
+      }
+      const titleTerm = q('filter[_or][0][locales][_some][title][_icontains]')
+      const slugTerm = q('filter[_or][1][locales][_some][slug][_icontains]')
+      if (titleTerm !== null || slugTerm !== null) {
+        const has = (value: unknown, term: string | null) => term !== null && String(value ?? '').toLowerCase().includes(term.toLowerCase())
+        rows = rows.filter(r => localesOf(r.id).some(l => has(l.title, titleTerm) || has(l.slug, slugTerm)))
+      }
       rows.sort((a, b) => String(b.date_created).localeCompare(String(a.date_created)))
       const limit = Number(q('limit') ?? 100)
       const page = Number(q('page') ?? 1)
@@ -132,6 +144,16 @@ class FakeDirectus {
       this.assertLocaleUnique(next, id)
       this.locales.set(id, next)
       return { data: { id } }
+    }
+
+    if (url.pathname === '/items/content_relations' && method === 'GET' && q('aggregate[count]') === '*') {
+      const itemId = Number(q('filter[content_items_id][_eq]'))
+      return { data: [{ count: String([...this.relations.values()].filter(r => r.content_items_id === itemId).length) }] }
+    }
+
+    if (url.pathname === '/items/content_items_files' && method === 'GET' && q('aggregate[count]') === '*') {
+      const itemId = Number(q('filter[content_items_id][_eq]'))
+      return { data: [{ count: String([...this.files.values()].filter(r => r.content_items_id === itemId).length) }] }
     }
 
     if (url.pathname === '/items/content_items_files' && method === 'GET') {
@@ -226,6 +248,54 @@ describe('create and read drafts', () => {
     expect(news.data.map(i => i.content_type)).toEqual(['news'])
     await expectStatus(listContentDrafts(db.fetch, { content_type: 'blog' }), 422)
     await expectStatus(listContentDrafts(db.fetch, { status: 'live' }), 422)
+  })
+
+  it('CC-IMP-02: searches title and slug across locale drafts, case-insensitively', async () => {
+    const a = await create({ title: `${TEST_TITLE} Powder guide`, slug: 'test-only-alpha' })
+    const b = await create({ title: `${TEST_TITLE} Other`, slug: 'test-only-beta-powder' })
+    await create({ title: `${TEST_TITLE} Unrelated`, slug: 'test-only-gamma' })
+    const byTitle = await listContentDrafts(db.fetch, { search: 'GUIDE' })
+    expect(byTitle.data.map(i => i.id)).toEqual([a.id])
+    const both = await listContentDrafts(db.fetch, { search: ' powder ' })
+    expect(both.data.map(i => i.id).sort()).toEqual([a.id, b.id].sort())
+    expect(both.total).toBe(2)
+    const blank = await listContentDrafts(db.fetch, { search: '   ' })
+    expect(blank.total).toBe(3)
+  })
+
+  it('CC-IMP-02: encodes the search term instead of letting it add query parameters', async () => {
+    const seen: string[] = []
+    const spy = (async (path: string, options?: Record<string, unknown>) => {
+      seen.push(path)
+      return db.fetch(path, options as never)
+    }) as unknown as typeof db.fetch
+    await listContentDrafts(spy, { search: 'a&filter[status][_eq]=published' })
+    const url = new URL(seen[0], 'http://directus.local')
+    expect(url.searchParams.get('filter[status][_eq]')).toBeNull()
+    expect(url.searchParams.get('filter[_or][0][locales][_some][title][_icontains]')).toBe('a&filter[status][_eq]=published')
+  })
+
+  it('CC-IMP-02: filters by an existing locale draft and rejects unknown or oversized filters', async () => {
+    const withEs = await create()
+    await createLocaleDraft(db.fetch, withEs.id, { locale: 'es', title: TEST_TITLE, slug: 'test-only-es-filter' })
+    await create()
+    const es = await listContentDrafts(db.fetch, { locale: 'es' })
+    expect(es.data.map(i => i.id)).toEqual([withEs.id])
+    expect((await listContentDrafts(db.fetch, { locale: 'en' })).total).toBe(2)
+    await expectStatus(listContentDrafts(db.fetch, { locale: 'zh' }), 422)
+    await expectStatus(listContentDrafts(db.fetch, { search: 'x'.repeat(101) }), 422)
+    await expectStatus(listContentDrafts(db.fetch, { search: ['a', 'b'] }), 422)
+  })
+
+  it('CC-IMP-02: counts real media links and relations for one item only', async () => {
+    const draft = await create()
+    const other = await create()
+    expect(await countContentLinks(db.fetch, draft.id)).toEqual({ media: 0, relations: 0 })
+    db.files.set(1, { id: 1, content_items_id: draft.id, file_role: 'hero' })
+    db.files.set(2, { id: 2, content_items_id: other.id, file_role: 'hero' })
+    db.relations.set(1, { id: 1, content_items_id: draft.id, relation_kind: 'content' })
+    expect(await countContentLinks(db.fetch, draft.id)).toEqual({ media: 1, relations: 1 })
+    expect(db.writes).toHaveLength(2)
   })
 })
 

@@ -3,6 +3,7 @@ import type { AdminUser } from '~/types/product-cms'
 
 const user = ref<AdminUser | null>(null)
 const router = useRouter()
+const route = useRoute()
 const menuOpen = ref(false)
 
 // Refresh interval: 10 min (Directus access token expires at ~15 min)
@@ -111,13 +112,18 @@ function closeMenu() {
           </svg>
           Product Center
         </NuxtLink>
-        <span class="nav-item nav-item--disabled" title="Available after Phase 9A-2">
+        <NuxtLink
+          to="/admin/content-center"
+          class="nav-item"
+          :class="{ 'nav-item--active': route.path.startsWith('/admin/content-center') }"
+          @click="closeMenu"
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
           </svg>
           Content Center
-        </span>
+        </NuxtLink>
         <NuxtLink to="/admin/media" class="nav-item" active-class="nav-item--active" @click="closeMenu">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="2" />

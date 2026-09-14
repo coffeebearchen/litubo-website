@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CONTENT-CENTER-BLUEPRINT-01 + REVIEW-FIX-01（accepted for implementation · local commit 56752a6 · not pushed）
-Latest completed module:            CC-IMP-01-FIX-01-R1 — Atomic Draft Revision Guard（LOCAL COMPLETE · awaiting controller review）
-Active authorized module:           NONE（CC-IMP-01-FIX-01-R1 已收口，等待下一份授权）
+Latest accepted module:             CC-IMP-01 Content Foundation + CC-IMP-01-FIX-01-R1（accepted locally by the CC-IMP-02 work order · local commit 5a8a640 · not pushed）
+Latest completed module:            CC-IMP-02 — List, Workspace Shell & Overview（LOCAL COMPLETE · awaiting controller review）
+Active authorized module:           NONE（CC-IMP-02 已收口，等待下一份授权）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-02 — List, Workspace Shell & Overview
+Next candidate:                     CC-IMP-03 — Content Editor
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：22bdc63）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：5a8a640）
 Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -8864,3 +8864,93 @@ CC-IMP-02: NOT STARTED · NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-01-FIX-01-R1"任务中写入。*
+
+---
+
+## CC-IMP-02 — List, Workspace Shell & Overview = COMPLETED（LOCAL COMPLETE，2026-09-15）
+
+```text
+TYPE A — Visual / UX + bounded runtime integration · A2 LOCAL_IMPLEMENTATION
+First visible Content Center UI: CC-00 List + Content Workspace Shell + CC-01 Overview
+Schema: 0 · AI: 0 · Publish: 0 · Public frontend: 0 · Production: 0 · Provider calls: 0 · push: 0 · deploy: 0
+```
+
+**分支：** `review/cc-imp-02-list-workspace-overview`，从 `5a8a640` 创建，仅本地。
+
+```text
+CC-IMP-02:                  COMPLETED
+List:                       implemented
+Admin Content Center nav:   enabled
+Workspace shell:            implemented
+Overview:                   implemented
+Create Draft:               implemented
+1440:                       PASS
+375:                        PASS
+console:                    PASS
+horizontal overflow:        NONE
+runtime code:               YES
+schema:                     0
+AI:                         0
+Publish:                    0
+Public frontend:            0
+Provider calls:             0
+Production:                 0
+```
+
+### 一、实现
+
+| 项 | 内容 |
+|---|---|
+| 全局导航 | `layouts/admin.vue`：原禁用占位 `<span>`（title "Available after Phase 9A-2"）改为 `NuxtLink → /admin/content-center`，在 `/admin/content-center/**` 下高亮；主菜单仍为 Product Center / Content Center / Media Library / Settings，未新增任何菜单 |
+| 路由 | `pages/admin/content-center/index.vue`（CC-00 列表）· `new.vue`（Create Draft，静态路由优先于 `[id]`）· `[id]/index.vue`（裸 id → `navigateTo(/overview, replace)`）· `[id]/overview.vue`（CC-01）；无 `[id].vue` 父路由，未来 7 个模块页面均未创建 |
+| 列表 | 沿用 Product Center 列表模式：标题 + 副标题 + `+ New content`；搜索（title / slug，300 ms 防抖）+ Type / Status / Language 过滤 + Clear filters；URL 查询与状态双向同步；桌面表格（Title/slug、Content type、Status、Languages、Last updated、Open），≤1023px 卡片列表；loading / error+Retry / 首条空态 "No content yet. Create your first draft." / 过滤空态；分页 25 条 |
+| Create Draft | 独立页面（与 `/admin/products/new` 一致）：Content type（选项来自 `CONTENT_TYPES` 注册表）、Title、Slug、Summary（可选）；前端只检查必填，slug 格式 / 保留字 / 唯一性仍由 BFF + 数据库裁定并原样显示；400 / 401（含 Sign in 链接）/ 403 / 404 / 409 / 422 / 5xx / 网络错误均有英文可见提示，字段错误显示在对应字段；成功后跳转 `/admin/content-center/:id/overview` |
+| Workspace Shell | 新组件 `components/admin/content/ContentWorkspaceShell.vue`（面包屑、标题、状态、Back to Content Center、Refresh）与 `ContentWorkspaceNav.vue`（← All content、记录身份、8 个模块按冻结顺序；仅 Overview 可用，其余 7 个为 disabled 按钮 + 可见 "Not built yet"，不链接任何路由；≤767px 折叠为 Modules 手风琴）。复用 `StatusBadge`、`WorkspaceNavIcon` 与 Product Workspace 的布局 / 间距模式；Product Workspace 组件未修改（其 shell 含产品专属 Preview / Save 操作，泛化需要改动 Product UI，故新建 Content 专属组件） |
+| Overview | `ContentOverview.vue`（只读、无请求、无表单控件）：Content identity（默认语言 title / slug / summary）· Content type（注册表允许的 section 类型）· Lifecycle（状态、Created / Last updated（UTC）、draft revision、First published）· Readiness = "Not available yet" · Language status（EN/ES/PT：Not started / Draft / Published / Published · unpublished changes，按 Blueprint §8.1 由 `published_revision` 推导）· Structured content（真实 block 数与类型）· SEO status（SEO title / meta description 有无、canonical 覆盖、noindex）· Media & relations（真实行数）· AI-assisted content = "AI workflow not configured" · Workspace modules（Available / Not built yet）。无百分比、分数、置信度、假 AI、假业务数据 |
+| 共享 helper | `utils/contentCenter.ts`：路由、模块注册表、标签、列表查询解析 / 构造、API 错误解释、创建请求体、Overview 汇总（全部来自注册表或 BFF 真实字段） |
+| BFF 最小扩展 | `GET /api/admin/content-center`：新增 `locale`（allowlist，`filter[locales][_some][locale][_eq]`，未知 → 422）与 `search`（trim、≤100 字符、单字符串，URL 编码后作为 `_or` 的 title / slug `_icontains`，超长或数组 → 422）。`GET /api/admin/content-center/:id`：附加 `linkCounts { media, relations }`（`countContentLinks`，Directus `aggregate[count]`，只读）。未新增路由，未改动 create / locale / save 路由与 revision guard |
+| 类型 | `types/content-center.ts`：`AdminContentLinkCounts`、`AdminContentDraftDetail` |
+
+### 二、验证
+
+| 检查 | 结果 |
+|---|---|
+| 定向测试 | `contentCenterUi` 20 · `ContentCenterList.component` 5 · `ContentCreateForm.component` 6 · `ContentWorkspace.component` 7 · `contentDraftService` 63（+4：search 含大小写与编码注入、locale 过滤与 422、link counts）· `contentBlocks` 41 · `contentFoundationRegistries` 14 → 156 通过 |
+| 全量 `vitest run`（含 DB 集成，`CONTENT_DB_TEST_CONTAINER`） | **2304 passed / 45 skipped**（57 文件）；revision guard 真实 PostgreSQL 集成 6 项通过 |
+| `npm run typecheck` / `npm run lint` | 0 / 0 |
+| `npx nuxt build` | Build complete |
+| `git diff --check` | 0 错误 |
+| 真实 BFF（已登录会话，只读 GET） | 列表 4→5 条；`search=race` → [2]；`search=CAS` → [5]；`search=verify` → [4,2,1]；`locale=es` → [1]；`locale=pt` → []；`content_type=news` → [4]；`status=published` → []；`search=verify&locale=es` → [1]；编码注入 `a&filter[status][_eq]=published` → [] 且未变成状态过滤；`locale=zh` / 101 字符 search / `content_type=blog` → 422；`/5` → 200 + `linkCounts {0,0}`；`/999999` → 404；`/abc` → 400 |
+| 浏览器功能 | `/admin/content-center/5` → `/5/overview`；`/999999/overview`、`/abc/overview` → "Content not found"（不进入空 Overview）；`/new` 渲染创建表单（未被 `[id]` 遮蔽）；Create Draft：重复 slug → POST 409 显示在 slug 字段；`new` → 422 "reserved slug"；唯一 slug → 201 并跳转 `/6/overview`；列表 UI 搜索 / Language / Type / Status 过滤、URL 同步、过滤空态、Clear filters、URL 入站过滤均正常 |
+| 1440 | 列表：`scrollWidth = clientWidth = 1440`，表格显示、卡片隐藏，Content Center 导航高亮；Overview：`scrollWidth = clientWidth = 1425`（含纵向滚动条），卡片 3 列 × 285 px，模块栏 220 px，越界元素 0，栏内唯一链接为 `/admin/content-center`，7 个 disabled 模块 |
+| 375 | 列表：`scrollWidth = clientWidth = 375`，表格隐藏、卡片显示，New content 343 px、搜索与 3 个过滤 311 px 堆叠，全局抽屉按钮可见，越界元素 0；Overview：375 / 375，卡片单列 343 px，模块手风琴 Modules / Hide modules 可展开 8 项，长标题与 slug 折行不越界，头部两个操作按钮等高 |
+| console | 最终验收在修改后新开的标签页（tab-3）进行：1440 与 375 下 0 error（仅 vite debug 与 Suspense info）；早期标签页中的 `ERR_CONNECTION_REFUSED` 来自 dev server 重启，不计入 |
+| 截图 | 375 列表 / Overview 截图清晰，仅作为会话内证据，未写入 Git；1440 截图在 Browser 面板中缩放后不可辨认（面板不支持区域裁剪），1440 以 DOM 几何测量为证据（与既有先例一致） |
+| dev server | 首次启动出现已知 P2 `#app-manifest`（`.nuxt` 与 typecheck 共用），干净重启后消失；验收结束已停止 |
+| Node | 24.14.0（持久 Node 22.22.2 Release Gate 仍 OPEN） |
+
+### 三、测试数据
+
+| ID | 标题 | 状态 | 公开快照 | TEST ONLY |
+|---|---|---|---|---|
+| 1 | TEST ONLY — NOT FOR PUBLICATION A v2（+ ES） | draft | 无 | 是 |
+| 2 | TEST ONLY — NOT FOR PUBLICATION race 1 | draft | 无 | 是 |
+| 4 | TEST ONLY — NOT FOR PUBLICATION B | draft | 无 | 是 |
+| 5 | TEST ONLY — NOT FOR PUBLICATION Concurrent A r3 | draft | 无 | 是 |
+| **6（本模块新建）** | TEST ONLY — NOT FOR PUBLICATION CC-IMP-02 UI create（slug `cc-imp-02-ui-create-2sxq57`，en rev 1，5 blocks） | draft | 无 | 是 |
+
+数据库核对：`content_items` 共 5 行；`published_snapshot` 非空的 locale 行 0。
+
+**文档：** Register CC-00 / CC-01 Implementation 更新；MASTER-ROADMAP 最小更新。Blueprint、Freeze、Decision Log、Charter、CLAUDE.md、Protocol：0 修改。
+
+**未处理（保持原登记）：** Product AI Apply 缺口、公开媒体代理归档检查、posts 数据、Directus schema 缓存行为、持久 Node 22 环境、公开权限；Register §12.1 English-first 台账中关于 `layouts/admin.vue:114` 旧 tooltip 的历史行未改写（该 tooltip 已随导航启用移除）。
+
+```text
+CC-IMP-02 LIST:            ACCEPTED LOCALLY（candidate）
+WORKSPACE SHELL:           ACCEPTED LOCALLY（candidate）
+OVERVIEW:                  ACCEPTED LOCALLY（candidate）
+CONTENT FOUNDATION:        REGRESSION PASS
+CC-IMP-03:                 NOT STARTED · NOT AUTHORIZED
+```
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-02"任务中写入。*

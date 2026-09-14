@@ -38,6 +38,17 @@ export interface AdminContentDraft {
   locales: AdminContentLocaleDraft[]
 }
 
+/** CC-IMP-02 — real row counts shown read-only on the CC-01 Overview. */
+export interface AdminContentLinkCounts {
+  media: number
+  relations: number
+}
+
+/** CC-IMP-02 — `GET /api/admin/content-center/:id`: the draft plus its link counts. */
+export interface AdminContentDraftDetail extends AdminContentDraft {
+  linkCounts: AdminContentLinkCounts
+}
+
 export interface AdminContentListItem {
   id: number
   content_type: ContentTypeId

@@ -7,6 +7,7 @@ import { CONTENT_LOCALES, DEFAULT_CONTENT_LOCALE, isContentLocale, type ContentL
 import { getContentType, isContentTypeId } from '../../utils/contentTypes'
 import type {
   AdminContentDraft,
+  AdminContentLinkCounts,
   AdminContentList,
   AdminContentListItem,
   AdminContentLocaleDraft,
@@ -50,6 +51,7 @@ const SEO_DESCRIPTION_MAX = 320
 const CANONICAL_PATH_MAX = 255
 const LIST_LIMIT_MAX = 100
 const LIST_LIMIT_DEFAULT = 25
+const LIST_SEARCH_MAX = 100
 const ITEM_STATUSES: readonly ContentItemStatus[] = ['draft', 'published', 'archived']
 
 const ITEM_READ_FIELDS = ['id', 'content_type', 'status', 'first_published_at', 'archived_at', 'date_created', 'date_updated'] as const
@@ -251,6 +253,23 @@ export async function getContentDraft(fetch: FetchFn, itemId: number): Promise<A
   }
 }
 
+/**
+ * CC-IMP-02 — real link counts for the CC-01 Overview (read-only). Media links
+ * and relations are managed in CC-IMP-04; the Overview only reports how many
+ * rows exist for this item.
+ */
+export async function countContentLinks(fetch: FetchFn, itemId: number): Promise<AdminContentLinkCounts> {
+  const count = async (collection: string): Promise<number> => {
+    const res = await fetch<{ data: Array<{ count: number | string }> }>(
+      `/items/${collection}?filter[content_items_id][_eq]=${itemId}&aggregate[count]=*`,
+    )
+    const value = Number((res.data ?? [])[0]?.count ?? 0)
+    return Number.isFinite(value) ? value : 0
+  }
+  const [media, relations] = await Promise.all([count('content_items_files'), count('content_relations')])
+  return { media, relations }
+}
+
 export async function listContentDrafts(fetch: FetchFn, query: Record<string, unknown>): Promise<AdminContentList> {
   const page = Math.max(1, Number.parseInt(String(query.page ?? '1'), 10) || 1)
   const limit = Math.min(LIST_LIMIT_MAX, Math.max(1, Number.parseInt(String(query.limit ?? LIST_LIMIT_DEFAULT), 10) || LIST_LIMIT_DEFAULT))
@@ -262,6 +281,23 @@ export async function listContentDrafts(fetch: FetchFn, query: Record<string, un
   if (query.status !== undefined && query.status !== '') {
     if (!ITEM_STATUSES.includes(query.status as ContentItemStatus)) fail(422, 'Unknown status filter.')
     filters.push(`filter[status][_eq]=${query.status}`)
+  }
+  // CC-IMP-02 — "has a draft in this locale" and a title/slug search across the
+  // item's locale drafts. Both are allowlisted/bounded and URL-encoded values;
+  // Directus parameterizes them.
+  if (query.locale !== undefined && query.locale !== '') {
+    if (!isContentLocale(query.locale)) fail(422, 'Unknown locale filter.')
+    filters.push(`filter[locales][_some][locale][_eq]=${query.locale}`)
+  }
+  if (query.search !== undefined) {
+    if (typeof query.search !== 'string') fail(422, 'search must be a single string.')
+    const term = query.search.trim()
+    if (term.length > LIST_SEARCH_MAX) fail(422, `search must be at most ${LIST_SEARCH_MAX} characters.`)
+    if (term.length > 0) {
+      const value = encodeURIComponent(term)
+      filters.push(`filter[_or][0][locales][_some][title][_icontains]=${value}`)
+      filters.push(`filter[_or][1][locales][_some][slug][_icontains]=${value}`)
+    }
   }
   const fields = ['id', 'content_type', 'status', 'date_created', 'date_updated', 'locales.locale', 'locales.title', 'locales.slug', 'locales.draft_revision'].join(',')
   const res = await fetch<{ data: AdminContentListItem[], meta?: { filter_count?: number } }>(
