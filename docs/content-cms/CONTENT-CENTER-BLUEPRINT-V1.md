@@ -2,6 +2,7 @@
 
 > **Status:** FROZEN FOR IMPLEMENTATION — content, block, media, relation, SEO, locale, AI target, draft/publish, preview and public-delivery contracts.
 > **Produced by:** `CONTENT-CENTER-BLUEPRINT-01` (TYPE C, A1, user-authorized, 2026-09-14). Long-term decision: `D-032`.
+> **Revised by:** `CONTENT-CENTER-BLUEPRINT-01-REVIEW-FIX-01` (Controller review clarifications, 2026-09-14: database slug uniqueness, proposal binding, `block:new` identity, in-memory proposal expiry).
 > **Runtime effect:** none. No collection, migration, route, component, API, permission, AI or media change is made or authorized by this document. Each implementation module in §34 needs its own work order.
 
 ---
@@ -242,7 +243,7 @@ Not V1 data: focus terms, social title, social description (OG uses SEO title/de
 ## 14. Slug / canonical
 
 - **Format:** `^[a-z0-9]+(?:-[a-z0-9]+)*$`, ≤ 100 chars.
-- **Unique scope:** (`locale`, `slug`) across all content types, so a slug never changes meaning when a type's route changes. Enforced by the BFF before save and re-checked at Publish; a composite database unique index is a P2 hardening item.
+- **Unique scope:** (`locale`, `slug`) across all content types, so a slug never changes meaning when a type's route changes. **The database-level unique constraint/index on (`locale`, `slug`) is the final authority** (P1, created and tested in CC-IMP-01), because an application pre-check cannot prevent concurrent races. The BFF keeps a friendly duplicate pre-check before save and at Publish, and maps a database uniqueness violation to the same 409 field error. The same slug in another locale is allowed; a different content type does not bypass the constraint.
 - **Reserved:** `new`, `index`, `preview`, `draft`, `edit`, `admin`, `api`, `search`, `page`, `all`.
 - **Collision:** 409 with a field error; no auto-suffixing.
 - **After publish:** the slug is locked once the locale has `first_published_at` (unpublish, archive and restore do not unlock). V1 has **no slug redirect history** (limitation, P2). Changing a published URL requires a new item.
@@ -273,7 +274,7 @@ Not V1 data: focus terms, social title, social description (OG uses SEO title/de
 
 ## 17. AI target model
 
-**One engine, generalized subject.** The engine is refactored to take a subject `{ kind: 'product' | 'content', id, locale?, identity, resolveSources }`, keeping the product path's behavior and outputs identical. Fingerprint, replay guard, sourceRef payload and rate-limit keys use `kind:id` (plus locale for content). Proposals remain in the existing in-memory replay guard.
+**One engine, generalized subject.** The engine is refactored to take a subject `{ kind: 'product' | 'content', id, locale?, identity, resolveSources }`, keeping the product path's behavior and outputs identical. Fingerprint, replay guard, sourceRef payload and rate-limit keys use `kind:id` (plus locale for content). Proposals remain in the existing in-memory replay guard in V1; binding, expiry and restart behaviour are fixed in §18.
 
 **Target `content-draft`** (`server/utils/aiTargets/contentDraftTarget.ts`), declared with the shared `TargetDefinition` contract, zod `.strict()` output validation, leakage and echo checks tuned for longer prose.
 
@@ -283,6 +284,7 @@ Proposal item contract (model output → validated → server-held proposal):
 |---|---|
 | target domain | `content` |
 | target record | `content_items.id` + `locale` (from the server-side subject, never from model output) |
+| proposal item id | `proposalItemId` — stable and unique within the proposal, assigned by the server when the validated output is stored; identifies each change for Human Review and Apply, including each individual `block:new` |
 | target path | `field:title` \| `field:summary` \| `field:seo_title` \| `field:seo_description` \| `block:<id>` \| `block:new` |
 | operation | `set` (fields) \| `replace` (existing block data) \| `insert` (new block of an allowed type, appended) |
 | existing value | captured by the server from the working copy at analysis time |
@@ -302,14 +304,39 @@ Not AI-proposable in V1: slug, canonical, noindex, content type, status, media l
 | `field:seo_title` set | `content_item_locales.seo_title` | ≤ 120 |
 | `field:seo_description` set | `content_item_locales.seo_description` | ≤ 320 |
 | `block:<id>` replace | element with that `id` in `blocks` | same type; block schema; block must exist |
-| `block:new` insert | appended to `blocks` | type allowed for the content type; block schema; `image` blocks not insertable by AI |
+| `block:new` insert (one per `proposalItemId`) | appended to `blocks` in the order stored in the server-held proposal; the **server generates the new block UUID** at Apply | type allowed for the content type; block schema; `image` blocks not insertable by AI; the client never supplies the final block id |
 
 Apply contract:
 - One PATCH to the locale row per Apply (all accepted items together), setting `last_change_kind = ai_apply` and `draft_revision + 1`.
-- Preconditions: Administrator; item not archived; locale row exists; `draft_revision` equals the revision captured at analysis (409 `stale` otherwise); proposal not expired or already applied.
-- **Every submitted change must match a target path and operation present in the server-held proposal output**; a human-edited value may differ only in value, never in target (closes the known gap for this target).
+- Preconditions: Administrator; item not archived; locale row exists; `draft_revision` equals the revision captured at analysis; proposal available, not expired and not already applied.
+- **Every submitted change must match a proposal item in the server-held proposal output.** The request identifies accepted items by `proposalItemId` only. Human Review may accept or reject an item, or edit its proposed value (field string or block `data`, re-validated); it may never change `target`, `operation`, `subject`, `locale` or `proposalItemId`, which are always taken from the server-held proposal.
 - Apply writes the working copy only — never `published_snapshot`, `status` or publish fields — and never calls Publish.
 - Idempotent through the existing replay guard state machine; the single PATCH makes Apply all-or-nothing.
+
+#### Proposal binding — mandatory acceptance contract for CC-IMP-09
+
+Each content proposal is bound server-side when it is stored to: `subject.kind` (`content`), `subject.id`, `locale`, the `draft_revision` read at analysis, the proposal item set (every `proposalItemId` with its target and operation), the source content fingerprint, `PROMPT_CONTRACT_VERSION`, and the authenticated admin user (existing replay-guard binding).
+
+Apply must prove that the `proposalRef` belongs to the same content item and locale addressed by the authenticated request's route. A proposal for Content A can never be applied to Content B, and a proposal for one locale never to another.
+
+**Error convention (fixed, following the existing AI apply routes):** `409` — proposal not found, expired, already applied or being applied; subject, locale, target, operation or `proposalItemId` mismatch; `draft_revision` changed. `400` — unreadable or schema-invalid request body. `422` — an edited proposed value fails field or block validation. No rejection writes anything.
+
+#### `block:new` identity
+
+- Every proposed insert has its own `proposalItemId`; several `block:new` items stay one-to-one and are never matched by array position.
+- Review may edit the proposed block `data` only.
+- Apply processes accepted inserts in the deterministic order stored in the proposal, appends each after the existing blocks, generates each new block UUID on the server, and returns the mapping `proposalItemId → new block id`.
+
+#### In-memory proposal expiry, restart and replay-guard loss (V1)
+
+- Proposals and the replay guard stay in process memory; no proposal collection is added. A durable multi-instance proposal store remains P2.
+- Server restart, TTL expiry (existing 2-hour apply window) or replay-guard eviction make the proposal unavailable: Apply fails safely with `409`, the Draft is not modified, nothing is reconstructed automatically, and the UI tells the user to Analyze again.
+- `proposalRef` is a lookup handle and **not an authentication credential**. Safety rests on admin authentication + proposal subject binding + proposal target binding + `draft_revision` + replay/expiry validation.
+- Because proposal state is ephemeral, the readiness "unapplied AI proposal" check (§21) is a best-effort soft warning and never a Publish blocker.
+
+#### Pre-existing Product AI debt — not inherited
+
+The Product AI Apply route binds `proposalRef` to the admin user and product (`claimApply`), but does not verify submitted changes against the stored proposal output, and Product generate has no Draft gate. This is **pre-existing cross-domain debt** (§35), not changed by this Blueprint or its review fix. Content Center must not inherit it: the `content-draft` Apply implements the full binding above. When CC-IMP-08 / CC-IMP-09 generalize the Proposal Engine, the Product AI regression tests must pass — Product target, D-025 Product Model Guard, source limits, replay behaviour and Apply behaviour. If a shared server-side binding would change Product AI runtime behaviour, that change must be listed explicitly in the implementation work order, never added implicitly.
 
 Proposals are never persisted to content collections, never public, never in the sitemap or public API; nothing changes before Apply.
 
@@ -360,7 +387,7 @@ Deterministic checklist computed server-side per (item, locale) by `server/utils
 | Item not archived | `seo_title` or `seo_description` empty (fallback used) |
 | Title present; summary present | No OG image (hero fallback) |
 | Slug valid, not reserved, unique for the locale | No relations |
-| Blocks valid against the registry; type-required blocks present (§7) | An unapplied AI proposal exists for this locale in this session scope |
+| Blocks valid against the registry; type-required blocks present (§7) | An unapplied AI proposal may exist for this locale (best-effort: proposal state is in memory and may already be gone; never a Publish blocker) |
 | Hero media present when the type requires it | `noindex` is on |
 | Every referenced file exists, is linked, not archived and `is_public` | Other site-published locales not started |
 | `resource_download`: ≥ 1 enabled download file | Unpublished changes exist (informational) |
@@ -422,7 +449,7 @@ Every BFF write uses an explicit field allowlist (no mass assignment) and verifi
 | Collection | New / reuse | Purpose | Ownership | Key fields | Relations | Indexes / unique | Lifecycle impact | Public access (`nuxt-server`) |
 |---|---|---|---|---|---|---|---|---|
 | `content_items` | New | Locale-neutral identity and lifecycle | Content Center | `content_type`, `status`, `first_published_at`, `archived_at` | — | index `status`, `content_type` | Holds item status | Read `id`, `content_type` only; filter `status = published` |
-| `content_item_locales` | New | Working copy + published snapshot per locale | Content Center | §6.1 | M2O item | unique (`content_items_id`, `locale`); index (`locale`, `slug`) + BFF uniqueness | Holds snapshots | Read `id`, `content_items_id`, `locale`, `slug`, `published_snapshot`, `published_at` only; filter `published_snapshot` not null **and** `content_items_id.status = published` |
+| `content_item_locales` | New | Working copy + published snapshot per locale | Content Center | §6.1 | M2O item | unique (`content_items_id`, `locale`); **database unique (`locale`, `slug`)** — final authority — plus BFF friendly pre-check | Holds snapshots | Read `id`, `content_items_id`, `locale`, `slug`, `published_snapshot`, `published_at` only; filter `published_snapshot` not null **and** `content_items_id.status = published` |
 | `content_items_files` | New (junction) | Media Library references with role | Content Center (files stay Media Library) | §11 | M2O item, M2O `directus_files` | unique (item, file, role) | none | **None** (snapshot carries public file refs) |
 | `content_relations` | New | Product / content references | Content Center (products stay Product Center) | §12 | M2O item, M2O products, M2O item | unique (item, kind, target) | none | **None** (snapshot carries target ids) |
 | `directus_files`, `media_file_lifecycle` | Reuse | Files and archive state | Media Library | — | — | — | — | Unchanged (`/api/cms/media` proxy) |
@@ -482,12 +509,13 @@ Public BFF (CC-IMP-10), `nuxt-server` token:
 | Stale / archived media | Archived or private file served | Link rejects archived; publish requires `is_public` + not archived; proxy archived check | Link archived → 422; proxy archived → 404 |
 | Public source leakage | Internal documents downloadable | `source_document` role never in snapshot or DTO; junction not readable by `nuxt-server` | Snapshot builder excludes role; permission test |
 | AI direct publish | Unreviewed publication | Publish handlers not reachable from AI/Apply code; Apply writes working copy only | Apply never changes snapshot/status; AI modules do not import publish handlers |
-| Slug collision | Wrong page served / overwrite | (locale, slug) uniqueness at save and publish; reserved words; lock after first publish | Duplicate slug → 409; locked slug edit → 422 |
+| Slug collision | Wrong page served / overwrite | Database unique constraint on (locale, slug) as final authority + BFF pre-check at save and publish; reserved words; lock after first publish | Sequential duplicate → 409; concurrent duplicate attempts → exactly one succeeds; same slug in another locale allowed; another content type does not bypass; locked slug edit → 422 |
 | Locale leakage | Untranslated or unapproved locale exposed | Publish requires locale in `publishedLocales`; no fallback | ES snapshot with ES unpublished site-wide → not served |
 | Unauthorized publish | Non-admin publish | Administrator middleware + CSRF | Unauthenticated / wrong origin → 401 / 403 |
 | Mass assignment | Client sets status/snapshot/revision | Field allowlists; lifecycle fields only via action routes | PATCH with `status` / `published_snapshot` ignored or 422 |
 | IDOR / cross-record access | Editing another item's rows | Ownership check on every child row | Child row of item B via item A route → 403 |
-| AI apply tampering | Arbitrary writes via Apply | Submitted changes must match server-held proposal targets; stale revision check | Unknown target / changed revision → 409 |
+| Apply integrity / proposal binding | Arbitrary or cross-record writes via Apply | Proposal bound server-side to subject, locale, draft revision, item set, source fingerprint, prompt version and admin; client may only accept, reject or edit values; server generates new block ids (§18) | Content A proposal applied to B → 409; wrong locale → 409; modified target / operation / `proposalItemId` → 409; changed revision → 409; several `block:new` map one-to-one; Draft unchanged after every rejection |
+| Proposal / session persistence | Proposal lost after restart or expiry, then reconstructed, replayed or applied to a changed Draft | In-memory store with TTL; unavailable proposal → safe 409, no write, no reconstruction, UI asks to Analyze again; `proposalRef` is not a credential; readiness warning is best-effort only (§18) | Expired proposal → Apply 409; proposal missing after restart (fresh replay guard) → 409; wrong content id / locale → 409; Draft unchanged in each case; readiness never blocks on proposal state |
 
 ## 32. Test matrix
 
@@ -495,7 +523,7 @@ Public BFF (CC-IMP-10), `nuxt-server` token:
 |---|---|---|---|---|
 | Type & block registry | schema accept/reject, limits, unknown type | — | — | CC-IMP-01 |
 | Item / locale CRUD | allowlist mapper | create, save with revision, 409 stale | IDOR, mass assignment, auth | CC-IMP-01 |
-| Slug | format, reserved | uniqueness, lock after publish | — | CC-IMP-01 / 05 |
+| Slug | format, reserved | DB unique (locale, slug): sequential duplicate 409, concurrent attempts → one succeeds, other locale allowed, other type does not bypass; lock after publish | — | CC-IMP-01 / 05 |
 | Media references | role rules | link/unlink, archived rejected, duplicate 409 | getFileReferences counts content | CC-IMP-04 |
 | Relations | kind/target rules | self/duplicate rejected | render only published targets | CC-IMP-04 / 10 |
 | Locales | structure copy | no fallback | locale not site-published not served | CC-IMP-05 / 10 |
@@ -505,7 +533,7 @@ Public BFF (CC-IMP-10), `nuxt-server` token:
 | Archive / restore | transitions | snapshots cleared on restore | archived not public | CC-IMP-07 |
 | History | event derivation | revisions read scoped to item | — | CC-IMP-07 |
 | AI sources & target | subject generalization (product regression), guard included, fingerprint | eligibility incl. archived, limits 5/3 | cross-item sourceRef rejected | CC-IMP-08 |
-| AI apply | mapping table | target match, stale 409, replay idempotent | never touches snapshot/status | CC-IMP-09 |
+| AI apply | mapping table; `block:new` identity and server-generated block ids | subject / locale / target / operation / item binding → 409; expired or missing (restart) proposal → 409; stale revision → 409; replay idempotent; Product AI regression suite | never touches snapshot/status; Draft unchanged on every rejection | CC-IMP-09 |
 | Public delivery | DTO allowlist | list/detail, 503 on failure | Draft / archived / proposal / source leakage; sitemap filtering | CC-IMP-10 |
 
 ## 33. 1440 / 375 acceptance
@@ -518,7 +546,7 @@ Not started, not authorized. Each module needs its own work order (protocol §10
 
 | ID | Name | Scope | Dependencies | Write surface | Recommended model | Visual | Required tests |
 |---|---|---|---|---|---|---|---|
-| **CC-IMP-01** | Content Foundation | 4 collections (snapshot + backup), type / block / role registries, readiness-free admin BFF: create item + default locale, read, save working copy with revision, slug rules, allowlists, ownership | Collection approval in its work order | Directus schema, `server/api/admin/content-center/**`, `server/utils/content*`, `utils/content*`, types, tests | Opus 5 · High | N/A | registry, CRUD contract, IDOR, mass assignment, slug |
+| **CC-IMP-01** | Content Foundation | 4 collections (snapshot + backup), type / block / role registries, readiness-free admin BFF: create item + default locale, read, save working copy with revision, slug rules, allowlists, ownership | Collection approval in its work order | Directus schema, `server/api/admin/content-center/**`, `server/utils/content*`, `utils/content*`, types, tests | Opus 5 · High | N/A | registry, CRUD contract, IDOR, mass assignment, slug incl. DB unique (locale, slug) and concurrent duplicate |
 | **CC-IMP-02** | List, Workspace Shell & Overview | `CC-00` list/search/filter/create, Content Workspace shell + module rail, `CC-01` Overview (summaries), enable Content Center item in existing Admin shell | CC-IMP-01 | admin pages/components | Sonnet 5 · High | Product Center list pattern + `CC-FLOW-01`; `CC-VIS-01` | component, API list, 1440/375 |
 | **CC-IMP-03** | Content Editor | `CC-02` title/summary/blocks editing and ordering | CC-IMP-02 | editor components, block BFF validation | Opus 5 · High | `CC-VIS-02` | block schema round-trip, stale revision, 1440/375 |
 | **CC-IMP-04** | Media & Relations | `CC-03` Media Library picker links, roles, alt/caption; product/content relations; `getFileReferences` extension; archived-link rejection | CC-IMP-03 | junction BFF, `mediaLifecycle.ts` | Opus 5 · High | `CC-VIS-03` | reference protection, archived, duplicates, relation rules, 1440/375 |
@@ -526,7 +554,7 @@ Not started, not authorized. Each module needs its own work order (protocol §10
 | **CC-IMP-06** | Preview, Readiness & Publish | `CC-05` admin preview renderer, readiness checklist, publish/unpublish with snapshot | CC-IMP-04, CC-IMP-05 | publish BFF, snapshot builder, renderer components | Opus 5 · High | `CC-VIS-05` | readiness, snapshot exclusion, idempotency, preview isolation, 1440/375 |
 | **CC-IMP-07** | Archive, Restore & Change History | archive/restore actions; `CC-HIST` read-only timeline from revisions | CC-IMP-06 | lifecycle BFF, history API/UI | Sonnet 5 · High | `PW-VIS-09-CHANGE-HISTORY-D1440` pattern | transitions, event derivation, 1440/375 |
 | **CC-IMP-08** | Content AI Target & Source Intake | engine subject generalization (no product regression), `content-draft` target, attribution guard + prompt version bump, content source resolver with archived exclusion, `CC-AI-01` UI | CC-IMP-04, CC-IMP-05 | `server/utils/ai*`, content AI routes, intake UI | Opus 5 · High | `CC-AI-01-SOURCE-INTAKE-D1440` | product AI regression suite, eligibility, limits, fingerprint, 1440/375; real provider calls only if separately authorized |
-| **CC-IMP-09** | AI Proposal Review & Apply | `CC-AI-02` review UI, conflicts, apply mapping with proposal-match and stale checks | CC-IMP-08 | content apply BFF, review UI | Opus 5 · High | `CC-AI-02-PROPOSAL-REVIEW-D1440` | mapping, tamper, stale, never-publish, 1440/375 |
+| **CC-IMP-09** | AI Proposal Review & Apply | `CC-AI-02` review UI, conflicts, apply mapping with proposal-match and stale checks | CC-IMP-08 | content apply BFF, review UI | Opus 5 · High | `CC-AI-02-PROPOSAL-REVIEW-D1440` | mapping, proposal binding (subject / locale / target / item), `block:new` identity, expiry / restart, stale, never-publish, Product AI regression, 1440/375 |
 | **CC-IMP-10** | Public Delivery & Sitemap | public content API, `nuxt-server` permissions, media proxy archived check, confirmed routes per type, sitemap, legacy `posts` coexistence | CC-IMP-06 (CC-IMP-07 recommended); user route decisions (§35) | public BFF, pages, sitemap, Directus permissions | Opus 5 · High | existing public design system; routes per IA | leakage suite, sitemap, locale, 503, public 1440/375 |
 
 First candidate: **CC-IMP-01**.
@@ -541,17 +569,19 @@ First candidate: **CC-IMP-01**.
 |---|---|---|
 | 1 | Explicit approval of 4 new collections; schema snapshot + backup | CC-IMP-01 |
 | 2 | Directus revisions enabled/retained for content collections | CC-IMP-01 |
-| 3 | Slug uniqueness per locale in BFF (save + publish) | CC-IMP-01 / 05 |
+| 3 | Database unique constraint on (`locale`, `slug`) created and tested, including concurrent duplicates; BFF friendly pre-check kept | CC-IMP-01 (UI messaging in CC-IMP-05) |
 | 4 | `getFileReferences` counts `content_items_files`; archived files cannot be linked | CC-IMP-04 |
 | 5 | Snapshot builder excludes `source_document`; publish requires `is_public` + not archived | CC-IMP-06 |
 | 6 | Engine subject generalization without Product AI behavior change | CC-IMP-08 |
 | 7 | Content source resolver excludes archived files; generate refuses archived items | CC-IMP-08 |
-| 8 | Apply verifies submitted changes against server-held proposal targets | CC-IMP-09 |
+| 8 | **Mandatory acceptance contract:** proposal subject / locale / target / item binding, `block:new` identity with server-generated block ids, safe expiry and restart behaviour (§18) | CC-IMP-09 |
 | 9 | `nuxt-server` column/row permissions configured and verified by test (not inferable from snapshots today) | CC-IMP-10 |
 | 10 | Public media proxy checks archived state | CC-IMP-10 |
 | 11 | Plain-text block rendering (no `v-html`) | CC-IMP-06 / 10 |
 
-**P2 — registered backlog:** slug redirect history; composite database unique index for (locale, slug); multi-instance proposal/rate-limit store; locale block-structure sync; AI relation and media-metadata suggestions; focus terms / social title / social description fields; scheduled publishing; version list/compare/rollback; signed preview links; `posts` migration and deprecation; `site_content` future; Product-side gaps (archived check in product AI sources and `POST /products/:id/media`, product preview noindex, published product edits going live immediately); stale docs listed in §28; `SECTION_TYPES` code/schema drift (products).
+**P2 — registered backlog:** slug redirect history; durable multi-instance proposal/rate-limit store; locale block-structure sync; AI relation and media-metadata suggestions; focus terms / social title / social description fields; scheduled publishing; version list/compare/rollback; signed preview links; `posts` migration and deprecation; `site_content` future; Product-side gaps (archived check in product AI sources and `POST /products/:id/media`, product preview noindex, published product edits going live immediately); stale docs listed in §28; `SECTION_TYPES` code/schema drift (products).
+
+**Pre-existing cross-domain debt (registered, not fixed here):** Product AI Apply does not verify submitted changes against the stored proposal output, and Product generate has no Draft gate (§18). Content Center does not inherit it; any Product AI runtime change needs its own explicit work-order scope, and CC-IMP-08 / CC-IMP-09 must pass the Product AI regression suite.
 
 **OPEN — USER DECISION REQUIRED** (block only CC-IMP-10, not earlier modules):
 

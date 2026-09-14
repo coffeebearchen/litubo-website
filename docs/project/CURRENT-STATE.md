@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             PROJECT-EXECUTION-PROTOCOL-01（accepted candidate · local commit f3228fe · not pushed）
-Latest completed module:            CONTENT-CENTER-BLUEPRINT-01（COMPLETED · awaiting controller review）
-Active authorized module:           NONE（CONTENT-CENTER-BLUEPRINT-01 已收口，等待下一份授权）
+Latest completed module:            CONTENT-CENTER-BLUEPRINT-01-REVIEW-FIX-01（COMPLETED · awaiting controller review）
+Active authorized module:           NONE（CONTENT-CENTER-BLUEPRINT-01-REVIEW-FIX-01 已收口，等待下一份授权）
 Active module authorization level:  —
 Next candidate:                     CC-IMP-01 — Content Foundation
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：f3228fe）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：69215b3）
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
 
@@ -8641,3 +8641,56 @@ NO
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"CONTENT-CENTER-BLUEPRINT-01"任务中写入。*
+
+**恢复记录：** 69215b3 在关机前已生成，原最终报告被中断未发出；之后已按只读恢复施工单补发正式最终报告，Controller 审查后发出下一节的 4 项澄清。
+
+---
+
+## CONTENT-CENTER-BLUEPRINT-01-REVIEW-FIX-01 = COMPLETED（2026-09-14）
+
+```text
+TYPE C — Governance / Documentation · A1 GOVERNANCE_DOCS
+Controller review clarifications to the Content Center Blueprint · docs only
+0 runtime · 0 DB · 0 Directus · 0 migration · 0 Provider calls · 0 push · 0 deploy
+```
+
+**分支：** `review/content-center-blueprint-01-review-fix-01`，从 `69215b3` 创建，仅本地，未 push；未 amend `69215b3`。**修改文件：** `docs/content-cms/CONTENT-CENTER-BLUEPRINT-V1.md`、本文件。
+
+### 四项 Controller 澄清（均已写入 Blueprint）
+
+| # | 澄清 | Blueprint 位置 | 分级 / 归属 |
+|---|---|---|---|
+| FIX-01 | `(locale, slug)` 由**数据库唯一约束 / 索引**作为最终权威；BFF 友好预检保留；测试：顺序重复 409、并发只有一个成功、其他语言允许、其他类型不能绕过 | §14、§26、§31、§32、§34、§35 P1 #3 | P2 → **P1 / CC-IMP-01** |
+| FIX-02 | Proposal 服务端绑定 subject.kind / subject.id / locale / draft_revision / 提案项集合 / 来源指纹 / prompt 版本 / admin；Apply 须证明 proposalRef 属于同一内容 + 语言；客户端只能接受 / 拒绝 / 编辑值；错误约定固定：409（提案不可用、各类绑定不匹配、revision 变化）、400（请求体不可读）、422（编辑值校验失败） | §17、§18、§31、§32、§34 | **CC-IMP-09 强制验收合同**（P1 #8） |
+| FIX-02b | Product AI 现有缺口（Apply 不校验提交是否来自提案输出；generate 无 Draft 门禁）登记为 **pre-existing cross-domain debt**，Content Center 不继承；CC-IMP-08 / 09 必须通过 Product AI 回归；若共享绑定会改变 Product AI 运行行为，须在实施施工单中显式列出 | §18、§35 | 登记，不做 runtime 修复 |
+| FIX-03 | 每条提案有稳定唯一 `proposalItemId`；多个 `block:new` 一一对应，不按数组位置；审核只能改 block data；Apply 按服务端提案顺序追加，由**服务端生成**新 block UUID 并返回映射 | §17、§18、§31、§32 | CC-IMP-09 |
+| FIX-04 | V1 提案继续在内存；重启 / 过期 / replay guard 丢失 → Apply 安全 409、Draft 不变、不自动重建、提示重新 Analyze；`proposalRef` 不是认证凭证；readiness 的"未应用提案"仅为 best-effort 软警告，不阻塞 Publish；新增安全矩阵行"Proposal / session persistence"（risk / control / test） | §18、§21、§31、§32 | 持久化多实例存储保持 **P2** |
+
+### 同步判断
+
+- **D-032：** 0 修改——(2)"slugs are unique per locale"与 (7)"Apply mapped deterministically to working-copy fields and block ids only"与本次澄清兼容。无 D-033。
+- **Register：** 0 修改——9 行 Blueprint 仍 `FROZEN`，Implementation 仍 `NOT_STARTED`。
+- **MASTER-ROADMAP：** 0 修改——已正确表达 Blueprint 完成、CC-IMP-01 未授权。
+- CLAUDE.md、Charter、Freeze、Protocol：0 修改。
+
+### 验证
+
+| 检查 | 结果 |
+|---|---|
+| `git diff --check` / `git diff --cached --check` | 通过 |
+| Blueprint ↔ Freeze / D-031 / D-032 / Protocol 只读一致性 | 通过；四项澄清均已落盘 |
+| Runtime tests / 1440 / 375 | N/A — docs-only |
+
+```text
+CONTENT-CENTER-BLUEPRINT-01-REVIEW-FIX-01
+=
+COMPLETED
+
+NEXT:
+CC-IMP-01 — Content Foundation
+
+NEXT CANDIDATE AUTHORIZED:
+NO
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"CONTENT-CENTER-BLUEPRINT-01-REVIEW-FIX-01"任务中写入。*
