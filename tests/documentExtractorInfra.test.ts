@@ -78,10 +78,12 @@ describe('document-extractor/Dockerfile', () => {
     expect(dockerfile.match(/^FROM .*$/gm)).toHaveLength(1)
   })
 
-  it('installs only poppler-utils and util-linux, without recommended packages, and keeps no apt lists', () => {
-    expect(dockerfile).toContain('apt-get install -y --no-install-recommends poppler-utils util-linux')
+  /** AI-IMAGE-OCR-SOURCE-01 — libvips-tools and Tesseract with the English and Simplified Chinese models were added, and nothing else. */
+  it('installs only poppler-utils, util-linux, libvips-tools and Tesseract (eng, chi_sim), without recommended packages, and keeps no apt lists', () => {
+    expect(dockerfile).toContain('apt-get install -y --no-install-recommends poppler-utils util-linux libvips-tools tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim \\')
+    expect(dockerfile.match(/apt-get install/g)).toHaveLength(1)
     expect(dockerfile).toContain('rm -rf /var/lib/apt/lists/*')
-    for (const unwanted of ['tesseract', 'libvips', 'libreoffice', 'ghostscript', 'python', 'curl', 'wget', 'npm ', 'package.json']) {
+    for (const unwanted of ['imagemagick', 'opencv', 'libreoffice', 'ghostscript', 'python', 'curl', 'wget', 'npm ', 'package.json', 'fonts-']) {
       expect(dockerfile.toLowerCase(), unwanted).not.toContain(unwanted)
     }
   })

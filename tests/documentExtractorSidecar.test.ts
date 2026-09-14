@@ -117,7 +117,7 @@ const alive = (pid: number) => {
 
 // ── HTTP surface ──
 
-describe('the HTTP surface is two routes and nothing else', () => {
+describe('the HTTP surface is three routes and nothing else (the image route: tests/documentExtractorImage.test.ts)', () => {
   it('GET /healthz answers exactly {"ok":true} — no version, path, host or environment detail, and no CORS header', async () => {
     const { base } = await startServer()
     const response = await fetch(`${base}/healthz`)

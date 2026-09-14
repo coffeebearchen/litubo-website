@@ -12,6 +12,9 @@
 /** Mirrors `server/utils/aiTextExtraction.ts`'s `MAX_FILES_PER_REQUEST` for client-side display/gating only — the server independently re-enforces this. */
 export const MAX_FILES_PER_REQUEST = 5
 
+/** Mirrors the server's `MAX_IMAGES_PER_ANALYSIS` (AI-IMAGE-OCR-SOURCE-01) for display/gating only — the server re-enforces it. */
+export const MAX_IMAGES_PER_ANALYSIS = 3
+
 /** A filename this long is anomalous regardless of content. Mirrors the server's own ceiling. */
 const MAX_SAFE_DISPLAY_NAME_LENGTH = 120
 
@@ -80,6 +83,8 @@ export interface AiIntakeSource {
   roleLabel: string
   analyzable: boolean
   unavailableReason: string | null
+  /** Counts toward the per-analysis image limit. */
+  isImage: boolean
 }
 
 // ── Canonical proposal shape — mirrors the server's Zod-validated output ────

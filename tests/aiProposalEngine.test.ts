@@ -218,13 +218,13 @@ describe('runProposalEngine — trusted-metadata size pre-check happens before a
 describe('runProposalEngine — honest per-file outcomes', () => {
   it('an unsupported file type is reported, never silently included or faked as readable', async () => {
     const fetch = mockFetch({
-      productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-img', filename_download: 'photo.jpg', type: 'image/jpeg', filesize: SMALL_SIZE } }],
+      productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-vid', filename_download: 'clip.mp4', type: 'video/mp4', filesize: SMALL_SIZE } }],
     })
     const result = await runProposalEngine(fetch, mockRegistry(), specificationsTarget, { productId: 1, providerId: 'deepseek', mediaIds: [1] })
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.fileResults).toEqual([
-        { displayName: 'photo.jpg', status: 'unsupported', reason: 'Images are not supported for source analysis yet.' },
+        { displayName: 'clip.mp4', status: 'unsupported', reason: 'This file type is not supported for source analysis.' },
       ])
     }
   })
@@ -287,7 +287,7 @@ describe('runProposalEngine — honest per-file outcomes', () => {
     const fetch = mockFetch({
       productsFilesRows: [
         { id: 1, directus_files_id: { id: 'uuid-txt', filename_download: 'notes.txt', type: 'text/plain', filesize: SMALL_SIZE } },
-        { id: 2, directus_files_id: { id: 'uuid-img', filename_download: 'photo.jpg', type: 'image/jpeg', filesize: SMALL_SIZE } },
+        { id: 2, directus_files_id: { id: 'uuid-vid', filename_download: 'clip.mp4', type: 'video/mp4', filesize: SMALL_SIZE } },
       ],
       assetBytesByUuid: { 'uuid-txt': textBytes('Detection sensitivity (Fe): 0.8 mm') },
     })
@@ -297,7 +297,7 @@ describe('runProposalEngine — honest per-file outcomes', () => {
     if (result.ok) {
       expect(result.fileResults).toEqual(expect.arrayContaining([
         { displayName: 'notes.txt', status: 'read' },
-        { displayName: 'photo.jpg', status: 'unsupported', reason: 'Images are not supported for source analysis yet.' },
+        { displayName: 'clip.mp4', status: 'unsupported', reason: 'This file type is not supported for source analysis.' },
       ]))
     }
   })

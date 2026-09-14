@@ -313,7 +313,8 @@ describe('one analysis of multi-model sources: one provider request, carrying th
     })
 
     expect(result.ok).toBe(true)
-    expect(result.fileResults.map(f => f.status)).toEqual(['read', 'unsupported'])
+    // AI-IMAGE-OCR-SOURCE-01 — the image is a readable format now; with no image reader wired in here it is unavailable.
+    expect(result.fileResults.map(f => f.status)).toEqual(['read', 'unreadable'])
     expect(requests).toHaveLength(1)
   })
 

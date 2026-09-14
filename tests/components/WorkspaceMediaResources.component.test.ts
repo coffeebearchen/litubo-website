@@ -151,12 +151,13 @@ describe('each file row says what it is and where it is', () => {
     expect(row.find('.ws-lib-card__path').text()).toBe('products / checkweigher / LT180C')
   })
 
-  it('marks only the formats AI Source Intake can analyze as AI-readable — a PDF too since AI-PDF-SOURCE-01, an image not', () => {
-    const withImage = [...files, file('f-img', 'LT180C-nameplate.jpg', 'image/jpeg', 'lt180c')]
-    const rows = mountPicker({ libraryFolderId: 'lt180c', libraryFiles: withImage, libraryTotal: 3 }).findAll('.ws-lib-card')
+  it('marks only the formats AI Source Intake can analyze as AI-readable — a PDF since AI-PDF-SOURCE-01, an image since AI-IMAGE-OCR-SOURCE-01, a video not', () => {
+    const mixed = [...files, file('f-img', 'LT180C-nameplate.jpg', 'image/jpeg', 'lt180c'), file('f-vid', 'LT180C-demo.mp4', 'video/mp4', 'lt180c')]
+    const rows = mountPicker({ libraryFolderId: 'lt180c', libraryFiles: mixed, libraryTotal: 4 }).findAll('.ws-lib-card')
     expect(rows[0]?.find('.ws-lib-card__ai').exists()).toBe(true)
     expect(rows[1]?.find('.ws-lib-card__ai').exists()).toBe(true)
-    expect(rows[2]?.find('.ws-lib-card__ai').exists()).toBe(false)
+    expect(rows[2]?.find('.ws-lib-card__ai').exists()).toBe(true)
+    expect(rows[3]?.find('.ws-lib-card__ai').exists()).toBe(false)
   })
 
   it('a file in no folder says Unclassified', () => {
@@ -199,11 +200,11 @@ describe('the format filter includes Text, and the AI-readable note follows the 
     expect(wrapper.emitted('update-type-filter')).toEqual([['text']])
   })
 
-  it('names the formats AI can analyze (PDF since AI-PDF-SOURCE-01, XLSX since AI-XLSX-SOURCE-01, DOCX since AI-DOCX-SOURCE-01) and the ones that can only be linked', () => {
+  it('names the formats AI can analyze — images since AI-IMAGE-OCR-SOURCE-01 — and says images are read for their text only', () => {
     const text = mountPicker().text()
-    expect(text).toContain('marks the CSV, DOCX, PDF, TSV, TXT, XLSX files AI Source Intake can analyze today.')
-    expect(text).toContain('JPG, PNG, WebP files can be linked, but not analyzed.')
-    expect(text).not.toContain('PDF and images can be linked')
+    expect(text).toContain('marks the CSV, DOCX, JPG, PDF, PNG, TSV, TXT, WebP, XLSX files AI Source Intake can analyze today. Images are read for their visible text only.')
+    expect(text).not.toContain('can be linked, but not analyzed')
+    expect(text).not.toMatch(/\. {2}files/)
   })
 })
 

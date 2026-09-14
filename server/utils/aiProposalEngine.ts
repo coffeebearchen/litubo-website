@@ -4,6 +4,7 @@ import {
   sanitizeDisplayNameForBrowser,
   capTotalCharacters,
   MAX_FILES_PER_REQUEST,
+  MAX_IMAGES_PER_ANALYSIS,
   MAX_PER_FILE_CHARS,
   MAX_TOTAL_EXTRACTED_CHARS,
   type ExtractedSource,
@@ -308,6 +309,7 @@ const NOT_FOUND_ERROR = 'Product not found.'
 const NOT_CONFIGURED_ERROR = 'AI provider is not configured.'
 const NO_SELECTION_ERROR = 'Select at least one source file to analyze.'
 const NO_READABLE_SOURCES_ERROR = 'None of the selected files could be read as text. Nothing was sent to the AI provider.'
+const IMAGE_LIMIT_ERROR = `Select up to ${MAX_IMAGES_PER_ANALYSIS} images per analysis.`
 const DUPLICATE_CONTENT_REASON = 'Duplicate content excluded from analysis.'
 
 /**
@@ -376,6 +378,14 @@ export async function runProposalEngine<TOutput>(
 
   const rows = await resolveProductSourceFiles(fetch, params.productId, mediaIds)
   const rowById = new Map(rows.map(r => [r.id, r]))
+
+  // AI-IMAGE-OCR-SOURCE-01 — the image limit is the server's, whatever the browser
+  // allowed. It is counted from the files' own stored types before anything is
+  // downloaded, and an analysis over it does not start at all.
+  const selectedImages = mediaIds.filter(mediaId => aiSourceFormatFor(rowById.get(mediaId)?.directus_files_id?.type)?.key === 'image').length
+  if (selectedImages > MAX_IMAGES_PER_ANALYSIS) {
+    return { ok: false, error: IMAGE_LIMIT_ERROR, fileResults: [] }
+  }
 
   const fileResults: SourceFileOutcome[] = []
   /** Content digests already accepted into this request's prompt. Memory only. */

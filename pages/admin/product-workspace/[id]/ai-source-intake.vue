@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProductStatus } from '~/types/product-cms'
 import { workspaceMediaResourcesRoute, workspaceAiProposalReviewRoute } from '~/utils/productCentre'
-import { MAX_FILES_PER_REQUEST, type AiProductContext, type AiIntakeSource, type SpecificationProposal, type SourceFileOutcome } from '~/utils/aiProposal'
+import { MAX_FILES_PER_REQUEST, MAX_IMAGES_PER_ANALYSIS, type AiProductContext, type AiIntakeSource, type SpecificationProposal, type SourceFileOutcome } from '~/utils/aiProposal'
 
 interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
 interface GenerateResponse {
@@ -116,6 +116,9 @@ function toggleSelection(sourceRef: string) {
   const idx = selectedRefs.value.indexOf(sourceRef)
   if (idx === -1) {
     if (selectedRefs.value.length >= MAX_FILES_PER_REQUEST) return
+    // AI-IMAGE-OCR-SOURCE-01 — a fourth image is not added; the server refuses one too.
+    const isImage = (ref: string) => sources.value.find((s: AiIntakeSource) => s.sourceRef === ref)?.isImage === true
+    if (isImage(sourceRef) && selectedRefs.value.filter(isImage).length >= MAX_IMAGES_PER_ANALYSIS) return
     selectedRefs.value.push(sourceRef)
   } else {
     selectedRefs.value.splice(idx, 1)

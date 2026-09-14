@@ -7662,3 +7662,244 @@ NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"AI-DOCX-SOURCE-01"任务中写入。*
+
+---
+
+## AI-IMAGE-OCR-SOURCE-01 = COMPLETED（2026-09-14）
+
+```text
+JPG / PNG / WebP → existing isolated document-extractor → libvips (bounded raster) → local Tesseract OCR → normalized transcription → ExtractedSource → D-025 → existing Proposal Engine.
+AI-readable today: TXT / CSV / TSV / PDF (text-layer) / XLSX / DOCX / JPG / PNG / WebP.
+OCR only — not Vision.
+```
+
+JPG / PNG / WebP 图片在既有流程中按"可见文字"成为 AI 来源：Media Library → products_files → AI Source Intake（每次最多 3 张图片）→ Analyze → 服务端按可信文件大小预检 → 有界下载 → Nuxt 校验图片签名与存储类型一致 → 现有 document-extractor 的 `POST /extract/image`（libvips 校验与预处理 + 本地 Tesseract OCR）→ 有界转录文本 → 既有 `ExtractedSource`（类型 `Image`）→ D-025 guard → 既有 Proposal Engine → 一个 Provider → 一份 proposal。原始图片从不发送给 AI Provider，也不发送给任何外部 OCR / Vision 服务；不根据画面内容推断任何参数。
+
+**分支：** `review/ai-image-ocr-source-01`，从 `f0de72b` 创建，仅本地，未 push。
+
+决策登记为 `08-decision-log.md` 的 **D-030 — Isolated Image OCR Extraction**。
+
+### 一、当前事实
+
+| 项目 | 状态 |
+|---|---|
+| JPG / PNG / WebP AI 可读 | YES（`aiReadableNow = true`，来源类型 `Image`） |
+| Media 上传 | 原本已支持，未改 |
+| GIF / SVG / TIFF / BMP / HEIC / AVIF | 不上传、不读取 |
+| OCR | 本地 Tesseract，仅在现有 document-extractor 内 |
+| Vision / 外部 OCR | NO |
+| 新 Docker service / network / volume / secret | 0 |
+| 原始图片 → Provider | NO |
+| OCR 转录文本 → 所选 Provider | YES |
+| 扫描 PDF OCR | NOT IMPLEMENTED（PDF 路径未改） |
+| 模块期间真实 Provider 调用 | 0 |
+| Production deployment | NOT AUTHORIZED |
+
+### 二、document-extractor（现有 sidecar，扩展一个路由）
+
+- **Dockerfile：** 在原 `poppler-utils util-linux` 基础上加入 `libvips-tools tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim`（`--no-install-recommends`，清理 apt lists）。Debian 的 `tesseract-ocr` 依赖会同时装入 `tesseract-ocr-osd`，OCR 流程不使用它。
+- **实际版本：** libvips 8.14.1（`libvips-tools` / `libvips42` 8.14.1-3+deb12u3）· Tesseract 5.3.0（`tesseract-ocr` / `libtesseract5` 5.3.0-2，leptonica 1.82.0）· `tesseract-ocr-eng` 1:4.1.0-2 · `tesseract-ocr-chi-sim` 1:4.1.0-2 · `tesseract-ocr-osd` 1:4.1.0-2。镜像内 copyright 文件声明：libvips42 LGPL-2.1，libtesseract5 与三个语言模型 Apache-2.0（仅记录，不作法律结论）。
+- **镜像大小：** 366 MB → 633 MB。
+- **隔离（compose 与 docker inspect 实测均未变）：** 512 MB 内存、无额外 swap、1 CPU、64 PIDs、只读根、tmpfs `/tmp` 64 MB（noexec,nosuid,nodev）、cap_drop ALL、no-new-privileges、非 root（uid 1000）、只在 internal 网络、无 volume / env_file / secret、不发布端口。每个子进程 `prlimit --as=384MB --core=0`。gateway 仍是纯 TCP 转发（只更新了超时注释），`docker-compose.yml` 未改。
+- **路由：** `GET /healthz`、`POST /extract/pdf`（不变）、`POST /extract/image`（新增）。只接受 `image/jpeg`、`image/png`、`image/webp`，其他类型 415。
+- **流程（一个确定管线，一个 20 秒整体期限）：**
+  1. 按字节签名识别 JPEG / PNG / WebP，必须与声明类型一致，否则 `malformed`，不写盘、不运行工具。
+  2. `vipsheader` 只读头部：loader 必须恰好是 `jpegload` / `pngload` / `webpload`；宽 ≤12,000、高 ≤12,000、像素 ≤50,000,000，否则 `too_complex`，不解码像素。
+  3. `vips thumbnail … 3000 --height 3000 --size down --fail-on truncated`：按 EXIF 方向转正、只缩不放到长边 ≤3000、输出 `[strip]` PNG（无元数据）；像素数据被截断即 `malformed`。
+  4. `vipsheader` 复查缩放结果长边 ≤3000；只有带 alpha（2 / 4 通道）时才 `vips flatten --background 255` 到白底（无 alpha 的图 flatten 会误吞颜色通道，已实测并排除）。
+  5. `tesseract <raster> stdout -l eng+chi_sim --psm 3 --oem 1 tsv`：一次 OCR、一种页面分割模式；原始 TSV 读取上限 4 MB，超过即杀进程并 `too_complex`。
+- **子进程环境：** vips 为 `VIPS_CONCURRENCY=1`、`VIPS_BLOCK_UNTRUSTED=1`（屏蔽 ImageMagick / SVG / PDF / HEIF 等不受信 loader）、`MALLOC_ARENA_MAX=1`；tesseract 为 `OMP_THREAD_LIMIT=1`、`MALLOC_ARENA_MAX=1`。`MALLOC_ARENA_MAX=1` 的原因：实测 WebP 解码在 384 MB 地址空间限制下因 glibc 每线程 arena 预留地址空间而失败，设置后成功，未放宽限制。
+- **转录规则：** 保留 Tesseract 的行；置信度 < 40 的词输出 `[?]`（不输出猜测字符），相邻 `[?]` 合并，全是 `[?]` 的行省略；中文字符之间不加空格；没有任何高置信度字母或数字 → `no_text`；规范化后 > 8,000 字符 → `too_complex`，不截断。
+- **队列：** PDF 与图片共用同一个 admission 队列：1 个执行 + 3 个等待，第 5 个（无论 PDF 或图片）`busy`。
+- **临时文件：** 原图、缩放图、flatten 图都用服务生成的 UUID 名写入 tmpfs，任务结束（成功、失败、超时、OCR 错误、no_text）均删除。
+- **失败代码：** `too_large` / `too_complex` / `malformed` / `no_text` / `timeout` / `unsafe_parse` / `busy`；不返回 stderr、命令、路径、TSV 或堆栈。
+
+### 三、Nuxt 侧
+
+- **`utils/aiSourceFormats.ts`：** image `aiReadableNow = true`；`MEDIA_ONLY_FORMATS_LABEL` 变为空；新增图片 `no_text` 文案 "No readable text was found in this image. Images are read for their visible text only."；"Supported formats" 与选择面板提示随合同变为 "CSV, DOCX, JPG, PDF, PNG, TSV, TXT, WebP, XLSX"。
+- **`server/utils/documentExtractorClient.ts`：** 新增 `createImageTextReader`（`/extract/image`，请求前校验签名与存储类型一致，`image/jpg` 按 JPEG 发送，只接受约定的 7 个失败码，文本 > 8,000 视为 unavailable）；PDF reader 行为不变，公共请求逻辑抽为内部 `postToExtractor`。
+- **`server/utils/aiTextExtraction.ts`：** 新增 `readImageSource`：签名不符 → `malformed`；无 reader → `unavailable`；期限 = min(20 秒, 剩余读取预算)；文本前加 `OCR transcription — low-confidence text is marked [?].`；超出份额 → `too_complex`，不截断。常量 `MAX_IMAGES_PER_ANALYSIS = 3`、`MAX_IMAGE_READ_MS = 20,000`。
+- **`server/utils/aiProposalEngine.ts`：** 在任何下载之前，按文件存储类型统计所选图片数；> 3 → 整个 Analyze 不开始（"Select up to 3 images per analysis."，0 下载、0 OCR、0 Provider 调用）。其余（去重、指纹、60 秒预算、部分成功、全部失败 0 次调用、D-025、单次调用）不变。
+- **`generate.post.ts`：** readers 增加 `image`。
+- **`sources.get.ts` / `utils/aiProposal.ts`：** DTO 增加 `isImage`；客户端镜像常量 `MAX_IMAGES_PER_ANALYSIS = 3`。
+- **AI Source Intake：** 已选 3 张图片时其余图片复选框禁用，并显示 "Up to 3 images per analysis — other files can still be added."；页面 `toggleSelection` 同样拦截第 4 张；空态文案去掉"可能全是图片"。
+- **Media & resources 选择面板：** 没有"可存储但不可分析"的格式时显示 "Images are read for their visible text only."，不再输出残缺句子。
+- **Prompt 合同：** 0 改动。`[?]` 规则沿用 D-025 共享合同（"Text marked [?] could not be read reliably. Never infer a value from text marked [?]."），`PROMPT_CONTRACT_VERSION` 仍为 2。
+- **未改：** Media 上传路由与白名单、folder / picker / archive、Provider adapter、Product 写接口、DB / Directus schema、PDF / XLSX / DOCX 语义、Charter、Register。
+- **依赖：** 0 新增 npm package；sidecar 仍只用 Node 内置模块。
+
+### 四、测试
+
+新增 4 个测试文件 + 1 个 helper + TEST ONLY 图片夹具：
+
+- `tests/documentExtractorImage.test.ts`（63，受控，脚本化 libvips / Tesseract）：生产常量；签名识别；声明类型与字节不符、SVG / GIF 伪装、随机字节 → `malformed` 且不运行工具；非白名单类型 415；Content-Length > 20 MB → 413；loader 必须匹配；头部不可信 → `malformed`；尺寸 / 像素边界（12,000 / 12,001、7,071² / 7,072²、12,000×4,167、100,000²）；完整命令参数、UUID 文件名、受限环境变量、单一期限；只在 alpha 时 flatten；缩放后长边 > 3000 → `unsafe_parse`；解码失败 / 崩溃 / 缺工具 / OCR 失败 / 非 TSV / 原始输出超限 / 期限；TSV → 转录（[?]、合并、CJK、no_text、控制字符、坏表头）；8,000 / 8,001 字符；成功 / 解码失败 / OCR 错误 / no_text / 原始输出超限 / 期限后临时文件为 0；整体期限中止正在运行的步骤；PDF 与图片共用队列（峰值 1、第 5 个 busy、双向排队）；日志无文本。
+- `tests/documentExtractorImageClient.test.ts`（29）：客户端与 sidecar 常量 / 失败码 / 签名一致；存储类型匹配；只有两种答案离开客户端；不符字节不发送。
+- `tests/aiImageSource.test.ts`（20，引擎，stand-in reader）：合同；图片 + DOCX + TXT、图片 + DOCX + PDF + XLSX + TXT 一次调用；reader 期限 ≤20 秒；3 张允许、4 张拒绝（0 下载 / 0 OCR / 0 调用）、3 图 + 2 文档允许、4 图 + 1 文档拒绝；部分失败；全部图片失败 0 次调用；无 reader → unavailable；20 MB 预检；8,000 / 8,001；份额拒绝；多型号 OCR + Current product + 型号代码 + D-025；`[?]` 回归（合同文字与版本 2）；文件名不作事实；真实 DeepSeek adapter + stub `fetch` 的出站请求只含转录（无图片字节 / base64 / data URI / URL / UUID / 文件名 / EXIF / TSV）；0 写入。
+- `tests/documentExtractorImageIntegration.test.ts`（27，真实容器，需设置环境变量，默认跳过）：见下节。
+- `tests/helpers/testOnlyImage.ts`：夹具读取、纯色 PNG、只有头部的尺寸炸弹 PNG、签名 + 噪声、Tesseract TSV 构造器。
+- `tests/fixtures/image-ocr/`：`generate-fixtures.ps1`（System.Drawing 生成）与 8 个 TEST-ONLY 光栅图（英文铭牌 PNG / JPG / WebP、透明 PNG、4200 px 大图、EXIF 方向 6 + 元数据文字 JPEG、简体中文 PNG、双型号 PNG），每张图可见文字含 "TEST ONLY — NOT FOR PUBLICATION"。WebP 由容器内 vips 从 PNG 转换。
+
+同步调整 9 个既有测试文件（图片由不可读改为可读、DTO `isImage`、未支持示例改为视频、Dockerfile 包清单、Intake 3 图上限组件测试、选择面板文案）。
+
+### 五、验证
+
+**Nuxt（真实 Node 22.22.2）：**
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **2142 通过 + 45 跳过**（51 个文件；跳过的 2 个为默认不运行的 PDF 与图片真实容器测试） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | Build complete（7.02 MB / 1.76 MB gzip） |
+
+**真实容器（重建镜像并只重建 document-extractor 与 gateway 两个容器后，顺序运行）：** 图片 27 / 27、PDF 回归 18 / 18，共 45 / 45，结束后容器 `/tmp` 为空。首次两个文件并行运行时 PDF 有 2 项失败（排队与 `/tmp` 断言），原因是两个文件同时压同一个容器；顺序运行全部通过，不是回归。
+
+- 英文铭牌 PNG / JPEG / WebP：`TEST ONLY — NOT FOR PUBLICATION`、`LT-180C`、`Voltage 220 V`、`Frequency 50 Hz`、`Power 0.45 kW` 逐行正确。
+- 透明 PNG：flatten 后正确（`LT-200C` / `Voltage 380 V` / `Power 0.55 kW`）。
+- **简体中文：** `chi_sim` 已安装，真实中文 TEST ONLY 夹具（Microsoft YaHei 渲染）实测识别为 `测试资料` / `电压 220V` / `功率 0.45kW`。
+- **EXIF 方向：** 以 90° 逆时针存储并带 orientation 6 的 JPEG 实测转正后识别正确（原始 420×1200 → OCR 光栅 1200×420）；夹具中的 ImageDescription / Artist / Software 元数据文字未出现在输出中（夹具未包含真实 GPS IFD，GPS 字段仅以描述文字形式测试）。
+- 4200 px 大图：OCR 光栅实测 3000×1071，小图 1200×420 未放大。
+- 双型号图片：`LT180C 220 V` / `LT200C 380 V` 都保留。
+- 纯白、纯色图 → `no_text`。
+- 只有头部的 100,000² / 12,001×1 / 7,072² PNG → `too_complex`（解码前）；12,000×1 → 通过尺寸检查后 `malformed`。
+- 随机字节、截断 PNG、JPEG / PNG / WebP 签名 + 噪声、JPEG 声明为 PNG、SVG 声明为 PNG → `malformed`；GIF / SVG / TIFF 类型 415；声明 > 20 MB → 413。
+- 3 个 PDF + 1 张图片占满队列时第 5 个图片请求 `busy`；随后 PDF 抽取仍正常。
+- 容器内：`tesseract --list-langs` 含 eng、chi_sim；vips 8.14；子进程 RLIMIT_AS 402653184 且无 core；不受信 loader（SVG）在服务环境中被拒绝。
+
+**构建产物实际启动：** Node 22.22.2 运行 `.output/server/index.mjs`，只监听 `127.0.0.1:3001`；`/admin/login` 200、`/admin` 200、受保护页面 302、`/api/admin/products/3/ai/sources` 401，日志只有 `Listening`。直接加载产物服务端 chunk（`.output/server/chunks/_/aiSourceRef.mjs`）的 `extractTextFromFile` + `createImageTextReader`，经真实 extractor 读取 TEST ONLY 图片：PNG、以 `image/jpg` 存储的 JPEG、WebP 均输出 `OCR transcription — …` + 铭牌逐行文字；中文输出 `测试资料 / 电压 220V / 功率 0.45kW`；PNG 存为 `image/jpeg` → `malformed`；无 reader → `unavailable`；GIF → `unsupported`。`.output/public` 中 yauzl / saxes / 图片 OCR 客户端 / extractor 地址引用为 0。
+
+**Windows `nuxt dev`（3000 端口进程实测 Node 22.22.2）：** build 后首次启动出现已知的 `#app-manifest` 报错；确认端口释放后干净重启一次，重启后日志无任何错误；无 cookie：`/`、`/admin/login`、`/admin` 200，受保护页面 302，AI sources API 401，无全站 500。
+
+**1440px（重启稳定后全新标签页，已登录，console 0 条错误，均无横向溢出）：**
+- `/admin`（→ `/admin/products`）：1425 = 1425。
+- `/admin/media`：54 张文件卡，1440 = 1440；上传 accept 未变。
+- AI Source Intake：11 张来源卡全部可选（其中 7 张图片，原本不可选）、`0 / 5 selected`、Analyze 禁用；1425 = 1425。
+- Media & resources：7 assets / 4 documents、Save changes 禁用；打开选择面板，提示为 "AI-readable marks the CSV, DOCX, JPG, PDF, PNG, TSV, TXT, WebP, XLSX files AI Source Intake can analyze today. Images are read for their visible text only."；未保存，重新加载后仍为 7 / 4。
+- AI Proposal Review：空态 "No active proposal. Return to AI Source Intake."。
+
+**375px（同一标签页，console 0 条错误，以上路由均 `scrollWidth = clientWidth = 375`）：**
+- AI Source Intake（使用 Product 3 已关联的图片，未上传、未保存）：依次选中 3 张图片 → `3 / 5 selected`，其余 4 张图片复选框禁用，显示 "Up to 3 images per analysis — other files can still be added."；点击第 4 张图片不增加选择；TXT 仍可选（→ `4 / 5 selected`）；披露文案 "Original files are not sent to the AI provider." 显示；全部取消后 `0 / 5 selected`、Analyze 禁用；无 generate 请求。
+- Media & resources：选择面板提示同上，类型筛选仍为 All formats / Image / PDF / Text (TXT, CSV, TSV)；未保存，重新加载后仍为 7 / 4、Save changes 禁用。
+- AI Proposal Review：空态正常。
+
+**未做与还原：** 未点击 Analyze，0 次 generate / apply；未上传或关联图片；Product 3 与其 `product_code` 未改；`.claude/launch.json` 仅在验收期间临时加入 Node 22 启动配置，验收后已还原，与 HEAD 一致。Docker：只构建 document-extractor 镜像并重建 document-extractor 与 gateway 两个容器；Postgres、Directus 未重建，数据与 volume 未动。
+
+**Node 运行环境说明：** 本机持久安装的 Node 为 PATH 上的 24.14.0 与 fnm 中的 18.20.8；本模块验证使用的是本机已存在于某个旧 Claude 会话 Temp 目录中的便携 Node 22.22.2（进程实测 v22.22.2），未下载、未安装、未修改系统 Node，路径未写入项目文件。该路径不持久，后续应由用户授权安装持久 Node 22.22.2。
+
+### 六、已知限制
+
+- OCR 是转录，不是图像理解：不做 Vision、物体识别、设备外观判断、Logo 识别、技术图纸或尺寸标注理解。
+- 不做扫描 PDF OCR；不保证手写文字；只按 EXIF 方向转正，任意角度倾斜 / 旋转的文字不保证识别（未做 OSD）。
+- 低置信度以 `[?]` 表示；置信度只是转录可靠性信号，不是真实性评分。复杂版面（多栏、表格截图）按 Tesseract PSM 3 的行输出，不重建表格结构。
+- 每次 Analyze 最多 3 张图片；单张 20 秒期限、8,000 字符转录上限；超出整份拒绝，不截断。
+- 镜像增大到 633 MB；生产服务器 RAM / CPU 容量、原生包许可证与 CVE 审查仍是发布门槛，本模块未部署、不作法律结论。
+- 当前配置的 npm 镜像源不支持 `npm audit`；本模块未新增 npm 依赖。
+- Media picker 类型筛选未新增 Word / Spreadsheet（既有 P2）。
+
+### 七、边界
+
+**JPG / PNG / WebP OCR implemented · 0 Vision · 0 external OCR · 0 scanned PDF OCR · 0 new Docker service · 0 new npm packages · 0 Product changes · 0 DB / Directus schema · 0 Provider adapter changes · 0 Prompt contract semantic changes · 0 real Provider calls · 0 API fees · 0 push · 0 deploy。**
+
+- **Charter / Register：** 未改，格式状态以 D-024 + 共享格式合同 + 本文件为准。
+- **MASTER-ROADMAP：** 最小同步——新增 AI-IMAGE-OCR-SOURCE-01 ✅ COMPLETED 行，下一阶段 AI-DOCUMENT-MIXED-SOURCE-BETA-01（未授权）。
+
+---
+
+```text
+AI-IMAGE-OCR-SOURCE-01
+=
+COMPLETED
+
+JPG AI-readable:
+YES
+
+PNG AI-readable:
+YES
+
+WebP AI-readable:
+YES
+
+OCR:
+local Tesseract only
+
+Vision:
+NO
+
+External OCR:
+NO
+
+Extractor:
+existing document-extractor
+
+New Docker services:
+0
+
+Native tools:
+libvips 8.14.1
+Tesseract 5.3.0
+eng
+chi_sim
+
+Original image → Provider:
+NO
+
+OCR text → selected Provider:
+YES
+
+Max image bytes:
+20 MB
+
+Max width:
+12000
+
+Max height:
+12000
+
+Max pixels:
+50 MP
+
+Preprocess max long edge:
+3000 px
+
+Max images per Analyze:
+3
+
+OCR text per image:
+8000 chars
+
+OCR raw output cap:
+4 MB
+
+OCR task deadline:
+20 sec
+
+OCR languages / PSM:
+eng+chi_sim / 3
+
+Low-confidence:
+[?] (confidence < 40)
+
+D-025:
+unchanged
+
+Scanned PDF OCR:
+NOT IMPLEMENTED
+
+Product writes:
+0
+
+Real Provider calls:
+0
+
+AI-readable:
+TXT / CSV / TSV / PDF / XLSX / DOCX / JPG / PNG / WebP
+
+NEXT CANDIDATE:
+AI-DOCUMENT-MIXED-SOURCE-BETA-01
+
+STATUS:
+NOT AUTHORIZED
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"AI-IMAGE-OCR-SOURCE-01"任务中写入。*

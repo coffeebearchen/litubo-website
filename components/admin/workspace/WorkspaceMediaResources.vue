@@ -423,7 +423,7 @@ function pickerFilePath(f: LibraryFile): string {
                 <!-- Honest about today's AI scope, derived from the shared format contract so it cannot drift from what the server reads. -->
                 <p class="ws-lib-note">
                   <span class="ws-lib-card__ai">AI-readable</span>
-                  marks the {{ AI_READABLE_FORMATS_LABEL }} files AI Source Intake can analyze today. {{ MEDIA_ONLY_FORMATS_LABEL }} files can be linked, but not analyzed.
+                  marks the {{ AI_READABLE_FORMATS_LABEL }} files AI Source Intake can analyze today.<template v-if="MEDIA_ONLY_FORMATS_LABEL"> {{ MEDIA_ONLY_FORMATS_LABEL }} files can be linked, but not analyzed.</template><template v-else> Images are read for their visible text only.</template>
                 </p>
 
                 <p v-if="!pickerShowsFiles" class="ws-lib-prompt">

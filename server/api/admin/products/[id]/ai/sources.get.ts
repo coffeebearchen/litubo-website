@@ -2,7 +2,7 @@ import { createError, getRouterParam, setResponseHeader } from 'h3'
 import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
 import { sanitizeDisplayNameForBrowser } from '~/server/utils/aiTextExtraction'
 import { createSourceRef, SourceRefUnavailableError } from '~/server/utils/aiSourceRef'
-import { aiSourceFormatRefusal, aiSourceTypeLabel, sourceFailureMessage } from '~/utils/aiSourceFormats'
+import { aiSourceFormatFor, aiSourceFormatRefusal, aiSourceTypeLabel, sourceFailureMessage } from '~/utils/aiSourceFormats'
 
 /**
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — the AI Source Intake screen's own,
@@ -29,6 +29,8 @@ export interface AiIntakeSource {
   analyzable: boolean
   /** Present only when `analyzable` is false — the honest, specific reason. */
   unavailableReason: string | null
+  /** AI-IMAGE-OCR-SOURCE-01 — an image counts toward the per-analysis image limit. */
+  isImage: boolean
 }
 
 interface ProductFileRow {
@@ -91,6 +93,7 @@ export default defineEventHandler(async (event): Promise<AiIntakeSource[]> => {
         roleLabel: roleLabel(row.file_role),
         analyzable: reason === null,
         unavailableReason: reason,
+        isImage: aiSourceFormatFor(row.directus_files_id?.type ?? null)?.key === 'image',
       }
     })
   } catch (error) {

@@ -7,8 +7,13 @@ FROM node:22.22.2-bookworm-slim@sha256:9f6d5975c7dca860947d3915877f85607946403fc
 # poppler-utils provides pdfinfo and pdftotext. util-linux provides prlimit; it
 # is already an Essential package of the base image and is listed only so the
 # dependency is explicit. No recommended packages, and no apt lists are kept.
+#
+# AI-IMAGE-OCR-SOURCE-01 — libvips-tools (vipsheader, vips) checks and prepares
+# JPG / PNG / WebP images; tesseract-ocr with the English and Simplified Chinese
+# models reads their text, locally. Debian's tesseract-ocr depends on
+# tesseract-ocr-osd, so that model is present, but the OCR pass does not use it.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends poppler-utils util-linux \
+ && apt-get install -y --no-install-recommends poppler-utils util-linux libvips-tools tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

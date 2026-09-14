@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { MAX_FILES_PER_REQUEST, type AiIntakeSource } from '~/utils/aiProposal'
+import { MAX_FILES_PER_REQUEST, MAX_IMAGES_PER_ANALYSIS, type AiIntakeSource } from '~/utils/aiProposal'
 import { AI_READABLE_FORMATS_LABEL } from '~/utils/aiSourceFormats'
 
 interface AiProviderSummary { id: string, label: string, configured: boolean, isDefault: boolean }
@@ -52,10 +52,15 @@ const hasConfiguredProvider = computed(() => configuredProviders.value.length > 
 
 const atSelectionCap = computed(() => props.selectedRefs.length >= MAX_FILES_PER_REQUEST)
 
-/** Disabled when the server says the file is not analyzable, OR the cap is reached and this file is not already selected. */
+/** AI-IMAGE-OCR-SOURCE-01 — images already selected, against their own, smaller limit. */
+const selectedImageCount = computed(() => props.sources.filter(s => s.isImage && selectedSet.value.has(s.sourceRef)).length)
+const atImageCap = computed(() => selectedImageCount.value >= MAX_IMAGES_PER_ANALYSIS)
+
+/** Disabled when the server says the file is not analyzable, OR a cap it would pass is reached and this file is not already selected. */
 function isCheckboxDisabled(source: AiIntakeSource): boolean {
   if (!source.analyzable) return true
   if (isSelected(source.sourceRef)) return false
+  if (source.isImage && atImageCap.value) return true
   return atSelectionCap.value
 }
 
@@ -105,6 +110,9 @@ const canAnalyze = computed(() =>
         <h2 id="ws-ai-intake-heading" class="ws-card-title">Select source files for this product</h2>
         <span class="ws-selected-count">{{ selectedRefs.length }} / {{ MAX_FILES_PER_REQUEST }} selected</span>
       </div>
+      <p v-if="atImageCap" class="ws-analyze-note ws-image-cap-note">
+        Up to {{ MAX_IMAGES_PER_ANALYSIS }} images per analysis — other files can still be added.
+      </p>
 
       <!--
         A failed request is never presented as "no files": that would tell an
@@ -124,7 +132,7 @@ const canAnalyze = computed(() =>
       </p>
 
       <p v-else-if="!hasAnyAnalyzableSource" class="ws-empty ws-empty--no-readable">
-        None of this product&apos;s linked files can be analyzed as text yet — they may all be images, disabled for this product, or another unsupported format.
+        None of this product&apos;s linked files can be analyzed yet — they may all be disabled for this product, or in an unsupported format.
         Supported formats: {{ AI_READABLE_FORMATS_LABEL }}.
         <NuxtLink :to="mediaResourcesHref">Go to Media &amp; resources</NuxtLink> to link a readable file.
       </p>

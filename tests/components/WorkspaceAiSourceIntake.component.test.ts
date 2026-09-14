@@ -22,6 +22,7 @@ function source(overrides: Partial<AiIntakeSource> & { sourceRef: string }): AiI
     roleLabel: 'Role not set',
     analyzable: true,
     unavailableReason: null,
+    isImage: false,
     ...overrides,
   }
 }
@@ -96,6 +97,27 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
     expect(wrapper.text()).toContain('Word')
     await checkbox.setValue(true)
     expect(wrapper.emitted('toggle')).toEqual([['ref-docx']])
+  })
+
+  /** AI-IMAGE-OCR-SOURCE-01 — images are selectable, at most three of them; other files stay selectable up to five in all. */
+  it('with three images selected, a fourth image cannot be selected while a document still can, and the limit is explained', () => {
+    const images = ['i1', 'i2', 'i3', 'i4'].map(ref => source({ sourceRef: ref, displayName: `TEST-ONLY-${ref}.png`, typeLabel: 'Image', isImage: true }))
+    const wrapper = mountIntake({
+      ...BASE_PROPS,
+      sources: [...images, source({ sourceRef: 'doc', displayName: 'manual.docx', typeLabel: 'Word' })],
+      selectedRefs: ['i1', 'i2', 'i3'],
+    })
+    const boxes = wrapper.findAll('input[type="checkbox"]').map(box => (box.element as HTMLInputElement).disabled)
+    expect(boxes).toEqual([false, false, false, true, false])
+    expect(wrapper.text()).toContain('Up to 3 images per analysis — other files can still be added.')
+    expect(wrapper.text()).toContain('3 / 5 selected')
+  })
+
+  it('with two images selected a third is still selectable, and no limit note shows', () => {
+    const images = ['i1', 'i2', 'i3'].map(ref => source({ sourceRef: ref, typeLabel: 'Image', isImage: true }))
+    const wrapper = mountIntake({ ...BASE_PROPS, sources: images, selectedRefs: ['i1', 'i2'] })
+    expect(wrapper.findAll('input[type="checkbox"]').map(box => (box.element as HTMLInputElement).disabled)).toEqual([false, false, false])
+    expect(wrapper.text()).not.toContain('images per analysis')
   })
 
   /** AI-XLSX-SOURCE-01 — a workbook the server marks analyzable is a source like any other, under the same selection cap. */
@@ -182,12 +204,13 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
     const wrapper = mountIntake({
       ...BASE_PROPS,
       sources: [
-        source({ sourceRef: 'a', typeLabel: 'Image', analyzable: false, unavailableReason: 'Images are not supported for source analysis yet.' }),
+        source({ sourceRef: 'a', typeLabel: 'Video', analyzable: false, unavailableReason: 'This file type is not supported for source analysis.' }),
         source({ sourceRef: 'b', typeLabel: 'PDF', analyzable: false, unavailableReason: 'This file is disabled for this product, so it cannot be analyzed. Enable it in Media & resources first.' }),
       ],
     })
-    // Derived from the shared format contract, so it lists exactly what the server reads today — PDF since AI-PDF-SOURCE-01, XLSX since AI-XLSX-SOURCE-01, DOCX since AI-DOCX-SOURCE-01.
-    expect(wrapper.text()).toContain('Supported formats: CSV, DOCX, PDF, TSV, TXT, XLSX.')
+    // Derived from the shared format contract, so it lists exactly what the server reads today — PDF, XLSX, DOCX, and since AI-IMAGE-OCR-SOURCE-01 images.
+    expect(wrapper.text()).toContain('Supported formats: CSV, DOCX, JPG, PDF, PNG, TSV, TXT, WebP, XLSX.')
+    expect(wrapper.text()).not.toContain('they may all be images')
     // Never a hand-written format description of its own.
     expect(wrapper.text()).not.toContain('PDF (with extractable text)')
     expect(wrapper.find('a').exists()).toBe(true)

@@ -11,6 +11,9 @@
  * their bounded reader passed its own tests.
  *
  * AI-DOCX-SOURCE-01 — standard .docx documents joined them the same way.
+ *
+ * AI-IMAGE-OCR-SOURCE-01 — JPG, PNG and WebP joined them for their visible text,
+ * read by local OCR. No listed format is waiting for its reader any more.
  */
 
 import { describe, it, expect, vi, beforeAll } from 'vitest'
@@ -30,6 +33,7 @@ import {
 import { extractTextFromFile } from '../server/utils/aiTextExtraction'
 import { tableXlsx } from './helpers/testOnlyXlsx'
 import { docx, para } from './helpers/testOnlyDocx'
+import { fixture } from './helpers/testOnlyImage'
 
 const repoFile = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8')
 
@@ -40,23 +44,24 @@ const PDF = 'application/pdf'
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+const PNG_MIME = 'image/png'
+const WEBP_MIME = 'image/webp'
 
 describe('A. what AI Source Intake can analyze today', () => {
-  it.each([TXT, CSV, TSV, PDF, XLSX, DOCX])('%s is AI-readable', (mime) => {
+  it.each([TXT, CSV, TSV, PDF, XLSX, DOCX, ...IMAGES])('%s is AI-readable', (mime) => {
     expect(isAiSourceReadableNow(mime)).toBe(true)
     expect(aiSourceFormatRefusal(mime)).toBeNull()
   })
 
-  it.each(IMAGES)('%s is a planned format — listed, but NOT readable yet', (mime) => {
-    expect(aiSourceFormatFor(mime)).not.toBeNull()
-    expect(isAiSourceReadableNow(mime)).toBe(false)
-    expect(aiSourceFormatRefusal(mime)).toBe('not_enabled')
+  it('no listed format is still waiting for its reader', () => {
+    expect(AI_SOURCE_FORMATS.every(format => format.aiReadableNow)).toBe(true)
   })
 
   it.each([
     'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-excel.sheet.macroenabled.12', 'video/mp4',
     'application/vnd.ms-word.document.macroenabled.12', 'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
-    'application/zip', 'text/html', 'image/gif', 'application/octet-stream', '',
+    'application/zip', 'text/html', 'image/gif', 'image/svg+xml', 'image/tiff', 'image/bmp', 'image/heic', 'image/avif',
+    'application/octet-stream', '',
   ])('%s is outside the contract, so it is simply unsupported', (mime) => {
     expect(aiSourceFormatFor(mime)).toBeNull()
     expect(isAiSourceReadableNow(mime)).toBe(false)
@@ -74,20 +79,20 @@ describe('A. what AI Source Intake can analyze today', () => {
     expect(isAiSourceReadableNow('text/csv; charset=utf-8')).toBe(true)
     expect(isAiSourceReadableNow(XLSX.toUpperCase())).toBe(true)
     expect(aiSourceFormatRefusal('Application/PDF')).toBeNull()
-    expect(aiSourceFormatRefusal('IMAGE/PNG')).toBe('not_enabled')
+    expect(aiSourceFormatRefusal('IMAGE/PNG')).toBeNull()
   })
 
-  /** AI-PDF-SOURCE-01, AI-XLSX-SOURCE-01 and AI-DOCX-SOURCE-01 — each format joined text once its own reader passed acceptance. No other format has. */
-  it('exactly four format families are readable: text, text-layer PDF, .docx documents and .xlsx workbooks', () => {
-    expect(AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).map(f => f.key)).toEqual(['text', 'pdf', 'docx', 'xlsx'])
+  /** AI-PDF-SOURCE-01, AI-XLSX-SOURCE-01, AI-DOCX-SOURCE-01 and AI-IMAGE-OCR-SOURCE-01 — each format joined once its own reader passed acceptance. */
+  it('all five format families are readable: text, text-layer PDF, .docx documents, .xlsx workbooks and images', () => {
+    expect(AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).map(f => f.key)).toEqual(['text', 'pdf', 'docx', 'xlsx', 'image'])
   })
 
   it('the "Supported formats" copy lists exactly the readable formats', () => {
-    expect(AI_READABLE_FORMATS_LABEL).toBe('CSV, DOCX, PDF, TSV, TXT, XLSX')
+    expect(AI_READABLE_FORMATS_LABEL).toBe('CSV, DOCX, JPG, PDF, PNG, TSV, TXT, WebP, XLSX')
   })
 
-  it('the "can be linked, but not analyzed" copy lists exactly the stored-but-unreadable formats', () => {
-    expect(MEDIA_ONLY_FORMATS_LABEL).toBe('JPG, PNG, WebP')
+  it('no format is stored without being readable, so the "can be linked, but not analyzed" copy is empty', () => {
+    expect(MEDIA_ONLY_FORMATS_LABEL).toBe('')
   })
 })
 
@@ -128,22 +133,28 @@ describe('B. the server reads exactly what the shared contract marks readable', 
     'application/vnd.ms-excel', 'application/msword', 'text/html', null,
   ]
 
-  /** A PDF is read through the document-extractor's reader, so the table gives it a PDF header and a stand-in reader. */
-  const PDF_READER = { pdf: async () => ({ ok: true as const, text: 'Aperture: 180 mm' }) }
+  /** PDFs and images are read through the document-extractor, so the table gives them stand-in readers. */
+  const READERS = {
+    pdf: async () => ({ ok: true as const, text: 'Aperture: 180 mm' }),
+    image: async () => ({ ok: true as const, text: 'Aperture: 180 mm' }),
+  }
 
-  /** Real content for each format: a PDF header for a PDF, a TEST ONLY workbook or document for .xlsx and .docx, plain text otherwise. */
+  /** Real content for each format: a PDF header, a TEST ONLY workbook, document or image, plain text otherwise. */
   const contentFor = (mime: string | null): ArrayBuffer => {
     const key = aiSourceFormatFor(mime)?.key
+    const image = mime === PNG_MIME ? fixture('TEST-ONLY-nameplate-en.png') : mime === WEBP_MIME ? fixture('TEST-ONLY-nameplate-en.webp') : fixture('TEST-ONLY-nameplate-en.jpg')
     const bytes = key === 'xlsx'
       ? tableXlsx([['Parameter', 'Value'], ['Aperture', '180 mm']])
       : key === 'docx'
         ? docx([para('Aperture: 180 mm')])
-        : new TextEncoder().encode(key === 'pdf' ? '%PDF-1.7\nAperture: 180 mm' : 'Aperture: 180 mm')
+        : key === 'image'
+          ? image
+          : new TextEncoder().encode(key === 'pdf' ? '%PDF-1.7\nAperture: 180 mm' : 'Aperture: 180 mm')
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
   }
 
   it.each(TABLE)('server extraction and isAiSourceReadableNow agree on %s', async (mime) => {
-    const result = await extractTextFromFile(contentFor(mime), mime, 'Source 1', { readers: PDF_READER })
+    const result = await extractTextFromFile(contentFor(mime), mime, 'Source 1', { readers: READERS })
     expect(result.ok).toBe(isAiSourceReadableNow(mime))
   })
 
@@ -224,9 +235,17 @@ describe('C. Media Library storage and AI readability are separate facts', () =>
     expect(aiSourceFormatFor(XLSX)?.maxBytes).toBe(10 * 1024 * 1024)
   })
 
-  it('Images: the Media Library can store them, AI cannot analyze them yet', () => {
+  it('Images: the Media Library stores them, and AI Source Intake can analyze their visible text (AI-IMAGE-OCR-SOURCE-01)', () => {
     for (const [filename, mime] of [['nameplate.jpg', 'image/jpeg'], ['screenshot.png', 'image/png'], ['photo.webp', 'image/webp']]) {
       expect(isAllowedUpload(filename, mime)).toBe(true)
+      expect(isAiSourceReadableNow(mime)).toBe(true)
+      expect(aiSourceFormatFor(mime)?.maxBytes).toBe(20 * 1024 * 1024)
+    }
+  })
+
+  it('GIF, SVG, TIFF, BMP, HEIC and AVIF are neither stored nor analyzed', () => {
+    for (const [filename, mime] of [['a.gif', 'image/gif'], ['a.svg', 'image/svg+xml'], ['a.tiff', 'image/tiff'], ['a.bmp', 'image/bmp'], ['a.heic', 'image/heic'], ['a.avif', 'image/avif']]) {
+      expect(isAllowedUpload(filename, mime)).toBe(false)
       expect(isAiSourceReadableNow(mime)).toBe(false)
     }
   })
@@ -284,6 +303,8 @@ describe('D. every source failure is worded once, safely', () => {
   it('no_text for a PDF names the likely cause — a scan — while every other format keeps the generic sentence', () => {
     expect(sourceFailureMessage('no_text', PDF)).toBe('No extractable text was found in this PDF. Scanned PDFs are not supported yet.')
     expect(sourceFailureMessage('no_text', TXT)).toBe('No extractable text was found in this file.')
+    // AI-IMAGE-OCR-SOURCE-01 — an image says it is read for its visible text only.
+    expect(sourceFailureMessage('no_text', 'image/png')).toBe('No readable text was found in this image. Images are read for their visible text only.')
     expect(sourceFailureMessage('no_text')).toBe('No extractable text was found in this file.')
   })
 

@@ -9,7 +9,7 @@ import { claimGenerateSlot, releaseGenerateSlot } from '~/server/utils/aiGenerat
 import { lookupAnalysis, rememberAnalysis } from '~/server/utils/aiProposalReplayGuard'
 import type { SpecificationProposal } from '~/utils/aiProposal'
 import { MAX_FILES_PER_REQUEST, MAX_PER_FILE_CHARS } from '~/server/utils/aiTextExtraction'
-import { createPdfTextReader } from '~/server/utils/documentExtractorClient'
+import { createImageTextReader, createPdfTextReader } from '~/server/utils/documentExtractorClient'
 
 /**
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — a legitimate body here is
@@ -113,8 +113,10 @@ export default defineEventHandler(async (event) => {
   // AI-PDF-SOURCE-01 — PDFs are read by the isolated document-extractor sidecar,
   // never in this process. An unset or unreachable URL makes each PDF report
   // "unavailable"; the other selected sources are still analyzed.
+  // AI-IMAGE-OCR-SOURCE-01 — images are transcribed by the same sidecar, locally.
   const readers = {
     pdf: createPdfTextReader({ baseUrl: config.documentExtractorUrl, maxTextChars: MAX_PER_FILE_CHARS }),
+    image: createImageTextReader({ baseUrl: config.documentExtractorUrl }),
   }
 
   try {

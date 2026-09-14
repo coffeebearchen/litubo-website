@@ -15,9 +15,9 @@
  *     permission.
  *   - `aiReadableNow` — AI Source Intake can turn this format into text today.
  *
- * Images are why they differ: they can be uploaded and linked, but not yet
- * analyzed. (PDF was the first such format; AI-PDF-SOURCE-01 made text-layer
- * PDFs readable.)
+ * They used to differ: PDF and then images could be uploaded and linked before
+ * they could be analyzed. AI-PDF-SOURCE-01 made text-layer PDFs readable, and
+ * AI-IMAGE-OCR-SOURCE-01 made JPG, PNG and WebP readable for their visible text.
  *
  * A planned format is listed so that its label, its size contract and its
  * honest refusal already exist — but it stays unreadable until its own
@@ -102,7 +102,9 @@ export const AI_SOURCE_FORMATS: readonly AiSourceFormat[] = [
     aiReadableNow: true,
   },
   {
-    // Planned: local OCR, so only extracted text ever reaches a provider (AI-IMAGE-OCR-SOURCE-01).
+    // Read today for their visible text only, by local Tesseract OCR inside the
+    // isolated document-extractor (AI-IMAGE-OCR-SOURCE-01). No vision: an image
+    // without readable text reports no_text, and the image itself never reaches a provider.
     key: 'image',
     types: [
       { mime: 'image/jpeg', label: 'Image', shortName: 'JPG' },
@@ -112,7 +114,7 @@ export const AI_SOURCE_FORMATS: readonly AiSourceFormat[] = [
     ],
     maxBytes: 20 * MB,
     mediaUploadSupported: true,
-    aiReadableNow: false,
+    aiReadableNow: true,
   },
 ]
 
@@ -167,7 +169,7 @@ export const AI_READABLE_FORMATS_LABEL = [...new Set(
   AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).flatMap(f => f.types.map(t => t.shortName)),
 )].sort().join(', ')
 
-/** "JPG, PNG, WebP" — formats the Media Library stores but AI cannot analyze yet, for help copy. Derived the same way. */
+/** Formats the Media Library stores but AI cannot analyze yet, for help copy — empty while every stored format can be analyzed. Derived the same way. */
 export const MEDIA_ONLY_FORMATS_LABEL = [...new Set(
   AI_SOURCE_FORMATS.filter(f => f.mediaUploadSupported && !f.aiReadableNow).flatMap(f => f.types.map(t => t.shortName)),
 )].sort().join(', ')
@@ -253,6 +255,13 @@ const NOT_ENABLED_MESSAGES: Record<Exclude<AiSourceFormatKey, 'text'>, string> =
 const PDF_NO_TEXT_MESSAGE = 'No extractable text was found in this PDF. Scanned PDFs are not supported yet.'
 
 /**
+ * AI-IMAGE-OCR-SOURCE-01 — an image is read for its visible text only, so an
+ * ordinary product photo has nothing to read. Saying so keeps anyone from
+ * expecting the picture itself to be interpreted.
+ */
+const IMAGE_NO_TEXT_MESSAGE = 'No readable text was found in this image. Images are read for their visible text only.'
+
+/**
  * The fixed sentence for one failure code. `not_enabled` names the format it is
  * about, so it takes the file's MIME type; with no planned format to name, it
  * falls back to the generic unsupported sentence. `no_text` for a PDF points at
@@ -260,6 +269,7 @@ const PDF_NO_TEXT_MESSAGE = 'No extractable text was found in this PDF. Scanned 
  */
 export function sourceFailureMessage(code: SourceFailureCode, mimeType?: string | null): string {
   if (code === 'no_text' && aiSourceFormatFor(mimeType)?.key === 'pdf') return PDF_NO_TEXT_MESSAGE
+  if (code === 'no_text' && aiSourceFormatFor(mimeType)?.key === 'image') return IMAGE_NO_TEXT_MESSAGE
   if (code === 'not_enabled') {
     const key = aiSourceFormatFor(mimeType)?.key
     return key && key !== 'text' ? NOT_ENABLED_MESSAGES[key] : SOURCE_FAILURE_MESSAGES.unsupported

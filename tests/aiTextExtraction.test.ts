@@ -30,6 +30,7 @@ import type { PdfTextReadResult } from '../server/utils/documentExtractorClient'
 import { aiSourceFormatFor, sourceFailureMessage } from '../utils/aiSourceFormats'
 import { tableXlsx } from './helpers/testOnlyXlsx'
 import { DOCX_MIME, docx, heading, para } from './helpers/testOnlyDocx'
+import { fixture } from './helpers/testOnlyImage'
 
 /** The text family's own size contract — the only download limit in force today. */
 const TEXT_MAX_BYTES = aiSourceFormatFor('text/plain')!.maxBytes
@@ -40,13 +41,14 @@ function toArrayBuffer(buffer: Buffer): ArrayBuffer {
 }
 
 describe('extractTextFromFile — only what the shared contract marks readable is ever read', () => {
-  it('refuses a planned-but-not-readable format with not_enabled, before touching the bytes', async () => {
-    const bytes = toArrayBuffer(Buffer.from('not a real document'))
-    for (const mime of [
-      'image/jpeg', 'image/png', 'image/webp',
-    ]) {
-      expect(await extractTextFromFile(bytes, mime, 'Source 1')).toEqual({ ok: false, code: 'not_enabled' })
+  /** AI-IMAGE-OCR-SOURCE-01 — images are read by the document-extractor; bytes that are not the stored format never reach it. */
+  it('an image is never decoded here: bytes that are not the stored format are malformed, and without a reader it is unavailable', async () => {
+    const notAnImage = toArrayBuffer(Buffer.from('not a real image'))
+    for (const mime of ['image/jpeg', 'image/png', 'image/webp']) {
+      expect(await extractTextFromFile(notAnImage, mime, 'Source 1')).toEqual({ ok: false, code: 'malformed' })
     }
+    const png = toArrayBuffer(Buffer.from(fixture('TEST-ONLY-nameplate-en.png')))
+    expect(await extractTextFromFile(png, 'image/png', 'Source 1')).toEqual({ ok: false, code: 'unavailable' })
   })
 
   it('refuses video, archives, legacy Office and unknown types as unsupported — never faking support', async () => {

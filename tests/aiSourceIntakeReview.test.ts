@@ -51,7 +51,9 @@ describe('the AI screens take format decisions from the shared contract, not a b
     for (const mime of ['text/csv', 'text/tab-separated-values', 'text/plain']) {
       expect(isAiSourceReadableNow(mime)).toBe(true)
     }
-    expect(isAiSourceReadableNow('image/jpeg')).toBe(false)
+    // AI-IMAGE-OCR-SOURCE-01 — JPG / PNG / WebP are read for their visible text; other image formats are not.
+    expect(isAiSourceReadableNow('image/jpeg')).toBe(true)
+    expect(isAiSourceReadableNow('image/gif')).toBe(false)
     expect(isAiSourceReadableNow('application/vnd.ms-excel')).toBe(false)
     expect(isAiSourceReadableNow(null)).toBe(false)
   })

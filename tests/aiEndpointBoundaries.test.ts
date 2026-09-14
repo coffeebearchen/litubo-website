@@ -422,7 +422,7 @@ describe('/api/admin/products/:id/ai/sources — the browser receives no Directu
     const { result } = await loadSources()
     for (const source of result) {
       expect(Object.keys(source).sort()).toEqual(
-        ['analyzable', 'displayName', 'roleLabel', 'sourceRef', 'typeLabel', 'unavailableReason'],
+        ['analyzable', 'displayName', 'isImage', 'roleLabel', 'sourceRef', 'typeLabel', 'unavailableReason'],
       )
     }
   })
@@ -452,10 +452,11 @@ describe('/api/admin/products/:id/ai/sources — the browser receives no Directu
     expect(result[0]).toMatchObject({ analyzable: true, unavailableReason: null })
     expect(result[2]).toMatchObject({ analyzable: false })
     expect(String(result[2].unavailableReason)).toContain('disabled for this product')
-    expect(result[3]).toMatchObject({ analyzable: false })
-    expect(String(result[3].unavailableReason)).toContain('Images are not supported for source analysis yet')
+    // AI-IMAGE-OCR-SOURCE-01 — an enabled image is analyzable now, for its visible text, and counts toward the image limit.
+    expect(result[3]).toMatchObject({ analyzable: true, unavailableReason: null, isImage: true })
     // AI-PDF-SOURCE-01 — an enabled PDF is analyzable now; the document-extractor reads it at Analyze time.
-    expect(result[4]).toMatchObject({ analyzable: true, unavailableReason: null })
+    expect(result[4]).toMatchObject({ analyzable: true, unavailableReason: null, isImage: false })
+    expect(result[0]).toMatchObject({ isImage: false })
   })
 
   it('is not cached — provider and source context must not outlive the session', async () => {

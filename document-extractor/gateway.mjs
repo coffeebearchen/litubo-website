@@ -18,7 +18,7 @@ import { connect, createServer } from 'node:net'
 
 const LISTEN_PORT = 8787
 const TARGET = Object.freeze({ host: 'document-extractor', port: 8787 })
-/** Longer than the extractor's own 15 s task deadline, so a slow extraction is never cut off here. */
+/** Longer than the extractor's longest task deadline (20 s for an image), so a slow extraction is never cut off here. */
 const IDLE_TIMEOUT_MS = 30_000
 
 const server = createServer((client) => {

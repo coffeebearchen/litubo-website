@@ -59,6 +59,15 @@
  * model here; the relevance guard in the prompt decides. Legacy .doc and
  * macro-enabled .docm remain unsupported.
  *
+ * AI-IMAGE-OCR-SOURCE-01 — JPG, PNG and WebP images are read for their visible
+ * text only, by the same isolated document-extractor, through an injected reader:
+ * libvips prepares the image and Tesseract transcribes it there, never in this
+ * process and never by an AI provider. The transcription is labelled as OCR, and
+ * a word the recognizer was not sure of arrives as `[?]` — the mark the shared
+ * prompt contract already forbids inferring from. There is no vision: an image
+ * without readable text is `no_text`. At most MAX_IMAGES_PER_ANALYSIS images
+ * belong to one analysis.
+ *
  * File bytes and extracted text exist only for the lifetime of one request:
  * this module returns plain strings to its caller and keeps no cache, no
  * disk write, and no database write of its own.
@@ -71,12 +80,26 @@ import {
   type SourceFailureCode,
 } from '../../utils/aiSourceFormats'
 import { extractDocxText, MAX_DOCX_PROCESSING_MS } from './docxExtraction'
-import { hasPdfHeader, type PdfTextReader, type PdfTextReadResult } from './documentExtractorClient'
+import {
+  hasPdfHeader,
+  imageMatchesDeclaredType,
+  MAX_IMAGE_OCR_TEXT_CHARS,
+  type ImageTextReader,
+  type ImageTextReadResult,
+  type PdfTextReader,
+  type PdfTextReadResult,
+} from './documentExtractorClient'
 import { officeExtractionGate, type OfficeExtractionGate } from './officeExtractionGate'
 import { extractXlsxText, MAX_XLSX_PROCESSING_MS } from './xlsxExtraction'
 
 /** At most this many source files may be analyzed in a single Generate call. */
 export const MAX_FILES_PER_REQUEST = 5
+
+/**
+ * AI-IMAGE-OCR-SOURCE-01 — at most this many of them may be images. Three
+ * image reads of up to MAX_IMAGE_READ_MS each fit the 60-second reading budget.
+ */
+export const MAX_IMAGES_PER_ANALYSIS = 3
 
 /** Hard ceiling on the combined extracted text sent to any provider in one call. */
 export const MAX_TOTAL_EXTRACTED_CHARS = 60_000
@@ -149,6 +172,8 @@ export type ExtractionResult =
 export interface SourceReaders {
   /** Text-layer PDFs, read by the document-extractor sidecar. Without one, a PDF reports `unavailable`. */
   pdf?: PdfTextReader
+  /** JPG / PNG / WebP visible text, transcribed by the same sidecar. Without one, an image reports `unavailable`. */
+  image?: ImageTextReader
 }
 
 export interface ExtractionOptions {
@@ -168,6 +193,15 @@ export interface ExtractionOptions {
 
 /** One PDF is never read for longer than this, however much of the reading budget is left. */
 export const MAX_PDF_READ_MS = 15_000
+
+/** One image is never read for longer than this, however much of the reading budget is left. */
+export const MAX_IMAGE_READ_MS = 20_000
+
+/**
+ * The first line of every image source's text. It says what the text is — a
+ * transcription — and what `[?]` means, and claims nothing about accuracy.
+ */
+export const OCR_TRANSCRIPTION_HEADER = 'OCR transcription — low-confidence text is marked [?].'
 
 /**
  * Trusted, server-known file size check — must run BEFORE any byte of the
@@ -220,7 +254,10 @@ export async function extractTextFromFile(
   if (format.key === 'docx') {
     return readDocxSource(new Uint8Array(bytes), mimeType, displayName, options)
   }
-  // Text, PDF, XLSX and DOCX are the only formats with a reader. A format marked
+  if (format.key === 'image') {
+    return readImageSource(new Uint8Array(bytes), mimeType, displayName, options)
+  }
+  // Text is the only other format with a reader. A format marked
   // readable before its own reader exists is still refused: its bytes are never
   // decoded as text.
   if (format.key !== 'text') {
@@ -360,6 +397,48 @@ async function readDocxSource(
   return {
     ok: true,
     source: { displayName, fileType: aiSourceTypeLabel(mimeType), text: result.text },
+  }
+}
+
+/**
+ * AI-IMAGE-OCR-SOURCE-01 — one image, transcribed outside this process.
+ *
+ * The stored content type is a claim, so the image signature is checked before
+ * the bytes go anywhere. The reader gets at most MAX_IMAGE_READ_MS, or less when
+ * the analysis has less reading time left. What comes back is either a fixed
+ * failure code or a transcription of at most MAX_IMAGE_OCR_TEXT_CHARS, which is
+ * given its OCR header and refused — never cut — when it does not fit the
+ * source's share. Nothing here retries, and nothing falls back to another reader.
+ */
+async function readImageSource(
+  bytes: Uint8Array,
+  mimeType: string | null | undefined,
+  displayName: string,
+  options: ExtractionOptions,
+): Promise<ExtractionResult> {
+  if (!imageMatchesDeclaredType(bytes, mimeType)) return { ok: false, code: 'malformed' }
+  const reader = options.readers?.image
+  if (!reader) return { ok: false, code: 'unavailable' }
+
+  const timeoutMs = Math.min(MAX_IMAGE_READ_MS, options.timeoutMs ?? MAX_IMAGE_READ_MS)
+  let result: ImageTextReadResult
+  try {
+    result = await reader(bytes, { timeoutMs, mimeType })
+  }
+  catch {
+    return { ok: false, code: 'unavailable' }
+  }
+  if (!result.ok) return { ok: false, code: result.code }
+
+  const transcription = result.text.trim()
+  if (!transcription) return { ok: false, code: 'no_text' }
+  if (transcription.length > MAX_IMAGE_OCR_TEXT_CHARS) return { ok: false, code: 'too_complex' }
+  const text = `${OCR_TRANSCRIPTION_HEADER}\n${transcription}`
+  const maxChars = Math.min(MAX_PER_FILE_CHARS, options.maxChars ?? MAX_PER_FILE_CHARS)
+  if (text.length > maxChars) return { ok: false, code: 'too_complex' }
+  return {
+    ok: true,
+    source: { displayName, fileType: aiSourceTypeLabel(mimeType), text },
   }
 }
 
