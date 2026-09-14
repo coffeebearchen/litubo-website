@@ -74,14 +74,28 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
     const wrapper = mountIntake({
       ...BASE_PROPS,
       sources: [source({
-        sourceRef: 'ref-docx',
-        displayName: 'manual.docx',
-        typeLabel: 'Word',
+        sourceRef: 'ref-scan',
+        displayName: 'scanned manual.pdf',
+        typeLabel: 'PDF',
         analyzable: false,
-        unavailableReason: 'Word documents are not supported for source analysis yet.',
+        unavailableReason: 'No extractable text was found in this PDF. Scanned PDFs are not supported yet.',
       })],
     })
-    expect(wrapper.text()).toContain('Word documents are not supported for source analysis yet.')
+    expect(wrapper.text()).toContain('No extractable text was found in this PDF. Scanned PDFs are not supported yet.')
+  })
+
+  /** AI-DOCX-SOURCE-01 — a Word document the server marks analyzable is a source like any other, under the same selection cap. */
+  it('a .docx source the server marks analyzable can be selected, and shows its Word type', async () => {
+    const wrapper = mountIntake({
+      ...BASE_PROPS,
+      sources: [source({ sourceRef: 'ref-docx', displayName: 'LT180C manual.docx', typeLabel: 'Word', analyzable: true })],
+    })
+    const checkbox = wrapper.find('input[type="checkbox"]')
+    expect((checkbox.element as HTMLInputElement).disabled).toBe(false)
+    expect(wrapper.text()).toContain('LT180C manual.docx')
+    expect(wrapper.text()).toContain('Word')
+    await checkbox.setValue(true)
+    expect(wrapper.emitted('toggle')).toEqual([['ref-docx']])
   })
 
   /** AI-XLSX-SOURCE-01 — a workbook the server marks analyzable is a source like any other, under the same selection cap. */
@@ -172,8 +186,8 @@ describe('WorkspaceAiSourceIntake — real mounted component', () => {
         source({ sourceRef: 'b', typeLabel: 'PDF', analyzable: false, unavailableReason: 'This file is disabled for this product, so it cannot be analyzed. Enable it in Media & resources first.' }),
       ],
     })
-    // Derived from the shared format contract, so it lists exactly what the server reads today — PDF since AI-PDF-SOURCE-01, XLSX since AI-XLSX-SOURCE-01.
-    expect(wrapper.text()).toContain('Supported formats: CSV, PDF, TSV, TXT, XLSX.')
+    // Derived from the shared format contract, so it lists exactly what the server reads today — PDF since AI-PDF-SOURCE-01, XLSX since AI-XLSX-SOURCE-01, DOCX since AI-DOCX-SOURCE-01.
+    expect(wrapper.text()).toContain('Supported formats: CSV, DOCX, PDF, TSV, TXT, XLSX.')
     // Never a hand-written format description of its own.
     expect(wrapper.text()).not.toContain('PDF (with extractable text)')
     expect(wrapper.find('a').exists()).toBe(true)

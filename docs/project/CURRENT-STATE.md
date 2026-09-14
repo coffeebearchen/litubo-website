@@ -7418,3 +7418,247 @@ NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"AI-XLSX-SOURCE-01-R1"任务中写入。*
+
+---
+
+## AI-DOCX-SOURCE-01 = COMPLETED（2026-09-14）
+
+```text
+.docx → bounded ZIP (yauzl) → streaming WordprocessingML (saxes) → final-visible structured text → ExtractedSource → D-025 → existing Proposal Engine.
+AI-readable today: TXT / CSV / TSV / PDF (text-layer) / XLSX / DOCX.
+```
+
+标准 `.docx` 在既有流程中成为 AI 来源：Media Library 上传 → products_files → AI Source Intake → Analyze → 服务端按可信文件大小预检 → 有界下载 → Nuxt 进程内有界 OOXML 流式读取（与 XLSX 共用 `ooxmlReader.ts` 和 Office gate）→ 按"接受全部修订后"的最终可见文字生成标题 / 段落 / 表格结构化文本 → 既有 `ExtractedSource` → D-025 guard → 既有 Proposal Engine → 一个 Provider → 一份 proposal。原始 Word 文件从不发送给 AI Provider。
+
+**分支：** `review/ai-docx-source-01`，从 `6402f50` 创建，仅本地，未 push。
+
+决策登记为 `08-decision-log.md` 的 **D-029 — Bounded DOCX Extraction**。
+
+### 一、当前事实
+
+| 项目 | 状态 |
+|---|---|
+| DOCX Media 上传 | ENABLED（官方 MIME 与 `.docx` 扩展名须同时匹配） |
+| DOCX AI 可读 | ENABLED（`aiReadableNow = true`，来源卡片类型 `Word`） |
+| Legacy `.doc` | 不在 V1。上传拒绝，提示 "Legacy .doc files are not supported. Save as .docx and upload again." |
+| `.docm` / `.dotx` / `.dotm` | 上传拒绝；伪装成 `.docx` 的宏 / 模板文档、VBA 部件 / 内容类型 / 关系 → `unsupported` |
+| 加密 Word（OLE / CFB） | `encrypted`，不尝试密码 |
+| `altChunk` / `subDoc` | `unsupported`（外部导入的可见内容，不静默忽略） |
+| AI 可读 | TXT / CSV / TSV / PDF / XLSX / DOCX |
+| 仍不可读 | JPG / PNG / WebP（DOC / XLS 不在 V1） |
+| 原始 DOCX 发送给 Provider | NO |
+| 模块期间真实 Provider 调用 | 0 |
+| Production deployment | NOT AUTHORIZED |
+
+### 二、读取器（`server/utils/docxExtraction.ts`，新建）
+
+- **复用：** `ooxmlReader.ts`（yauzl + saxes，实际解压字节计数、1,000 entries、不安全 / 重复 part 名 → `malformed`、DOCTYPE / DTD / entity → `malformed`、深度 128、单 token 1 MB、逐分片期限检查）与 `officeExtractionGate.ts`（与 XLSX 共用，1 执行 + 3 等待，第 5 个 `busy`）。未新增第二个 gate；未修改 `ooxmlReader.ts` 与 `xlsxExtraction.ts`（仅引用其已导出的 `resolvePartTarget`）。
+- **只读 4 个 part：** `[Content_Types].xml`、`word/document.xml`（经内容类型定位主文档）、`word/_rels/document.xml.rels`（只为找到 styles，关系只读不跟随）、`word/styles.xml`（可选）。
+- **从不打开：** comments、header / footer、footnotes / endnotes、media、embeddings / OLE、customXml、vbaProject、settings / 外部模板。测试通过包装读取器记录实际打开的 part 名证明。
+- **最终可见文字：** `w:ins` 保留；`w:del` / `w:delText` 删除；`w:moveTo` 保留、`w:moveFrom` 删除；修订删除的表格行（`w:trPr/w:del`）和单元格（`w:cellDel`）删除；`w:rPrChange` 等旧格式记录忽略。
+- **隐藏文字：** `vanish` / `webHidden` / `specVanish` 删除——直接设在 run 上，或经字符样式、段落样式（含 basedOn 链）、文档默认 run 属性继承；run 上 `w:val="0/false"` 可取消样式隐藏。
+- **字段：** `w:instrText` / `w:delInstrText` / `w:fldData` 删除，只保留字段显示结果，不执行字段。
+- **超链接：** 只保留显示文字，不输出、不访问 relationship URL。
+- **AlternateContent：** 只读一个分支（第一个 Choice；没有 Choice 时读 Fallback），文本框不会重复。VML 文本框单独出现时读取一次。
+- **内容控件：** 保留 `w:sdtContent`，忽略 `w:sdtPr`（alias / tag / placeholder）。
+- **标题：** 仅按 styles.xml 判定——内置 "heading 1…9" 或 basedOn 内置标题的样式 → `#`…`######`（7–9 级显示为 6 级）；从不按字体、字号、粗体、颜色猜；无 styles.xml 时全部为普通段落。
+- **段落：** run 拼接；`xml:space="preserve"` 保留首尾空格，否则去掉；tab → 空格；`w:br` / `w:cr` → 换行成独立行；空白与控制 / 格式字符折叠；空段落不输出。
+- **表格：** `Table:` + 每行一行、单元格 ` | ` 分隔（值内 `|` 转义）；单元格内多段 ` / `；空单元格保留位置；`gridSpan` / `gridBefore` 补空位保证列对齐；全空行省略；嵌套表格留在所在单元格内（行间 ` / `、格间 ` ; `）。
+- **不做型号预筛：** 读取器不接收 product_code，没有标题 / 章节过滤；多型号文档全部章节进入 D-025 guard。
+
+结构化文本（测试实际输出）：
+
+```text
+# LT180C
+Aperture: 180 mm
+Power: 0.45 kW
+Table:
+Parameter | Value
+Voltage | 220 V
+```
+
+多型号（LT180C / LT200C）文档输出两节全部内容；Provider mock 看到 Current product、product_code（有值时）与 D-025 guard，1 次调用。
+
+### 三、V1 限制
+
+| 项目 | 限制 |
+|---|---|
+| 文件 | 10 MB（可信元数据预检 + 下载流式计数 + 读取器复检） |
+| ZIP entries | 1,000 |
+| 实际解压 | document.xml 32 MB · styles.xml 4 MB · 内容类型 / 关系各 4 MB · 整包 64 MB |
+| XML | 深度 128 · 单 token 1 MB · DOCTYPE / DTD / entity → `malformed` |
+| 段落 | 5,000（含表格单元格与文本框内段落） |
+| 表格 | 100 个 · 每表 1,000 行 · 单元格合计 20,000（跨列按列数计，跨列 > 64 拒绝）· 嵌套深度 2 |
+| 文本 | 20,000 字符；多来源时不超过份额（1–3 个来源 20,000，4 个 15,000，5 个 12,000） |
+| 期限 | 5 秒，且不超过 60 秒读取预算剩余时间（排队计入）；在 entry、XML 分片、段落、表格行处检查 |
+| 并发 | 与 XLSX 共用：1 个执行 + 3 个等待 |
+
+超过任一限制整份拒绝（`too_large` / `too_complex` / `timeout` / `busy`），不截断；无可见正文 → `no_text`。
+
+### 四、Nuxt 侧
+
+- **`utils/aiSourceFormats.ts`：** DOCX `mediaUploadSupported = true`、`aiReadableNow = true`、标签仍为既有 `Word`。"Supported formats" 与 Media & resources 选择面板提示随合同自动变为 "CSV, DOCX, PDF, TSV, TXT, XLSX"。
+- **`server/utils/aiTextExtraction.ts`：** 新增 `readDocxSource`，期限 = min(5 秒, 剩余读取预算)，经共享 Office gate 调用读取器，不请求 product_code；超出份额 → `too_complex`，不截断。
+- **`server/utils/aiProposalEngine.ts`：** 未改。内容去重、指纹、60 秒读取预算、部分成功、全部失败 0 次调用、D-025 guard、单次 Provider 调用全部沿用。
+- **上传：** `server/api/admin/media/upload.post.ts` 白名单加入 DOCX MIME 与 `.docx`，标签 "JPG、PNG、WebP、PDF、TXT、CSV、TSV、XLSX、DOCX"，新增 `LEGACY_DOC_MESSAGE`（仅按 `.doc` 扩展名触发）。`pages/admin/media/index.vue` 上传 `accept` 加入 `.docx` 与官方 MIME（不含 `.doc` / `.docm` / `.dotx` / `.dotm`），DOCX 卡片颜色 `#2f5597`；`utils/mediaDisplay.ts` 的 `fileKind` 返回 `DOCX`。
+- **未改：** Media picker 类型筛选不新增 Word（P2）；asset proxy 不代理 DOCX；document-extractor、PDF 路径、XLSX 语义、Provider adapter、Product 写接口、Charter、Register 均未改。
+- **依赖：** 0 新增。复用 `yauzl` 3.4.0、`saxes` 6.0.0、devDependency `@types/yauzl` 3.4.0。
+
+### 五、测试
+
+新增 2 个测试文件 + 1 个 helper：
+
+- `tests/docxExtraction.test.ts`（41）：结构（标题 / 段落 / 表格 / 跨列 / 嵌套 / 多型号 / 内容控件）、最终可见文字（ins/del、move、删除行 / 单元格、隐藏文字含样式与默认、rPrChange）、实际打开的 part 名、批注 / 页眉页脚 / 脚注尾注 / media / OLE / customXml 不进入输出、字段指令、超链接不联网、AlternateContent、文本框、`no_text`、malformed（随机字节 / 截断 ZIP / XLSX 伪装 / 缺主文档 / 缺内容类型 / 非 document 根 / 不完整 XML）、encrypted、docm / 模板 / VBA、altChunk / subDoc、不安全路径与重复 document.xml、DOCTYPE / XXE / billion laughs、深度 128/129、token 1 MB/+1、ZIP bomb（真实解压计数、声明大小不可信）、整包总量、1,000/1,001 entries、段落 / 表格 / 行 / 单元格 / 字符 / 文件大小 / 期限边界、生产常量、源码边界。
+- `tests/aiDocxSource.test.ts`（22）：DOCX + TXT、DOCX + PDF + XLSX + TXT 一次调用一份 proposal、多型号 + product_code + D-025、不请求 product_code、去重、部分失败、全部失败 0 次调用（malformed / encrypted / unsupported / too_complex / no_text、too_large / altChunk）、10 MB 下载上限、字符份额（3→20k、4→15k、5→12k，超出拒绝）、DOCX + XLSX 跨格式并发峰值 1、同一队列顺序、1 执行 + 3 等待 + 第 5 个 `busy`、默认共用进程级 gate、5 秒排队期限、真实 DeepSeek adapter + stub `fetch`（来源段落只含可见文字；无 ZIP 字节 / base64 / XML / Content_Types / UUID / 文件名 / 隐藏文字 / 批注 / 删除文字 / 字段路径 / 链接目标）、Provider 失败 1 次请求、0 写入。
+- `tests/helpers/testOnlyDocx.ts`：复用 XLSX helper 的内存 ZIP 写入器生成 TEST ONLY Word 包（core.xml 标题带 TEST ONLY 标记）；生产代码不引用。
+
+同步调整 7 个既有测试文件（DOCX 由不可读改为可读、上传白名单与提示、accept、卡片标签、组件文案）。
+
+对抗测试中，1,000/1,001 entries、深度、1 MB token、DOCTYPE、CFB、宏 / VBA、altChunk、路径、重复 part、隐藏 / 删除 / 字段、表格嵌套、20,000 字符使用生产限制；document.xml 解压上限、整包总量、段落 / 表格 / 行 / 单元格数、文件大小使用调低的测试限制，生产常量单独断言。
+
+### 六、验证（真实 Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | **2021 通过 + 18 跳过**（47 个文件；跳过的 1 个为默认不运行的 PDF 真实容器测试） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `git diff --check` | 通过 |
+| `npm run build` | Build complete（7.01 MB / 1.76 MB gzip） |
+| 依赖 | 0 新增；`package.json` / `package-lock.json` 未改 |
+
+- **构建产物实际启动：**
+  - Node 22.22.2 运行 `.output/server/index.mjs`，只监听 `127.0.0.1:3001`；日志只有 `Listening`。
+  - `/admin/login` 200、`/admin` 200；`/admin/media`、AI Source Intake、Media & resources、AI Proposal Review 302 → `/admin/login`；`/api/admin/products/3/ai/sources` 401。
+  - 直接加载产物服务端 chunk（`.output/server/chunks/_/aiSourceRef.mjs`）的 `extractTextFromFile` 读取 TEST ONLY DOCX：输出 `# LT180C / Voltage 220 V / Aperture 180 mm / Weight 45 kg / Table: / Parameter | Value / Power | 0.45 kW`，不含删除值、隐藏文字、批注、字段路径；malformed / DOCTYPE → `malformed`，docm / altChunk → `unsupported`，空文档 → `no_text`。
+  - `.output/public` 中 yauzl / saxes / Word 读取器引用为 0；二者只在 `.output/server/node_modules`。未使用任何凭证。
+- **Windows `nuxt dev`（3000 端口进程实测 Node 22.22.2）：**
+  - build 后首次启动出现已知的 `#app-manifest` Pre-transform 报错；确认端口释放后干净重启一次，重启后日志无任何错误。
+  - 无 cookie：`/` 200、`/admin/login` 200、`/admin` 200；受保护页面 302 → `/admin/login`；AI sources API 401；无全站 500。
+  - 验收期间浏览器面板被重置一次（疑似其他会话同时使用面板），用户重新登录一次后，在服务器稳定后新开的标签页中完成验收。
+- **1440px（全新标签页，console 0 条错误，均无横向溢出）：**
+  - `/admin`（→ `/admin/products`）：`scrollWidth = clientWidth = 1425`。
+  - `/admin/media`：54 张文件卡，1440 = 1440；上传 input `accept` 含 `.docx` 与官方 MIME，不含 `.doc` / `.docm` / `.dotx` / `.dotm`（另一个文件夹上传 input 原本无 accept）。
+  - AI Source Intake：11 张来源卡、4 个可选、`0 / 5 selected`、Analyze 禁用；1425 = 1425。
+  - Media & resources：7 assets / 4 documents、Save changes 禁用；1425 = 1425。
+  - AI Proposal Review：空态 "No active proposal. Return to AI Source Intake."；1425 = 1425。
+- **375px（同一全新标签页，console 0 条错误，以上路由均 `scrollWidth = clientWidth = 375`）：**
+  - AI Source Intake：选中 `LT-180C-BETA-SYNTHETIC-SOURCE.txt` → `1 / 5 selected`、Analyze 可用、披露文案 "Original files are not sent to the AI provider." 显示；取消 → `0 / 5 selected`、Analyze 禁用；无 generate 请求。
+  - Media & resources：打开 "+ Select from Media Library"，提示为 "AI-readable marks the CSV, DOCX, PDF, TSV, TXT, XLSX files AI Source Intake can analyze today. JPG, PNG, WebP files can be linked, but not analyzed."，类型筛选仍为 All formats / Image / PDF / Text (TXT, CSV, TSV)；未保存，重新加载后仍为 7 / 4、Save changes 禁用。
+  - AI Proposal Review：空态正常。
+- **未做与还原：**
+  - 未点击 Analyze，0 次 generate / apply；未上传或关联 DOCX；Product 3 与其 `product_code` 未改。
+  - `.claude/launch.json` 仅在验收期间临时加入 Node 22 启动配置，验收后已还原，与 HEAD 一致。
+- **Node 运行环境说明：** 本机持久安装的 Node 为 PATH 上的 24.14.0 与 fnm 中的 18.20.8，未发现持久安装的 22.22.2。本模块全部验证使用的是本机已存在于某个旧 Claude 会话 Temp 目录中的便携 Node 22.22.2（进程实测 v22.22.2），未下载、未安装、未修改系统 Node，路径未写入项目文件。该路径依赖会话、不持久，不能作为标准运行环境；后续模块开工前应由用户授权安装持久 Node 22.22.2。
+
+### 七、已知限制
+
+- 读取器在 Nuxt 进程内运行，没有 OS 级内存硬限制；5 秒是应用层期限。安全性来自：输入 10 MB、实际解压计数、流式 XML、段落 / 表格 / 单元格 / 字符计数、频繁期限检查与共享单并发 Office gate。
+- 不支持 legacy `.doc`、`.docm`、`.dotx` / `.dotm`；不提取页眉页脚、批注、脚注尾注；不解析嵌入的 Office / PDF / OLE 对象；`altChunk` / `subDoc` 整份拒绝；图片不做 OCR。
+- 无页码 / 段落定位 provenance；列表编号（"1."、项目符号）不输出；垂直合并单元格的续行为空单元格；不重建多级表头。
+- 不做确定性的 DOCX 型号章节过滤：型号归属完全由 D-025 guard 与人工审核判断。
+- 单个 run 的文本（包括隐藏 run）超过字符上限时整份按 `too_complex` 拒绝（保守，不泄露）。
+- 选择 4–5 个来源时，文档份额降为 15,000 / 12,000 字符，超出整份拒绝（`too_complex`），不截断。
+- 当前配置的 npm 镜像源不支持 `npm audit`；本模块未新增依赖。
+
+### 八、边界
+
+**DOCX implemented · 0 Image OCR · 0 Vision · 0 legacy DOC · 0 DOCM · 0 scanned PDF OCR · 0 新 npm package · 0 Docker 改动 · 0 PDF 架构改动 · 0 XLSX 语义改动 · 0 产品数据写入 · 0 DB / Directus schema · 0 Provider adapter 改动 · 0 真实 Provider 调用 · 0 API 费用 · 0 push · 0 部署 · 抽取文本 0 持久化。**
+
+- **Charter / Register：** 未改，格式状态以 D-024 + 共享格式合同 + 本文件为准。
+- **MASTER-ROADMAP：** 最小同步——新增 AI-DOCX-SOURCE-01 ✅ COMPLETED 行，"规划中"行改为 Image OCR。
+
+---
+
+```text
+AI-DOCX-SOURCE-01
+=
+COMPLETED
+
+DOCX Media upload:
+ENABLED
+
+DOCX AI-readable:
+ENABLED
+
+Parser:
+bounded in-process OOXML streaming
+
+Dependencies:
+reuses yauzl / saxes
+0 new packages
+
+Primary extraction:
+headings
+paragraphs
+tables
+visible body text
+
+Excluded:
+comments
+headers
+footers
+footnotes
+endnotes
+hidden text
+deleted text
+field instructions
+embedded files
+
+Track changes:
+final-visible semantics
+
+Macros:
+unsupported
+
+Legacy DOC:
+unsupported
+
+altChunk:
+unsupported
+
+Office gate:
+shared with XLSX
+1 active + 3 queued
+
+Product model:
+D-025
+no deterministic DOCX section filtering
+
+DOCX hard limits:
+10 MB
+1000 ZIP entries
+document.xml 32 MB actual
+styles.xml 4 MB actual
+64 MB package actual
+5000 paragraphs
+100 tables
+1000 rows/table
+20000 table cells
+table nesting 2
+20k extracted chars
+5s processing deadline
+
+Original DOCX → Provider:
+NO
+
+Product writes:
+0
+
+Provider real calls:
+0
+
+AI-readable now:
+TXT / CSV / TSV / PDF / XLSX / DOCX
+
+Still not AI-readable:
+JPG / PNG / WebP
+
+NEXT CANDIDATE:
+AI-IMAGE-OCR-SOURCE-01
+
+STATUS:
+NOT AUTHORIZED
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"AI-DOCX-SOURCE-01"任务中写入。*

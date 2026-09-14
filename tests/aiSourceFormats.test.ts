@@ -9,6 +9,8 @@
  *
  * AI-XLSX-SOURCE-01 — standard .xlsx workbooks joined the readable formats once
  * their bounded reader passed its own tests.
+ *
+ * AI-DOCX-SOURCE-01 — standard .docx documents joined them the same way.
  */
 
 import { describe, it, expect, vi, beforeAll } from 'vitest'
@@ -27,6 +29,7 @@ import {
 } from '../utils/aiSourceFormats'
 import { extractTextFromFile } from '../server/utils/aiTextExtraction'
 import { tableXlsx } from './helpers/testOnlyXlsx'
+import { docx, para } from './helpers/testOnlyDocx'
 
 const repoFile = (rel: string) => readFileSync(resolve(process.cwd(), rel), 'utf8')
 
@@ -39,12 +42,12 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
 describe('A. what AI Source Intake can analyze today', () => {
-  it.each([TXT, CSV, TSV, PDF, XLSX])('%s is AI-readable', (mime) => {
+  it.each([TXT, CSV, TSV, PDF, XLSX, DOCX])('%s is AI-readable', (mime) => {
     expect(isAiSourceReadableNow(mime)).toBe(true)
     expect(aiSourceFormatRefusal(mime)).toBeNull()
   })
 
-  it.each([DOCX, ...IMAGES])('%s is a planned format — listed, but NOT readable yet', (mime) => {
+  it.each(IMAGES)('%s is a planned format — listed, but NOT readable yet', (mime) => {
     expect(aiSourceFormatFor(mime)).not.toBeNull()
     expect(isAiSourceReadableNow(mime)).toBe(false)
     expect(aiSourceFormatRefusal(mime)).toBe('not_enabled')
@@ -52,6 +55,7 @@ describe('A. what AI Source Intake can analyze today', () => {
 
   it.each([
     'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-excel.sheet.macroenabled.12', 'video/mp4',
+    'application/vnd.ms-word.document.macroenabled.12', 'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
     'application/zip', 'text/html', 'image/gif', 'application/octet-stream', '',
   ])('%s is outside the contract, so it is simply unsupported', (mime) => {
     expect(aiSourceFormatFor(mime)).toBeNull()
@@ -73,13 +77,13 @@ describe('A. what AI Source Intake can analyze today', () => {
     expect(aiSourceFormatRefusal('IMAGE/PNG')).toBe('not_enabled')
   })
 
-  /** AI-PDF-SOURCE-01 and AI-XLSX-SOURCE-01 — each format joined text once its own reader passed acceptance. No other format has. */
-  it('exactly three format families are readable: text, text-layer PDF and .xlsx workbooks', () => {
-    expect(AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).map(f => f.key)).toEqual(['text', 'pdf', 'xlsx'])
+  /** AI-PDF-SOURCE-01, AI-XLSX-SOURCE-01 and AI-DOCX-SOURCE-01 — each format joined text once its own reader passed acceptance. No other format has. */
+  it('exactly four format families are readable: text, text-layer PDF, .docx documents and .xlsx workbooks', () => {
+    expect(AI_SOURCE_FORMATS.filter(f => f.aiReadableNow).map(f => f.key)).toEqual(['text', 'pdf', 'docx', 'xlsx'])
   })
 
   it('the "Supported formats" copy lists exactly the readable formats', () => {
-    expect(AI_READABLE_FORMATS_LABEL).toBe('CSV, PDF, TSV, TXT, XLSX')
+    expect(AI_READABLE_FORMATS_LABEL).toBe('CSV, DOCX, PDF, TSV, TXT, XLSX')
   })
 
   it('the "can be linked, but not analyzed" copy lists exactly the stored-but-unreadable formats', () => {
@@ -105,10 +109,10 @@ describe('the contract itself', () => {
     expect(aiSourceTypeLabel(TSV)).toBe('TSV')
     expect(aiSourceTypeLabel(PDF)).toBe('PDF')
     expect(aiSourceTypeLabel(XLSX)).toBe('Spreadsheet')
+    expect(aiSourceTypeLabel(DOCX)).toBe('Word')
   })
 
   it('labels a source card for every other format without ever going blank', () => {
-    expect(aiSourceTypeLabel(DOCX)).toBe('Word')
     expect(aiSourceTypeLabel('image/png')).toBe('Image')
     expect(aiSourceTypeLabel('image/gif')).toBe('Image')
     expect(aiSourceTypeLabel('video/mp4')).toBe('Video')
@@ -127,12 +131,14 @@ describe('B. the server reads exactly what the shared contract marks readable', 
   /** A PDF is read through the document-extractor's reader, so the table gives it a PDF header and a stand-in reader. */
   const PDF_READER = { pdf: async () => ({ ok: true as const, text: 'Aperture: 180 mm' }) }
 
-  /** Real content for each format: a PDF header for a PDF, a TEST ONLY workbook for an .xlsx, plain text otherwise. */
+  /** Real content for each format: a PDF header for a PDF, a TEST ONLY workbook or document for .xlsx and .docx, plain text otherwise. */
   const contentFor = (mime: string | null): ArrayBuffer => {
     const key = aiSourceFormatFor(mime)?.key
     const bytes = key === 'xlsx'
       ? tableXlsx([['Parameter', 'Value'], ['Aperture', '180 mm']])
-      : new TextEncoder().encode(key === 'pdf' ? '%PDF-1.7\nAperture: 180 mm' : 'Aperture: 180 mm')
+      : key === 'docx'
+        ? docx([para('Aperture: 180 mm')])
+        : new TextEncoder().encode(key === 'pdf' ? '%PDF-1.7\nAperture: 180 mm' : 'Aperture: 180 mm')
     return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
   }
 
@@ -225,10 +231,20 @@ describe('C. Media Library storage and AI readability are separate facts', () =>
     }
   })
 
-  it('DOCX: still not uploadable, and not analyzable — its own module changes that', () => {
-    expect(isAllowedUpload('manual.docx', DOCX)).toBe(false)
-    expect(aiSourceFormatFor(DOCX)?.mediaUploadSupported).toBe(false)
-    expect(isAiSourceReadableNow(DOCX)).toBe(false)
+  it('DOCX: the Media Library stores it, and AI Source Intake can analyze it (AI-DOCX-SOURCE-01)', () => {
+    expect(isAllowedUpload('manual.docx', DOCX)).toBe(true)
+    expect(aiSourceFormatFor(DOCX)?.mediaUploadSupported).toBe(true)
+    expect(isAiSourceReadableNow(DOCX)).toBe(true)
+    expect(aiSourceFormatFor(DOCX)?.maxBytes).toBe(10 * 1024 * 1024)
+  })
+
+  it('legacy .doc, macro-enabled .docm and the .dotx / .dotm templates are neither stored nor analyzed', () => {
+    expect(isAllowedUpload('manual.doc', 'application/msword')).toBe(false)
+    expect(isAllowedUpload('macro.docm', 'application/vnd.ms-word.document.macroEnabled.12')).toBe(false)
+    expect(isAllowedUpload('template.dotx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.template')).toBe(false)
+    expect(isAllowedUpload('template.dotm', 'application/vnd.ms-word.template.macroEnabled.12')).toBe(false)
+    expect(aiSourceFormatFor('application/msword')).toBeNull()
+    expect(aiSourceFormatFor('application/vnd.ms-word.document.macroEnabled.12')).toBeNull()
   })
 
   it('legacy .xls and macro-enabled .xlsm are neither stored nor analyzed', () => {

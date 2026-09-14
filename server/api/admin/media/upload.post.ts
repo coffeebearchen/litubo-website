@@ -12,20 +12,27 @@ import { assertFolderAllowsUpload } from '~/server/utils/folderRegistry'
  * AI-XLSX-SOURCE-01 — standard .xlsx workbooks are accepted too. Legacy .xls and
  * macro-enabled .xlsm are not: V1 reads neither, so storing one would only offer
  * a source that can never be analyzed.
+ *
+ * AI-DOCX-SOURCE-01 — standard .docx documents are accepted too, for the same
+ * reason. Legacy .doc, macro-enabled .docm and the .dotx / .dotm templates are not.
  */
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const ALLOWED_TYPES = new Set([
   'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf',
   'text/plain', 'text/csv', 'text/tab-separated-values',
-  XLSX_MIME,
+  XLSX_MIME, DOCX_MIME,
 ])
-const ALLOWED_EXTS = /\.(jpe?g|png|webp|pdf|txt|csv|tsv|xlsx)$/i
+const ALLOWED_EXTS = /\.(jpe?g|png|webp|pdf|txt|csv|tsv|xlsx|docx)$/i
 
 /** Human-readable list of what is accepted, kept next to the rule it describes so the two cannot drift. */
-export const ALLOWED_UPLOAD_LABEL = 'JPG、PNG、WebP、PDF、TXT、CSV、TSV、XLSX'
+export const ALLOWED_UPLOAD_LABEL = 'JPG、PNG、WebP、PDF、TXT、CSV、TSV、XLSX、DOCX'
 
 /** A legacy workbook is told what to do about it, not only that it was refused. */
 export const LEGACY_XLS_MESSAGE = 'Legacy .xls files are not supported. Save as .xlsx and upload again.'
+
+/** A legacy Word document likewise. */
+export const LEGACY_DOC_MESSAGE = 'Legacy .doc files are not supported. Save as .docx and upload again.'
 
 /**
  * The upload rule itself, exported so it is asserted directly rather than
@@ -38,12 +45,14 @@ export function isAllowedUpload(filename: string, contentType: string): boolean 
 }
 
 /**
- * Why a file was refused. A legacy .xls workbook gets its own sentence. It is
- * recognised by its name alone: a browser on a machine with Excel installed can
- * label a .csv file `application/vnd.ms-excel` too, and that file is no .xls.
+ * Why a file was refused. A legacy .xls workbook or .doc document gets its own
+ * sentence. It is recognised by its name alone: a browser on a machine with Excel
+ * installed can label a .csv file `application/vnd.ms-excel` too, and that file
+ * is no .xls.
  */
 export function uploadRefusalMessage(filename: string, contentType: string): string {
   if (/\.xls$/i.test(filename)) return LEGACY_XLS_MESSAGE
+  if (/\.doc$/i.test(filename)) return LEGACY_DOC_MESSAGE
   return `格式不支持（${contentType}）。仅允许 ${ALLOWED_UPLOAD_LABEL}`
 }
 /**

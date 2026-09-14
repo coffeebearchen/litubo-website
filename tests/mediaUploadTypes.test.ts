@@ -24,10 +24,12 @@ import { resolve } from 'node:path'
 let isAllowedUpload: (filename: string, contentType: string) => boolean
 let ALLOWED_UPLOAD_LABEL: string
 let LEGACY_XLS_MESSAGE: string
+let LEGACY_DOC_MESSAGE: string
 let uploadFailureMessage: (status: number | undefined) => string
 let uploadRefusalMessage: (filename: string, contentType: string) => string
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 beforeAll(async () => {
   vi.stubGlobal('defineEventHandler', (handler: unknown) => handler)
@@ -35,6 +37,7 @@ beforeAll(async () => {
   isAllowedUpload = mod.isAllowedUpload
   ALLOWED_UPLOAD_LABEL = mod.ALLOWED_UPLOAD_LABEL
   LEGACY_XLS_MESSAGE = mod.LEGACY_XLS_MESSAGE
+  LEGACY_DOC_MESSAGE = mod.LEGACY_DOC_MESSAGE
   uploadFailureMessage = mod.uploadFailureMessage
   uploadRefusalMessage = mod.uploadRefusalMessage
 })
@@ -88,6 +91,22 @@ describe('Media Library upload — standard .xlsx workbooks are accepted', () =>
   })
 })
 
+/** AI-DOCX-SOURCE-01 — a standard .docx document is stored like any other accepted source. */
+describe('Media Library upload — standard .docx documents are accepted', () => {
+  it('accepts .docx with its official content type, in any letter case', () => {
+    expect(isAllowedUpload('manual.docx', DOCX)).toBe(true)
+    expect(isAllowedUpload('MANUAL.DOCX', DOCX.toUpperCase())).toBe(true)
+  })
+
+  it('still needs both halves: a .docx name with another type, or the type on another name, is refused', () => {
+    expect(isAllowedUpload('manual.docx', 'application/msword')).toBe(false)
+    expect(isAllowedUpload('manual.docx', 'application/octet-stream')).toBe(false)
+    expect(isAllowedUpload('manual.docm', DOCX)).toBe(false)
+    expect(isAllowedUpload('manual.doc', DOCX)).toBe(false)
+    expect(isAllowedUpload('manual.dotx', DOCX)).toBe(false)
+  })
+})
+
 describe('Media Library upload — everything else is still refused', () => {
   it.each([
     ['sheet.xls', 'application/vnd.ms-excel'],
@@ -96,8 +115,10 @@ describe('Media Library upload — everything else is still refused', () => {
     ['archive.zip', 'application/zip'],
     ['script.js', 'text/javascript'],
     ['page.html', 'text/html'],
-    ['doc.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
     ['doc.doc', 'application/msword'],
+    ['macro.docm', 'application/vnd.ms-word.document.macroEnabled.12'],
+    ['template.dotx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.template'],
+    ['template.dotm', 'application/vnd.ms-word.template.macroEnabled.12'],
     ['video.mp4', 'video/mp4'],
     ['unknown.bin', 'application/octet-stream'],
   ])('refuses %s (%s)', (filename, type) => {
@@ -118,8 +139,8 @@ describe('Media Library upload — everything else is still refused', () => {
 })
 
 describe('the refusal message names exactly what is accepted', () => {
-  it('lists all eight accepted formats', () => {
-    expect(ALLOWED_UPLOAD_LABEL).toBe('JPG、PNG、WebP、PDF、TXT、CSV、TSV、XLSX')
+  it('lists all nine accepted formats', () => {
+    expect(ALLOWED_UPLOAD_LABEL).toBe('JPG、PNG、WebP、PDF、TXT、CSV、TSV、XLSX、DOCX')
   })
 
   it('the handler builds its error message from that label rather than a hard-coded list', () => {
@@ -136,9 +157,19 @@ describe('the refusal message names exactly what is accepted', () => {
     expect(uploadRefusalMessage('SHEET.XLS', 'application/octet-stream')).toBe(LEGACY_XLS_MESSAGE)
     expect(uploadRefusalMessage('macro.xlsm', 'application/vnd.ms-excel.sheet.macroenabled.12'))
       .toBe(`格式不支持（application/vnd.ms-excel.sheet.macroenabled.12）。仅允许 ${ALLOWED_UPLOAD_LABEL}`)
-    expect(uploadRefusalMessage('manual.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')).not.toBe(LEGACY_XLS_MESSAGE)
+    expect(uploadRefusalMessage('manual.docx', 'application/octet-stream')).not.toBe(LEGACY_XLS_MESSAGE)
     // A .csv that a browser labelled with the Excel type is not an .xls, and is not told it is one.
     expect(uploadRefusalMessage('parameters.csv', 'application/vnd.ms-excel')).not.toBe(LEGACY_XLS_MESSAGE)
+  })
+
+  /** AI-DOCX-SOURCE-01 — a legacy Word document is told the same kind of thing. */
+  it('tells a legacy .doc upload to save it as .docx, and never says so to a .docm or .docx', () => {
+    expect(LEGACY_DOC_MESSAGE).toBe('Legacy .doc files are not supported. Save as .docx and upload again.')
+    expect(uploadRefusalMessage('manual.doc', 'application/msword')).toBe(LEGACY_DOC_MESSAGE)
+    expect(uploadRefusalMessage('MANUAL.DOC', 'application/octet-stream')).toBe(LEGACY_DOC_MESSAGE)
+    expect(uploadRefusalMessage('macro.docm', 'application/vnd.ms-word.document.macroenabled.12'))
+      .toBe(`格式不支持（application/vnd.ms-word.document.macroenabled.12）。仅允许 ${ALLOWED_UPLOAD_LABEL}`)
+    expect(uploadRefusalMessage('manual.docx', 'application/msword')).not.toBe(LEGACY_DOC_MESSAGE)
   })
 })
 
@@ -148,7 +179,7 @@ describe('the Media Library file input offers the same set the server accepts', 
     return (source.match(/accept="([^"]+)"/)?.[1] ?? '').split(',').map(token => token.trim())
   }
 
-  it('accept lists every accepted extension and MIME type, .xlsx included', () => {
+  it('accept lists every accepted extension and MIME type, .xlsx and .docx included', () => {
     const accept = acceptTokens()
     for (const token of ['.txt', '.csv', '.tsv', 'text/plain', 'text/csv', 'text/tab-separated-values']) {
       expect(accept).toContain(token)
@@ -158,11 +189,16 @@ describe('the Media Library file input offers the same set the server accepts', 
     }
     expect(accept).toContain('.xlsx')
     expect(accept).toContain(XLSX)
+    expect(accept).toContain('.docx')
+    expect(accept).toContain(DOCX)
   })
 
-  it('never offers a legacy, macro-enabled or Word file the server would refuse', () => {
+  it('never offers a legacy, macro-enabled or template file the server would refuse', () => {
     const accept = acceptTokens()
-    for (const token of ['.xls', '.xlsm', '.xltx', '.doc', '.docx', 'application/vnd.ms-excel', 'application/msword']) {
+    for (const token of [
+      '.xls', '.xlsm', '.xltx', '.doc', '.docm', '.dotx', '.dotm',
+      'application/vnd.ms-excel', 'application/msword', 'application/vnd.ms-word.document.macroenabled.12',
+    ]) {
       expect(accept).not.toContain(token)
     }
   })

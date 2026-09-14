@@ -81,12 +81,15 @@ export const AI_SOURCE_FORMATS: readonly AiSourceFormat[] = [
     aiReadableNow: true,
   },
   {
-    // Planned: paragraphs, headings and tables, read by a bounded streaming reader (AI-DOCX-SOURCE-01).
+    // Standard .docx documents, read by the same bounded in-process OOXML reader
+    // (AI-DOCX-SOURCE-01): headings, paragraphs and tables of the main document as
+    // it reads with tracked changes accepted — no hidden text, comments, headers or
+    // footers. Legacy .doc and macro-enabled .docm are not this format.
     key: 'docx',
     types: [{ mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', label: 'Word', shortName: 'DOCX' }],
     maxBytes: 10 * MB,
-    mediaUploadSupported: false,
-    aiReadableNow: false,
+    mediaUploadSupported: true,
+    aiReadableNow: true,
   },
   {
     // Standard .xlsx workbooks, read by a bounded in-process OOXML reader
@@ -199,7 +202,8 @@ export type SourceFailureCode =
   | 'unavailable'
   | 'busy'
   | 'unsafe_parse'
-  // Produced by the workbook reader (AI-XLSX-SOURCE-01), besides the codes above
+  // Produced by the workbook reader (AI-XLSX-SOURCE-01), besides the codes above.
+  // The Word reader (AI-DOCX-SOURCE-01) produces only codes already listed.
   | 'too_complex'
   | 'too_many_sheets'
   | 'too_many_rows'

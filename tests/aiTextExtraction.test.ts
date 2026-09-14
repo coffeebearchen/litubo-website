@@ -6,8 +6,9 @@
  * injected reader — in production the isolated document-extractor sidecar,
  * here a stand-in. An .xlsx workbook goes to the bounded workbook reader
  * (AI-XLSX-SOURCE-01; its own tests are `tests/xlsxExtraction.test.ts` and
- * `tests/aiXlsxSource.test.ts`). Every other format is refused. No network, no
- * Directus, no mock provider involved.
+ * `tests/aiXlsxSource.test.ts`), and a .docx document to the bounded Word reader
+ * (AI-DOCX-SOURCE-01; `tests/docxExtraction.test.ts` and `tests/aiDocxSource.test.ts`).
+ * Every other format is refused. No network, no Directus, no mock provider involved.
  *
  * AI-SOURCE-CONTRACT-01 — a refusal is now a failure code. Which formats are
  * readable, and the sentence each code becomes, are pinned against the shared
@@ -28,6 +29,7 @@ import {
 import type { PdfTextReadResult } from '../server/utils/documentExtractorClient'
 import { aiSourceFormatFor, sourceFailureMessage } from '../utils/aiSourceFormats'
 import { tableXlsx } from './helpers/testOnlyXlsx'
+import { DOCX_MIME, docx, heading, para } from './helpers/testOnlyDocx'
 
 /** The text family's own size contract — the only download limit in force today. */
 const TEXT_MAX_BYTES = aiSourceFormatFor('text/plain')!.maxBytes
@@ -41,7 +43,6 @@ describe('extractTextFromFile — only what the shared contract marks readable i
   it('refuses a planned-but-not-readable format with not_enabled, before touching the bytes', async () => {
     const bytes = toArrayBuffer(Buffer.from('not a real document'))
     for (const mime of [
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'image/jpeg', 'image/png', 'image/webp',
     ]) {
       expect(await extractTextFromFile(bytes, mime, 'Source 1')).toEqual({ ok: false, code: 'not_enabled' })
@@ -69,6 +70,17 @@ describe('extractTextFromFile — only what the shared contract marks readable i
     const bytes = toArrayBuffer(Buffer.from('not a real xlsx'))
     expect(await extractTextFromFile(bytes, XLSX, 'sheet.xlsx')).toEqual({ ok: false, code: 'malformed' })
     expect(await extractTextFromFile(bytes, 'application/zip', 'archive.zip')).toEqual({ ok: false, code: 'unsupported' })
+  })
+
+  /** AI-DOCX-SOURCE-01 — a Word document is read by the bounded Word reader; bytes that only claim to be one are damaged, not unsupported. */
+  it('a .docx document is read into structured text, and bytes that only claim to be one are malformed', async () => {
+    const document = toArrayBuffer(Buffer.from(docx([heading(1, 'LT180C'), para('Aperture: 180 mm')])))
+    expect(await extractTextFromFile(document, DOCX_MIME, 'Source 1')).toEqual({
+      ok: true,
+      source: { displayName: 'Source 1', fileType: 'Word', text: '# LT180C\nAperture: 180 mm' },
+    })
+    expect(await extractTextFromFile(toArrayBuffer(Buffer.from('not a real docx')), DOCX_MIME, 'manual.docx')).toEqual({ ok: false, code: 'malformed' })
+    expect(await extractTextFromFile(toArrayBuffer(Buffer.from('not a real doc')), 'application/msword', 'manual.doc')).toEqual({ ok: false, code: 'unsupported' })
   })
 
   it('is case-insensitive and ignores a charset suffix', async () => {

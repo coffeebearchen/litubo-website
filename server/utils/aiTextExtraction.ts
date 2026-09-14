@@ -52,6 +52,13 @@
  * (`officeExtractionGate.ts`), and a workbook over a limit is refused, never
  * cut. Legacy .xls and macro-enabled .xlsm remain unsupported.
  *
+ * AI-DOCX-SOURCE-01 — .docx documents are read the same way: `docxExtraction.ts`
+ * streams the main document part through the same bounded OOXML reader, under
+ * the same Office gate, into headings, paragraphs and tables as the document
+ * reads with tracked changes accepted. A document is never narrowed to a product
+ * model here; the relevance guard in the prompt decides. Legacy .doc and
+ * macro-enabled .docm remain unsupported.
+ *
  * File bytes and extracted text exist only for the lifetime of one request:
  * this module returns plain strings to its caller and keeps no cache, no
  * disk write, and no database write of its own.
@@ -63,6 +70,7 @@ import {
   aiSourceTypeLabel,
   type SourceFailureCode,
 } from '../../utils/aiSourceFormats'
+import { extractDocxText, MAX_DOCX_PROCESSING_MS } from './docxExtraction'
 import { hasPdfHeader, type PdfTextReader, type PdfTextReadResult } from './documentExtractorClient'
 import { officeExtractionGate, type OfficeExtractionGate } from './officeExtractionGate'
 import { extractXlsxText, MAX_XLSX_PROCESSING_MS } from './xlsxExtraction'
@@ -152,7 +160,7 @@ export interface ExtractionOptions {
    * analysis without one never needs it. Null when the product has no code.
    */
   productCode?: () => Promise<string | null>
-  /** The most characters a workbook's text may have — at most MAX_PER_FILE_CHARS. A longer text is refused, never cut. */
+  /** The most characters an Office document's text may have — at most MAX_PER_FILE_CHARS. A longer text is refused, never cut. */
   maxChars?: number
   /** The Office parse queue. Tests inject their own; everything else shares the process-wide gate. */
   officeGate?: OfficeExtractionGate
@@ -209,7 +217,10 @@ export async function extractTextFromFile(
   if (format.key === 'xlsx') {
     return readXlsxSource(new Uint8Array(bytes), mimeType, displayName, options)
   }
-  // Text, PDF and XLSX are the only formats with a reader. A format marked
+  if (format.key === 'docx') {
+    return readDocxSource(new Uint8Array(bytes), mimeType, displayName, options)
+  }
+  // Text, PDF, XLSX and DOCX are the only formats with a reader. A format marked
   // readable before its own reader exists is still refused: its bytes are never
   // decoded as text.
   if (format.key !== 'text') {
@@ -303,6 +314,42 @@ async function readXlsxSource(
   const gate = options.officeGate ?? officeExtractionGate
   const outcome = await gate
     .run(() => extractXlsxText(bytes, { deadline, productCode, maxChars }), { deadline })
+    .catch(() => null)
+  if (!outcome) return { ok: false, code: 'unreadable' }
+  if (!outcome.ok) return { ok: false, code: outcome.code }
+  const result = outcome.value
+  if (!result.ok) return { ok: false, code: result.code }
+  // The reader already refuses anything longer; checked again here, and refused rather than cut.
+  if (result.text.length > maxChars) return { ok: false, code: 'too_complex' }
+  return {
+    ok: true,
+    source: { displayName, fileType: aiSourceTypeLabel(mimeType), text: result.text },
+  }
+}
+
+/**
+ * AI-DOCX-SOURCE-01 — one Word document, read in this process by the bounded reader.
+ *
+ * It gets at most MAX_DOCX_PROCESSING_MS, or less when the analysis has less
+ * reading time left, and waits for the same Office gate as a workbook, spending
+ * that same deadline while it waits. No product code is asked for: a document is
+ * never narrowed to one model here. The text is never cut: a document whose text
+ * would not fit `maxChars` is refused. Nothing here retries.
+ */
+async function readDocxSource(
+  bytes: Uint8Array,
+  mimeType: string | null | undefined,
+  displayName: string,
+  options: ExtractionOptions,
+): Promise<ExtractionResult> {
+  const timeoutMs = Math.min(MAX_DOCX_PROCESSING_MS, options.timeoutMs ?? MAX_DOCX_PROCESSING_MS)
+  if (timeoutMs <= 0) return { ok: false, code: 'timeout' }
+  const deadline = Date.now() + timeoutMs
+  const maxChars = Math.min(MAX_PER_FILE_CHARS, options.maxChars ?? MAX_PER_FILE_CHARS)
+
+  const gate = options.officeGate ?? officeExtractionGate
+  const outcome = await gate
+    .run(() => extractDocxText(bytes, { deadline, maxChars }), { deadline })
     .catch(() => null)
   if (!outcome) return { ok: false, code: 'unreadable' }
   if (!outcome.ok) return { ok: false, code: outcome.code }

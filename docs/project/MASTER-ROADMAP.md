@@ -274,7 +274,8 @@ AI-DOCUMENT-SOURCE-V1-PREFLIGHT      ✅ PASS WITH ARCHITECTURE DECISIONS
 → PRODUCT-MODEL-RELEVANCE-GUARD-01   ✅ COMPLETED（当前产品型号归属保护；AI 可读仍仅 TXT / CSV / TSV）
 → AI-PDF-SOURCE-01                   ✅ COMPLETED（text-layer PDF 经隔离 document-extractor 读取；AI 可读 TXT / CSV / TSV / PDF；未部署）
 → AI-XLSX-SOURCE-01                  ✅ COMPLETED（.xlsx 经有界进程内 OOXML 流式读取 + 精确 product_code 预筛；AI 可读 TXT / CSV / TSV / PDF / XLSX；未部署）
-→ 各格式实施模块（DOCX / Image OCR）与混合来源 Beta — 规划中，逐项授权
+→ AI-DOCX-SOURCE-01                  ✅ COMPLETED（.docx 经同一有界 OOXML 读取器与共享 Office gate 读取正文可见文字；不做型号预筛，归属由 D-025 判断；AI 可读 TXT / CSV / TSV / PDF / XLSX / DOCX；未部署）
+→ Image OCR 格式模块与混合来源 Beta — 规划中，逐项授权
 ```
 
 ### 禁止（M5）

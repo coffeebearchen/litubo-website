@@ -1267,7 +1267,7 @@ const selectedFileFolderIsLegacy = computed(() => {
           ref="fileInputRef"
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.webp,.pdf,.txt,.csv,.tsv,.xlsx,image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".jpg,.jpeg,.png,.webp,.pdf,.txt,.csv,.tsv,.xlsx,.docx,image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           class="hidden-input"
           @change="onFilesSelected"
         >
@@ -2700,6 +2700,7 @@ const selectedFileFolderIsLegacy = computed(() => {
 .file-card__icon--tsv .icon-kind,
 .file-card__icon--xlsx .icon-kind { background: #1e7a52; }
 .file-card__icon--txt .icon-kind { background: #4a6572; }
+.file-card__icon--docx .icon-kind { background: #2f5597; }
 .file-card__icon--image .icon-kind { background: #b06a2c; }
 .icon-note {
   font-size: 10px; color: var(--color-ink-muted); text-align: center;

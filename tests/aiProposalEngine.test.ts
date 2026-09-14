@@ -229,13 +229,15 @@ describe('runProposalEngine — honest per-file outcomes', () => {
     }
   })
 
-  it('a Word document gets its own distinct "not supported yet" reason, not the generic one', async () => {
+  /** AI-DOCX-SOURCE-01 — a Word document is read now; the Word reader's own tests are `tests/docxExtraction.test.ts` and `tests/aiDocxSource.test.ts`. */
+  it('a file that only claims to be a Word document is reported as damaged, not as an unsupported format', async () => {
     const fetch = mockFetch({
       productsFilesRows: [{ id: 1, directus_files_id: { id: 'uuid-docx', filename_download: 'manual.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filesize: SMALL_SIZE } }],
+      assetBytesByUuid: { 'uuid-docx': textBytes('not a real document') },
     })
     const result = await runProposalEngine(fetch, mockRegistry(), specificationsTarget, { productId: 1, providerId: 'deepseek', mediaIds: [1] })
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.fileResults[0].reason).toBe('Word documents are not supported for source analysis yet.')
+    if (!result.ok) expect(result.fileResults[0].reason).toBe('This file is damaged or is not a valid document.')
   })
 
   /**
