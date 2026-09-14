@@ -7,14 +7,15 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             PROJECT-EXECUTION-PROTOCOL-01（accepted candidate · local commit f3228fe · not pushed）
-Latest completed module:            CONTENT-CENTER-BLUEPRINT-01-REVIEW-FIX-01（COMPLETED · awaiting controller review）
-Active authorized module:           NONE（CONTENT-CENTER-BLUEPRINT-01-REVIEW-FIX-01 已收口，等待下一份授权）
+Latest accepted module:             CONTENT-CENTER-BLUEPRINT-01 + REVIEW-FIX-01（accepted for implementation · local commit 56752a6 · not pushed）
+Latest completed module:            CC-IMP-01 — Content Foundation（LOCAL COMPLETE · awaiting controller review）
+Active authorized module:           NONE（CC-IMP-01 已收口，等待下一份授权）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-01 — Content Foundation
+Next candidate:                     CC-IMP-02 — List, Workspace Shell & Overview
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：69215b3）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：56752a6）
+Local Directus schema:              Content Foundation applied (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
 
@@ -8694,3 +8695,95 @@ NO
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"CONTENT-CENTER-BLUEPRINT-01-REVIEW-FIX-01"任务中写入。*
+
+---
+
+## CC-IMP-01 — Content Foundation = COMPLETED（LOCAL COMPLETE，2026-09-14）
+
+```text
+TYPE B — Backend / Data / Runtime · A2 LOCAL_IMPLEMENTATION
+Runtime code changed: YES · DB schema changed: YES — LOCAL DEVELOPMENT ONLY
+Production changes: 0 · Provider calls: 0 · push: 0 · deploy: 0
+```
+
+**分支：** `review/cc-imp-01-content-foundation`，从 `56752a6` 创建，仅本地。schema 变更前快照先单独提交为 `8239d99`（CLAUDE.md schema 协议）；本模块收口 commit 以 `git log -1 -- docs/project/CURRENT-STATE.md` 为准。
+
+### 一、备份与 schema
+
+| 项 | 结果 |
+|---|---|
+| 目标 | 本机 Docker Desktop 的本地开发库（Postgres 本地 socket；Directus 11.17.4 仅 `127.0.0.1:8055`） |
+| DB 备份 | `backups/cc-imp-01-before-20260914-231705.sql`（749,859 B，`pg_dump`，git 忽略） |
+| 变更前快照 | `directus/schema/cc-imp-01-before.yaml`（commit `8239d99`） |
+| 应用快照 | `directus/schema/cc-imp-01-apply.yaml` = before + 4 集合 / 48 字段 / 6 关系；先 dry-run 核对只含这些新增，再 `schema apply` |
+| 数据库约束 | `directus/schema/cc-imp-01-constraints.sql`（Directus 快照无法表达的复合 / 部分唯一与 CHECK；幂等） |
+| 变更后快照 | `directus/schema/cc-imp-01-after.yaml`；apply 文件复跑 dry-run = "No changes to apply" |
+| 集合预算 | 16 → **20**（新增 4：`content_items`、`content_item_locales`、`content_items_files`、`content_relations`） |
+| 其他表 | posts 8 行、site_content 1 行未改；产品 / 媒体集合无 schema 变化 |
+
+**数据库约束（实测）：** unique `(content_items_id, locale)`；**unique `(locale, slug)`**；CHECK `draft_revision >= 1`；unique `(content_items_id, directus_files_id, file_role)`；关系 CHECK 目标与类型一致、禁止自关联；部分唯一 `(item, product_id)`、`(item, related_content_id)`。外键：locale / 文件关联 / 关系随条目 CASCADE；`content_relations.product_id` → products CASCADE；`content_items_files.directus_files_id` → directus_files NO ACTION（被引用文件不可物理删除）。psql 实测：同语言同 slug 拒绝、跨语言允许、跨类型仍拒绝、两会话并发只有先提交者成功、关系与 revision CHECK 均拒绝；测试行已回滚 / 清除。
+
+### 二、代码
+
+- **注册表（fail-closed）：** `utils/contentTypes.ts`（5 类，全部 `publicEnabled=false` / `sitemapEligible=false` / `publicRoute=null`）、`utils/contentBlocks.ts`（7 种块、60 块、200 KB = 204,800 B）、`utils/contentMediaRoles.ts`（5 角色，`source_document` 非公开）、`utils/contentRelations.ts`（关系基础校验）、`utils/contentLocales.ts`（与 nuxt.config i18n 一致，测试守护）。
+- **块校验：** `server/utils/contentBlocks.ts`，zod 严格 schema，拒绝未知类型 / 未知键、限制长度与数量、按内容类型限制块类型；纯文本，无 HTML 字段。
+- **Draft 服务：** `server/utils/contentDraft.ts`；`server/utils/contentAdminFetch.ts`（管理员自身 Directus 会话）；`types/content-center.ts`。
+- **Admin BFF（均在 admin-auth 中间件下）：**
+
+| 方法 | 路由 | 作用 | 写入边界 |
+|---|---|---|---|
+| POST | `/api/admin/content-center` | 创建 Draft 条目 + 默认 locale（嵌套，一次事务） | 仅 `content_type/title/slug/summary`；status 固定 draft |
+| GET | `/api/admin/content-center` | 列表（分页 ≤100、类型 / 状态筛选） | 只读 |
+| GET | `/api/admin/content-center/:id` | 条目 + locale 工作稿（不返回 `published_snapshot`） | 只读 |
+| POST | `/api/admin/content-center/:id/locales` | 新建非默认 locale（复制默认 locale 块结构、空文本） | 仅 `locale/title/slug/summary` |
+| PATCH | `/api/admin/content-center/:id/locales/:locale` | 保存工作稿，必须带 `expectedDraftRevision` | 仅 `title/slug/summary/blocks/seo_title/seo_description/canonical_path/noindex`；`draft_revision` +1、`last_change_kind=manual_edit` |
+
+- **错误约定：** 400 请求体非对象 / 无可更新字段 / 非法 id；404 条目或该路由下 locale 不存在；409 slug 或 locale 重复（数据库约束为最终权威，Directus `RECORD_NOT_UNIQUE` 映射为 409）、`expectedDraftRevision` 过期、已归档条目；422 禁止字段（mass assignment）、未知类型 / locale、字段校验失败。
+- **不存在：** 条目级 PATCH（content_type 不可变）、publish / unpublish / archive / restore、媒体与关系写入流程、AI、公开 API、sitemap、UI。
+
+**实现细化（Blueprint 未规定的细节）：** 工作稿允许空字符串（新建默认块为空文本；是否完整属于 CC-IMP-06 readiness）；`cta.href` 允许空；`content_items.locales` 为 Directus O2M alias（无数据库列，仅用于原子嵌套创建）；`user_created/user_updated` 不建外键关系；image 块 `fileLinkId` 必须是本条目的 `inline` 关联。
+
+### 三、验证
+
+| 检查 | 结果 |
+|---|---|
+| 新测试 | `contentBlocks` 41 · `contentDraftService` 56 · `contentFoundationRegistries` 14 = **111 通过** |
+| 全量 `vitest run` | **2253 passed / 45 skipped**（52 文件；此前 2142 + 新增 111） |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors |
+| `npx nuxt build` | Build complete |
+| `git diff --check` | 通过 |
+| 数据库约束（psql） | 通过（见第一节） |
+| 真实 BFF（用户本机登录一次，新标签页） | 创建 201（draft、en rev 1、5 块、无快照字段）；读取 200；es locale 同 slug 201（块 id 一致）；重复 locale 409；保存 200（rev 2）；过期保存 409（currentDraftRevision 2）；11 个禁止字段 PATCH 全 422 且条目仍 draft / technical_article / rev 2；创建带 status 422；**并发同 slug 两次创建 → [201, 409]**（失败者消耗序列号 3，确认由数据库唯一约束拦截）；顺序重复 409；跨类型重复 409；非法 / 保留 slug 422；未知类型 422；B 路由改 es（B 无 es）404；请求体改挂 A 422；A 的 es 未变；news 块类型不允许 422；列表 200；条目级 PATCH 404；无会话 401 |
+| Directus revisions | 基线后 content 集合 activity 8 条（create 3 条目 + 4 locale、update 1），revisions 8 条，8/8 记录操作人；保存的 delta = `title, draft_revision, last_change_kind` |
+| 公开隔离 | 4 集合权限行 0；匿名 `/items/content_*` 403；未新增 nuxt-server 权限、公开路由、sitemap |
+| console / server | 控制台仅为验收脚本故意发出的 4xx 负向请求；dev server 0 error |
+| 1440 / 375 | N/A — backend / data foundation |
+
+**测试数据（本地 Draft，保留，均无快照、无公开权限）：**
+
+| content_items.id | 类型 | locale | 标题 |
+|---|---|---|---|
+| 1 | technical_article | en（rev 2）、es（rev 1） | TEST ONLY — NOT FOR PUBLICATION A v2 / A ES |
+| 2 | case_study | en（rev 1） | TEST ONLY — NOT FOR PUBLICATION race 1 |
+| 4 | news | en（rev 1） | TEST ONLY — NOT FOR PUBLICATION B |
+
+### 四、记录（不阻塞）
+
+- **P2：** `expectedDraftRevision` 为"读取 → 比较 → 写入"，单管理员场景足够；两个并发保存之间仍有极小窗口（无行锁），与"前端提交状态 + 服务端写入前重查"原则一致。
+- **运维注意：** 通过 CLI `schema apply` 修改 schema 后，运行中的 Directus 仍缓存旧 schema（首次 BFF 验收全部 403）；重启本地 Directus 容器后恢复。后续 schema 模块应在 apply 后重启 / 清理缓存。
+- **环境：** typecheck / lint / build / 测试使用 PATH 上 Node 24.14.0（持久 Node 22.22.2 环境仍是 Open Release Gate）；build 后首次 `nuxt dev` 的 `#app-manifest` 报错已按既有做法重启消除。
+- **遗留结构：** `posts` 表有 8 行（CC-IMP-10 切换前须只读核对是否为真实内容）。
+- Blueprint、Freeze、Decision Log、CLAUDE.md、Protocol、Register：0 修改。
+
+```text
+CC-IMP-01 CONTENT FOUNDATION: LOCAL COMPLETE
+SCHEMA: IMPLEMENTED LOCALLY
+CONTENT UI: NOT STARTED · AI: NOT STARTED · PUBLISH: NOT STARTED · PUBLIC DELIVERY: NOT STARTED
+PRODUCTION: NOT CHANGED
+
+NEXT: CC-IMP-02 — List, Workspace Shell & Overview
+AUTHORIZATION: NO
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"CC-IMP-01 — Content Foundation"任务中写入。*
