@@ -49,6 +49,10 @@ const UI_FILES = [
   'components/admin/content/ContentWorkspaceShell.vue',
   'components/admin/content/ContentWorkspaceNav.vue',
   'components/admin/content/ContentOverview.vue',
+  'pages/admin/content-center/[id]/editor.vue',
+  'components/admin/content/ContentEditor.vue',
+  'components/admin/content/ContentBlockEditor.vue',
+  'components/admin/content/ContentEditorOutline.vue',
 ]
 
 describe('routes and workspace module rail', () => {
@@ -58,12 +62,13 @@ describe('routes and workspace module rail', () => {
     expect(contentOverviewRoute(5)).toBe('/admin/content-center/5/overview')
   })
 
-  it('lists the eight workspace modules in the frozen order with only Overview enabled', () => {
+  it('lists the eight workspace modules in the frozen order with only Overview and Content editor enabled', () => {
     expect(CONTENT_WORKSPACE_MODULES.map(m => m.label)).toEqual([
       'Overview', 'Content editor', 'Media & relations', 'SEO & locales',
       'AI Source Intake', 'AI Proposal Review', 'Preview & publish readiness', 'Change history',
     ])
-    expect(CONTENT_WORKSPACE_MODULES.filter(m => m.enabled).map(m => m.key)).toEqual(['overview'])
+    expect(CONTENT_WORKSPACE_MODULES.filter(m => m.enabled).map(m => m.key)).toEqual(['overview', 'editor'])
+    expect(contentWorkspaceModuleRoute('editor', 5)).toBe('/admin/content-center/5/editor')
     for (const module of CONTENT_WORKSPACE_MODULES.filter(m => !m.enabled)) {
       expect(module.disabledReason).toBe('Not built yet')
       expect(contentWorkspaceModuleRoute(module.key, 5)).toBeNull()
@@ -75,7 +80,7 @@ describe('routes and workspace module rail', () => {
     for (const file of UI_FILES) expect(existsSync(resolve(process.cwd(), file)), file).toBe(true)
     expect(existsSync(resolve(process.cwd(), 'pages/admin/content-center/[id].vue'))).toBe(false)
     expect(existsSync(resolve(process.cwd(), 'pages/admin/content-center.vue'))).toBe(false)
-    for (const future of ['editor', 'media-relations', 'seo-locales', 'ai-source-intake', 'ai-proposal-review', 'preview-publish', 'history']) {
+    for (const future of ['media-relations', 'seo-locales', 'ai-source-intake', 'ai-proposal-review', 'preview-publish', 'history']) {
       expect(existsSync(resolve(process.cwd(), `pages/admin/content-center/[id]/${future}.vue`)), future).toBe(false)
     }
   })
@@ -216,15 +221,17 @@ describe('source evidence — scope and safety', () => {
     expect(labels).toEqual(['Product Center', 'Content Center', 'Media Library', 'Settings'])
   })
 
-  it('reads and creates only through the admin BFF; no publish, AI, media-write or Directus call', () => {
+  it('reads, creates and saves drafts only through the admin BFF; no publish, AI, media-write or Directus call', () => {
     for (const file of UI_FILES) {
       const source = repoFile(file)
       expect(source, file).not.toMatch(/\/items\/|directus/i)
       expect(source, file).not.toMatch(/publish'|\/publish|\/unpublish|\/archive|\/restore|\/ai\/|proposal/i)
-      expect(source, file).not.toMatch(/method:\s*'(PATCH|PUT|DELETE)'/)
+      expect(source, file).not.toMatch(/method:\s*'(PUT|DELETE)'/)
     }
     const posts = UI_FILES.filter(file => /method:\s*'POST'/.test(repoFile(file)))
     expect(posts).toEqual(['components/admin/content/ContentCreateForm.vue'])
+    const patches = UI_FILES.filter(file => /method:\s*'PATCH'/.test(repoFile(file)))
+    expect(patches).toEqual(['components/admin/content/ContentEditor.vue'])
     expect(repoFile('components/admin/content/ContentCreateForm.vue')).toContain("$fetch<AdminContentDraft>('/api/admin/content-center', {")
   })
 

@@ -49,3 +49,19 @@ export const BLOCK_TEXT_LIMITS = {
 export function isContentBlockType(value: unknown): value is ContentBlockType {
   return typeof value === 'string' && (CONTENT_BLOCK_TYPES as readonly string[]).includes(value)
 }
+
+/**
+ * Empty draft data for a block type. `image` has no empty form — it always needs a file link.
+ * Shared (CC-IMP-03) so the admin Content Editor adds blocks with the exact data the
+ * server creates; `server/utils/contentBlocks.ts` re-exports it unchanged.
+ */
+export function emptyBlockData(type: Exclude<ContentBlockType, 'image'>): Record<string, unknown> {
+  switch (type) {
+    case 'text': return { paragraphs: [''] }
+    case 'key_points': return { items: [{ title: '' }] }
+    case 'faq': return { items: [{ question: '', answer: '' }] }
+    case 'cta': return { label: '', href: '' }
+    case 'related_content': return {}
+    case 'downloads': return {}
+  }
+}

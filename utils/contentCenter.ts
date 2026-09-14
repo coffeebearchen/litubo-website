@@ -42,7 +42,7 @@ export interface ContentWorkspaceModule {
 /** Frozen order. Only Overview exists; every other entry is a visible, non-navigating placeholder. */
 export const CONTENT_WORKSPACE_MODULES: readonly ContentWorkspaceModule[] = [
   { key: 'overview', label: 'Overview', icon: 'overview', enabled: true },
-  { key: 'editor', label: 'Content editor', icon: 'page-content', enabled: false, disabledReason: 'Not built yet' },
+  { key: 'editor', label: 'Content editor', icon: 'page-content', enabled: true },
   { key: 'media-relations', label: 'Media & relations', icon: 'media-resources', enabled: false, disabledReason: 'Not built yet' },
   { key: 'seo-locales', label: 'SEO & locales', icon: 'seo-locales', enabled: false, disabledReason: 'Not built yet' },
   { key: 'ai-source-intake', label: 'AI Source Intake', icon: 'ai-source-intake', enabled: false, disabledReason: 'Not built yet' },
@@ -51,9 +51,16 @@ export const CONTENT_WORKSPACE_MODULES: readonly ContentWorkspaceModule[] = [
   { key: 'history', label: 'Change history', icon: 'change-history', enabled: false, disabledReason: 'Not built yet' },
 ]
 
+/** CC-IMP-03 — CC-02 Content Editor. */
+export function contentEditorRoute(id: number | string): string {
+  return `/admin/content-center/${encodeURIComponent(String(id))}/editor`
+}
+
 /** Routes exist only for enabled modules. */
 export function contentWorkspaceModuleRoute(key: string, id: number | string): string | null {
-  return key === 'overview' ? contentOverviewRoute(id) : null
+  if (key === 'overview') return contentOverviewRoute(id)
+  if (key === 'editor') return contentEditorRoute(id)
+  return null
 }
 
 // ── Labels ──────────────────────────────────────────────────────────────────

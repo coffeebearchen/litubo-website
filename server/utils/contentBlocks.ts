@@ -3,6 +3,7 @@ import {
   BLOCK_TEXT_LIMITS as L,
   MAX_BLOCKS_JSON_BYTES,
   MAX_BLOCKS_PER_LOCALE,
+  emptyBlockData,
   type ContentBlock,
   type ContentBlockType,
 } from '../../utils/contentBlocks'
@@ -134,17 +135,8 @@ export function validateBlocks(input: unknown, allowedTypes?: readonly ContentBl
   return errors.length > 0 ? { ok: false, errors } : { ok: true, blocks }
 }
 
-/** Empty draft data for a block type. `image` has no empty form — it always needs a file link. */
-export function emptyBlockData(type: Exclude<ContentBlockType, 'image'>): Record<string, unknown> {
-  switch (type) {
-    case 'text': return { paragraphs: [''] }
-    case 'key_points': return { items: [{ title: '' }] }
-    case 'faq': return { items: [{ question: '', answer: '' }] }
-    case 'cta': return { label: '', href: '' }
-    case 'related_content': return {}
-    case 'downloads': return {}
-  }
-}
+/** Empty draft data for a block type — defined in the shared registry (utils/contentBlocks.ts). */
+export { emptyBlockData }
 
 /** Default blocks for a new draft of `typeId`, each with a fresh server-generated id. */
 export function createDefaultBlocks(typeId: ContentTypeId, newId: () => string): ContentBlock[] {

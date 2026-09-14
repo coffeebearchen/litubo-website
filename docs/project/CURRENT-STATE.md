@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             CC-IMP-01 Content Foundation + CC-IMP-01-FIX-01-R1（accepted locally by the CC-IMP-02 work order · local commit 5a8a640 · not pushed）
-Latest completed module:            CC-IMP-02 — List, Workspace Shell & Overview（LOCAL COMPLETE · awaiting controller review）
-Active authorized module:           NONE（CC-IMP-02 已收口，等待下一份授权）
+Latest completed module:            CC-IMP-03 — Content Editor（LOCAL COMPLETE · awaiting controller review）
+Active authorized module:           NONE（CC-IMP-03 已收口，等待下一份授权）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-03 — Content Editor
+Next candidate:                     CC-IMP-04 — Media & Relations
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：5a8a640）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：bde24a6）
 Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -8954,3 +8954,94 @@ CC-IMP-03:                 NOT STARTED · NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-02"任务中写入。*
+
+---
+
+## CC-IMP-03 — Content Editor = COMPLETED（LOCAL COMPLETE，2026-09-15）
+
+```text
+TYPE A — Visual / UX + Draft Runtime · A2 LOCAL_IMPLEMENTATION
+CC-02 Content Editor: default-locale Draft editing · structured blocks · explicit atomic Save · stale-conflict safe
+Schema: 0 · Media: 0 · Relations: 0 · SEO/Locales workflow: 0 · AI: 0 · Publish: 0 · Production: 0 · Provider calls: 0 · push: 0 · deploy: 0
+```
+
+**分支：** `review/cc-imp-03-content-editor`，从 `bde24a6` 创建，仅本地。
+
+```text
+CC-IMP-03:                       COMPLETED
+Content Editor:                  implemented
+Default locale Draft editing:    implemented
+Structured blocks:               implemented
+Explicit Save:                   implemented
+Atomic revision:                 preserved
+409 stale UX:                    implemented
+Unsaved changes protection:      implemented
+1440:                            PASS
+375:                             PASS
+Schema:                          0
+AI:                              0
+Publish:                         0
+Production:                      0
+```
+
+### 一、实现
+
+| 项 | 内容 |
+|---|---|
+| 路由 / 导航 | `pages/admin/content-center/[id]/editor.vue`；Workspace 模块栏 Overview + Content editor 启用，其余 6 个仍为 disabled "Not built yet"；未创建未来模块路由 |
+| Shell | `ContentWorkspaceShell` 新增 `actions` slot 与 `showRefresh`（默认 true，Overview 不变）；Editor 隐藏 Refresh，头部显示保存状态 + Save changes |
+| Basic information | 默认 locale（`DEFAULT_CONTENT_LOCALE` = en，组件 `locale` 参数化）的 Title / Slug / Summary（字符计数）；Content type 只读；es / pt 行不读写 |
+| 结构化 section | `ContentBlockEditor.vue`：text（heading、1–20 段落，增删排序）、key_points（heading、1–12 项 title/description，增删排序）、faq（heading、1–30 问答，增删排序）、cta（heading、text、button label、link）；maxlength 取自 `BLOCK_TEXT_LIMITS`；纯文本，无 HTML / v-html / contenteditable |
+| Add / Remove / Reorder | `+ Add section` 只列内容类型允许且本模块可编辑的类型；image / related_content / downloads 显示 disabled "Available in Media & relations"；Remove 需行内二次确认；section 与条目用可键盘操作的 ↑ / ↓ 按钮排序（无拖拽假 handle，0 新依赖） |
+| 未来模块 block | image / related_content / downloads：只读卡片 "Managed in Media & relations"，可移动顺序，不可编辑 / 删除，保存时原样保留 |
+| Block identity | 已有 block 保留原 UUID；新增 block `crypto.randomUUID()`；空数据来自共享 `emptyBlockData`（由 `server/utils/contentBlocks.ts` 移至 `utils/contentBlocks.ts` 并在 server 端 re-export，行为不变） |
+| Outline | `ContentEditorOutline.vue`：由同一 blocks state 派生（序号、标题 / 预览、类型、Empty / Media & relations），点击展开并聚焦对应 section；另显示 Language / Draft revision / Last updated / Sections n/60；≤1279px 叠放于 sections 之前并折叠为 "Show (n)" |
+| Save | `ContentEditor.vue`：本地工作副本 + 显式 Save；一次 Save = 一次 `PATCH /api/admin/content-center/:id/locales/:locale`，body = `expectedDraftRevision` + 真实变化的 title / slug / summary / blocks（title / summary 按服务端 trim 比较；空的可选文本键归一化）；成功后以响应重建状态、revision 更新、"Saved" 提示、dirty=false；dirty 时显示底部 sticky 保存栏 |
+| 409 冲突 | 仅 `data.currentDraftRevision` 形态识别为过期冲突：显示 "This draft changed since you opened it." + 新 revision，本地编辑保留；Keep editing / Reload latest（二次确认 "Discard my changes and reload" 后才 GET 并重建）；无自动重试、无自动 reload、无 last-write-wins |
+| 校验 UX | 409 slug、422 title/slug/summary 显示在字段；422 blocks 错误按 `blocks[i]` 挂到对应 section 并自动展开；60 section 上限前端禁止 + 服务端消息；200 KB 与 413 专门提示；400 / 401 / 403 / 404 / 5xx 均为可见英文消息且保留本地编辑；archived 记录只读 |
+| 离开保护 | 页面 `onBeforeRouteLeave`（dirty 时 `window.confirm`，取消则留在页面）；组件 `beforeunload`（dirty 时 preventDefault）；无改动时导航不受阻 |
+| 缺陷修复（施工中发现） | 首轮真实保存发现：同一 section 在一次渲染前的多次输入只保留最后一次（子组件以 prop 快照拼整块）。改为子组件 emit updater、父组件按 block id 应用于最新 state；新增同 tick 连续输入回归测试；复测全部值持久化 |
+| Overview 连续性 | Structured content 提示改为 "Section text is edited in Content editor."；Workspace modules 显示 Content editor = Available |
+
+### 二、验证
+
+| 检查 | 结果 |
+|---|---|
+| 定向测试 | `contentEditor` 18 · `ContentEditor.component` 15 · `contentCenterUi` 20 · `ContentWorkspace.component` 7 · `ContentCenterList.component` 5 · `ContentCreateForm.component` 6 · `contentDraftService` 63 · `contentBlocks` 41 · `contentFoundationRegistries` 14 → 189 通过；编辑器保存体经服务端真实 `validateBlocks` 校验通过 |
+| 全量 `vitest run`（含 DB 集成） | **2337 passed / 45 skipped**（59 文件）；revision guard 真实 PostgreSQL 集成 6 项通过 |
+| `npm run typecheck` / `npm run lint` | 0 / 0 |
+| `npx nuxt build` | Build complete |
+| 真实保存（条目 6，1440 标签页） | 改 title / summary、编辑 text / key_points / faq / cta、新增 Text section（UUID v4）、CTA 上移 → 1 次 PATCH 200，revision 1→2；reload 后 ID 与顺序一致。发现上述同 tick 丢值缺陷 → 修复后复测：11 个字段同 tick 连续输入全部持久化，revision 2→3 |
+| 过期冲突 | 起始 rev 3；本地未保存 title "…CC-IMP-03 LOCAL UNSAVED"；独立请求 PATCH summary（expectedDraftRevision 3）→ 200，rev 4；编辑器 Save → PATCH 409，显示冲突与 "revision 4"，本地 title 保留，无自动 GET；确认后 Reload latest → rev 4、外部 summary、冲突消失。数据库：该本地标题在 revisions 中出现 0 次 |
+| 离开保护 | dirty 时点 Overview / All content → confirm=false 留在 editor；beforeunload defaultPrevented=true；confirm=true → 离开；干净页面导航不询问、beforeunload 不拦截 |
+| Directus revisions | locale 行 15：822（title/summary/blocks）· 823（blocks）· 824（外部 summary）· 825（375 blocks）；每次 delta 含 `draft_revision, last_change_kind` |
+| 1440 | Editor：`scrollWidth = clientWidth = 1425`；模块栏 220、编辑区 595、大纲 280 可见；Basic information 两列；6 sections；越界元素 0；无 AI suggestions / Reading time / Publish / 百分比；console 0 error（新标签页） |
+| 375 | Editor：375 / 375；大纲叠放于 sections 前并折叠；Title / Slug 309 px、Add section 343 px、section 控件与 Save 均在视口内；Modules 手风琴可用；真实键盘输入段落 → 保存栏 Save → revision 4→5 → reload 持久化；console 0 error |
+| CC-IMP-02 回归 | List 1440（1440/1440，5 行）· Overview 1440（1425/1425，Content editor Available，栏内出现 editor 链接）· List 375（375/375，5 卡片）· Overview 375（375/375，越界 0，Content editor Available）；console 0 error |
+| 截图 | 375 Editor 截图清晰（会话内交付，未入 Git）；1440 在 Browser 面板中缩放后不可辨认（面板不支持区域裁剪），以 DOM 几何测量为证据 |
+| dev server | 首次启动已知 P2 `#app-manifest`，干净重启后消失；验收结束已停止 |
+| Node | 24.14.0（持久 Node 22.22.2 Release Gate 仍 OPEN） |
+
+### 三、测试数据
+
+| ID | 标题 | 状态 | 快照 | 本模块变化 |
+|---|---|---|---|---|
+| **6** | TEST ONLY — NOT FOR PUBLICATION CC-IMP-03 editor | draft | 无 | rev 1→5；blocks：text、key_points、cta、faq、related_content（原样保留）、text（新增）；所有文本带 TEST ONLY |
+| 1 / 2 / 4 / 5 | TEST ONLY 既有 Draft | draft | 无 | 未改动 |
+
+数据库：`content_items` 5 行；非空 `published_snapshot` 0；revision guard trigger 仍存在。
+
+**文档：** Register CC-02 Implementation → `AUTOMATED_CHECKED`；MASTER-ROADMAP 最小更新。Blueprint、Freeze、Decision Log、Charter、CLAUDE.md、Protocol：0 修改。
+
+**未处理（保持原登记）：** Product AI Apply 缺口、公开媒体代理归档检查、posts 数据、Directus schema 缓存行为、持久 Node 22 环境、公开权限；hero / media / relations / SEO / locales / AI / publish 均留给后续模块。
+
+```text
+CC-IMP-03 CONTENT EDITOR:   LOCAL COMPLETE
+STRUCTURED BLOCK EDITING:   PASS
+ATOMIC SAVE:                PASS
+STALE CONFLICT UX:          PASS
+FOUNDATION:                 REGRESSION PASS
+CC-IMP-04:                  NOT STARTED · NOT AUTHORIZED
+```
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-03"任务中写入。*

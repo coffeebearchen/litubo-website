@@ -8,13 +8,15 @@ import { CONTENT_CENTER_LIST_ROUTE } from '~/utils/contentCenter'
  * without importing its product-specific header actions (Preview product /
  * Save changes). Content modules that later need header actions add them here.
  */
-defineProps<{
+withDefaults(defineProps<{
   recordTitle: string
   pageTitle: string
   subtitle: string
   status: ContentItemStatus
   refreshing?: boolean
-}>()
+  /** CC-IMP-03 — editing modules hide Refresh so a reload can never silently drop local edits. */
+  showRefresh?: boolean
+}>(), { refreshing: false, showRefresh: true })
 
 const emit = defineEmits<{ refresh: [] }>()
 </script>
@@ -38,9 +40,10 @@ const emit = defineEmits<{ refresh: [] }>()
 
       <div class="cc-header-actions">
         <NuxtLink :to="CONTENT_CENTER_LIST_ROUTE" class="cc-btn">Back to Content Center</NuxtLink>
-        <button type="button" class="cc-btn" :disabled="refreshing" @click="emit('refresh')">
+        <button v-if="showRefresh" type="button" class="cc-btn" :disabled="refreshing" @click="emit('refresh')">
           {{ refreshing ? 'Refreshing…' : 'Refresh' }}
         </button>
+        <slot name="actions" />
       </div>
     </div>
 

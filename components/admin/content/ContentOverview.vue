@@ -129,7 +129,7 @@ const seo = computed(() => contentSeoSummary(primary.value))
         </li>
       </ul>
       <p v-else class="cc-card-note">No content sections yet.</p>
-      <p class="cc-card-note">Section text is edited in Content editor, which is not built yet.</p>
+      <p class="cc-card-note">Section text is edited in Content editor.</p>
     </section>
 
     <section class="cc-card" aria-labelledby="cc-seo-heading">
