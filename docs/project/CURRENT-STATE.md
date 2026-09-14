@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CONTENT-CENTER-MODULE-FREEZE-01（accepted candidate · local commit 8ee1563 · not pushed）
-Latest completed module:            PROJECT-EXECUTION-PROTOCOL-01（COMPLETED · awaiting controller review）
-Active authorized module:           NONE（PROJECT-EXECUTION-PROTOCOL-01 已收口，等待下一份授权）
+Latest accepted module:             PROJECT-EXECUTION-PROTOCOL-01（accepted candidate · local commit f3228fe · not pushed）
+Latest completed module:            CONTENT-CENTER-BLUEPRINT-01（COMPLETED · awaiting controller review）
+Active authorized module:           NONE（CONTENT-CENTER-BLUEPRINT-01 已收口，等待下一份授权）
 Active module authorization level:  —
-Next candidate:                     CONTENT-CENTER-BLUEPRINT-01
+Next candidate:                     CC-IMP-01 — Content Foundation
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：8ee1563）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：f3228fe）
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
 
@@ -8568,3 +8568,76 @@ NO
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"PROJECT-EXECUTION-PROTOCOL-01"任务中写入。*
+
+---
+
+## CONTENT-CENTER-BLUEPRINT-01 = COMPLETED（2026-09-14）
+
+```text
+TYPE C — Governance / Documentation · A1 GOVERNANCE_DOCS
+0 runtime code · 0 DB · 0 Directus · 0 migrations · 0 AI runtime · 0 Provider calls · 0 Media runtime · 0 Product data
+```
+
+**分支：** `review/content-center-blueprint-01`，从 `f3228fe` 创建，仅本地，未 push。**Blueprint：** `docs/content-cms/CONTENT-CENTER-BLUEPRINT-V1.md`（本模块 commit，以 `git log -1 -- docs/content-cms/CONTENT-CENTER-BLUEPRINT-V1.md` 为准）。
+
+### 一、选定架构（D-032）
+
+| 项 | V1 决定 |
+|---|---|
+| 内容存储 | 新 `content_items`（身份 / 生命周期）+ `content_item_locales`（每语言一行：工作稿 + 发布快照） |
+| 新增集合 | **4 个**：`content_items`、`content_item_locales`、`content_items_files`、`content_relations`（16 → 20；SPEC ≤ 23 规则内；须在 CC-IMP-01 施工单中明确批准） |
+| `posts` | LEGACY，原样保留；现有公开路由与 fixtures 继续读取；按路由逐一切换；真实行迁移另行授权 |
+| `site_content` | 不用于 Content Center，原样保留（仅首页 Hero） |
+| Locale | 每语言一行（比较了 translation rows / JSON / 复制 item / 扁平列）；slug 按语言唯一；无跨语言 fallback；语言来源复用 i18n 配置与 `publishedLocales` |
+| Blocks | locale 行上的有序 JSON 数组，服务端 zod 注册表严格校验（text / key_points / image / faq / cta / related_content / downloads）；类型配置为代码注册表 |
+| Draft / Publish | 工作稿 + 每语言一个发布快照；编辑已发布内容只改工作稿；人工 Publish 生成快照；V1 含 Unpublish；Archive 隐藏；Restore 回 draft 且清空快照；无版本历史 |
+| Public isolation（P0） | 公开读取只能读已发布 item 的 `published_snapshot`（权限列级 + BFF allowlist + sitemap 同一查询） |
+| Media | `content_items_files`（hero / og_image / inline / download / source_document），文件只在 Media Library；`source_document` 永不公开 |
+| Relations | 单表 `content_relations`（product / content），只存引用 id |
+| AI | 同一 Proposal Engine 泛化 subject；新 target `content-draft`；Content Attribution Guard；来源上限 5 / 3 不变；排除归档来源；Apply 确定性映射到工作稿字段与 block id，且须匹配服务端提案 |
+| History | 复用 Directus revisions + `last_change_kind` 标记，不新增审计集合 |
+| Readiness | 确定性清单（hard / soft），无百分比 |
+| Preview | 管理端鉴权内渲染 Draft（noindex），不提供公开 token 预览 |
+| Publish | 独立人工命令，服务端重算 readiness，`expectedDraftRevision`，两步写入失败不暴露、可重试幂等 |
+
+### 二、风险分级
+
+- **P0：** 无未解决项；公开隔离、AI 只写 Draft 不发布、来源上限为相关模块的强制验收合同。
+- **P1（11 项，归属模块见 Blueprint §35）：** 集合批准与 schema 快照 / 备份；revisions 保留；slug 唯一；引用保护扩展与归档关联拒绝；快照排除 source_document 且要求 `is_public`；Engine 泛化不回归产品 AI；内容来源排除归档；Apply 校验提案匹配；`nuxt-server` 权限配置与测试；公开媒体代理检查归档；纯文本渲染。
+- **P2：** slug 重定向、DB 复合唯一索引、多实例提案存储、多语言结构同步、AI 关系 / 媒体建议、focus terms / social 字段、定时发布、版本对比、签名预览、posts 迁移、产品侧既有缺口、文档漂移。
+- **OPEN — USER DECISION REQUIRED（只阻塞 CC-IMP-10）：** 各类型公开路由（含 Application / Solution 与 8 个 D-002 页面的关系、Resource 详情页）、哪些类型何时公开、是否迁移真实 posts。
+
+### 三、实施顺序（均 NOT STARTED / NOT AUTHORIZED）
+
+`CC-IMP-01` Content Foundation → `CC-IMP-02` List + Shell + Overview → `CC-IMP-03` Editor → `CC-IMP-04` Media & Relations → `CC-IMP-05` SEO & Locales → `CC-IMP-06` Preview + Readiness + Publish → `CC-IMP-07` Archive / Restore + History → `CC-IMP-08` AI Target + Source Intake → `CC-IMP-09` AI Review + Apply → `CC-IMP-10` Public Delivery + Sitemap（依赖见 Blueprint §34）。
+
+### 四、同步修改
+
+- `08-decision-log.md`：新增 **D-032**。
+- Register §3：`FROZEN` 定义扩展到 Blueprint 列；§4.8 九行 Blueprint = `FROZEN`；规则 1 / 2 更新，新增规则 6（CC 行 → CC-IMP 模块映射）。
+- 旧 Implementation Blueprint §14：只加一句文档交叉引用（收口顺序以 §13 DoD 与协议 §11 为准，push 为 A3），核实为文字漂移，非架构冲突。
+- `MASTER-ROADMAP.md`：最小更新。
+- CLAUDE.md、Charter、Module Freeze、PROJECT-EXECUTION-PROTOCOL：0 修改（Freeze §27 "Blueprint: NOT STARTED" 为冻结时点记录）。
+
+### 五、验证
+
+| 检查 | 结果 |
+|---|---|
+| `git diff --check` / `git diff --cached --check` | 通过 |
+| Freeze / D-031 / Protocol / Media / AI 一致性、公开隔离、遗留兼容审查 | 通过（见本模块报告） |
+| governance 专项测试 | 仓库无 |
+| Runtime tests / 1440 / 375 截图 | N/A — Blueprint 模块；已人工核对 8 张视觉与模块映射 |
+
+```text
+CONTENT-CENTER-BLUEPRINT-01
+=
+COMPLETED
+
+NEXT:
+CC-IMP-01 — Content Foundation
+
+NEXT CANDIDATE AUTHORIZED:
+NO
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"CONTENT-CENTER-BLUEPRINT-01"任务中写入。*

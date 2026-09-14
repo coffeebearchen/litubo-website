@@ -449,4 +449,6 @@ Codex identifies next dependency and consolidated Gate
 → state and milestone updates
 ```
 
+**Closeout order cross-reference (documentation only, 2026-09-14):** the line order above is a summary, not the closeout sequence. `CURRENT-STATE` (and the Roadmap when a milestone changes) is updated *before* the local commit, as §13 Definition of Done and `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §11 require; push is a separate A3 authorization (protocol §13). No stage, gate or module dependency changes.
+
 No module may jump this sequence.

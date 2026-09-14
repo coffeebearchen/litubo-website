@@ -24,6 +24,8 @@
 
 **PROJECT-EXECUTION-PROTOCOL-01（2026-09-14）补充：** ✅ COMPLETED——全项目施工控制协议 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` 生效（授权等级 A0–A5、模块内自动驾驶、模块间人工授权、local commit ≠ push ≠ merge ≠ deploy）。里程碑顺序不变；`CONTENT-CENTER-BLUEPRINT-01` 仍为 NEXT — NOT AUTHORIZED。
 
+**CONTENT-CENTER-BLUEPRINT-01（2026-09-14）补充：** ✅ COMPLETED——Content Center 技术蓝图冻结（D-032；4 个新集合提案未创建）。NEXT：`CC-IMP-01` Content Foundation — NOT AUTHORIZED。0 runtime、0 DB、0 Directus。
+
 ---
 
 ## 总览
@@ -218,8 +220,9 @@ typecheck 0 errors、lint 0 errors、build SUCCESS、375px 无水平溢出
 ```text
 Content Center Visual Direction      ✅ APPROVED（2026-09-14）
 → CONTENT-CENTER-MODULE-FREEZE-01    ✅ COMPLETED（2026-09-14，模块拓扑 / 路由意图 / 写入边界已冻结）
-→ CONTENT-CENTER-BLUEPRINT-01        NEXT — NOT AUTHORIZED
-→ Content Center implementation      未开始，须单独授权
+→ CONTENT-CENTER-BLUEPRINT-01        ✅ COMPLETED（2026-09-14，D-032，docs/content-cms/CONTENT-CENTER-BLUEPRINT-V1.md）
+→ CC-IMP-01 Content Foundation       NEXT — NOT AUTHORIZED
+→ CC-IMP-02 … CC-IMP-10              未开始，每个模块须单独授权（顺序见 Blueprint §34）
 ```
 
 #### M4-Next-6：真实产品资料录入与正式上线
@@ -291,7 +294,7 @@ AI-DOCUMENT-SOURCE-V1-PREFLIGHT      ✅ PASS WITH ARCHITECTURE DECISIONS
 → AI-IMAGE-OCR-SOURCE-01             ✅ COMPLETED（JPG / PNG / WebP 经现有隔离 document-extractor 本地 libvips + Tesseract OCR 读取可见文字；非 Vision；低置信度 [?]；每次 Analyze 最多 3 张；AI 可读 TXT / CSV / TSV / PDF / XLSX / DOCX / JPG / PNG / WebP；未部署）
 → AI-DOCUMENT-MIXED-SOURCE-BETA-01   ✅ COMPLETED（新建 TEST ONLY Draft 产品 LT-180C-MIXED-BETA-01 上 TXT / PDF / XLSX / DOCX / PNG 五来源一次真实 DeepSeek Analyze；无跨型号 / 隐藏表 / UNKNOWN 泄漏；Power supply 冲突人工选 220 V, 50 Hz；Apply 一次写入 4 条，仍为 Draft；未部署）
 → AI-DOCUMENT-SOURCE-V1-FINAL        ✅ FEATURE COMPLETE / SIGNED OFF（TXT / CSV / TSV / PDF text-layer / XLSX / DOCX / JPG / PNG / WebP OCR；一个 Proposal Engine；Human Review 必需；原始二进制不发往 Provider；Production release gates remain open — 生产发布未批准，不代表网站可上线）
-→ 后续主线转入 Content Center（M4-Next-5）：Module Freeze ✅ 已完成；CONTENT-CENTER-BLUEPRINT-01 NEXT — 未授权
+→ 后续主线转入 Content Center（M4-Next-5）：Module Freeze ✅ · Blueprint ✅；CC-IMP-01 NEXT — 未授权
 ```
 
 ### 禁止（M5）

@@ -79,12 +79,12 @@ Rules:
 - A master shown only by a global or unrelated page cannot be marked implemented.
 - Status changes require evidence, not optimistic planning language.
 
-**Governance-state labels** (defined by `PROJECT-EXECUTION-PROTOCOL-01`, 2026-09-14). They describe the governance state of a design or scope artefact, not implementation progress, and may appear only in columns explicitly named for them (for example the `Visual` and `Module` columns of §4.8):
+**Governance-state labels** (defined by `PROJECT-EXECUTION-PROTOCOL-01`, 2026-09-14). They describe the governance state of a design or scope artefact, not implementation progress, and may appear only in columns explicitly named for them (for example the `Visual`, `Module` and `Blueprint` columns of §4.8):
 
 | Label | Meaning |
 |---|---|
 | `APPROVED` | The user approved a visual direction. It is not an implementation authorization. |
-| `FROZEN` | A Module Freeze fixed scope, page responsibilities, route intent and write boundaries. It is not a data/API contract and not an implementation authorization. |
+| `FROZEN` | A Module Freeze fixed scope, page responsibilities, route intent and write boundaries; or, in a `Blueprint` column, a technical Blueprint fixed the data/API/lifecycle contract. It is not an implementation authorization. |
 
 - A governance label never appears in an implementation or acceptance column, and an implementation status never appears in a governance column.
 - `APPROVED` or `FROZEN` never means Definition of Ready is met.
@@ -279,23 +279,24 @@ Content Center work orders use the `CC-*` engineering module IDs below. This ext
 
 | `CC-*` ID | Module | Visual basis | Route intent | Visual | Module | Blueprint | Implementation | Acceptance |
 |---|---|---|---|---|---|---|---|---|
-| `CC-00` | Content Center List | None single-authoritative: existing Product Center collection/list pattern (`/admin/products`) + `CC-FLOW-01-FUNCTIONAL-FLOW-D1440` | `/admin/content-center` | `APPROVED` (flow) | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
-| `CC-01` | Workspace Overview | `CC-VIS-01-CONTENT-CENTER-OVERVIEW-D1440` | `/admin/content-center/:id/overview` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
-| `CC-02` | Content Editor | `CC-VIS-02-CONTENT-EDITOR-D1440` | `/admin/content-center/:id/editor` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
-| `CC-03` | Media & Relations | `CC-VIS-03-MEDIA-RELATIONS-D1440` | `/admin/content-center/:id/media-relations` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
-| `CC-04` | SEO & Locales | `CC-VIS-04-SEO-LOCALES-D1440` | `/admin/content-center/:id/seo-locales` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
-| `CC-AI-01` | AI Source Intake | `CC-AI-01-SOURCE-INTAKE-D1440` | `/admin/content-center/:id/ai-source-intake` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
-| `CC-AI-02` | AI Proposal Review | `CC-AI-02-PROPOSAL-REVIEW-D1440` | `/admin/content-center/:id/ai-proposal-review` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
-| `CC-05` | Preview & Publish Readiness | `CC-VIS-05-PREVIEW-PUBLISH-READINESS-D1440` | `/admin/content-center/:id/preview-publish` | `APPROVED` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
-| `CC-HIST` | Change History | No new master: existing Product Workspace history pattern (`PW-VIS-09-CHANGE-HISTORY-D1440`; the `PWS-08` runtime module is itself not built) | `/admin/content-center/:id/history` | reuse | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-00` | Content Center List | None single-authoritative: existing Product Center collection/list pattern (`/admin/products`) + `CC-FLOW-01-FUNCTIONAL-FLOW-D1440` | `/admin/content-center` | `APPROVED` (flow) | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-01` | Workspace Overview | `CC-VIS-01-CONTENT-CENTER-OVERVIEW-D1440` | `/admin/content-center/:id/overview` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-02` | Content Editor | `CC-VIS-02-CONTENT-EDITOR-D1440` | `/admin/content-center/:id/editor` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-03` | Media & Relations | `CC-VIS-03-MEDIA-RELATIONS-D1440` | `/admin/content-center/:id/media-relations` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-04` | SEO & Locales | `CC-VIS-04-SEO-LOCALES-D1440` | `/admin/content-center/:id/seo-locales` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-AI-01` | AI Source Intake | `CC-AI-01-SOURCE-INTAKE-D1440` | `/admin/content-center/:id/ai-source-intake` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-AI-02` | AI Proposal Review | `CC-AI-02-PROPOSAL-REVIEW-D1440` | `/admin/content-center/:id/ai-proposal-review` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-05` | Preview & Publish Readiness | `CC-VIS-05-PREVIEW-PUBLISH-READINESS-D1440` | `/admin/content-center/:id/preview-publish` | `APPROVED` | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
+| `CC-HIST` | Change History | No new master: existing Product Workspace history pattern (`PW-VIS-09-CHANGE-HISTORY-D1440`; the `PWS-08` runtime module is itself not built) | `/admin/content-center/:id/history` | reuse | `FROZEN` | `FROZEN` | `NOT_STARTED` | `NOT_STARTED` |
 
 Rules:
 
-1. **Column vocabulary.** `Visual` and `Module` use the governance-state labels defined in §3 (`APPROVED`, `FROZEN`); they are not implementation statuses. `Blueprint`, `Implementation` and `Acceptance` use the §3 implementation statuses.
-2. **No code authorization.** Definition of Ready (§10.1) is `NOT MET` for every row: the data/API contract does not exist until `CONTENT-CENTER-BLUEPRINT-01` is completed and implementation is separately authorized.
+1. **Column vocabulary.** `Visual`, `Module` and `Blueprint` use the governance-state labels defined in §3 (`APPROVED`, `FROZEN`); `Blueprint` = `FROZEN` since `CONTENT-CENTER-BLUEPRINT-01` (2026-09-14). `Implementation` and `Acceptance` use the §3 implementation statuses.
+2. **No code authorization.** Definition of Ready (§10.1) remains `NOT MET` for every row. The data/API contract now exists (`docs/content-cms/CONTENT-CENTER-BLUEPRINT-V1.md`, `D-032`), but each row still needs its implementation module (rule 6) separately authorized with its prerequisites met.
 3. **Sequence.** Content Center is a capability-gated track (Approved Visual → Module Freeze → Blueprint → explicit implementation authorization → Draft/Public safety gates → production release gates; `D-031`). It does not alter Blueprint §11 or Charter §J product-line stages.
 4. **Boundaries** (`D-031`): one unified Content Center; `product_sections` / `product_section_items` stay Product Workspace-owned and are not the Content Center store; `posts` / `site_content` require Blueprint inventory; Media Library references only; Content AI is scoped to one current Content Draft on the existing Proposal Engine and never publishes; publish is a manual human action.
 5. **Cross-references updated by this change** (§13): Charter §E.4 / §F.3 / §H.4 note / §J note / §M.1; Decision Log `D-031`; `CURRENT-STATE.md`; `MASTER-ROADMAP.md`; `MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md` Content Center entry conditions. Implementation Blueprint: no change. Compatibility / rollback: documentation only, no runtime consequence.
+6. **Implementation modules** (Content Center Blueprint §34, `CONTENT-CENTER-BLUEPRINT-01`, 2026-09-14): `CC-00` + `CC-01` → `CC-IMP-02`; `CC-02` → `CC-IMP-03`; `CC-03` → `CC-IMP-04`; `CC-04` → `CC-IMP-05`; `CC-05` → `CC-IMP-06`; `CC-HIST` → `CC-IMP-07`; `CC-AI-01` → `CC-IMP-08`; `CC-AI-02` → `CC-IMP-09`. `CC-IMP-01` (foundation, backend-only) and `CC-IMP-10` (public delivery) have no row here and are tracked in `CURRENT-STATE.md`. All ten are `NOT_STARTED` and not authorized.
 
 ---
 
