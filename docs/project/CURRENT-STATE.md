@@ -7903,3 +7903,207 @@ NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"AI-IMAGE-OCR-SOURCE-01"任务中写入。*
+
+---
+
+## AI-DOCUMENT-MIXED-SOURCE-BETA-01 = COMPLETED（2026-09-14）
+
+```text
+Real mixed-source end-to-end beta: TXT + PDF + XLSX + DOCX + Image OCR → ONE real DeepSeek call → Human Review → ONE Apply to a NEW TEST ONLY Draft.
+Acceptance / real beta only · 0 runtime code changes.
+```
+
+在一个**新建的独立 TEST ONLY Draft 产品**上，把五种核心来源放进同一次 Analyze，验证整条真实链路：安全、准确、可审核、可 Apply。Product 3 未使用。
+
+**分支：** `review/ai-document-mixed-source-beta-01`，从 `35fcbb5` 创建，仅本地，未 push。
+
+### 一、TEST ONLY 产品与来源
+
+| 项目 | 值 |
+|---|---|
+| 产品 | id 6 · `TEST ONLY — NOT FOR PUBLICATION — Mixed Source Beta — LT-180C-MIXED-BETA-01` |
+| product_code | `LT-180C-MIXED-BETA-01`（首个未占用运行编码；其他型号 `LT-200C-MIXED-BETA-01` / `LT-300C-MIXED-BETA-01`） |
+| 创建方式 | Admin UI `/admin/products/new`（分类 Metal Detection，slug `test-only-lt-180c-mixed-beta-01`）；另经正式 SEO 接口设 `seo_noindex = true`（Charter G.5） |
+| 状态 | Draft（全程） |
+| Media 文件夹 | `products/metal-detection/TEST ONLY — AI Mixed Source Beta/LT-180C-MIXED-BETA-01`（正式 folders 接口，客户 zone 内） |
+| 源文件（外部，不入 Git） | `D:\LITUBO-exports\ai-mixed-source-beta\LT-180C-MIXED-BETA-01\`，由 TEST ONLY helper（PDF / XLSX / DOCX）、Node 内置与 System.Drawing（PNG）生成，0 新依赖 |
+
+| 类型 | 文件 | Media UUID | 内容要点 |
+|---|---|---|---|
+| TXT | `TEST-ONLY_LT-180C-MIXED-BETA-01_unknown-traps.txt` | `a7ce7117…` | Detection sensitivity: UNKNOWN / Conveyor speed: NOT VERIFIED / Noise level: [?] |
+| PDF | `TEST-ONLY_LT-180C-MIXED-BETA-01_verified-source.pdf` | `e1746197…` | text-layer：Aperture 180 mm / Power supply 220 V, 50 Hz / Net weight 45 kg |
+| XLSX | `TEST-ONLY_LT-180C-MIXED-BETA-01_multi-model.xlsx` | `7b91a63c…` | 可见 Specifications（180C / 200C / 300C 三行）+ Notice（TEST ONLY 标记）+ 隐藏 Internal Trap（999 mm / 9.99 kW / 999 kg） |
+| DOCX | `TEST-ONLY_LT-180C-MIXED-BETA-01_multi-model-conflict.docx` | `ee1eb773…` | # 180C：Power supply 380 V, 50 Hz；# 200C：200 mm / 440 V, 60 Hz / 55 kg |
+| Image | `TEST-ONLY_LT-180C-MIXED-BETA-01_nameplate.png` | `bd33216e…` | TEST ONLY / 编码 / POWER SUPPLY 220 V 50 Hz / RATED POWER 0.45 kW |
+
+- **上传：** 正式 `POST /api/admin/media/upload`（已登录浏览器会话）。Directus 容器内 5 个存储文件的 SHA-256 与本地文件逐一一致。
+- **一次上传纠正（如实记录）：** 第一次 XLSX 上传时手工转写的 base64 有误，存储字节哈希不符（`cf2acb3b…`）。该文件从未关联任何产品，已经正式接口 **Archive（可恢复，未永久删除）**；随后改由仅绑定 127.0.0.1 的临时只读本地字节服务取原始字节再上传，上传前哈希比对一致。
+- **关联：** 正式 `POST /api/admin/products/6/media`，请求体与 Media & resources 页面 Save 相同（`{ directus_files_id, file_role: null }`），link 22–26，均 enabled。页面选择面板在隐藏的 Browser 面板中点击不生效，因此未经面板点选。产品 3 / 4 / 5 的关联中 0 个 Beta 文件。
+
+### 二、Preflight 抽取（0 Provider）
+
+用构建产物中的 `extractTextFromFile` + 真实 document-extractor 读取本地字节（5 来源份额 12,000 字符）：
+
+| 来源 | 结果 |
+|---|---|
+| TXT | 含编码、UNKNOWN、NOT VERIFIED、[?] |
+| PDF | 编码、180 mm、220 V, 50 Hz、45 kg |
+| XLSX | `Filtered to exact product code: LT-180C-MIXED-BETA-01` + 表头 + 当前型号一行（180 mm / 0.45 kW / 45 kg）；0 个 200 / 300 / 999 值；Notice 只有标记行，无数据行，不输出 |
+| DOCX | 两个型号章节全部保留（预期，D-029 不做型号过滤） |
+| Image OCR | `OCR transcription — …` + TEST ONLY / 编码 / POWER SUPPLY 220 V 50 Hz / RATED POWER 0.45 kW |
+
+### 三、Pre-call gate（Node 22.22.2）
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | 2142 通过 + 45 跳过（51 个文件） |
+| `npx vue-tsc --noEmit` | 0 errors |
+| `npm run lint` | 0 errors |
+| `npm run build` | Build complete（7.02 MB / 1.76 MB gzip） |
+| `git diff --check` | 通过 |
+| mock 混合回归 | `aiImageSource.test.ts` 20 / 20，含 "image, Word, PDF, workbook and TXT together: five sources, one provider call, one merged proposal" |
+| extractor | document-extractor 与 gateway healthy，`/healthz` 200 |
+| 产品 / 公开 | 产品 6 为 Draft；5 个文件只关联到产品 6 |
+
+### 四、唯一一次真实 Provider 调用
+
+- **Provider：** DeepSeek（`/api/admin/ai/providers`：deepseek configured + default；openai 未配置，不可能 fallback）。未读取任何 key / `.env`。
+- **操作：** AI Source Intake 选中 5 / 5（1 张图片），披露文案显示；点击一次 "Analyze selected sources"。
+- **计数证据：** 页内 fetch 计数器 generate = 1（2026-09-14T06:02:38Z），apply = 0；0 retry、0 fallback、0 第二次 Analyze、0 provider ping。
+- **费用：** 一次真实计费调用；精确费用未独立测量。
+
+### 五、真实 Proposal（原样）
+
+- Sources in this analysis：5 Analyzed · 0 Duplicate · 0 Not analyzed。
+- 共 4 条：Safe pending 3 · Review required 1。
+  - Specifications / Aperture = 180 mm（Pending）
+  - Specifications / Rated power = 0.45 kW（Pending）
+  - Specifications / Net weight = 45 kg（Pending）
+  - Source conflicts — Review required：Power supply，候选 `220 V, 50 Hz` / `380 V, 50 Hz`（Pending，未自动选择）
+- 全页搜索 0 处：200 mm、300 mm、0.55 kW、0.75 kW、55 kg、75 kg、440 V、60 Hz、999 mm、9.99 kW、999 kg、UNKNOWN、NOT VERIFIED、[?]、Detection sensitivity、Conveyor speed、Noise level、LT-200C、LT-300C。
+- 375px 与 1440px（同一标签页，未重载）均无横向溢出，console 0 error。
+
+### 六、Human Review 与 Apply
+
+- **用户明确批准：** "批准按测试预期应用，Power supply 选择 220 V, 50 Hz。"
+- 冲突选 `220 V, 50 Hz` → Use selected value；Accept all safe → 4 Accepted / 0 Rejected；其他内容未额外接受。
+- **Apply：** 点击一次 "Apply 4 accepted changes to Draft"；计数器 apply = 1；提示 "Applied 4 accepted changes to Draft."。
+- **重放：** Apply 后会话清除，页面为 "No active proposal. Return to AI Source Intake."，无 Apply 按钮；未再次调用 apply。
+
+### 七、Apply 后实际保存数据（API 与 Specifications 页面回读）
+
+| 组 | 参数 | 值 | item id |
+|---|---|---|---|
+| Specifications（group 16） | Aperture | 180 mm | 49 |
+| Specifications | Rated power | 0.45 kW | 50 |
+| Specifications | Net weight | 45 kg | 51 |
+| Specifications | Power supply | 220 V, 50 Hz | 52 |
+
+- 共 1 组 4 条，0 重复参数；Specifications 页面显示 "4 parameters"，输入框值同上。
+- 规格数据中 0 处：200 mm、300 mm、0.55 kW、0.75 kW、55 kg、75 kg、440 V、60 Hz、380 V、999 mm、9.99 kW、999 kg、UNKNOWN、NOT VERIFIED、[?]、Detection sensitivity、Conveyor speed、Noise level。
+- 产品 6：`status = draft`、`published_at = null`、`seo_noindex = true`。
+- 产品 3 / 4 / 5：状态、`date_updated`、规格组数与条数与 Beta 前基线完全一致（3：12 组 45 条；4：1 组 0 条；5：1 组 1 条）。
+
+### 八、Draft / 公开隔离
+
+- 管理端 `status=published` 过滤（与 sitemap 和公开 CMS 接口相同条件）：0 个产品，产品 6 不在其中。
+- 无 cookie 请求：sitemap 为空骨架、公开页面 404、公开详情 API 503。**但 dev server 日志显示公开 CMS 读取 Directus 返回 401**，所以这些结果不能单独证明过滤生效：
+  - Draft state verified; public-route behavior relies on existing publication gate（sitemap 与 `cms/products` 代码均只取 `status = published`）and its tests。
+- 应用内无公开搜索端点；未向任何外部搜索引擎提交。
+
+### 九、浏览器验收（Windows `nuxt dev`，3000 端口进程实测 Node 22.22.2）
+
+- build 后首次启动出现已知 `#app-manifest` 报错；确认端口释放后干净重启一次，之后服务端 0 错误（仅上述公开 CMS 401 日志）。
+- **1440px：** AI Source Intake（调用前：5 张可选卡、`0 / 5 selected`）、AI Proposal Review（真实 proposal）、Specifications（Apply 后）、Media & resources（1 asset / 4 documents，Save 禁用）均无横向溢出，console 0 error。
+- **375px：** AI Source Intake（选择与 Analyze）、AI Proposal Review（真实 proposal 与冲突审核）、Specifications、Media & resources 均 `scrollWidth = clientWidth`，console 0 error。
+- 截图在隐藏面板中不可辨认，结论以 DOM 与 console 为准。
+- `.claude/launch.json` 验收期间临时加入 Node 22 与临时字节服务配置，已还原，与 HEAD 一致。
+
+### 十、数据出境
+
+- Provider 收到：TXT 文本、PDF 抽取文本、XLSX 精确筛选文本、DOCX 结构化可见文字、图片 OCR 转录。
+- Provider 未收到：原始 PDF / XLSX / DOCX / 图片、二进制 / base64、Media URL、文件系统路径、凭证（由 D-024 ~ D-030 的合同与既有出站测试保证；本 Beta 未抓取真实请求体）。
+
+### 十一、边界
+
+**1 TEST ONLY Draft Product · 5 TEST ONLY 来源 · 1 次真实 Provider Analyze · 1 次 Human Review · 1 次 Apply · 0 生产产品改动 · 0 发布 · 0 retry · 0 fallback · 0 第二次 Analyze · 0 新格式 · 0 parser / Provider adapter / prompt 改动 · 0 runtime 代码改动 · 0 DB / Directus schema · 0 push · 0 deploy。**
+
+- 产品 6、5 个来源与已归档的错误 XLSX 均保留（不物理删除），作为审计证据。
+- 未新增 Decision（D-024 ~ D-030 已覆盖）；Charter / Register 未改；MASTER-ROADMAP 最小同步。
+- Node 22.22.2 仍为旧会话 Temp 中的便携版本，非持久安装。
+
+---
+
+```text
+AI-DOCUMENT-MIXED-SOURCE-BETA-01
+=
+COMPLETED
+
+Test Product:
+LT-180C-MIXED-BETA-01 (id 6)
+
+Product status:
+Draft
+
+Sources:
+TXT / PDF / XLSX / DOCX / Image
+
+Real Provider:
+DeepSeek
+
+Real Analyze attempts:
+1
+
+Retry:
+0
+
+Fallback:
+0
+
+Cross-model leakage:
+NO
+
+Hidden XLSX leakage:
+NO
+
+UNKNOWN inference:
+NO
+
+[?] inference:
+NO
+
+Conflict:
+Power supply 220 V, 50 Hz vs 380 V, 50 Hz
+
+Human decision:
+220 V, 50 Hz
+
+Apply:
+ONE time
+
+Applied safe facts:
+Aperture 180 mm
+Rated power 0.45 kW
+Net weight 45 kg
+Power supply 220 V, 50 Hz
+
+Draft remained Draft:
+YES
+
+Published:
+NO
+
+Sitemap:
+NO (published filter; dev public CMS read returned 401 — see §八)
+
+Real product changes:
+0
+
+NEXT CANDIDATE:
+AI-DOCUMENT-SOURCE-V1-FINAL
+
+STATUS:
+NOT AUTHORIZED
+```
+
+*最后更新：2026-09-14，由 Claude Code 在"AI-DOCUMENT-MIXED-SOURCE-BETA-01"任务中写入。*
