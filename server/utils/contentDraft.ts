@@ -25,7 +25,8 @@ import type {
  *   400 — body is not a JSON object / no updatable field / invalid id
  *   404 — content item or locale row not found for this route
  *   409 — duplicate slug or locale (database unique constraint is the final
- *         authority), stale `expectedDraftRevision`, archived item
+ *         authority), stale `expectedDraftRevision` (BFF pre-check; the
+ *         database revision guard trigger is the final authority), archived item
  *   422 — a field that may not be set here (mass assignment), unknown content
  *         type or locale, or a value that fails validation
  * Every rejection writes nothing.
@@ -144,10 +145,24 @@ export function uniqueViolationField(err: unknown): string | null {
   return hit ? String(hit.extensions?.field ?? '') : null
 }
 
+/**
+ * CC-IMP-01-FIX-01-R1 — the database revision guard
+ * (directus/schema/cc-imp-01-fix-01-revision-guard.sql) raises SQLSTATE 23505
+ * with the field `draft_revision`, which Directus reports as RECORD_NOT_UNIQUE
+ * on that field. No real index covers `draft_revision`, so only the guard
+ * produces it. Every other error keeps its own status.
+ */
+export const DRAFT_REVISION_GUARD_FIELD = 'draft_revision'
+
+export function isDraftRevisionConflict(err: unknown): boolean {
+  return uniqueViolationField(err) === DRAFT_REVISION_GUARD_FIELD
+}
+
 async function writeOrConflict<T>(write: Promise<T>): Promise<T> {
   try {
     return await write
   } catch (err) {
+    if (isDraftRevisionConflict(err)) throw err
     const field = uniqueViolationField(err)
     if (field !== null) {
       if (field.includes('slug')) fail(409, 'This slug is already used for this language.', { field: 'slug' })
@@ -382,6 +397,17 @@ export async function updateLocaleDraft(fetch: FetchFn, itemId: number, rawLocal
   patch.draft_revision = row.draft_revision + 1
   patch.last_change_kind = 'manual_edit'
 
-  await writeOrConflict(fetch(`/items/content_item_locales/${row.id}?fields=id`, { method: 'PATCH', body: patch }))
+  try {
+    await writeOrConflict(fetch(`/items/content_item_locales/${row.id}?fields=id`, { method: 'PATCH', body: patch }))
+  } catch (err) {
+    // CC-IMP-01-FIX-01-R1 — the database guard rejected a concurrent save that
+    // passed the pre-check with the same revision. Nothing was written.
+    if (isDraftRevisionConflict(err)) {
+      const current = await getLocaleRow(fetch, itemId, locale)
+      fail(409, 'This draft was changed since it was loaded. Reload it before saving.', { currentDraftRevision: current?.draft_revision ?? null })
+    }
+    throw err
+  }
+  // The revision returned here is read back from the database after the write.
   return getContentDraft(fetch, itemId)
 }

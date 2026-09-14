@@ -157,6 +157,8 @@ archived ──restore──▶ draft                        (clears all snapsho
 
 A non-default locale can be published only while the default locale is published. Charter §G.1 (product lifecycle) is unaffected; this is the content lifecycle defined under D-032.
 
+**Draft save concurrency (clarified by CC-IMP-01-FIX-01-R1):** the BFF pre-checks `expectedDraftRevision`, but the final authority is a database guard on `content_item_locales` (`directus/schema/cc-imp-01-fix-01-revision-guard.sql`): a change to any working-copy field requires `draft_revision = previous + 1`, and `draft_revision` never changes by anything other than +1. Publication-only updates and `last_change_kind` leave `draft_revision` unchanged. A rejected save writes nothing and returns 409.
+
 ## 9. Structured blocks
 
 **Recommended:** ordered, schema-validated JSON array `content_item_locales.blocks`, validated by a server-side zod registry `server/utils/contentBlocks.ts` with a shared type list in `utils/contentBlocks.ts`.

@@ -41,6 +41,25 @@ class FakeDirectus {
   writes: Array<{ method: string, path: string }> = []
   /** Simulates a pre-check that read before a concurrent request committed. */
   staleSlugReads = false
+  /** When set, locale reads return this earlier copy (both concurrent requests read revision N). */
+  frozenLocales: Map<number, Row> | null = null
+  /** When set, the next PATCH fails with this error (e.g. an unrelated Directus 500). */
+  failNextPatchWith: unknown = null
+
+  freezeLocaleReads(): void {
+    this.frozenLocales = new Map([...this.locales].map(([id, row]) => [id, structuredClone(row)]))
+  }
+
+  /** Mirrors directus/schema/cc-imp-01-fix-01-revision-guard.sql. */
+  private assertRevisionGuard(oldRow: Row, newRow: Row): void {
+    const draftFields = ['title', 'slug', 'summary', 'blocks', 'seo_title', 'seo_description', 'canonical_path', 'noindex']
+    const changed = draftFields.some(f => JSON.stringify(oldRow[f] ?? null) !== JSON.stringify(newRow[f] ?? null))
+    const oldRev = Number(oldRow.draft_revision)
+    const newRev = Number(newRow.draft_revision)
+    if ((newRev !== oldRev && newRev !== oldRev + 1) || (changed && newRev !== oldRev + 1)) {
+      throw uniqueError('draft_revision')
+    }
+  }
   private nextItem = 1
   private nextLocale = 1
 
@@ -81,7 +100,7 @@ class FakeDirectus {
     }
 
     if (url.pathname === '/items/content_item_locales' && method === 'GET') {
-      let rows = [...this.locales.values()]
+      let rows = [...(this.frozenLocales ?? this.locales).values()]
       if (q('filter[content_items_id][_eq]')) rows = rows.filter(r => r.content_items_id === Number(q('filter[content_items_id][_eq]')))
       if (q('filter[locale][_eq]')) rows = rows.filter(r => r.locale === q('filter[locale][_eq]'))
       if (q('filter[slug][_eq]')) {
@@ -103,7 +122,13 @@ class FakeDirectus {
       const id = Number(patchMatch[1])
       const existing = this.locales.get(id)
       if (!existing) throw Object.assign(new Error('forbidden'), { statusCode: 403 })
+      if (this.failNextPatchWith) {
+        const error = this.failNextPatchWith
+        this.failNextPatchWith = null
+        throw error
+      }
       const next = { ...existing, ...body, id }
+      this.assertRevisionGuard(existing, next)
       this.assertLocaleUnique(next, id)
       this.locales.set(id, next)
       return { data: { id } }
@@ -409,5 +434,47 @@ describe('cross-parent (IDOR) protection', () => {
     await expectStatus(updateLocaleDraft(db.fetch, a.id, 'en', { expectedDraftRevision: 1, blocks: [image(3)] }), 422)
     const saved = await updateLocaleDraft(db.fetch, a.id, 'en', { expectedDraftRevision: 1, blocks: [image(2)] })
     expect(saved.locales[0].blocks[0].data).toEqual({ fileLinkId: 2 })
+  })
+})
+
+describe('database revision guard mapping (CC-IMP-01-FIX-01-R1)', () => {
+  it('two concurrent saves that both pass the pre-check → exactly one succeeds, one 409, no mixed fields', async () => {
+    const draft = await create()
+    db.freezeLocaleReads() // both requests read revision 1 before either writes
+    const results = await Promise.allSettled([
+      updateLocaleDraft(db.fetch, draft.id, 'en', { expectedDraftRevision: 1, title: 'Concurrent A', summary: 'Summary A' }),
+      updateLocaleDraft(db.fetch, draft.id, 'en', { expectedDraftRevision: 1, title: 'Concurrent B', summary: 'Summary B' }),
+    ])
+    db.frozenLocales = null
+
+    const fulfilled = results.filter(r => r.status === 'fulfilled')
+    const rejected = results.filter(r => r.status === 'rejected') as PromiseRejectedResult[]
+    expect(fulfilled).toHaveLength(1)
+    expect(rejected).toHaveLength(1)
+    expect(rejected[0].reason).toMatchObject({ statusCode: 409 })
+    expect(String(rejected[0].reason.message)).toContain('changed since it was loaded')
+
+    const final = (await getContentDraft(db.fetch, draft.id)).locales[0]
+    expect(final.draft_revision).toBe(2)
+    const winner = final.title === 'Concurrent A' ? 'A' : 'B'
+    expect(final).toMatchObject({ title: `Concurrent ${winner}`, summary: `Summary ${winner}` })
+  })
+
+  it('maps only the draft_revision guard to 409; an unrelated Directus 500 keeps its status', async () => {
+    const draft = await create()
+    db.failNextPatchWith = Object.assign(new Error('boom'), {
+      statusCode: 500,
+      data: { errors: [{ message: 'An unexpected error occurred.', extensions: { code: 'INTERNAL_SERVER_ERROR' } }] },
+    })
+    await expectStatus(updateLocaleDraft(db.fetch, draft.id, 'en', { expectedDraftRevision: 1, title: 'x' }), 500)
+    expect((await getContentDraft(db.fetch, draft.id)).locales[0].draft_revision).toBe(1)
+  })
+
+  it('a draft_revision guard error is never reported as a duplicate locale', async () => {
+    const draft = await create()
+    db.failNextPatchWith = uniqueError('draft_revision')
+    const error = await updateLocaleDraft(db.fetch, draft.id, 'en', { expectedDraftRevision: 1, title: 'x' }).catch(e => e)
+    expect(error).toMatchObject({ statusCode: 409 })
+    expect(String(error.message)).toContain('changed since it was loaded')
   })
 })

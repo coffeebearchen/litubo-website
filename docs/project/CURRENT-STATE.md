@@ -8,14 +8,14 @@
 
 ```text
 Latest accepted module:             CONTENT-CENTER-BLUEPRINT-01 + REVIEW-FIX-01（accepted for implementation · local commit 56752a6 · not pushed）
-Latest completed module:            CC-IMP-01 — Content Foundation（LOCAL COMPLETE · awaiting controller review）
-Active authorized module:           NONE（CC-IMP-01 已收口，等待下一份授权）
+Latest completed module:            CC-IMP-01-FIX-01-R1 — Atomic Draft Revision Guard（LOCAL COMPLETE · awaiting controller review）
+Active authorized module:           NONE（CC-IMP-01-FIX-01-R1 已收口，等待下一份授权）
 Active module authorization level:  —
 Next candidate:                     CC-IMP-02 — List, Workspace Shell & Overview
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：56752a6）
-Local Directus schema:              Content Foundation applied (LOCAL DEVELOPMENT ONLY)
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：22bdc63）
+Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
 
@@ -8770,7 +8770,7 @@ Production changes: 0 · Provider calls: 0 · push: 0 · deploy: 0
 
 ### 四、记录（不阻塞）
 
-- **P2：** `expectedDraftRevision` 为"读取 → 比较 → 写入"，单管理员场景足够；两个并发保存之间仍有极小窗口（无行锁），与"前端提交状态 + 服务端写入前重查"原则一致。
+- **已关闭（CC-IMP-01-FIX-01-R1）：** ~~`expectedDraftRevision` 为"读取 → 比较 → 写入"，两个并发保存之间仍有窗口~~——Controller 判定须修复；现由数据库 revision guard trigger 强制，lost-update race = CLOSED（见下方 R1 节）。
 - **运维注意：** 通过 CLI `schema apply` 修改 schema 后，运行中的 Directus 仍缓存旧 schema（首次 BFF 验收全部 403）；重启本地 Directus 容器后恢复。后续 schema 模块应在 apply 后重启 / 清理缓存。
 - **环境：** typecheck / lint / build / 测试使用 PATH 上 Node 24.14.0（持久 Node 22.22.2 环境仍是 Open Release Gate）；build 后首次 `nuxt dev` 的 `#app-manifest` 报错已按既有做法重启消除。
 - **遗留结构：** `posts` 表有 8 行（CC-IMP-10 切换前须只读核对是否为真实内容）。
@@ -8787,3 +8787,80 @@ AUTHORIZATION: NO
 ```
 
 *最后更新：2026-09-14，由 Claude Code 在"CC-IMP-01 — Content Foundation"任务中写入。*
+
+---
+
+## CC-IMP-01-FIX-01-R1 — Atomic Draft Revision Guard = COMPLETED（LOCAL COMPLETE，2026-09-15）
+
+```text
+TYPE B — Backend / Data Runtime Fix · A2 LOCAL_IMPLEMENTATION
+Controller decision: OPTION A — DATABASE TRIGGER GUARD
+Production: 0 · Provider calls: 0 · push: 0 · deploy: 0
+```
+
+**过程：** `CC-IMP-01-FIX-01` 首轮 STOP（0 文件 / 0 DB 改动）——已核实 Directus 11 `ItemsService.updateMany` 只按主键 `whereIn` 更新、`updateByQuery` 的过滤是事务外的独立 SELECT，Nuxt 无直连数据库，因此"不改 schema"无法实现原子 CAS。Controller 以 R1 授权方案 A（本地 PostgreSQL trigger），明确拒绝 Directus Extension、Nuxt 直连数据库与维持现状。
+
+**分支：** `review/cc-imp-01-fix-01-atomic-revision`，从 `22bdc63` 创建，仅本地。
+
+```text
+Atomic CAS:                 IMPLEMENTED
+Mechanism:                  PostgreSQL BEFORE UPDATE trigger guard
+Directus write path:        PRESERVED（BFF 仍经 Directus ItemsService 写入）
+Directus revisions:         PRESERVED / verified
+True concurrency:           ONE SUCCESS / ONE 409
+Final revision:             increments exactly once
+Loser:                      NO BUSINESS WRITE
+Schema:                     local DB-native trigger + function added（0 collection / 0 field / 0 index / 0 constraint change）
+Tracked rebuild artifact:   directus/schema/cc-imp-01-fix-01-revision-guard.sql
+Lost-update race:           CLOSED
+Production:                 NO CHANGE
+Push:                       0
+Next:                       CC-IMP-02
+Authorized:                 NO
+```
+
+### 一、实现
+
+| 项 | 内容 |
+|---|---|
+| 备份 | `backups/cc-imp-01-fix-01-r1-before-20260915-002549.sql`（776,361 B，git 忽略）；变更前核对：public 用户 trigger 0、guard 函数不存在 |
+| 函数 | `content_item_locales_draft_revision_guard()`（plpgsql，returns trigger） |
+| Trigger | `content_item_locales_draft_revision_guard_trg` — `content_item_locales`，BEFORE UPDATE，FOR EACH ROW，enabled；public 用户 trigger 总数 1 |
+| 守护字段 | title、slug、summary、blocks（jsonb 比较）、seo_title、seo_description、canonical_path、noindex（与 BFF 保存 allowlist 一致） |
+| 不变量 | 工作稿字段有变化 → 必须 `NEW.draft_revision = OLD.draft_revision + 1`；`draft_revision` 只能 +1（不得减小、跳跃）；只改发布字段或 `last_change_kind` 且 revision 不变 → 放行 |
+| 错误标识 | SQLSTATE `23505`，DETAIL `Key (draft_revision)=…`，TABLE `content_item_locales`，CONSTRAINT `content_item_locales_draft_revision_guard` → Directus 翻译为 `RECORD_NOT_UNIQUE` + field `draft_revision`（HTTP 400；`draft_revision` 无真实唯一索引，只有 guard 产生此组合，且不依赖管理员才能看到的错误消息） |
+| BFF | `server/utils/contentDraft.ts`：`isDraftRevisionConflict()` 只识别上述组合 → 409（附重新读取的 `currentDraftRevision`）；其他 Directus 错误保持原状态（500 不会变 409）；预检查保留但不再是正确性依据；返回值为写入后从数据库读回的 revision |
+| 回滚（仅本地） | `DROP TRIGGER IF EXISTS content_item_locales_draft_revision_guard_trg ON content_item_locales;` → `DROP FUNCTION IF EXISTS content_item_locales_draft_revision_guard();` |
+| Directus 快照 | **不包含** trigger / function（已提交 `cc-imp-01-after.yaml` dry-run = No changes，文件内无 trigger）；tracked SQL 是唯一重建依据；SQL 可重复执行（已实测二次应用） |
+| Directus 重启 | 不需要（未改集合 / 字段） |
+
+### 二、验证
+
+| 检查 | 结果 |
+|---|---|
+| 单元测试 | `contentDraftService` 59（+3：并发同 revision 一成一 409 且不混写、Directus 500 不映射 409、guard 冲突不误报为重复 locale）；Content 三文件合计 114 通过 |
+| 真实 PostgreSQL 集成测试（`tests/contentRevisionGuardIntegration.test.ts`，需 `CONTENT_DB_TEST_CONTAINER`） | 6 通过：trigger 元数据；N→N+1 通过；过期保存拒绝且无写入（stderr 含 23505）；跳跃 / 减小 / 改字段不加 revision（summary、blocks、noindex）均拒绝；发布字段与 `last_change_kind` 更新放行（事务回滚、无快照留存）；两会话并发只有一个成功、败方等待行锁后被拒、最终行只含胜方 |
+| 全量 `vitest run`（含 DB 集成） | **2262 passed / 45 skipped**（53 文件） |
+| `npm run typecheck` / `npm run lint` | 0 / 0 |
+| `npx nuxt build` | Build complete |
+| 真实 BFF 并发（已登录会话，新建 TEST ONLY 条目 5） | 3 轮，每轮同 `expectedDraftRevision` 两个不同值并发：[409,200] 胜 B、[200,409] 胜 A、[200,409] 胜 A；revision 1→2→3→4 每轮 +1；最终值与胜方完全一致；败方 409 附 currentDraftRevision；顺序过期保存 409；客户端写 `draft_revision` 422 |
+| 败方路径 | Directus 日志 6 次 PATCH `content_item_locales/13` = 3×200 + 3×400 → 3 个败方均通过 BFF 预检，由数据库 guard 拒绝 |
+| Directus 审计 | 基线后条目 5：create 1 + locale create 1 + **update 3**（仅胜方）；3 条 update revision 的 delta = `title, summary, draft_revision, last_change_kind`；败方标题在 revisions 中出现次数 0 |
+| Mass assignment / IDOR 回归 | 通过（原单元测试全部保留并通过） |
+| console / server | 控制台仅为验收脚本故意发出的 4xx；dev server 0 error |
+| 测试数据 | 集成测试负 id 行已清除（剩余 0）；新增 TEST ONLY Draft 条目 **5**（en rev 4，无快照）保留，与条目 1 / 2 / 4 同列 |
+| Node | 24.14.0（持久 Node 22.22.2 Release Gate 仍 OPEN） |
+
+**文档：** Blueprint §8 新增一段"Draft save concurrency"技术澄清（数据库 guard 为最终权威），其他架构未改；Freeze、Decision Log、CLAUDE.md、Protocol、Register、MASTER-ROADMAP：0 修改。
+
+**未处理（保持原登记）：** Product AI Apply 缺口、公开媒体代理归档检查、posts 数据、Directus schema 缓存行为、Node 环境、公开权限、UI / AI / Publish。
+
+```text
+CC-IMP-01 CONTENT FOUNDATION: ACCEPTED LOCALLY（candidate）
+ATOMIC DRAFT REVISION: PASS
+DIRECTUS REVISIONS: PRESERVED
+LOST-UPDATE RACE: CLOSED
+CC-IMP-02: NOT STARTED · NOT AUTHORIZED
+```
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-01-FIX-01-R1"任务中写入。*
