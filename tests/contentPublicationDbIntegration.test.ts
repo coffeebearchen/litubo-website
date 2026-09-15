@@ -12,8 +12,9 @@
  * id and no media links; it is deleted before and after the run. The real plan
  * functions (readiness, snapshot builder, publish / unpublish plans) decide every
  * write; this file only executes those planned writes with SQL, the way the admin
- * route executes them through Directus. The TEST ONLY public registry exists only
- * inside this test; the committed registry keeps every type non-public.
+ * route executes them through Directus. The TEST ONLY registries exist only inside
+ * this test; CC-IMP-10 (D-035) makes only Technical Article and Case Study public in the
+ * committed registry, and the blocked-type path injects a registry where the type is not public.
  */
 
 import { execFile } from 'node:child_process'
@@ -40,7 +41,14 @@ const TEST_ONLY_PUBLIC_REGISTRY: PublicationOptions['resolveType'] = (id: unknow
   const def = getContentType(id)
   return def?.id === 'technical_article' ? { ...def, publicEnabled: true } : def
 }
-const RUNTIME: PublicationOptions = { publishedLocales: ['en'] }
+/** TEST ONLY — an isolated registry in which technical articles are not enabled for public delivery (the blocked-type path). */
+const NOT_PUBLIC: PublicationOptions = {
+  publishedLocales: ['en'],
+  resolveType: (id: unknown) => {
+    const def = getContentType(id)
+    return def?.id === 'technical_article' ? { ...def, publicEnabled: false } : def
+  },
+}
 const TEST_PUBLIC: PublicationOptions = { publishedLocales: ['en'], resolveType: TEST_ONLY_PUBLIC_REGISTRY }
 const TEST_PUBLIC_ES: PublicationOptions = { publishedLocales: ['en', 'es'], resolveType: TEST_ONLY_PUBLIC_REGISTRY }
 
@@ -143,12 +151,12 @@ describe.skipIf(!CONTAINER)('publish lifecycle — real PostgreSQL, TEST ONLY fi
     const snapshotsAfter = await psql('SELECT count(*) FROM content_item_locales WHERE published_snapshot IS NOT NULL AND content_items_id >= 0;')
     expect(snapshotsAfter.stdout.trim()).toBe(snapshotsBefore)
     // The committed registry never changed.
-    expect(Object.values(CONTENT_TYPES).every(def => def.publicEnabled === false)).toBe(true)
+    expect(Object.values(CONTENT_TYPES).filter(def => def.publicEnabled).map(def => def.id)).toEqual(['technical_article', 'case_study'])
   })
 
-  it('the normal runtime registry refuses to publish and nothing is written', async () => {
+  it('a registry where the type is not public refuses to publish and nothing is written', async () => {
     const ctx = await context()
-    const err = await refusal(() => reviewedPlan(ctx, 'en', 3, RUNTIME))
+    const err = await refusal(() => reviewedPlan(ctx, 'en', 3, NOT_PUBLIC))
     expect(err.statusCode).toBe(422)
     expect((err.data.blockers as Array<{ key: string }>).map(b => b.key)).toEqual(['type_public'])
     expect(row(await context(), 'en').published_snapshot).toBeNull()

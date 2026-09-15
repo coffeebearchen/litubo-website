@@ -46,6 +46,8 @@
 
 **CC-IMP-09（2026-09-15）补充：** ✅ COMPLETED（LOCAL COMPLETE）——CC-IMP-08 已由 Controller 签收（VISUALLY VERIFIED）。`/admin/content-center/:id/ai-proposal-review`：当前管理员对单一内容条目 + 精确语言的服务端 Proposal 逐项人工 Accept / Edit（仅值）/ Reject；冲突只能人工选择候选、编辑或拒绝，"Accept all safe" 不触碰冲突；Apply 只提交按 `proposalItemId` 的决定，target / operation / block 类型与顺序全部取自服务端 Proposal 与绑定（subject / locale / draft revision / lifecycle 标记）；一次 PATCH 写该语言 working copy（`draft_revision + 1`、`last_change_kind = ai_apply`、服务端生成新 block id），不写 status / 发布字段、不调用发布或生命周期处理器。过期 / 重启 / 已应用 / 跨条目 / 跨语言 / 跨管理员 / 过期 revision / 归档 / Restore 后全部 409 且 0 写入。真实 Provider 调用 0；未 push、未部署。NEXT：`CC-IMP-10` Public Delivery & Sitemap — NOT AUTHORIZED。
 
+**CC-IMP-10（2026-09-15）补充：** ✅ COMPLETED（LOCAL COMPLETE）——前置 DIRECTUS-PERMISSIONS-PROVISIONING-01（D-034）已完成。D-035：Technical Article → `/resources/insights/[slug]`、Case Study → `/resources/case-studies/[slug]`，只读 Content Center 英文 `published_snapshot`，经单一资格合同与显式 allowlist DTO；News 详情 404、hub 无 News；Application / Resource / News 不公开；旧 posts 仅保留 Technical Guide / FAQ；noindex 仍可访问但不进 sitemap；sitemap 产品查询去除 `date_updated`、上游失败 503；媒体代理检查公开 + 未归档；related 只显示合格目标。真实人工 Publish → noindex → Archive → Restore → Unpublish Golden Path 已走通，TEST ONLY 夹具已恢复为 Draft。权限未扩大；未 push、未部署。NEXT：NONE — 等待 Controller。
+
 ---
 
 ## 总览
@@ -253,7 +255,8 @@ Content Center Visual Direction      ✅ APPROVED（2026-09-14）
 → CC-IMP-08 Content AI Target & Source Intake  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；只读已关联来源 + 浏览器本地选择 + 单一 Proposal Engine 的 content-draft Target，一次 Analyze 一个内存 Proposal；0 关联 / Draft / 发布写入，无 Apply，真实 Provider 调用 0，未 push / 未部署）
 → CC-IMP-09 AI Proposal Review & Apply  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；人工 Accept / Edit / Reject + 冲突人工决定 + 按服务端 Proposal 绑定一次 PATCH 写入该语言 working Draft；无发布、真实 Provider 调用 0，未 push / 未部署）
 → DIRECTUS-PERMISSIONS-PROVISIONING-01  ✅ COMPLETED（2026-09-15，CC-IMP-10 prerequisite：已跟踪、幂等、fail-closed 的 nuxt-server Content 最小读取权限工件，D-034；公开策略 Content 权限 0；未 push / 未部署）
-→ CC-IMP-10 Public Delivery & Sitemap  NEXT — NOT AUTHORIZED（须按 Safety Gate 流程取证；Blueprint §35 用户路由决定）
+→ CC-IMP-10 Public Delivery & Sitemap V2  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；D-035：Technical Article / Case Study 仅英文、仅快照公开，News 等其他类型不公开，sitemap 去除 `date_updated` 并纳入合格内容，媒体代理归档检查；未 push / 未部署）
+→ NEXT：NONE — 等待 Controller 审查（未授权任何后续模块）
 ```
 
 #### M4-Next-6：真实产品资料录入与正式上线
@@ -325,7 +328,7 @@ AI-DOCUMENT-SOURCE-V1-PREFLIGHT      ✅ PASS WITH ARCHITECTURE DECISIONS
 → AI-IMAGE-OCR-SOURCE-01             ✅ COMPLETED（JPG / PNG / WebP 经现有隔离 document-extractor 本地 libvips + Tesseract OCR 读取可见文字；非 Vision；低置信度 [?]；每次 Analyze 最多 3 张；AI 可读 TXT / CSV / TSV / PDF / XLSX / DOCX / JPG / PNG / WebP；未部署）
 → AI-DOCUMENT-MIXED-SOURCE-BETA-01   ✅ COMPLETED（新建 TEST ONLY Draft 产品 LT-180C-MIXED-BETA-01 上 TXT / PDF / XLSX / DOCX / PNG 五来源一次真实 DeepSeek Analyze；无跨型号 / 隐藏表 / UNKNOWN 泄漏；Power supply 冲突人工选 220 V, 50 Hz；Apply 一次写入 4 条，仍为 Draft；未部署）
 → AI-DOCUMENT-SOURCE-V1-FINAL        ✅ FEATURE COMPLETE / SIGNED OFF（TXT / CSV / TSV / PDF text-layer / XLSX / DOCX / JPG / PNG / WebP OCR；一个 Proposal Engine；Human Review 必需；原始二进制不发往 Provider；Production release gates remain open — 生产发布未批准，不代表网站可上线）
-→ 后续主线转入 Content Center（M4-Next-5）：Module Freeze ✅ · Blueprint ✅ · CC-IMP-01 ✅ · CC-IMP-02 ✅ · CC-IMP-03 ✅ · CC-IMP-04 ✅ · CC-IMP-05 ✅ · RELEASE-SAFETY-GATES-01 ✅ · CC-IMP-06 ✅ · CC-IMP-07 ✅ · CC-IMP-08 ✅ · CC-IMP-09 ✅；CC-IMP-10 NEXT — 未授权
+→ 后续主线转入 Content Center（M4-Next-5）：Module Freeze ✅ · Blueprint ✅ · CC-IMP-01 ✅ · CC-IMP-02 ✅ · CC-IMP-03 ✅ · CC-IMP-04 ✅ · CC-IMP-05 ✅ · RELEASE-SAFETY-GATES-01 ✅ · CC-IMP-06 ✅ · CC-IMP-07 ✅ · CC-IMP-08 ✅ · CC-IMP-09 ✅；CC-IMP-10 ✅（LOCAL COMPLETE，等待 Controller 审查）
 ```
 
 ### 禁止（M5）

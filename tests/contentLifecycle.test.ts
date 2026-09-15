@@ -42,7 +42,14 @@ function publicRegistry(): PublicationOptions['resolveType'] {
     return def?.id === 'technical_article' ? { ...def, publicEnabled: true } : def
   }
 }
-const RUNTIME: PublicationOptions = { publishedLocales: ['en'] }
+/** TEST ONLY — an isolated registry in which technical articles are not enabled for public delivery (the blocked-type path). */
+const NOT_PUBLIC: PublicationOptions = {
+  publishedLocales: ['en'],
+  resolveType: (id: unknown) => {
+    const def = getContentType(id)
+    return def?.id === 'technical_article' ? { ...def, publicEnabled: false } : def
+  },
+}
 const TEST_PUBLIC_ES: PublicationOptions = { publishedLocales: ['en', 'es'], resolveType: publicRegistry() }
 
 async function rejection(promise: Promise<unknown>): Promise<{ statusCode: number, message: string, data: Record<string, unknown> }> {
@@ -308,13 +315,13 @@ describe('restore — archived → draft, snapshots cleared, never published (Bl
     expect(locked.data).toMatchObject({ slugLocked: true })
   })
 
-  it('does not publish: the runtime Publish is still blocked by readiness after restore', async () => {
+  it('does not publish: Publish of a non-public type is still blocked by readiness after restore', async () => {
     await archive()
     await restore()
-    const state = await getContentPreviewPublish(db.fetch, ITEM, 'en', RUNTIME)
+    const state = await getContentPreviewPublish(db.fetch, ITEM, 'en', NOT_PUBLIC)
     expect(state.publication.has_snapshot).toBe(false)
     expect(state.readiness.hard.filter(c => c.state === 'fail').map(c => c.key)).toEqual(['type_public'])
-    const err = await rejection(publishContentLocale(db.fetch, ITEM, 'en', await reviewed('en', RUNTIME), RUNTIME))
+    const err = await rejection(publishContentLocale(db.fetch, ITEM, 'en', await reviewed('en', NOT_PUBLIC), NOT_PUBLIC))
     expect(err.statusCode).toBe(422)
     expect(db.item.status).toBe('draft')
   })
@@ -392,7 +399,7 @@ describe('archived content is read-only for every existing mutation (RSG-01, RSG
       ['Open Graph save', saveContentSeoLocales(db.fetch, ITEM, { locale: 'en', og_image: { directus_files_id: HERO, expectedOgVersion: 'x' } }, ['en']), 409],
       ['start locale', createLocaleDraft(db.fetch, ITEM, { locale: 'pt', title: 'TEST ONLY PT', slug: 'test-only-pt' }), 409],
       ['media & relations save', saveContentMediaRelations(db.fetch, ITEM, { expectedInventoryVersion: 'x', media: [], relations: [] }), 409],
-      ['unpublish', unpublishContentLocale(db.fetch, ITEM, 'en', {}, RUNTIME), 409],
+      ['unpublish', unpublishContentLocale(db.fetch, ITEM, 'en', {}, NOT_PUBLIC), 409],
     ]
     for (const [name, promise, status] of cases) {
       expect((await rejection(promise)).statusCode, name).toBe(status)
@@ -408,7 +415,7 @@ describe('archived content is read-only for every existing mutation (RSG-01, RSG
     expect((await getContentDraft(db.fetch, ITEM)).status).toBe('archived')
     expect((await getContentSeoLocales(db.fetch, ITEM, ['en'])).item.status).toBe('archived')
     expect((await getContentMediaRelations(db.fetch, ITEM)).item.status).toBe('archived')
-    expect((await getContentPreviewPublish(db.fetch, ITEM, 'en', RUNTIME)).can_unpublish).toBe(false)
+    expect((await getContentPreviewPublish(db.fetch, ITEM, 'en', NOT_PUBLIC)).can_unpublish).toBe(false)
     expect((await getContentHistory(db.fetch, ITEM, 1)).lifecycle.can_restore).toBe(true)
   })
 
@@ -607,8 +614,8 @@ describe('static boundaries (RSG-03, RSG-04)', () => {
     expect(text('server/api/admin/content-center/[id]/history.get.ts')).not.toMatch(/readJsonBody|method:/)
   })
 
-  it('the committed registry keeps every content type non-public', () => {
-    for (const def of Object.values(CONTENT_TYPES)) expect(def.publicEnabled).toBe(false)
+  it('the committed registry makes only the Phase 1 types public (D-035)', () => {
+    expect(Object.values(CONTENT_TYPES).filter(def => def.publicEnabled).map(def => def.id)).toEqual(['technical_article', 'case_study'])
   })
 
   it('only the lifecycle service writes archived_at or the restore marker — the database restore guards rely on it', () => {

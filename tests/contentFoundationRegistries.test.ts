@@ -34,9 +34,13 @@ describe('content type registry', () => {
     }
   })
 
-  it('makes no type public in V1', () => {
-    for (const def of Object.values(CONTENT_TYPES)) {
-      expect(def.publicEnabled).toBe(false)
+  it('makes only the Phase 1 types public, each with its confirmed route (D-035)', () => {
+    const publicTypes = Object.values(CONTENT_TYPES).filter(def => def.publicEnabled)
+    expect(publicTypes.map(def => [def.id, def.sitemapEligible, def.publicRoute])).toEqual([
+      ['technical_article', true, '/resources/insights'],
+      ['case_study', true, '/resources/case-studies'],
+    ])
+    for (const def of Object.values(CONTENT_TYPES).filter(def => !def.publicEnabled)) {
       expect(def.sitemapEligible).toBe(false)
       expect(def.publicRoute).toBeNull()
     }
@@ -147,9 +151,12 @@ describe('route surface', () => {
     ])
   })
 
-  it('adds no public Content Center API', () => {
-    const cmsFiles = listFiles(join(ROOT, 'server', 'api', 'cms')).map(f => relative(ROOT, f))
-    expect(cmsFiles.some(f => /content-center|[\\/]content[\\/]|content_items/i.test(f))).toBe(false)
+  it('the only public Content Center API is the read-only public reader (CC-IMP-10)', () => {
+    const cmsFiles = listFiles(join(ROOT, 'server', 'api', 'cms')).map(f => relative(ROOT, f).split('\\').join('/'))
+    expect(cmsFiles.filter(f => /content-center|\/content\/|content_items/i.test(f)).sort()).toEqual([
+      'server/api/cms/content/[type]/[slug].get.ts',
+      'server/api/cms/content/[type]/index.get.ts',
+    ])
   })
 
   it('sits under the admin-auth middleware prefix', () => {

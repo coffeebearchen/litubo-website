@@ -401,6 +401,8 @@ export interface ContentRendererListEntry {
   label: string
   meta: string | null
   note: string | null
+  /** CC-IMP-10 — public pages only: an internal path or https:// URL; never followed in preview. */
+  href?: string | null
 }
 
 export type ContentPublicationOutcome = 'published' | 'already_published' | 'unpublished' | 'already_unpublished'

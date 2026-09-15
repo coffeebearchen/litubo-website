@@ -6,9 +6,11 @@ import type { ContentBlockType } from './contentBlocks'
  * One shared content system with five V1 types (D-031). Code configuration, not
  * database configuration; fail-closed — an unknown type is rejected.
  *
- * `publicEnabled` is false for every type until CC-IMP-10 and the user's public
- * route decisions (Blueprint §30, §35). No content can become public from this
- * registry, and Publish (a later module) refuses a type that is not public.
+ * CC-IMP-10 (D-035) — Phase 1 public delivery: only Technical Article
+ * (`/resources/insights/[slug]`) and Case Study (`/resources/case-studies/[slug]`)
+ * are `publicEnabled`, English only (`runtimeConfig.public.publishedLocales`).
+ * Application / Solution, Resource / Download and News stay non-public; Publish
+ * refuses a type that is not public, and the public reader never returns one.
  */
 
 export const CONTENT_TYPE_IDS = [
@@ -34,7 +36,7 @@ export interface ContentTypeDefinition {
   heroRequired: boolean
   publicEnabled: boolean
   sitemapEligible: boolean
-  /** Public route pattern — null until confirmed by the user (Blueprint §35 OPEN). */
+  /** Public route prefix (the slug follows) — null while the type has no confirmed public route. */
   publicRoute: string | null
 }
 
@@ -47,9 +49,10 @@ export const CONTENT_TYPES: Readonly<Record<ContentTypeId, ContentTypeDefinition
     requiredBlocks: [{ type: 'text', min: 1 }],
     requiresDownloadFile: false,
     heroRequired: false,
-    publicEnabled: false,
-    sitemapEligible: false,
-    publicRoute: null,
+    // D-035 — Phase 1 public route confirmed by the user.
+    publicEnabled: true,
+    sitemapEligible: true,
+    publicRoute: '/resources/insights',
   },
   application_solution: {
     id: 'application_solution',
@@ -59,6 +62,7 @@ export const CONTENT_TYPES: Readonly<Record<ContentTypeId, ContentTypeDefinition
     requiredBlocks: [{ type: 'text', min: 1 }, { type: 'key_points', min: 1 }],
     requiresDownloadFile: false,
     heroRequired: true,
+    // D-035 — not public in Phase 1; the eight D-002 application pages keep their fixtures.
     publicEnabled: false,
     sitemapEligible: false,
     publicRoute: null,
@@ -71,9 +75,10 @@ export const CONTENT_TYPES: Readonly<Record<ContentTypeId, ContentTypeDefinition
     requiredBlocks: [{ type: 'text', min: 1 }],
     requiresDownloadFile: false,
     heroRequired: true,
-    publicEnabled: false,
-    sitemapEligible: false,
-    publicRoute: null,
+    // D-035 — Phase 1 public route confirmed by the user.
+    publicEnabled: true,
+    sitemapEligible: true,
+    publicRoute: '/resources/case-studies',
   },
   resource_download: {
     id: 'resource_download',
@@ -83,6 +88,7 @@ export const CONTENT_TYPES: Readonly<Record<ContentTypeId, ContentTypeDefinition
     requiredBlocks: [{ type: 'downloads', min: 1 }],
     requiresDownloadFile: true,
     heroRequired: false,
+    // D-035 — not public in Phase 1; /resources/downloads keeps its placeholder.
     publicEnabled: false,
     sitemapEligible: false,
     publicRoute: null,
@@ -95,7 +101,7 @@ export const CONTENT_TYPES: Readonly<Record<ContentTypeId, ContentTypeDefinition
     requiredBlocks: [{ type: 'text', min: 1 }],
     requiresDownloadFile: false,
     heroRequired: false,
-    // D-004 / D-013: News stays non-public in Phase 1.
+    // D-004 / D-013 / D-035: News stays non-public in Phase 1.
     publicEnabled: false,
     sitemapEligible: false,
     publicRoute: null,

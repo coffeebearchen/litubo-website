@@ -8,8 +8,9 @@
  * write, so "nothing was written" and write order are checked exactly.
  *
  * The positive lifecycle uses a TEST ONLY registry injected into the service call
- * (`resolveType`). The committed registry is never changed: every content type
- * stays `publicEnabled = false`, and the normal runtime path is blocked.
+ * (`resolveType`); blocked-type paths inject a TEST ONLY registry in which the type is
+ * not public. CC-IMP-10 (D-035) makes only Technical Article and Case Study public in
+ * the committed registry.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -75,7 +76,14 @@ function testOnlyRegistry(...types: string[]): PublicationOptions['resolveType']
   }
 }
 
-const RUNTIME: PublicationOptions = { publishedLocales: ['en'] }
+/** TEST ONLY — an isolated registry in which technical articles are not enabled for public delivery (the blocked-type path). */
+const NOT_PUBLIC: PublicationOptions = {
+  publishedLocales: ['en'],
+  resolveType: (id: unknown) => {
+    const def = getContentType(id)
+    return def?.id === 'technical_article' ? { ...def, publicEnabled: false } : def
+  },
+}
 const TEST_PUBLIC: PublicationOptions = { publishedLocales: ['en'], resolveType: testOnlyRegistry() }
 
 function enBlocks() {
@@ -258,8 +266,8 @@ const workingCopy = (row: Row) => clone(Object.fromEntries(DRAFT_FIELDS.concat('
 // ── Readiness ────────────────────────────────────────────────────────────────
 
 describe('readiness — deterministic, server-side (Blueprint §21)', () => {
-  it('normal runtime registry: the only blocker of complete content is the content type not being public', async () => {
-    const r = await readiness('en', RUNTIME)
+  it('a type not enabled for public delivery: the only blocker of complete content is the content type not being public', async () => {
+    const r = await readiness('en', NOT_PUBLIC)
     expect(r.ready).toBe(false)
     expect(failing(r)).toEqual(['type_public'])
     expect(r.hard.find(c => c.key === 'type_public')!.label).toBe('This content type is not enabled for public delivery yet.')
@@ -294,12 +302,12 @@ describe('readiness — deterministic, server-side (Blueprint §21)', () => {
       ['image section on a disabled link', () => { db.links.get(103)!.enabled = false }, 'media_public'],
       ['image section on a missing link', () => { db.links.delete(103) }, 'media_public'],
       ['private enabled download', () => { (db.files.get(PDF) as Row).is_public = false }, 'media_public'],
-      ['runtime registry', () => {}, 'type_public'],
+      ['type not public', () => {}, 'type_public'],
     ]
     for (const [name, mutate, key] of cases) {
       db = new FakeDirectus()
       mutate()
-      const r = await readiness('en', name === 'runtime registry' ? RUNTIME : TEST_PUBLIC)
+      const r = await readiness('en', name === 'type not public' ? NOT_PUBLIC : TEST_PUBLIC)
       expect(failing(r), name).toEqual([key])
       expect(r.ready, name).toBe(false)
     }
@@ -419,8 +427,8 @@ describe('published snapshot — explicit allowlist (Blueprint §23, RSG-01, RSG
 // ── Publish ──────────────────────────────────────────────────────────────────
 
 describe('publish — human action, server authority (RSG-03)', () => {
-  it('is refused in the normal runtime because the content type is not public, and writes nothing', async () => {
-    const err = await rejection(publish('en', { expectedDraftRevision: 4 }, RUNTIME))
+  it('is refused when the content type is not public, and writes nothing', async () => {
+    const err = await rejection(publish('en', { expectedDraftRevision: 4 }, NOT_PUBLIC))
     expect(err.statusCode).toBe(422)
     expect(err.data.code).toBe('not_ready')
     expect((err.data.blockers as Array<{ key: string }>).map(b => b.key)).toEqual(['type_public'])
@@ -877,18 +885,19 @@ describe('static boundaries (RSG-03, RSG-04, RSG-01)', () => {
     expect(page).not.toMatch(/rel:\s*'canonical'|useSeoHead\(/)
   })
 
-  it('adds no public Content Center route, API, sitemap entry or preview parameter', () => {
+  it('public routes read content only through the public reader — no preview parameter, admin API, publish service or working copy (CC-IMP-10)', () => {
     const publicFiles = [...listFiles(join(ROOT, 'server', 'api', 'cms')), ...listFiles(join(ROOT, 'server', 'routes')), ...listFiles(join(ROOT, 'pages'))]
       .map(rel)
       .filter(f => !f.startsWith('pages/admin/'))
     for (const file of publicFiles) {
-      expect(source(file), file).not.toMatch(/content_items|content_item_locales|published_snapshot|preview-publish|api\/admin\/content-center/)
+      expect(source(file), file).not.toMatch(/content_items|content_item_locales|published_snapshot|preview-publish|api\/admin\/content-center|contentPublication/)
     }
+    expect(source('server/utils/contentPublic.ts')).not.toMatch(/draft_revision|last_change_kind|preview-publish|contentPublication/)
   })
 
-  it('the committed registry keeps every content type non-public', () => {
-    for (const def of Object.values(CONTENT_TYPES)) expect(def.publicEnabled).toBe(false)
-    expect(source('utils/contentTypes.ts')).not.toMatch(/publicEnabled:\s*true/)
+  it('the committed registry makes only the Phase 1 types public (D-035)', () => {
+    expect(Object.values(CONTENT_TYPES).filter(def => def.publicEnabled).map(def => def.id)).toEqual(['technical_article', 'case_study'])
+    for (const id of ['application_solution', 'resource_download', 'news'] as const) expect(CONTENT_TYPES[id].publicEnabled).toBe(false)
   })
 })
 
@@ -960,7 +969,7 @@ describe('admin-auth middleware on the preview and publication routes', () => {
 
 describe('page helpers', () => {
   it('explains a blocked Publish, finishes an interrupted one, and reports an up-to-date language', async () => {
-    const blocked = await getContentPreviewPublish(db.fetch, ITEM, 'en', RUNTIME)
+    const blocked = await getContentPreviewPublish(db.fetch, ITEM, 'en', NOT_PUBLIC)
     expect(publishAction(blocked)).toEqual({ enabled: false, label: 'Publish English', reason: 'This content type is not enabled for public delivery yet.' })
     expect(readinessCounts(blocked.readiness)).toEqual({ blockers: 1, warnings: 1 })
 

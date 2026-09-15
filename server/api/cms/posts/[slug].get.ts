@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { useRuntimeConfig } from '#imports'
 import sanitizeHtml from 'sanitize-html'
 import { directusFetch } from '~/server/utils/directus'
+import { isLegacyPublicPostType, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
 import { DEMO_POSTS } from '~/content/fixtures/posts'
 import type { Post } from '~/types/content'
 
@@ -139,8 +140,9 @@ export default defineEventHandler(async (event): Promise<Post> => {
 
   const config = useRuntimeConfig()
 
+  // CC-IMP-10 (D-035): only Technical Guide and FAQ posts are still public here.
   if (config.cmsMode !== 'directus') {
-    const post = DEMO_POSTS.find(p => p.slug === slug)
+    const post = DEMO_POSTS.find(p => p.slug === slug && isLegacyPublicPostType(p.contentType))
     if (!post) throw createError({ statusCode: 404, message: 'Not found' })
     return post
   }
@@ -159,7 +161,8 @@ export default defineEventHandler(async (event): Promise<Post> => {
   let record: DirectusPostDetail | null = null
   try {
     const res = await directusFetch<{ data: DirectusPostDetail[] }>(
-      `/items/posts?filter[slug][_eq]=${encodeURIComponent(slug)}&filter[status][_eq]=published&fields=${fields}&limit=1`,
+      `/items/posts?filter[slug][_eq]=${encodeURIComponent(slug)}&filter[status][_eq]=published`
+      + `&filter[content_type][_in]=${LEGACY_PUBLIC_POST_TYPES.join(',')}&fields=${fields}&limit=1`,
     )
     record = res.data[0] ?? null
   }
@@ -168,7 +171,7 @@ export default defineEventHandler(async (event): Promise<Post> => {
     throw createError({ statusCode: 503, message: 'Content unavailable' })
   }
 
-  if (!record) throw createError({ statusCode: 404, message: 'Not found' })
+  if (!record || !isLegacyPublicPostType(record.content_type)) throw createError({ statusCode: 404, message: 'Not found' })
 
   return toPost(record, slug)
 })

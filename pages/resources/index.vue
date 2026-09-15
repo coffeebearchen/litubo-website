@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { PostsResult, PostListItem, ContentType } from '~/types/content'
+import type { PostsResult } from '~/types/content'
+import type { PublicContentList } from '~/types/content-public'
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
@@ -10,67 +11,115 @@ useSeoHead({
   canonicalPath: '/resources',
 })
 
-const { data: postsData } = await useAsyncData<PostsResult>(
-  'cms-posts-list',
-  () => $fetch<PostsResult>('/api/cms/posts?exclude_type=faq'),
-  { default: () => ({ posts: [], cmsError: false }) },
-)
+/**
+ * CC-IMP-10 (D-035) — Phase 1 route ownership of "Latest from LITUBO":
+ *   Insights (Technical Articles) and Case Studies → Content Center public API only
+ *   Technical Guides → legacy posts
+ *   News → not public in Phase 1 (no filter, no cards)
+ * A source that fails shows the unavailable state; it is never shown as an empty list.
+ */
+type HubKind = 'technical_article' | 'technical_guide' | 'case_study'
 
-const allPosts = computed<PostListItem[]>(() => postsData.value?.posts ?? [])
-const cmsError = computed<boolean>(() => postsData.value?.cmsError ?? false)
+interface HubCard {
+  key: string
+  kind: HubKind
+  typeLabel: string
+  title: string
+  summary: string
+  date: string | null
+  href: string
+  imageUrl: string
+  imageAlt: string
+}
 
-type FilterType = 'all' | ContentType
-const activeFilter = ref<FilterType>('all')
-
-const TYPE_LABELS: Record<ContentType, string> = {
-  insight: 'Insight',
+const TYPE_LABELS: Record<HubKind, string> = {
+  technical_article: 'Insight',
   technical_guide: 'Technical Guide',
   case_study: 'Case Study',
-  news: 'News',
-  faq: 'FAQ',
 }
 
-const TYPE_ROUTE: Record<ContentType, string> = {
-  insight: 'insights',
-  technical_guide: 'technical-guides',
-  case_study: 'case-studies',
-  news: 'news',
-  faq: 'faq',
-}
+const { data: hub } = await useAsyncData(
+  `resources-hub-${locale.value}`,
+  async () => {
+    const query = { locale: locale.value }
+    const [articles, caseStudies, guides] = await Promise.allSettled([
+      $fetch<PublicContentList>('/api/cms/content/technical_article', { query }),
+      $fetch<PublicContentList>('/api/cms/content/case_study', { query }),
+      $fetch<PostsResult>('/api/cms/posts?content_type=technical_guide'),
+    ])
+    let unavailable = false
+    const cards: HubCard[] = []
+    for (const result of [articles, caseStudies]) {
+      if (result.status !== 'fulfilled') {
+        unavailable = true
+        continue
+      }
+      for (const item of result.value.items) {
+        const kind = item.type as HubKind
+        cards.push({
+          key: `${kind}:${item.href}`,
+          kind,
+          typeLabel: TYPE_LABELS[kind] ?? item.typeLabel,
+          title: item.title,
+          summary: item.summary,
+          date: item.publishedAt,
+          href: item.href,
+          imageUrl: item.image?.url ?? '',
+          imageAlt: item.image?.alt || item.title,
+        })
+      }
+    }
+    if (guides.status !== 'fulfilled' || guides.value.cmsError) {
+      unavailable = true
+    } else {
+      const lang = locale.value as 'en' | 'es' | 'pt'
+      for (const post of guides.value.posts.filter(p => p.contentType === 'technical_guide')) {
+        const title = post.title[lang] || post.title.en
+        cards.push({
+          key: `technical_guide:${post.slug}`,
+          kind: 'technical_guide',
+          typeLabel: TYPE_LABELS.technical_guide,
+          title,
+          summary: post.excerpt[lang] || post.excerpt.en,
+          date: post.publishDate,
+          href: localePath(`/resources/technical-guides/${post.slug}`),
+          imageUrl: post.coverImageUrl,
+          imageAlt: title,
+        })
+      }
+    }
+    cards.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+    return { cards, unavailable }
+  },
+  { default: () => ({ cards: [] as HubCard[], unavailable: false }) },
+)
+
+const allCards = computed<HubCard[]>(() => hub.value?.cards ?? [])
+const unavailable = computed<boolean>(() => hub.value?.unavailable ?? false)
+
+type FilterType = 'all' | HubKind
+const activeFilter = ref<FilterType>('all')
 
 const filterTabs: { key: FilterType; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'insight', label: 'Insights' },
+  { key: 'technical_article', label: 'Insights' },
   { key: 'technical_guide', label: 'Technical Guides' },
   { key: 'case_study', label: 'Case Studies' },
-  { key: 'news', label: 'News' },
 ]
 
-const filteredPosts = computed<PostListItem[]>(() =>
+const filteredCards = computed<HubCard[]>(() =>
   activeFilter.value === 'all'
-    ? allPosts.value
-    : allPosts.value.filter((p: PostListItem) => p.contentType === activeFilter.value),
+    ? allCards.value
+    : allCards.value.filter((card: HubCard) => card.kind === activeFilter.value),
 )
 
-function postTitle(post: PostListItem): string {
-  return post.title[locale.value as 'en' | 'es' | 'pt'] || post.title.en
-}
-function postExcerpt(post: PostListItem): string {
-  return post.excerpt[locale.value as 'en' | 'es' | 'pt'] || post.excerpt.en
-}
-function postRoute(post: PostListItem): string {
-  return localePath(`/resources/${TYPE_ROUTE[post.contentType]}/${post.slug}`)
-}
-function postTypeLabel(post: PostListItem): string {
-  return TYPE_LABELS[post.contentType]
-}
 function formatDate(iso: string | null): string {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 const imgErrors = ref<Record<string, boolean>>({})
-function onImgError(slug: string) { imgErrors.value[slug] = true }
+function onImgError(key: string) { imgErrors.value[key] = true }
 
 const categories = [
   {
@@ -154,40 +203,40 @@ const categories = [
           </button>
         </div>
 
-        <!-- CMS error state (CMS_MODE=directus, Directus unavailable) -->
-        <div v-if="cmsError" class="cms-error-state">
+        <!-- Unavailable state: a content source failed (never shown as an empty list) -->
+        <div v-if="unavailable" class="cms-error-state">
           <p>Content is temporarily unavailable. Please try again later.</p>
         </div>
 
         <!-- Empty state -->
-        <div v-else-if="filteredPosts.length === 0" class="empty-state">
+        <div v-else-if="filteredCards.length === 0" class="empty-state">
           <p>No articles available in this category yet.</p>
         </div>
 
         <!-- Resource cards -->
         <div v-else class="resource-grid">
           <article
-            v-for="post in filteredPosts"
-            :key="post.slug"
+            v-for="card in filteredCards"
+            :key="card.key"
             class="resource-card"
           >
-            <NuxtLink :to="postRoute(post)" class="resource-card__link">
+            <NuxtLink :to="card.href" class="resource-card__link">
               <div class="resource-card__media">
                 <img
-                  v-if="post.coverImageUrl && !imgErrors[post.slug]"
-                  :src="post.coverImageUrl"
-                  :alt="postTitle(post)"
+                  v-if="card.imageUrl && !imgErrors[card.key]"
+                  :src="card.imageUrl"
+                  :alt="card.imageAlt"
                   class="resource-card__img"
                   loading="lazy"
-                  @error="onImgError(post.slug)"
+                  @error="onImgError(card.key)"
                 >
                 <div v-else class="resource-card__photo-placeholder" aria-hidden="true" />
               </div>
               <div class="resource-card__body">
-                <p class="resource-card__type">{{ postTypeLabel(post) }}</p>
-                <h3 class="resource-card__title">{{ postTitle(post) }}</h3>
-                <p class="resource-card__summary">{{ postExcerpt(post) }}</p>
-                <p class="resource-card__date">{{ formatDate(post.publishDate) }}</p>
+                <p class="resource-card__type">{{ card.typeLabel }}</p>
+                <h3 class="resource-card__title">{{ card.title }}</h3>
+                <p class="resource-card__summary">{{ card.summary }}</p>
+                <p class="resource-card__date">{{ formatDate(card.date) }}</p>
               </div>
             </NuxtLink>
           </article>
@@ -362,6 +411,7 @@ const categories = [
   flex-direction: column;
   gap: var(--space-2);
   flex: 1;
+  min-width: 0;
 }
 .resource-card__type {
   font-size: var(--text-xs);
@@ -377,11 +427,13 @@ const categories = [
   color: var(--color-primary);
   line-height: var(--leading-snug);
   flex: 1;
+  overflow-wrap: anywhere;
 }
 .resource-card__summary {
   font-size: var(--text-sm);
   color: var(--color-ink-muted);
   line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
 }
 .resource-card__date {
   font-size: var(--text-xs);

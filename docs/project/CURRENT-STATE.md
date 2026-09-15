@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             CC-IMP-09 — AI Proposal Review & Apply（ACCEPTED LOCALLY / TECHNICAL PASS，Controller 签收 · f905fea · not pushed）
-Latest completed module:            DIRECTUS-PERMISSIONS-PROVISIONING-01 — Tracked Directus Permission Provisioning（A2 · LOCAL COMPLETE · CC-IMP-10 prerequisite · 等待 Controller 审查）
-Active authorized module:           NONE（DIRECTUS-PERMISSIONS-PROVISIONING-01 已收口，等待 Controller 审查）
+Latest completed module:            CC-IMP-10 — Public Delivery & Sitemap V2（A2 · LOCAL COMPLETE · D-035 · 等待 Controller 审查）
+Active authorized module:           NONE（CC-IMP-10 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-10 — Public Delivery & Sitemap（高风险模块；Phase 1 路由决定已由用户确认；前置权限工件已完成；本地 nuxt-server token 401 = ENVIRONMENT BLOCKED）
+Next candidate:                     NONE — 等待 Controller（不得自行启动 FINAL-RELEASE-AUDIT 或其他模块）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：f905fea）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：30faa55）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9883,3 +9883,57 @@ P0 Violations:                     NONE
 **已知 / 记录：** 既有 17 行 legacy 权限仍为手工来源（未纳入追踪，按 Controller 决定不重写），其中 `products_files` 读取无行过滤、product_* 为 `*` 字段（产品侧既有 P2）。docker-compose 使用浮动 `directus:11` 标签：升级到系统表形状不同的版本时 apply / verify 会 fail closed。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
 
 *最后更新：2026-09-15，由 Claude Code 在"DIRECTUS-PERMISSIONS-PROVISIONING-01"任务中写入。*
+
+---
+
+## CC-IMP-10 — Public Delivery & Sitemap V2（2026-09-15）
+
+```text
+Module:                         CC-IMP-10 — Public Delivery & Sitemap V2（高风险模块）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller 施工单 CC-IMP-10 V2）
+Branch:                         review/cc-imp-10-public-delivery-sitemap-v2（基线 30faa55）
+Decision:                       D-035 Phase-1 Content Public Delivery and Sitemap
+Safety gates touched:           RSG-01、RSG-02、RSG-05、RSG-06、RSG-07（本地范围 PROVEN）
+Permissions:                    未扩大；nuxt-server Content 读取仍为 D-034 工件（verify OK）；public policy Content 权限 0
+Schema:                         无变更
+MASTER-ROADMAP:                 CC-IMP-10 ✅；NEXT：NONE — 等待 Controller
+Push / merge / deploy:          NONE
+```
+
+**公开合同（D-035）：**
+- 公开类型只有 Technical Article → `/resources/insights/[slug]`、Case Study → `/resources/case-studies/[slug]`（`utils/contentTypes.ts` 注册表 `publicEnabled` / `sitemapEligible` / `publicRoute`）。Application / Solution、Resource / Download、News 不公开；Downloads / Videos 占位页与 8 个 application 页不变。
+- 单一资格合同 `server/utils/contentPublic.ts`：published、未归档、站点发布语言（仅 `en`）的 `published_snapshot`、Phase-1 公开类型、快照 type / locale / slug 一致。详情、列表（`/api/cms/content/[type]`、`/api/cms/content/[type]/[slug]`）、Resources hub、sitemap 共用；显式 allowlist DTO（`types/content-public.ts`）。无语言回退、无旧 posts 回退。
+- 不合格 → 404；上游 / 基础设施失败 → 503（sitemap 失败不再返回空 200）。
+- `noindex ≠ unpublished`：详情 200、列表保留、`robots: noindex, follow`、无 canonical、不进 sitemap。
+- Sitemap（`server/utils/sitemap.ts`）：产品查询去掉 `date_updated`（原 403 根因，未改权限）；新增合格且可索引的英文 Technical Article / Case Study，`lastmod = published_at`。
+- 公开媒体代理：存在 + `is_public` + 未归档，否则 404；查询 / 资产上游失败 503。
+- Related：内容只显示同语言合格目标；产品只显示已发布产品 + 已发布分类；无可显示条目的 related / downloads 区块不渲染。CTA 需非空文字与安全链接，否则不输出。
+- 旧 posts：`/api/cms/posts*` 只服务 Technical Guide / FAQ；`/resources/news/[slug]` 404；hub 无 News 筛选 / 卡片；旧 News 行未迁移、未删除。
+
+**验证：**
+- 全量 vitest（含真实 PostgreSQL，串行）：修复前一次全量 77 files passed / 2 skipped、2750 passed / 45 skipped；修复（空 related / downloads 区块不渲染，+1 测试）后串行全量两次：第一次 76 files passed / 1 failed（contentRevisionGuardIntegration 并发保存用例 5s 超时，当时 typecheck / lint 并行运行），第二次 76 files passed / 1 failed（contentAiApplyDbIntegration 2 个用例 5s 超时），其余全部通过；两个超时文件单独重跑均通过（6/6、5/5），失败均为超时、无断言失败，文件本模块未修改。contentPublicDelivery 44/44。typecheck 0 error；lint 0 error；`nuxt build` Build complete；`git diff --check` 通过。
+- 真实 HTTP（Directus 日志无 401 / 403）：Draft、旧 Insight / Case Study、News、ES / PT、不存在 slug → 404；私有 / 归档 / 不存在 / 非法 id 媒体 → 404，公开媒体 200；sitemap 200。
+- **真实 Golden Path（后台人工路径，TEST ONLY 夹具）：**
+  - 新建 Technical Article（id 7，`test-only-cc-imp-10-article`）与 Case Study（id 8，`test-only-cc-imp-10-case-study`，临时关联唯一公开未归档图片 `home-hero-inspection-line.png` 为 hero），经 Preview & publish readiness 人工 Publish English（服务端 readiness 全部通过）。
+  - 发布后：详情 API / 页面 200，列表与 hub 出现，sitemap 含两条，hero 经代理 200，ES / PT URL 404，公开载荷无内部字段。
+  - Case Study 关联文章后：再发布前公开 related 仍为空（快照不变），再发布后 related 显示文章链接。
+  - 文章设 noindex 并再发布：详情 200、`noindex, follow`、列表 / hub 保留、sitemap 移除。
+  - Archive 文章：详情 / 页面 404、列表 / hub / sitemap 移除，Case Study related 自动去掉；Restore → Draft、无快照、仍 404。
+  - Unpublish Case Study → Draft、无快照、404；随后解除 hero 与 related 关联。
+  - 最终：sitemap 空（0 已发布产品、0 快照）；两夹具均为 Draft；快照 0；非 Draft 条目 0；夹具文件关联 0、关系 0；hero 文件未改动。
+  - 真实 Directus revisions：locale 行 publish 4、unpublish 1、restore 1（此前 NOT_YET_EXERCISED 的 publish / unpublish revisions 已实际走通）。
+- 浏览器 1440 / 375（dev server 稳定后新开标签页）：详情页无横向溢出（1440：scrollWidth = clientWidth；375：375 = 375），hero 图加载（naturalWidth 1255），console 0 error（404 导航除外）。Browser 面板中原生 `window.confirm` 无法点击，发布 / 撤回确认以一次性脚本返回 true 代替点击，服务端 readiness 与指纹校验照常执行。
+
+**已知限制：**
+- dev 模式 `#app-manifest` 预转换噪声与 404 页面 dev 错误浮层（仅开发模式）。
+- Admin 中 "Public pages for content are not enabled yet" / "Draft preview — public route not enabled" 等文案已过时（本模块范围外，未改）。
+- 全量测试中 DB 集成测试的 TEST ONLY 夹具会在本地站点短暂公开（测试结束即删除）。
+- sitemap 内容 URL 使用自身路由路径，即使快照含 canonical 覆盖。
+- 媒体代理 Content-Disposition 文件名未清洗（既有）。
+- `content_items_files` / `content_relations` 对 nuxt-server 不可读（按设计，使用快照中的 id）。
+- 真实 PostgreSQL 集成测试每条语句经 `docker exec psql`，部分用例在 Windows 上接近 vitest 默认 5s 超时，全量串行运行偶发超时（既有测试，本模块未改超时设置）。
+- Products RSG-01 / RSG-02 与遗留 nuxt-server 权限仍 OPEN。
+
+**Release Safety Gates：** RSG-01 / 02 / 05 / 06 / 07 Content 公开部分 PROVEN（本地范围）；Products RSG-01 / 02、遗留回退（RSG-05）、遗留权限（RSG-07）OPEN；RSG-08 → TYPE D Release；完整串联 → FINAL-RELEASE-AUDIT。P0 Violations：NONE。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-10"任务中写入。*

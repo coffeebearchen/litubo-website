@@ -11,8 +11,9 @@ import type { ContentRendererImage, ContentRendererListEntry } from '~/types/con
  * never guessed at. Media, downloads and relations arrive already resolved by the
  * caller, so this component never fetches, links files or decides eligibility.
  *
- * Today it serves only the admin Draft preview (`preview`: placeholders for empty
- * text, inert call-to-action links). It creates no public page or route.
+ * It serves the admin Draft preview (`preview`: placeholders for empty text, inert
+ * links) and, since CC-IMP-10, the public Content Center pages, which pass only
+ * snapshot-built, eligible entries (links: internal paths or https:// only).
  */
 
 const props = withDefaults(defineProps<{
@@ -136,7 +137,8 @@ const safeHref = (href: string) => /^\/(?!\/)\S*$/.test(href) || /^https:\/\/\S+
         <h2 class="cbr-heading">{{ blank(view.heading) ? 'Related' : view.heading }}</h2>
         <ul v-if="relations.length" class="cbr-list" role="list">
           <li v-for="entry in relations" :key="entry.key" class="cbr-list-item">
-            <span class="cbr-list-label">{{ entry.label }}</span>
+            <a v-if="!preview && entry.href && safeHref(entry.href)" :href="entry.href" class="cbr-list-label cbr-list-link">{{ entry.label }}</a>
+            <span v-else class="cbr-list-label">{{ entry.label }}</span>
             <span v-if="entry.meta" class="cbr-list-meta">{{ entry.meta }}</span>
             <span v-if="preview && entry.note" class="cbr-note">{{ entry.note }}</span>
           </li>
@@ -148,7 +150,8 @@ const safeHref = (href: string) => /^\/(?!\/)\S*$/.test(href) || /^https:\/\/\S+
         <h2 class="cbr-heading">{{ blank(view.heading) ? 'Downloads' : view.heading }}</h2>
         <ul v-if="downloads.length" class="cbr-list" role="list">
           <li v-for="entry in downloads" :key="entry.key" class="cbr-list-item">
-            <span class="cbr-list-label">{{ entry.label }}</span>
+            <a v-if="!preview && entry.href && safeHref(entry.href)" :href="entry.href" class="cbr-list-label cbr-list-link">{{ entry.label }}</a>
+            <span v-else class="cbr-list-label">{{ entry.label }}</span>
             <span v-if="entry.meta" class="cbr-list-meta">{{ entry.meta }}</span>
             <span v-if="preview && entry.note" class="cbr-note">{{ entry.note }}</span>
           </li>
@@ -193,6 +196,7 @@ const safeHref = (href: string) => /^\/(?!\/)\S*$/.test(href) || /^https:\/\/\S+
 .cbr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .cbr-list-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-sm); min-width: 0; }
 .cbr-list-label { font-weight: 500; color: var(--color-ink); overflow-wrap: anywhere; }
+.cbr-list-link { color: var(--color-primary); text-decoration: underline; }
 .cbr-list-meta { font-size: var(--text-xs); color: var(--color-ink-muted); }
 .cbr-unsupported { font-size: var(--text-xs); color: var(--color-ink-muted); border: 1px dashed var(--color-line); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); margin: 0; }
 </style>

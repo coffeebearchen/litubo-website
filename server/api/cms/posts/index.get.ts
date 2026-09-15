@@ -1,6 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3'
 import { useRuntimeConfig } from '#imports'
 import { directusFetch } from '~/server/utils/directus'
+import { isLegacyPublicPostType, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
 import { DEMO_POSTS_LIST } from '~/content/fixtures/posts'
 import type { PostListItem, PostsResult } from '~/types/content'
 
@@ -46,11 +47,15 @@ function toListItem(r: DirectusPost, isFaq: boolean): PostListItem {
 
 export default defineEventHandler(async (event): Promise<PostsResult> => {
   const config = useRuntimeConfig()
+  const query = getQuery(event)
+  const type = query.content_type as string | undefined
+  const excludeType = query.exclude_type as string | undefined
+
+  // CC-IMP-10 (D-035): legacy posts serve only Technical Guides and FAQ. Insights and
+  // Case Studies are Content Center only; News is not public in Phase 1.
+  if (type && !isLegacyPublicPostType(type)) return { posts: [] }
 
   if (config.cmsMode !== 'directus') {
-    const query = getQuery(event)
-    const type = query.content_type as string | undefined
-    const excludeType = query.exclude_type as string | undefined
     // For fixtures mode: include full Post data (which has faqGroup + bodyHtml) when FAQ type
     const { DEMO_POSTS } = await import('~/content/fixtures/posts')
     let list: PostListItem[] = type === 'faq'
@@ -60,14 +65,12 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
           title: p.title, excerpt: p.excerpt, faqGroup: p.faqGroup, bodyHtml: p.bodyHtml,
         }))
       : DEMO_POSTS_LIST.filter(p => p.contentType !== 'faq')
+    list = list.filter(p => isLegacyPublicPostType(p.contentType))
     if (type && type !== 'faq') list = list.filter(p => p.contentType === type)
     if (excludeType) list = list.filter(p => p.contentType !== excludeType)
     return { posts: list }
   }
 
-  const query = getQuery(event)
-  const type = query.content_type as string | undefined
-  const excludeType = query.exclude_type as string | undefined
   const topics = query['topics[]']
     ? (Array.isArray(query['topics[]']) ? query['topics[]'] : [query['topics[]']]) as string[]
     : undefined
@@ -75,7 +78,10 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
   const page = Number(query.page ?? 1)
   const offset = (page - 1) * limit
 
-  const filters: string[] = ['filter[status][_eq]=published']
+  const filters: string[] = [
+    'filter[status][_eq]=published',
+    `filter[content_type][_in]=${LEGACY_PUBLIC_POST_TYPES.join(',')}`,
+  ]
   if (type) filters.push(`filter[content_type][_eq]=${encodeURIComponent(type)}`)
   if (excludeType) filters.push(`filter[content_type][_neq]=${encodeURIComponent(excludeType)}`)
   // Note: Directus 11 json field type does not support array subset operators.
@@ -103,7 +109,7 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
 
   try {
     const res = await directusFetch<{ data: DirectusPost[] }>(`/items/posts?${qs}`)
-    let items = res.data.map(r => toListItem(r, isFaqQuery))
+    let items = res.data.filter(r => isLegacyPublicPostType(r.content_type)).map(r => toListItem(r, isFaqQuery))
     if (topics && topics.length > 0) {
       items = items.filter(p => topics.some(t => p.topics.includes(t as PostListItem['topics'][number])))
       items = items.slice(offset, offset + limit)
