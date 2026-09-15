@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { createError } from 'h3'
 import type { FetchFn } from './mediaLifecycle'
 import { assertJsonObject } from './contentDraft'
@@ -269,7 +270,17 @@ interface ReferencedMedia {
   downloads: PublicationFileLink[]
 }
 
-/** What this language would publish: enabled hero / OG image, the inline links its image sections use, and enabled downloads when it has a downloads section. */
+/**
+ * Download links that belong to `locale` under the CC-IMP-04 download language
+ * contract (`all | en | es | pt`, Blueprint §11): an exact language match, or
+ * `all` ("All languages"). An unset language or another language never counts —
+ * there is no fallback (RSG-05).
+ */
+export function localeDownloads(ctx: PublicationContext, locale: ContentLocale): PublicationFileLink[] {
+  return ctx.files.filter(f => f.role === 'download' && f.enabled && (f.language === locale || f.language === 'all'))
+}
+
+/** What this language would publish: enabled hero / OG image, the inline links its image sections use, and its own enabled downloads when it has a downloads section. */
 function referencedMedia(ctx: PublicationContext, row: PublicationLocaleRow | null): ReferencedMedia {
   const blocks = blocksOf(row)
   const images: ReferencedMedia['images'] = []
@@ -284,7 +295,7 @@ function referencedMedia(ctx: PublicationContext, row: PublicationLocaleRow | nu
     hero: ctx.files.find(f => f.role === 'hero' && f.enabled) ?? null,
     og: ctx.files.find(f => f.role === 'og_image' && f.enabled) ?? null,
     images,
-    downloads: hasDownloadsBlock ? ctx.files.filter(f => f.role === 'download' && f.enabled) : [],
+    downloads: hasDownloadsBlock && row ? localeDownloads(ctx, row.locale) : [],
   }
 }
 
@@ -365,6 +376,8 @@ export function computeContentReadiness(ctx: PublicationContext, locale: Content
   const defaultLabel = CONTENT_LOCALE_LABELS[DEFAULT_CONTENT_LOCALE]
   const hard: ContentReadinessCheck[] = []
   const soft: ContentReadinessCheck[] = []
+  /** Empty plain-text values the schema allows — a warning only (Review Fix 01: no hard rule the contract does not define). */
+  let emptySections: string[] | null = null
 
   hard.push(ctx.item.status === 'archived'
     ? failCheck('item_not_archived', 'Content is archived', 'Archived content cannot be published.')
@@ -388,13 +401,12 @@ export function computeContentReadiness(ctx: PublicationContext, locale: Content
       hard.push(failCheck('sections_valid', 'Sections are not valid', validation.errors.slice(0, 3).join(' ')))
     } else {
       hard.push(pass('sections_valid', 'Sections are valid'))
-      const incomplete = validation.blocks.map((block, index) => (incompleteSection(block) ? sectionName(validation.blocks, index) : null)).filter(Boolean)
-      hard.push(incomplete.length > 0
-        ? failCheck('sections_complete', 'Some sections are empty', `Fill in or remove: ${incomplete.join(', ')}.`)
-        : pass('sections_complete', 'Every section is filled in'))
-      const complete = validation.blocks.filter(block => !incompleteSection(block))
+      emptySections = validation.blocks
+        .map((block, index) => (incompleteSection(block) ? sectionName(validation.blocks, index) : null))
+        .filter((name): name is string => Boolean(name))
+      // Registry rule (Blueprint §7): the required block types are present.
       const missing = (type?.requiredBlocks ?? [])
-        .filter(rule => complete.filter(block => block.type === rule.type).length < rule.min)
+        .filter(rule => validation.blocks.filter(block => block.type === rule.type).length < rule.min)
         .map(rule => `at least ${rule.min} ${CONTENT_BLOCK_LABELS[rule.type as ContentBlockType]} section${rule.min > 1 ? 's' : ''}`)
       hard.push(missing.length > 0
         ? failCheck('required_sections', 'Required sections are missing', `${type?.label ?? 'This type'} needs ${missing.join(' and ')}.`)
@@ -412,9 +424,11 @@ export function computeContentReadiness(ctx: PublicationContext, locale: Content
       ? failCheck('media_public', 'Some media cannot be published', issues.join(' '))
       : pass('media_public', 'Media to publish is public and active'))
     if (type?.requiresDownloadFile) {
-      hard.push(ctx.files.some(f => f.role === 'download' && f.enabled)
-        ? pass('download_file', 'An enabled download file is linked')
-        : failCheck('download_file', 'No enabled download file', 'Resource / Download content needs at least one enabled download.'))
+      // This language's own enabled, publicly eligible download; another language's download never counts.
+      const eligible = localeDownloads(ctx, locale).filter(f => f.file && f.fileId && f.file.is_public && !ctx.archivedFileIds.has(f.fileId))
+      hard.push(eligible.length > 0
+        ? pass('download_file', `An eligible ${localeLabel} download is linked`)
+        : failCheck('download_file', `No eligible ${localeLabel} download`, `Resource / Download content needs at least one enabled, public download for ${localeLabel} or all languages.`))
     }
   }
 
@@ -436,6 +450,11 @@ export function computeContentReadiness(ctx: PublicationContext, locale: Content
   if (row) {
     const title = effectiveSeoTitle(row)
     const description = effectiveSeoDescription(row)
+    if (emptySections) {
+      soft.push(emptySections.length > 0
+        ? warn('sections_complete', 'Some sections have empty text', `Check: ${emptySections.join(', ')}.`)
+        : pass('sections_complete', 'Every section has text'))
+    }
     soft.push(title.source === 'seo' ? pass('seo_title', 'SEO title set') : warn('seo_title', 'SEO title missing', 'The title is used instead.'))
     soft.push(description.source === 'seo' ? pass('seo_description', 'Meta description set') : warn('seo_description', 'Meta description missing', 'The summary is used instead.'))
     const media = referencedMedia(ctx, row)
@@ -465,6 +484,48 @@ function hasUnpublishedChanges(ctx: PublicationContext, row: PublicationLocaleRo
   const validation = type ? validateBlocks(row.blocks, type.allowedBlocks) : null
   if (!validation?.ok) return true
   return !snapshotsEqual(row.published_snapshot, buildPublishedSnapshot(ctx, row.locale, options))
+}
+
+// ── Publication review fingerprint (Review Fix 01) ──────────────────────────
+
+/**
+ * Deterministic fingerprint of every stored input that decides this language's
+ * readiness or published snapshot: item identity / lifecycle / type, the locale
+ * working copy and its revision, slug availability, (for a translation) whether
+ * the default language is published, publication-relevant media links with their
+ * file visibility, lifecycle and download metadata, and relations. Media and
+ * relation edits do not change `draft_revision`, so Publish must also match this
+ * value — what a human reviewed is what gets published. No UI state is included;
+ * `source_document` links are not a publication input.
+ */
+export function publicationInputFingerprint(ctx: PublicationContext, locale: ContentLocale): string {
+  const row = localeRowOf(ctx, locale)
+  const defaultRow = localeRowOf(ctx, DEFAULT_CONTENT_LOCALE)
+  const input = {
+    item: { id: ctx.item.id, contentType: ctx.item.content_type, status: ctx.item.status },
+    locale,
+    draft: row
+      ? {
+          title: row.title, slug: row.slug, summary: row.summary, blocks: row.blocks, seoTitle: row.seo_title,
+          seoDescription: row.seo_description, canonicalPath: row.canonical_path, noindex: row.noindex, draftRevision: row.draft_revision,
+        }
+      : null,
+    slugTaken: ctx.slugTaken.has(locale),
+    defaultLocalePublished: locale === DEFAULT_CONTENT_LOCALE ? null : Boolean(defaultRow?.published_snapshot) && ctx.item.status === 'published',
+    files: ctx.files
+      .filter(f => f.role !== 'source_document')
+      .sort((a, b) => a.id - b.id)
+      .map(f => ({
+        id: f.id, role: f.role, enabled: f.enabled, sort: f.sort, fileId: f.fileId, missing: !f.file,
+        type: f.file?.type ?? null, isPublic: f.file?.is_public ?? null, archived: ctx.archivedFileIds.has(f.fileId),
+        alt: f.alt[locale] ?? null, caption: f.caption[locale] ?? null,
+        language: f.language, versionLabel: f.version_label, fileDate: f.file_date,
+      })),
+    relations: [...ctx.relations]
+      .sort((a, b) => a.id - b.id)
+      .map(r => ({ id: r.id, kind: r.relation_kind, productId: r.productId, contentId: r.contentId, sort: r.sort })),
+  }
+  return createHash('sha256').update(stableJson(input)).digest('hex').slice(0, 32)
 }
 
 // ── Snapshot (Blueprint §23) ─────────────────────────────────────────────────
@@ -543,15 +604,24 @@ export interface PublicationPlan {
 
 const CLEARED_PUBLICATION = { published_snapshot: null, published_revision: null, published_at: null, last_change_kind: 'unpublish' }
 
-export function parsePublishBody(rawBody: unknown): number {
+export interface PublishReview {
+  expectedDraftRevision: number
+  expectedPublicationInputFingerprint: string
+}
+
+export function parsePublishBody(rawBody: unknown): PublishReview {
   const body = assertJsonObject(rawBody)
-  const extra = Object.keys(body).filter(key => key !== 'expectedDraftRevision')
+  const extra = Object.keys(body).filter(key => key !== 'expectedDraftRevision' && key !== 'expectedPublicationInputFingerprint')
   if (extra.length > 0) fail(422, `These fields cannot be set here: ${extra.join(', ')}.`, { rejectedFields: extra })
   const expected = body.expectedDraftRevision
   if (!Number.isInteger(expected) || (expected as number) < 1) {
     fail(422, 'expectedDraftRevision is required.', { field: 'expectedDraftRevision' })
   }
-  return expected as number
+  const fingerprint = body.expectedPublicationInputFingerprint
+  if (typeof fingerprint !== 'string' || !/^[0-9a-f]{32}$/.test(fingerprint)) {
+    fail(422, 'expectedPublicationInputFingerprint is required.', { field: 'expectedPublicationInputFingerprint' })
+  }
+  return { expectedDraftRevision: expected as number, expectedPublicationInputFingerprint: fingerprint }
 }
 
 export function parseUnpublishBody(rawBody: unknown): void {
@@ -571,15 +641,22 @@ export function parseUnpublishBody(rawBody: unknown): void {
 export function planPublish(
   ctx: PublicationContext,
   locale: ContentLocale,
-  expectedDraftRevision: number,
+  review: PublishReview,
   options: PublicationOptions,
   now: string,
 ): PublicationPlan {
   const row = localeRowOf(ctx, locale)
   if (!row) fail(404, `No ${locale} draft exists for content item ${ctx.item.id}.`)
-  if (row.draft_revision !== expectedDraftRevision) {
+  if (row.draft_revision !== review.expectedDraftRevision) {
     fail(409, 'This draft changed since it was reviewed. Reload and check it again before publishing.', {
       code: 'changed_since_review', currentDraftRevision: row.draft_revision,
+    })
+  }
+  // Media, downloads, relations and file visibility can change without a new draft revision.
+  const currentFingerprint = publicationInputFingerprint(ctx, locale)
+  if (currentFingerprint !== review.expectedPublicationInputFingerprint) {
+    fail(409, 'This content changed since it was reviewed (text, media or relations). Reload and check it again before publishing.', {
+      code: 'changed_since_review', currentDraftRevision: row.draft_revision, currentPublicationInputFingerprint: currentFingerprint,
     })
   }
   const readiness = computeContentReadiness(ctx, locale, options)
@@ -781,6 +858,7 @@ export function buildPreviewPublishState(ctx: PublicationContext, locale: Conten
     }),
     preview: row ? previewOf(ctx, row) : null,
     readiness: computeContentReadiness(ctx, locale, options),
+    publicationInputFingerprint: publicationInputFingerprint(ctx, locale),
     publication: {
       has_snapshot: Boolean(row?.published_snapshot),
       published_revision: row?.published_revision ?? null,
@@ -820,9 +898,10 @@ export async function publishContentLocale(
   options: PublicationOptions & { now?: () => string },
 ): Promise<AdminContentPublicationResult> {
   const locale = routeLocale(rawLocale)
-  const expected = parsePublishBody(rawBody)
+  const review = parsePublishBody(rawBody)
+  // Publication inputs are read again here, immediately before the plan and its writes.
   const ctx = await loadPublicationContext(fetch, itemId)
-  const plan = planPublish(ctx, locale, expected, options, (options.now ?? (() => new Date().toISOString()))())
+  const plan = planPublish(ctx, locale, review, options, (options.now ?? (() => new Date().toISOString()))())
   await executePublicationPlan(fetch, plan)
   return { result: plan.result, state: buildPreviewPublishState(await loadPublicationContext(fetch, itemId), locale, options) }
 }

@@ -238,6 +238,8 @@ export interface AdminContentPreviewPublish {
   /** `null` when this language has not been started — never another language's content. */
   preview: AdminContentPreview | null
   readiness: ContentReadiness
+  /** Server fingerprint of every readiness / snapshot input; Publish must send it back (Review Fix 01). */
+  publicationInputFingerprint: string
   publication: {
     has_snapshot: boolean
     published_revision: number | null

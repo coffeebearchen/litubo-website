@@ -109,7 +109,10 @@ async function runAction(kind: 'publish' | 'unpublish') {
   busy.value = kind
   try {
     const res = kind === 'publish'
-      ? await $fetch<AdminContentPublicationResult>(url, { method: 'POST', body: { expectedDraftRevision: currentDraftRevision(current) } })
+      ? await $fetch<AdminContentPublicationResult>(url, {
+          method: 'POST',
+          body: { expectedDraftRevision: currentDraftRevision(current), expectedPublicationInputFingerprint: current.publicationInputFingerprint },
+        })
       : await $fetch<AdminContentPublicationResult>(url, { method: 'POST', body: {} })
     setState(res.state)
     notice.value = { tone: 'success', message: publicationOutcomeMessage(res.result, res.state), reload: false }

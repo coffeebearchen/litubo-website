@@ -142,7 +142,7 @@ export function interpretPublicationError(err: unknown): PublicationErrorView {
   const message = typeof payload?.message === 'string' && payload.message.trim() ? payload.message : null
   const data = payload?.data ?? {}
   if (status === 409 && data.code === 'changed_since_review') {
-    return { kind: 'conflict', message: 'This draft changed since the page was loaded. Reload and check it again before publishing.' }
+    return { kind: 'conflict', message: 'This content changed since the page was loaded (text, media or relations). Reload and review the latest version before publishing.' }
   }
   if (status === 409) return { kind: 'archived', message: message ?? 'This content cannot be changed in its current state.' }
   if (status === 422 && data.code === 'not_ready') {

@@ -61,6 +61,7 @@ function state(overrides: Partial<AdminContentPreviewPublish> = {}): AdminConten
       ],
       soft: [{ key: 'seo_title', state: 'warn', label: 'SEO title missing', detail: 'The title is used instead.' }, pass('noindex', 'Indexing allowed')],
     },
+    publicationInputFingerprint: 'a'.repeat(32),
     publication: { has_snapshot: false, published_revision: null, published_at: null, first_published_at: null, unpublished_changes: false },
     can_unpublish: false,
     ...overrides,
@@ -155,7 +156,7 @@ describe('ContentPreviewPublish — Draft preview and readiness', () => {
 })
 
 describe('ContentPreviewPublish — manual actions', () => {
-  it('publishes only after confirmation, sending just the loaded draft revision', async () => {
+  it('publishes only after confirmation, sending the loaded draft revision and publication input fingerprint', async () => {
     const published = readyState({ item: { ...state().item, status: 'published', first_published_at: '2026-09-15T10:00:00Z' }, publication: { has_snapshot: true, published_revision: 4, published_at: '2026-09-15T10:00:00Z', first_published_at: '2026-09-15T10:00:00Z', unpublished_changes: false }, can_unpublish: true })
     const fetchMock = vi.fn(async () => ({ result: 'published', state: published }))
     vi.stubGlobal('$fetch', fetchMock)
@@ -168,7 +169,9 @@ describe('ContentPreviewPublish — manual actions', () => {
     await wrapper.find('.cpp-publish').trigger('click')
     await flushPromises()
     expect(confirm).toHaveBeenCalledTimes(2)
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/content-center/6/locales/en/publish', { method: 'POST', body: { expectedDraftRevision: 4 } })
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/content-center/6/locales/en/publish', {
+      method: 'POST', body: { expectedDraftRevision: 4, expectedPublicationInputFingerprint: 'a'.repeat(32) },
+    })
     expect(wrapper.find('.cpp-notice--success').text()).toBe('English was published.')
     expect(wrapper.find('.cpp-publish').text()).toBe('Published')
     expect(wrapper.find('.cpp-unpublish').exists()).toBe(true)
@@ -186,7 +189,7 @@ describe('ContentPreviewPublish — manual actions', () => {
 
     await wrapper.find('.cpp-publish').trigger('click')
     await flushPromises()
-    expect(wrapper.find('.cpp-notice--error').text()).toContain('This draft changed since the page was loaded')
+    expect(wrapper.find('.cpp-notice--error').text()).toContain('This content changed since the page was loaded (text, media or relations)')
     expect(wrapper.find('.cpp-notice button').text()).toBe('Reload')
 
     await wrapper.find('.cpp-publish').trigger('click')

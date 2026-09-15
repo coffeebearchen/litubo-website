@@ -22,6 +22,7 @@ import {
   buildPreviewPublishState,
   buildPublishedSnapshot,
   planPublish,
+  publicationInputFingerprint,
   planUnpublish,
   snapshotsEqual,
   type PublicationContext,
@@ -104,6 +105,9 @@ async function context(): Promise<PublicationContext> {
 
 const row = (ctx: PublicationContext, locale: ContentLocale) => ctx.locales.find(l => l.locale === locale)!
 const now = () => new Date().toISOString()
+/** The real plan, with the draft revision and publication input fingerprint a reviewer would have loaded just now. */
+const reviewedPlan = (ctx: PublicationContext, locale: ContentLocale, revision: number, options: PublicationOptions) =>
+  planPublish(ctx, locale, { expectedDraftRevision: revision, expectedPublicationInputFingerprint: publicationInputFingerprint(ctx, locale) }, options, now())
 
 async function refusal(run: () => unknown): Promise<{ statusCode: number, data: Record<string, unknown> }> {
   try {
@@ -144,7 +148,7 @@ describe.skipIf(!CONTAINER)('publish lifecycle — real PostgreSQL, TEST ONLY fi
 
   it('the normal runtime registry refuses to publish and nothing is written', async () => {
     const ctx = await context()
-    const err = await refusal(() => planPublish(ctx, 'en', 3, RUNTIME, now()))
+    const err = await refusal(() => reviewedPlan(ctx, 'en', 3, RUNTIME))
     expect(err.statusCode).toBe(422)
     expect((err.data.blockers as Array<{ key: string }>).map(b => b.key)).toEqual(['type_public'])
     expect(row(await context(), 'en').published_snapshot).toBeNull()
@@ -153,7 +157,7 @@ describe.skipIf(!CONTAINER)('publish lifecycle — real PostgreSQL, TEST ONLY fi
   it('Draft → Publish: the database accepts the publication-only write; revision unchanged; item published', async () => {
     const ctx = await context()
     const expected = buildPublishedSnapshot(ctx, 'en', TEST_PUBLIC)
-    const plan = planPublish(ctx, 'en', 3, TEST_PUBLIC, now())
+    const plan = reviewedPlan(ctx, 'en', 3, TEST_PUBLIC)
     expect(plan.result).toBe('published')
     await execute(plan)
 
@@ -164,7 +168,7 @@ describe.skipIf(!CONTAINER)('publish lifecycle — real PostgreSQL, TEST ONLY fi
     expect(en.first_published_at).not.toBeNull()
     expect(after.item.status).toBe('published')
     expect(row(after, 'es').published_snapshot).toBeNull()
-    expect(planPublish(after, 'en', 3, TEST_PUBLIC, now())).toMatchObject({ result: 'already_published', steps: [] })
+    expect(reviewedPlan(after, 'en', 3, TEST_PUBLIC)).toMatchObject({ result: 'already_published', steps: [] })
     expect(buildPreviewPublishState(after, 'en', TEST_PUBLIC).locales.find(l => l.locale === 'en')!.state).toBe('published')
   })
 
@@ -179,9 +183,9 @@ describe.skipIf(!CONTAINER)('publish lifecycle — real PostgreSQL, TEST ONLY fi
     const edited = await context()
     expect(snapshotsEqual(row(edited, 'en').published_snapshot, snapshot)).toBe(true)
     expect(buildPreviewPublishState(edited, 'en', TEST_PUBLIC).publication.unpublished_changes).toBe(true)
-    expect((await refusal(() => planPublish(edited, 'en', 3, TEST_PUBLIC, now()))).data.code).toBe('changed_since_review')
+    expect((await refusal(() => reviewedPlan(edited, 'en', 3, TEST_PUBLIC))).data.code).toBe('changed_since_review')
 
-    await execute(planPublish(edited, 'en', 4, TEST_PUBLIC, now()))
+    await execute(reviewedPlan(edited, 'en', 4, TEST_PUBLIC))
     const republished = row(await context(), 'en')
     expect(republished).toMatchObject({ published_revision: 4, draft_revision: 4 })
     expect((republished.published_snapshot as { title: string }).title).toBe(`${TITLE} v2`)
@@ -190,10 +194,10 @@ describe.skipIf(!CONTAINER)('publish lifecycle — real PostgreSQL, TEST ONLY fi
 
   it('Spanish stays unpublished while the site does not publish it, then publishes on its own and unpublishes on its own', async () => {
     const ctx = await context()
-    const refused = await refusal(() => planPublish(ctx, 'es', 1, TEST_PUBLIC, now()))
+    const refused = await refusal(() => reviewedPlan(ctx, 'es', 1, TEST_PUBLIC))
     expect((refused.data.blockers as Array<{ key: string }>).map(b => b.key)).toEqual(['locale_site_published'])
 
-    const plan = planPublish(ctx, 'es', 1, TEST_PUBLIC_ES, now())
+    const plan = reviewedPlan(ctx, 'es', 1, TEST_PUBLIC_ES)
     expect(plan.steps.map(s => s.collection)).toEqual(['content_item_locales'])
     await execute(plan)
     const both = await context()
@@ -207,7 +211,7 @@ describe.skipIf(!CONTAINER)('publish lifecycle — real PostgreSQL, TEST ONLY fi
     expect(esOff.item.status).toBe('published')
 
     // Leave Spanish published again for the default-language unpublish below.
-    await execute(planPublish(esOff, 'es', 1, TEST_PUBLIC_ES, now()))
+    await execute(reviewedPlan(esOff, 'es', 1, TEST_PUBLIC_ES))
   })
 
   it('an interrupted default-language unpublish exposes nothing; the retry clears every language and keeps the Draft', async () => {

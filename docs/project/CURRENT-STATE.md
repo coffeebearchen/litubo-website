@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             CC-IMP-05 — SEO & Locales（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · local commit 7682193 · not pushed）
-Latest completed module:            CC-IMP-06 — Preview, Readiness & Publish（TYPE A/B · A2 · LOCAL COMPLETE · awaiting controller / user visual sign-off）
+Latest completed module:            CC-IMP-06 — Preview, Readiness & Publish（TYPE A/B · A2 · LOCAL COMPLETE + Review Fix 01 · awaiting controller final sign-off）
 Active authorized module:           NONE（CC-IMP-06 已收口，等待下一份授权）
 Active module authorization level:  —
 Next candidate:                     CC-IMP-07 — Archive, Restore & Change History（高风险模块：RSG-01 / RSG-03，须按 RELEASE-SAFETY-GATES.md 取证）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：49b56c8）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：97bf4d8）
 Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9434,3 +9434,26 @@ Golden Path 覆盖：G-10（Preview）、G-11（Readiness）、G-12（Manual Pub
 Blueprint / Freeze / RELEASE-SAFETY-GATES / CLAUDE.md / Protocol / Decision Log / Charter 均未修改。Product runtime、AI runtime、Media 生命周期未改。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-06"任务中写入。*
+
+### Review Fix 01（Controller 审查修正，2026-09-15）
+
+```text
+Base commit:            97bf4d8b380d6521ebf6713628048dbcab806462
+Commit:                 fix(content): tighten publish review integrity（本小节所在 commit）
+Scope:                  只修 3 项；未重设计模块
+Schema / dependency:    0 / 0
+Blueprint / Freeze / RELEASE-SAFETY-GATES: unchanged
+Register CC-05:         Implementation AUTOMATED_CHECKED · Acceptance NOT_STARTED（规则 14）
+P0 violations:          NONE
+```
+
+本小节修正并取代上文 CC-IMP-06 记录中的以下描述：hard 清单中的 "sections complete"、"下载按 enabled 全部进入快照、不按语言过滤"、"发布仅以 expectedDraftRevision 防过期"。
+
+- **A. sections_complete 不再是 Hard Blocker。** Hard 只保留 Blueprint §21 / 注册表 §7 / block schema 明确要求的内容：title、summary、slug、sections valid（schema）、required sections（注册表 min，按 block 存在计数，不再要求文本非空）、hero、media public、resource_download 下载、type public、locale 规则。schema 允许为空的文字（空段落、空 FAQ 回答、空 CTA 链接等）改为确定性 Soft Warning "Some sections have empty text"（列出 section 名）。测试：summary 缺失 → Blocker；缺少必需 text section → Blocker；空段落 + 空 FAQ 回答 + 空 CTA href → ready 且只 Warning，并可发布。
+- **B. publicationInputFingerprint（无 schema 变更）。** `server/utils/contentPublication.ts#publicationInputFingerprint` 对以下服务端读取的输入做稳定 JSON + sha256（32 hex）：item id / content_type / status；请求语言 working copy（title、slug、summary、blocks、seo_title、seo_description、canonical_path、noindex）与 draft_revision；slug 是否被占用；非默认语言时默认语言是否已发布；除 `source_document` 外全部媒体链接（id、role、enabled、sort、fileId、文件是否缺失、MIME、`is_public`、归档状态、该语言 alt / caption、download language / version_label / file_date）；关系（id、kind、product / content id、sort）。不含 UI 状态。GET preview-publish 返回 `publicationInputFingerprint`；Publish body 必须带 `expectedPublicationInputFingerprint`（缺失或格式错 422）；服务端在写入前重新读取、重新计算，不一致 → 409 `changed_since_review`（附 `currentPublicationInputFingerprint`），0 写入；UI 显示 "This content changed since the page was loaded (text, media or relations)" + Reload。测试：A 文本修改 → revision 409；B hero 换文件 / 删 OG / inline alt / 文件 `is_public` 变化 → 409 且 0 写入；C 下载 version_label / language / enabled 变化 → 409；D 关系增 / 删 / 排序 → 409；E 无变化 → 发布成功；F 409 后重新读取得到新指纹 → 人工发布成功且快照含新下载元数据；`source_document` 变化不影响。
+- **C. 下载按语言隔离。** 沿用 CC-IMP-04 冻结的 download language 合同 `all | en | es | pt`（`all` = "All languages"，既有中性值；未发明新值）。语言 X 只包含 `language = X` 或 `all` 的 enabled 下载；未设置语言或其他语言一律不包含，无回退。预览、readiness、快照三处统一（`localeDownloads`）。`resource_download` 的 hard 检查改为：当前语言至少一个 enabled 且可公开（文件存在、`is_public`、未归档）的下载。测试：EN 快照 / 预览含 EN + all、不含 ES / PT / 未设置；ES 快照 / 预览含 ES + all、不含 EN / PT；EN 只有 ES 下载 → Blocker 且 0 写入；当前语言下载 disabled → 不计入、不进快照；当前语言下载 private / archived → `media_public` + `download_file` Blocker（RSG-06 不变）。
+- **Safety Gates 复核：** RSG-03 PROVEN（审核时的全部发布输入 = 发布时的输入，否则 409 且 0 写入）；RSG-05 PROVEN（下载纳入语言隔离）；RSG-06 PROVEN（媒体资格规则不变，下载资格同样适用）；P0 Violations：NONE。
+- **测试：** 定向 107 passed（publication 单元 / 组件 / registries / UI）；全量 vitest 65 files passed / 4 skipped，2491 passed / 56 skipped；真实 PostgreSQL revision guard 6 / 6、publish lifecycle 5 / 5（计划调用改为带指纹的 review 对象）；typecheck 0；lint 0；`nuxt build` Build complete。
+- **浏览器（本地 dev，内容 6，TEST ONLY；会话过期后由用户本人重新登录）：** 1440 干净新标签页：Hard 9 项（不含 sections_complete）Pass ×7 + Blocker "Some media cannot be published" + Blocker "This content type is not enabled for public delivery yet."；Soft 首项 "Every section has text"；header Publish disabled 并显示原因；越界 0；robots noindex、canonical 0；console error 0。375 干净新标签页（`?locale=es`）：scrollWidth 375、越界 0、单列、侧栏在下方；"Publish Spanish" disabled；Warning "Some sections have empty text — Check: Text 1, Key points 1, Call to action 1, FAQ 1, Text 2."；无英文正文；console error 0。真实 BFF：指纹两次读取一致、EN / ES 指纹不同；带当前指纹 publish → 422 `not_ready` [media_public, type_public]；过期指纹 → 409 `changed_since_review`；缺指纹 → 422（field `expectedPublicationInputFingerprint`）；过期 revision → 409。前后核对：非空快照 0、published item 0、内容 6 revisions 13 → 13、两行 draft_revision 6 与 blocks md5 不变、4 个文件 `is_public` 仍 false；`publicEnabled` 未开启。dev server 首次启动已知 P2 `#app-manifest`，干净重启后无错误；验收后已停止。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-06 Review Fix 01"任务中写入。*

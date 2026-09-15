@@ -49,6 +49,9 @@ const INLINE = '44444444-4444-4444-8444-444444444444'
 const PDF = '55555555-5555-4555-8555-555555555555'
 const PDF_OFF = '66666666-6666-4666-8666-666666666666'
 const SRC = '77777777-7777-4777-8777-777777777777'
+const PDF_EN = '88888888-8888-4888-8888-888888888801'
+const PDF_ES = '88888888-8888-4888-8888-888888888802'
+const PDF_PT = '88888888-8888-4888-8888-888888888803'
 const B = {
   text: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   points: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -113,6 +116,9 @@ class FakeDirectus {
     [PDF, { id: PDF, type: 'application/pdf', filename_download: 'guide.pdf', title: 'TEST ONLY guide', width: null, height: null, is_public: true }],
     [PDF_OFF, { id: PDF_OFF, type: 'application/pdf', filename_download: 'old.pdf', title: null, width: null, height: null, is_public: true }],
     [SRC, { id: SRC, type: 'text/plain', filename_download: 'notes.txt', title: 'internal notes', width: null, height: null, is_public: false }],
+    [PDF_EN, { id: PDF_EN, type: 'application/pdf', filename_download: 'guide-en.pdf', title: null, width: null, height: null, is_public: true }],
+    [PDF_ES, { id: PDF_ES, type: 'application/pdf', filename_download: 'guia-es.pdf', title: null, width: null, height: null, is_public: true }],
+    [PDF_PT, { id: PDF_PT, type: 'application/pdf', filename_download: 'guia-pt.pdf', title: null, width: null, height: null, is_public: true }],
   ])
 
   archived = new Set<string>()
@@ -230,8 +236,21 @@ beforeEach(() => { db = new FakeDirectus() })
 const readiness = async (locale: 'en' | 'es' | 'pt' = 'en', options: PublicationOptions = TEST_PUBLIC) =>
   computeContentReadiness(await loadPublicationContext(db.fetch, ITEM), locale, options)
 const failing = (r: { hard: Array<{ key: string, state: string }> }) => r.hard.filter(c => c.state === 'fail').map(c => c.key)
-const publish = (locale: string, body: unknown, options: PublicationOptions = TEST_PUBLIC, now = NOW) =>
-  publishContentLocale(db.fetch, ITEM, locale, body, { ...options, now: () => now })
+/**
+ * Publishes as a reviewer who has just loaded the page: a body that names a draft
+ * revision but no fingerprint gets the current publication input fingerprint
+ * from the preview read (which never writes). Fingerprint tests call the service directly.
+ */
+async function publish(locale: string, body: unknown, options: PublicationOptions = TEST_PUBLIC, now = NOW) {
+  let request = body
+  if (body && typeof body === 'object' && !Array.isArray(body) && 'expectedDraftRevision' in body && !('expectedPublicationInputFingerprint' in body)) {
+    try {
+      const state = await getContentPreviewPublish(db.fetch, ITEM, locale, options)
+      request = { ...body, expectedPublicationInputFingerprint: state.publicationInputFingerprint }
+    } catch { /* unknown locale: the publish call reports it */ }
+  }
+  return publishContentLocale(db.fetch, ITEM, locale, request, { ...options, now: () => now })
+}
 const unpublish = (locale: string, body: unknown = undefined, options: PublicationOptions = TEST_PUBLIC) =>
   unpublishContentLocale(db.fetch, ITEM, locale, body, options)
 const workingCopy = (row: Row) => clone(Object.fromEntries(DRAFT_FIELDS.concat('draft_revision').map(f => [f, row[f]])))
@@ -251,7 +270,7 @@ describe('readiness — deterministic, server-side (Blueprint §21)', () => {
     const r = await readiness('en')
     expect(r.ready).toBe(true)
     expect(r.hard.map(c => c.key)).toEqual([
-      'item_not_archived', 'title', 'summary', 'slug', 'sections_valid', 'sections_complete', 'required_sections',
+      'item_not_archived', 'title', 'summary', 'slug', 'sections_valid', 'required_sections',
       'media_public', 'type_public', 'locale_site_published',
     ])
     expect(r.soft.filter(c => c.state === 'warn').map(c => c.key)).toEqual(['seo_title'])
@@ -268,7 +287,6 @@ describe('readiness — deterministic, server-side (Blueprint §21)', () => {
       ['reserved slug', () => { db.row('en').slug = 'preview' }, 'slug'],
       ['slug used by another item', () => { db.otherLocales.push(db.localeRow({ id: 90, content_items_id: 99, locale: 'en', slug: 'test-only-publish' })) }, 'slug'],
       ['invalid section', () => { (db.row('en').blocks as Row[])[0] = { id: B.text, type: 'text', data: { paragraphs: ['x'], html: '<b>' } } as unknown as Row }, 'sections_valid'],
-      ['empty section', () => { (db.row('en').blocks as Array<{ data: Record<string, unknown> }>)[3].data = { items: [{ question: 'Q?', answer: ' ' }] } }, 'sections_complete'],
       ['required section', () => { db.row('en').blocks = enBlocks().filter(b => b.type !== 'text') }, 'required_sections'],
       ['private hero', () => { (db.files.get(HERO) as Row).is_public = false }, 'media_public'],
       ['archived Open Graph image', () => { db.archived.add(OG) }, 'media_public'],
@@ -285,6 +303,29 @@ describe('readiness — deterministic, server-side (Blueprint §21)', () => {
       expect(failing(r), name).toEqual([key])
       expect(r.ready, name).toBe(false)
     }
+  })
+
+  it('Review Fix 01: required content missing blocks; text the schema allows to be empty only warns', async () => {
+    // Blueprint §21: summary is required to publish.
+    db.row('en').summary = ''
+    expect(failing(await readiness())).toEqual(['summary'])
+    // Registry §7: a technical article needs a text section.
+    db = new FakeDirectus()
+    db.row('en').blocks = enBlocks().filter(b => b.type !== 'text')
+    expect(failing(await readiness())).toEqual(['required_sections'])
+    // Optional / schema-allowed empty values: an empty paragraph, FAQ answer and CTA link.
+    db = new FakeDirectus()
+    const blocks = db.row('en').blocks as Array<{ data: Record<string, unknown> }>
+    blocks[0].data = { heading: 'TEST ONLY intro', paragraphs: [''] }
+    blocks[3].data = { items: [{ question: 'TEST ONLY question?', answer: ' ' }] }
+    blocks[4].data = { label: 'Contact us', href: '' }
+    const r = await readiness()
+    expect(r.ready).toBe(true)
+    expect(r.hard.some(c => c.key === 'sections_complete')).toBe(false)
+    const warning = r.soft.find(c => c.key === 'sections_complete')!
+    expect(warning.state).toBe('warn')
+    expect(warning.detail).toBe('Check: Text 1, FAQ 1, Call to action 1.')
+    expect((await publish('en', { expectedDraftRevision: 4 })).result).toBe('published')
   })
 
   it('does not check files that would not be published: disabled downloads and source documents', async () => {
@@ -402,7 +443,9 @@ describe('publish — human action, server authority (RSG-03)', () => {
     expect((await rejection(publish('en', undefined))).statusCode).toBe(400)
     expect((await rejection(publish('zh', { expectedDraftRevision: 4 }))).statusCode).toBe(404)
     expect((await rejection(publish('pt', { expectedDraftRevision: 1 }))).statusCode).toBe(404)
-    expect((await rejection(publishContentLocale(db.fetch, 999, 'en', { expectedDraftRevision: 4 }, TEST_PUBLIC))).statusCode).toBe(404)
+    expect((await rejection(publishContentLocale(db.fetch, ITEM, 'en', { expectedDraftRevision: 4 }, TEST_PUBLIC))).data).toMatchObject({ field: 'expectedPublicationInputFingerprint' })
+    expect((await rejection(publishContentLocale(db.fetch, ITEM, 'en', { expectedDraftRevision: 4, expectedPublicationInputFingerprint: 'abc' }, TEST_PUBLIC))).statusCode).toBe(422)
+    expect((await rejection(publishContentLocale(db.fetch, 999, 'en', { expectedDraftRevision: 4, expectedPublicationInputFingerprint: '0'.repeat(32) }, TEST_PUBLIC))).statusCode).toBe(404)
     expect(db.writes).toHaveLength(0)
   })
 
@@ -493,6 +536,158 @@ describe('publish — human action, server authority (RSG-03)', () => {
     db = new FakeDirectus()
     await publish('en', { expectedDraftRevision: 4 })
     expect(db.writes.every(w => w.path.startsWith('/items/content_item'))).toBe(true)
+  })
+})
+
+// ── Publication review fingerprint (Review Fix 01, RSG-03) ─────────────────
+
+describe('publication input fingerprint — the reviewed state is the published state', () => {
+  async function reviewOf(locale: 'en' | 'es' = 'en', options: PublicationOptions = TEST_PUBLIC) {
+    const state = await getContentPreviewPublish(db.fetch, ITEM, locale, options)
+    return { expectedDraftRevision: state.locales.find(l => l.locale === locale)!.draft_revision!, expectedPublicationInputFingerprint: state.publicationInputFingerprint }
+  }
+  const publishReviewed = (review: unknown) => publishContentLocale(db.fetch, ITEM, 'en', review, { ...TEST_PUBLIC, now: () => NOW })
+
+  async function expectStale(label: string, mutate: () => void) {
+    const review = await reviewOf()
+    mutate()
+    const err = await rejection(publishReviewed(review))
+    expect(err.statusCode, label).toBe(409)
+    expect(err.data.code, label).toBe('changed_since_review')
+    expect(err.data.currentPublicationInputFingerprint, label).not.toBe(review.expectedPublicationInputFingerprint)
+    expect(err.data.currentDraftRevision, label).toBe(4)
+    expect(db.writes, label).toHaveLength(0)
+    expect(db.row('en').published_snapshot, label).toBeNull()
+    expect(db.item.status, label).toBe('draft')
+  }
+
+  it('is a 32-hex server value, stable across reads, and independent of the page (no UI state)', async () => {
+    const a = await reviewOf()
+    const b = await reviewOf()
+    expect(a.expectedPublicationInputFingerprint).toMatch(/^[0-9a-f]{32}$/)
+    expect(b).toEqual(a)
+    expect(db.writes).toHaveLength(0)
+  })
+
+  it('A. Draft text changed → the draft revision contract still returns 409 and writes nothing', async () => {
+    const review = await reviewOf()
+    await updateLocaleDraft(db.fetch, ITEM, 'en', { expectedDraftRevision: 4, title: `${TITLE} v2` })
+    db.writes = []
+    const err = await rejection(publishReviewed(review))
+    expect(err.statusCode).toBe(409)
+    expect(err.data).toMatchObject({ code: 'changed_since_review', currentDraftRevision: 5 })
+    expect(db.writes).toHaveLength(0)
+  })
+
+  it('B. media association changed without a new draft revision → 409, zero publication writes', async () => {
+    await expectStale('hero replaced', () => { db.links.get(101)!.directus_files_id = INLINE })
+    db = new FakeDirectus()
+    await expectStale('Open Graph link removed', () => { db.links.delete(102) })
+    db = new FakeDirectus()
+    await expectStale('inline alt text changed', () => { db.links.get(103)!.alt_en = 'TEST ONLY inline alt v2' })
+    db = new FakeDirectus()
+    await expectStale('file visibility changed', () => { (db.files.get(OG) as Row).is_public = false })
+  })
+
+  it('C. download metadata changed without a new draft revision → 409', async () => {
+    await expectStale('version label', () => { db.links.get(104)!.version_label = 'v2' })
+    db = new FakeDirectus()
+    await expectStale('download language', () => { db.links.get(104)!.language = 'es' })
+    db = new FakeDirectus()
+    await expectStale('download enabled', () => { db.links.get(105)!.enabled = true })
+  })
+
+  it('D. relation changed without a new draft revision → 409', async () => {
+    await expectStale('relation added', () => { db.relations.push({ id: 7, content_items_id: ITEM, relation_kind: 'product', sort: 2, product_id: { id: 4, name_en: 'TEST ONLY product 4', product_code: 'TEST-4', status: 'draft' }, related_content_id: null }) })
+    db = new FakeDirectus()
+    await expectStale('relation removed', () => { db.relations = db.relations.slice(1) })
+    db = new FakeDirectus()
+    await expectStale('relation reordered', () => { db.relations[0].sort = 5 })
+  })
+
+  it('E. nothing changed → Publish proceeds', async () => {
+    const res = await publishReviewed(await reviewOf())
+    expect(res.result).toBe('published')
+    expect(db.writes).toHaveLength(2)
+  })
+
+  it('F. after a 409, reloading gives the new fingerprint and an explicit Publish of the latest state succeeds', async () => {
+    const old = await reviewOf()
+    db.links.get(104)!.version_label = 'v2'
+    expect((await rejection(publishReviewed(old))).statusCode).toBe(409)
+    const latest = await reviewOf()
+    expect(latest.expectedPublicationInputFingerprint).not.toBe(old.expectedPublicationInputFingerprint)
+    expect((await publishReviewed(latest)).result).toBe('published')
+    expect((db.row('en').published_snapshot as { media: { downloads: Array<{ versionLabel: string }> } }).media.downloads[0].versionLabel).toBe('v2')
+  })
+
+  it('a source document change is not a publication input', async () => {
+    const review = await reviewOf()
+    db.links.get(106)!.enabled = false
+    expect((await publishReviewed(review)).result).toBe('published')
+  })
+})
+
+// ── Download locale isolation (Review Fix 01, RSG-05) ──────────────────────
+
+describe('download locale isolation — exact language or the existing "all" value only', () => {
+  function addLocaleDownloads() {
+    db.addLink({ id: 107, directus_files_id: PDF_EN, file_role: 'download', language: 'en' })
+    db.addLink({ id: 108, directus_files_id: PDF_ES, file_role: 'download', language: 'es' })
+    db.addLink({ id: 109, directus_files_id: PDF_PT, file_role: 'download', language: 'pt' })
+  }
+  const snapshotDownloads = async (locale: 'en' | 'es') =>
+    buildPublishedSnapshot(await loadPublicationContext(db.fetch, ITEM), locale, TEST_PUBLIC).media.downloads.map(d => d.linkId)
+
+  it('EN snapshot and preview include EN and all-language downloads, never ES / PT or unset language', async () => {
+    addLocaleDownloads()
+    db.addLink({ id: 110, directus_files_id: PDF_PT, file_role: 'download', language: null })
+    expect(await snapshotDownloads('en')).toEqual([104, 107])
+    const state = await getContentPreviewPublish(db.fetch, ITEM, 'en', TEST_PUBLIC)
+    expect(state.preview!.downloads.map(d => d.link_id)).toEqual([104, 107])
+  })
+
+  it('ES snapshot and preview include ES and all-language downloads, never EN / PT', async () => {
+    addLocaleDownloads()
+    db.row('es').blocks = [...(db.row('es').blocks as unknown[]), { id: B.downloads, type: 'downloads', data: {} }]
+    expect(await snapshotDownloads('es')).toEqual([104, 108])
+    const state = await getContentPreviewPublish(db.fetch, ITEM, 'es', TEST_PUBLIC)
+    expect(state.preview!.downloads.map(d => d.link_id)).toEqual([104, 108])
+  })
+
+  const RESOURCE: PublicationOptions = { publishedLocales: ['en'], resolveType: testOnlyRegistry('resource_download') }
+  function resourceWithoutAllLanguageDownload() {
+    db.item.content_type = 'resource_download'
+    db.row('en').blocks = [enBlocks()[0], enBlocks()[5], enBlocks()[6]]
+    db.links.delete(104)
+  }
+
+  it('EN resource_download with only an enabled ES download is blocked', async () => {
+    resourceWithoutAllLanguageDownload()
+    db.addLink({ id: 108, directus_files_id: PDF_ES, file_role: 'download', language: 'es' })
+    expect(failing(await readiness('en', RESOURCE))).toEqual(['download_file'])
+    const err = await rejection(publish('en', { expectedDraftRevision: 4 }, RESOURCE))
+    expect((err.data.blockers as Array<{ key: string }>).map(b => b.key)).toEqual(['download_file'])
+    expect(db.writes).toHaveLength(0)
+  })
+
+  it('a disabled current-language download is neither published nor counted', async () => {
+    resourceWithoutAllLanguageDownload()
+    db.addLink({ id: 107, directus_files_id: PDF_EN, file_role: 'download', language: 'en', enabled: false })
+    expect(failing(await readiness('en', RESOURCE))).toEqual(['download_file'])
+    const ctx = await loadPublicationContext(db.fetch, ITEM)
+    expect(buildPublishedSnapshot(ctx, 'en', RESOURCE).media.downloads).toEqual([])
+  })
+
+  it('a private or archived current-language download blocks publishing (RSG-06)', async () => {
+    resourceWithoutAllLanguageDownload()
+    db.addLink({ id: 107, directus_files_id: PDF_EN, file_role: 'download', language: 'en' })
+    expect((await readiness('en', RESOURCE)).ready).toBe(true);
+    (db.files.get(PDF_EN) as Row).is_public = false
+    expect(failing(await readiness('en', RESOURCE))).toEqual(['media_public', 'download_file'])
+    ;(db.files.get(PDF_EN) as Row).is_public = true
+    db.archived.add(PDF_EN)
+    expect(failing(await readiness('en', RESOURCE))).toEqual(['media_public', 'download_file'])
   })
 })
 
