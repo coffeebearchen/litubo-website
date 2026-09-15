@@ -15,6 +15,8 @@ const IMG_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const IMG_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const IMG_NEW = '99999999-9999-4999-8999-999999999999'
 const PDF = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+const SRC = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+const SRC_NEW = '88888888-8888-4888-8888-888888888888'
 
 const file = (name: string, type: string, extra: Record<string, unknown> = {}) => ({
   filename_download: name, title: null, type, filesize: 2048, width: 1200, height: 800, is_public: false, archived: false, ...extra,
@@ -29,8 +31,9 @@ function initial(): AdminContentMediaRelations {
       { id: 2, directus_files_id: IMG_B, file_role: 'inline', alt: null, caption: null, language: null, version_label: null, file_date: null, enabled: true, sort: 0, used_by_image_blocks: true, file: file('inline-b.jpg', 'image/jpeg') },
       { id: 4, directus_files_id: IMG_A, file_role: 'inline', alt: null, caption: null, language: null, version_label: null, file_date: null, enabled: true, sort: 1, used_by_image_blocks: false, file: file('hero.png', 'image/png', { archived: true }) },
       { id: 3, directus_files_id: PDF, file_role: 'download', alt: null, caption: null, language: 'all', version_label: 'v1', file_date: null, enabled: true, sort: 0, used_by_image_blocks: false, file: file('guide.pdf', 'application/pdf') },
+      { id: 7, directus_files_id: SRC, file_role: 'source_document', alt: null, caption: null, language: null, version_label: null, file_date: null, enabled: true, sort: 0, used_by_image_blocks: false, file: file('spec-notes.txt', 'text/plain', { width: null, height: null }) },
     ],
-    preserved_role_counts: { og_image: 1, source_document: 0 },
+    preserved_role_counts: { og_image: 1 },
     relations: [{ id: 5, relation_kind: 'content', sort: 0, product: null, content: { id: 2, title: 'TEST ONLY resource', content_type: 'resource_download', status: 'draft' } }],
     inventory_version: 'inv-1',
   }
@@ -55,6 +58,8 @@ function routedFetch(overrides: Record<string, (options: Record<string, unknown>
     if (overrides[key]) return overrides[key](options)
     if (url === '/api/admin/media/folders') return []
     if (url === '/api/admin/media/files') {
+      const type = (options.query as Record<string, string> | undefined)?.type
+      if (!type) return { data: [{ id: SRC_NEW, filename_download: 'datasheet.pdf', title: null, type: 'application/pdf', filesize: 100, width: null, height: null, folder: null }], meta: { filter_count: 1 } }
       return { data: [{ id: IMG_NEW, filename_download: 'new-hero.webp', title: null, type: 'image/webp', filesize: 100, width: 10, height: 10, folder: null }], meta: { filter_count: 1 } }
     }
     if (url === '/api/admin/products') return { data: [{ id: 3, name_en: '[TEST ONLY] LT-180C', product_code: null, status: 'draft' }] }
@@ -79,7 +84,11 @@ describe('ContentMediaRelations — rendering', () => {
     expect(facts).toMatch(/Hero media\s*1/)
     expect(facts).toMatch(/Inline media\s*2/)
     expect(facts).toMatch(/Related resources\s*1/)
+    expect(facts).toMatch(/Source documents\s*1/)
+    expect(w.find('.cmr-sources').text()).toContain('spec-notes.txt')
+    expect(w.find('.cmr-sources').text()).toContain('Never shown publicly or published')
     expect(w.text()).toContain('Kept unchanged here: 1 Open Graph image link(s)')
+    expect(w.text()).not.toContain('AI Source Intake).')
     expect(w.text()).toContain('Archived')
     expect(w.text()).not.toMatch(/Ready|%|AI suggestions|Upload/)
     expect(w.find('input[type="file"]').exists()).toBe(false)
@@ -129,11 +138,45 @@ describe('ContentMediaRelations — staging', () => {
     await button(w, '.cmr-main', 'Link product').trigger('click')
     await flushPromises()
     await w.find('.crp-item').trigger('click')
-    const rows = () => w.findAll('.cmr-card')[3].findAll('.cmr-row').map(r => r.find('.cmr-file-name').text())
+    const rows = () => w.findAll('.cmr-card')[4].findAll('.cmr-row').map(r => r.find('.cmr-file-name').text())
     expect(rows()).toEqual(['TEST ONLY resource', '[TEST ONLY] LT-180C'])
-    await w.findAll('.cmr-card')[3].find('button[aria-label="Move [TEST ONLY] LT-180C up"]').trigger('click')
+    await w.findAll('.cmr-card')[4].find('button[aria-label="Move [TEST ONLY] LT-180C up"]').trigger('click')
     expect(rows()).toEqual(['[TEST ONLY] LT-180C', 'TEST ONLY resource'])
     expect(lastStatus(w).dirty).toBe(true)
+  })
+
+  it('adds and removes a source document only in staged state; the picker is not narrowed to images and excludes archived files', async () => {
+    const fetchMock = routedFetch()
+    vi.stubGlobal('$fetch', fetchMock)
+    const w = mountPanel()
+    await button(w, '.cmr-sources', 'Add source document').trigger('click')
+    await flushPromises()
+    // Not narrowed to images: like Downloads, the picker opens on folders and lists files once a folder is chosen.
+    expect(w.find('.ws-lib-modal').exists()).toBe(true)
+    expect(fetchMock.mock.calls.some(c => c[0] === '/api/admin/media/files')).toBe(false)
+    await w.find('.ws-lib-folder--view').trigger('click')
+    await flushPromises()
+    const filesCall = fetchMock.mock.calls.find(c => c[0] === '/api/admin/media/files') as unknown as [string, { query: Record<string, string> }]
+    expect(filesCall[1].query).toMatchObject({ archived: 'exclude', folder: 'root' })
+    expect(filesCall[1].query.type).toBeUndefined()
+    await w.find('.ws-lib-card').trigger('click')
+    const names = () => w.find('.cmr-sources').findAll('.cmr-row .cmr-file-name').map(n => n.text())
+    expect(names()).toEqual(['spec-notes.txt', 'datasheet.pdf'])
+    expect(w.find('.cmr-sources').text()).toContain('New')
+    expect(lastStatus(w).dirty).toBe(true)
+    await w.find('.cmr-sources').findAll('.cmr-row')[0].findAll('button').find(b => b.text() === 'Remove')!.trigger('click')
+    expect(names()).toEqual(['datasheet.pdf'])
+    expect(w.find('.cmr-sources').text()).not.toMatch(/Move|↑|↓/)
+    expect(fetchMock.mock.calls.every(c => (c[1] as { method?: string } | undefined)?.method === undefined)).toBe(true)
+  })
+
+  it('a selected source document shows no alt or caption fields', async () => {
+    vi.stubGlobal('$fetch', routedFetch())
+    const w = mountPanel()
+    await w.find('.cmr-sources .cmr-row-main').trigger('click')
+    expect(w.find('#cmr-alt').exists()).toBe(false)
+    expect(w.find('.cmr-details').text()).toContain('Source document')
+    expect(w.find('.cmr-details').text()).toContain('never published')
   })
 
   it('edits download metadata in the selected asset panel', async () => {
@@ -160,10 +203,34 @@ describe('ContentMediaRelations — save', () => {
     expect(puts).toHaveLength(1)
     const body = (puts[0][1] as { body: Record<string, unknown> }).body as { expectedInventoryVersion: string, media: Array<{ id: number }>, relations: unknown[] }
     expect(body.expectedInventoryVersion).toBe('inv-1')
-    expect(body.media.map(m => m.id)).toEqual([1, 2, 3])
+    // The source document is sent back unchanged, so editing inline media never removes it.
+    expect(body.media.map(m => m.id)).toEqual([1, 2, 3, 7])
     expect(body.relations).toEqual([{ id: 5, relation_kind: 'content', product_id: null, related_content_id: 2 }])
     expect(w.emitted('saved')).toHaveLength(1)
     expect(lastStatus(w).dirty).toBe(false)
+  })
+
+  it('a staged source document is written only by an explicit Save, as a source_document entry', async () => {
+    const saved = { ...initial(), inventory_version: 'inv-2' }
+    const fetchMock = routedFetch({ 'PUT /api/admin/content-center/6/media-relations': () => saved })
+    vi.stubGlobal('$fetch', fetchMock)
+    const w = mountPanel()
+    await button(w, '.cmr-sources', 'Add source document').trigger('click')
+    await flushPromises()
+    await w.find('.ws-lib-folder--view').trigger('click')
+    await flushPromises()
+    await w.find('.ws-lib-card').trigger('click')
+    expect(fetchMock.mock.calls.filter(c => (c[1] as { method?: string })?.method === 'PUT')).toHaveLength(0)
+    await w.find('.cmr-save').trigger('click')
+    await flushPromises()
+    const puts = fetchMock.mock.calls.filter(c => (c[1] as { method?: string })?.method === 'PUT')
+    expect(puts).toHaveLength(1)
+    const body = (puts[0][1] as { body: { media: Array<Record<string, unknown>> } }).body
+    expect(body.media.filter(m => m.file_role === 'source_document')).toEqual([
+      expect.objectContaining({ id: 7, directus_files_id: SRC }),
+      expect.objectContaining({ id: null, directus_files_id: SRC_NEW, enabled: true }),
+    ])
+    expect(JSON.stringify(body)).not.toMatch(/is_public|archived|status/)
   })
 
   it('a stale inventory keeps staged changes and needs a confirmed reload', async () => {

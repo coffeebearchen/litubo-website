@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             CC-IMP-06 — Preview, Readiness & Publish（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · core 97bf4d8 + Review Fix 01 404ed94 · not pushed）
-Latest completed module:            CC-IMP-07 — Archive, Restore & Change History（TYPE A/B · A2 · LOCAL COMPLETE，含 Review Fix 02 PostgreSQL lifecycle concurrency guard + Review Fix 03 duplicate restore audit cleanup · awaiting controller final acceptance）
-Active authorized module:           NONE（CC-IMP-07 Review Fix 03 已收口，等待下一份授权）
+Latest completed module:            CC-IMP-04-R3 — Source Document Association（A2 · LOCAL COMPLETE · CC-IMP-08 前置窄修复；CC-IMP-07 含 Review Fix 02/03 已由 Controller 签收）
+Active authorized module:           NONE（CC-IMP-04-R3 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-08 — Content AI Target & Source Intake（高风险模块：RSG-04 / RSG-06，须按 RELEASE-SAFETY-GATES.md 取证）
+Next candidate:                     CC-IMP-08 — Content AI Target & Source Intake（高风险模块：RSG-04 / RSG-06，须按 RELEASE-SAFETY-GATES.md 取证；Controller 审查 CC-IMP-04-R3 前不授权）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：ae337e0）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：f5d020b）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9663,3 +9663,42 @@ P0 Violations:                  NONE
 **最终本地数据：** 内容 1 / 2 / 4 / 5 / 6 全部 draft；内容 4 en revision 2（`last_change_kind` restore，标题不变）、0 链接 / 0 关系；负 id 夹具 0；非空快照 0；published 0；archived 0；trigger 7；`media_file_lifecycle` 20 不变；provider calls 0。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-07 Review Fix 03"任务中写入。*
+
+## CC-IMP-04-R3 — Source Document Association（2026-09-15）
+
+```text
+Module:                         CC-IMP-04-R3 — Source Document Association（CC-03 Media & Relations 窄修复；CC-IMP-08 前置）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller Decision — CC-IMP-08 Governance Conflict Resolution）
+Status:                         COMPLETED（LOCAL COMPLETE · 等待 Controller 审查）
+Branch:                         review/cc-imp-08-content-ai-source-intake（CC-IMP-08 本身 0 代码）
+Baseline:                       f5d020bb5fe2412e3bb9f92064acea2354f50944
+Commit:                         fix(content): add source document associations（本节所在 commit）
+Association owner:              CC-03 Media & Relations（含 source_document）
+CC-AI-01 association writes:    NO（AI Source Intake 仍为 Analyze / session only，Draft write = NO，Module Freeze §14 不变）
+Content AI eligible roles:      source_document / download / inline（已关联、属于当前条目、enabled、文件存在、未归档、共享格式合同可读；Controller 裁定，CC-IMP-08 实施）
+Schema / dependency / Provider: 0 / 0 / 0 calls
+Register:                       未修改（CC-03 Implementation AUTOMATED_CHECKED · Acceptance VISUALLY_VERIFIED 不变）
+MASTER-ROADMAP:                 未修改（CC-IMP-08 NEXT — NOT AUTHORIZED）
+P0 Violations:                  NONE
+```
+
+**背景：** CC-IMP-08 开工时发现施工单 §22（Intake 页写 source_document 关联）与 Module Freeze §14 / §10、Blueprint §34 写入面冲突，STOP（0 代码、0 commit）。Controller 裁定：CC-AI-01 不写 `content_items_files`；所有 Content ↔ Media 关联（含 `source_document`）归 CC-03；Content AI 可读取已关联的 source_document / download / inline；DG-07 仍 OPEN、不阻塞（真实 Provider 调用 0、数据出境未授权）。本节取代 CC-IMP-04 节中"`source_document`（CC-IMP-08）不可提交（422）"的描述。Freeze、Blueprint、Decision Log、RELEASE-SAFETY-GATES 未修改。
+
+**实现（最小改动，复用既有合同）：**
+
+- `utils/contentMediaRelations.ts`：`CONTENT_MEDIA_MANAGED_ROLES` 增加 `source_document`；保留角色只剩 `og_image`（SEO & Locales）。
+- `server/utils/contentMediaRelations.ts`：`source_document` 走与其他角色完全相同的整体校验 → 暂存保存流程——字段 allowlist、文件存在、**新关联文件未归档**、同一 (文件, 角色) 不重复、按 id 校验归属当前条目、`inventory_version` 过期 409、条目 archived 409、PostgreSQL lifecycle guard 拒绝映射 409 `lifecycle_changed`；download 元数据（language / version / date）对它拒绝；不写文件可见性 / 生命周期 / content status / blocks。响应 `preserved_role_counts` 只含 `og_image`。
+- `types/content-center.ts`、`utils/contentMediaRelationsEditor.ts`：角色类型与摘要计数（Source documents）。
+- `ContentMediaRelations.vue`：新增 "Source documents" 卡片（说明"Internal reference files for AI Source Intake… Never shown publicly or published."）、"Add source document"（共享 `MediaLibraryPicker`，不限图片、查询带 `archived=exclude`）、行显示文件名 / 大小 / Disabled / New / Archived、Remove；无排序按钮（sort 仍按列表顺序由既有合同写入）、无 alt / caption 字段（详情面板改为"internal… never published"提示）；所有操作只改暂存，一次 Save = 一次 PUT；无上传、无点击即写。
+
+**测试：** `tests/contentMediaRelations.test.ts` 38 / 38（新增 8 项：source_document 新增〔一次 POST、内部角色、无可见性 / 生命周期写入〕、移除〔一次 DELETE〕、重复拒绝与重复保存收敛、他条目 link id 拒绝且 0 写入、归档 / 不存在文件与 download 元数据拒绝、archived 条目 409 与 lifecycle guard 拒绝 → 409 `lifecycle_changed` 且 0 关联、新增来源时 hero / inline / download / og_image 行逐字段不变、编辑 hero / inline 时页面回传 source_document 不被删除；原 "source_document 被拒" 用例改为只拒绝 og_image）。`tests/components/ContentMediaRelations.component.test.ts` 12 / 12（新增：Source documents 渲染与摘要、picker 不限图片且 archived=exclude、暂存新增 / 移除 0 请求且无排序、详情无 alt / caption、显式 Save 一次 PUT 含 source_document 条目；保存 inline 变更时 body 保留 source_document）。全量 vitest（含真实 PostgreSQL）：首轮与 `nuxt build` 并行时 3 个与本改动无关的套件（DOCX 解压炸弹、revision guard 并发、publish lifecycle DB）在 5 s 默认超时处失败；无并行负载重跑 52 / 52 通过；其余 67 files 2570 tests 通过（CC-IMP-04/05/06/07、lifecycle guard 20 / 20）。typecheck 0；lint 0；`nuxt build` Build complete；`git diff --check` 通过。
+
+**浏览器验收（本地 dev，TEST ONLY 内容 4，新标签页）：**
+
+- 1440（DOM 实测）：主列 575 + 右栏 300，Source documents 卡片 575 宽，scrollWidth 1425 ≤ 1440，console error 0。说明：Browser 面板 800×500，1440 视口被整体缩放，截图不可辨认、指针 / 键盘输入落点失准（既有 "Add download" 同样无法触发）；以 JS `click()` 证明 picker 逻辑正常（标题 "Select source document from Media Library"、文件夹列表），真实交互改在未缩放的 375 宽度完成。
+- 375（375×812 实测 + 375×480 未缩放真实点击，截图可辨认）：scrollWidth 375 无溢出；Source documents 卡片 343 宽、按钮 309 宽；真实点击打开 picker（left 16 / right 359 / top 22 / bottom 464，Close 可达，搜索框 319 宽，格式 "All formats"、文件夹 + Unclassified files）；搜索 "9C1-batch-test" → 选择 TEST ONLY PDF → 卡片出现 "New"、保存条 "Unsaved changes"、0 保存请求；点击 Save → "Saved"、Source documents 1；Remove → 暂存 → Save → 0；console error 0。
+- Directus 可追溯性（SQL）：activity 1110 `create` `content_items_files` 320（`file_role = source_document`，revision 865）与 1111 `delete` 320，actor 均为 dev@litubo.com；文件 `is_public` 仍为 false。
+
+**最终本地数据：** 内容 1 / 2 / 4 / 5 / 6 全部 draft；内容 4 链接 0 / 关系 0；全库 `source_document` 关联 0（测试关联已移除）；负 id 夹具 0；非空快照 0；trigger 7；provider calls 0。CC-IMP-07 的 Controller 签收（ACCEPTED LOCALLY / VISUALLY VERIFIED）与 Register CC-HIST Acceptance 同步留待下一份授权模块执行。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-04-R3"任务中写入。*

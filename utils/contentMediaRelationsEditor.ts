@@ -251,6 +251,7 @@ export function summarizeMediaRelations(state: MediaRelationsState) {
     hero: mediaOfRole(state.media, 'hero').length,
     inline: mediaOfRole(state.media, 'inline').length,
     downloads: mediaOfRole(state.media, 'download').length,
+    sources: mediaOfRole(state.media, 'source_document').length,
     products: state.relations.filter(r => r.relation_kind === 'product').length,
     content: state.relations.filter(r => r.relation_kind === 'content' && r.content_type !== 'resource_download').length,
     resources: state.relations.filter(r => r.relation_kind === 'content' && r.content_type === 'resource_download').length,

@@ -53,7 +53,7 @@ export interface AdminContentDraftDetail extends AdminContentDraft {
 export interface AdminContentMediaLink {
   id: number
   directus_files_id: string
-  file_role: 'hero' | 'inline' | 'download'
+  file_role: 'hero' | 'inline' | 'download' | 'source_document'
   /** `alt_<locale>` / `caption_<locale>` for the requested locale. */
   alt: string | null
   caption: string | null
@@ -90,8 +90,8 @@ export interface AdminContentMediaRelations {
   item: { id: number, content_type: ContentTypeId, status: ContentItemStatus, title: string | null }
   locale: ContentLocale
   media: AdminContentMediaLink[]
-  /** Links owned by other modules (SEO & Locales, AI Source Intake) — counted, never changed here. */
-  preserved_role_counts: { og_image: number, source_document: number }
+  /** Links owned by another module (SEO & Locales) — counted, never changed here. */
+  preserved_role_counts: { og_image: number }
   relations: AdminContentRelation[]
   /** Fingerprint of every file link and relation row; a save must send the one it loaded. */
   inventory_version: string

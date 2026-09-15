@@ -69,6 +69,8 @@ class FakeDirectus {
 
   writes: Array<{ method: string, path: string, body: unknown }> = []
   failOnWrite: number | null = null
+  /** Error thrown by the next write instead of the default 503 (e.g. the database lifecycle guard). */
+  failWith: unknown = null
   private nextLink = 100
   private nextRelation = 200
 
@@ -94,7 +96,7 @@ class FakeDirectus {
     const ids = (key: string) => String(q(key) ?? '').split(',').filter(Boolean)
     if (method !== 'GET') {
       this.writes.push({ method, path: url.pathname, body: clone(options.body) })
-      if (this.failOnWrite === this.writes.length) throw Object.assign(new Error('Directus unavailable'), { statusCode: 503 })
+      if (this.failOnWrite === this.writes.length) throw this.failWith ?? Object.assign(new Error('Directus unavailable'), { statusCode: 503 })
     }
 
     if (url.pathname === '/items/content_items' && method === 'GET') {
@@ -182,10 +184,10 @@ describe('read', () => {
     db.addRelation({ relation_kind: 'product', product_id: 3 })
     db.addRelation({ relation_kind: 'content', related_content_id: 2 })
     const value = await load()
-    expect(value.media.map(m => m.file_role)).toEqual(['hero', 'inline'])
+    expect(value.media.map(m => m.file_role)).toEqual(['hero', 'inline', 'source_document'])
     expect(value.media[0]).toMatchObject({ alt: 'Hero alt', file: { filename_download: 'a.png', archived: false, is_public: false } })
     expect(value.media[1].file.archived).toBe(true)
-    expect(value.preserved_role_counts).toEqual({ og_image: 1, source_document: 1 })
+    expect(value.preserved_role_counts).toEqual({ og_image: 1 })
     expect(value.relations.map(r => r.relation_kind)).toEqual(['product', 'content'])
     expect(value.relations[0].product).toMatchObject({ id: 3, status: 'draft' })
     expect(value.relations[1].content).toMatchObject({ id: 2, content_type: 'resource_download', title: 'TEST ONLY resource' })
@@ -248,22 +250,19 @@ describe('archived and missing media', () => {
 })
 
 describe('roles owned by other modules', () => {
-  it('rejects og_image, source_document and unknown roles', async () => {
+  it('rejects og_image and unknown roles', async () => {
     await expectRejected(save(await load(), [{ directus_files_id: OG, file_role: 'og_image' }]), 422, /another workspace module/)
-    await expectRejected(save(await load(), [{ directus_files_id: SRC, file_role: 'source_document' }]), 422, /another workspace module/)
-    await expectRejected(save(await load(), [{ directus_files_id: IMG_A, file_role: 'gallery' }]), 422, /hero, inline or download/)
+    await expectRejected(save(await load(), [{ directus_files_id: IMG_A, file_role: 'gallery' }]), 422, /hero, inline, download or source_document/)
+    expect(db.writes).toHaveLength(0)
   })
 
-  it('never removes or edits og_image and source_document links', async () => {
+  it('never removes or edits og_image links', async () => {
     const og = db.addLink({ directus_files_id: OG, file_role: 'og_image', alt_en: 'OG alt' })
-    const src = db.addLink({ directus_files_id: SRC, file_role: 'source_document' })
     db.addLink({ directus_files_id: IMG_A, file_role: 'hero' })
     await save(await load(), [{ directus_files_id: IMG_B, file_role: 'inline' }])
     expect(db.links.get(og.id)).toMatchObject({ file_role: 'og_image', alt_en: 'OG alt' })
-    expect(db.links.get(src.id)).toMatchObject({ file_role: 'source_document' })
     const deleted = db.writes.filter(w => w.method === 'DELETE').flatMap(w => w.body as number[])
     expect(deleted).not.toContain(og.id)
-    expect(deleted).not.toContain(src.id)
   })
 
   it('rejects mass-assigned fields', async () => {
@@ -316,6 +315,96 @@ describe('inline media and downloads', () => {
     expect(db.writes.filter(w => w.method === 'POST')).toHaveLength(0)
     expect(db.links.size).toBe(1)
     await expectRejected(save(await load(), [{ directus_files_id: IMG_A, file_role: 'inline' }, { directus_files_id: IMG_A, file_role: 'inline' }]), 422, /already linked/)
+  })
+})
+
+describe('source documents (CC-IMP-04-R3) — association owner is Media & Relations', () => {
+  it('adds a source_document link from the Media Library: one POST, internal role, no visibility or lifecycle write', async () => {
+    const value = await save(await load(), [{ directus_files_id: SRC, file_role: 'source_document' }])
+    expect(value.media).toEqual([expect.objectContaining({ file_role: 'source_document', directus_files_id: SRC, enabled: true })])
+    expect(db.writes.map(w => `${w.method} ${w.path}`)).toEqual(['POST /items/content_items_files'])
+    expect(db.writes[0].body).toEqual([expect.objectContaining({ content_items_id: ITEM, directus_files_id: SRC, file_role: 'source_document', enabled: true, sort: 0 })])
+    expect(JSON.stringify(db.writes)).not.toMatch(/is_public|archived|status|published/)
+  })
+
+  it('removes a source_document link with one DELETE and nothing else', async () => {
+    const src = db.addLink({ directus_files_id: SRC, file_role: 'source_document' })
+    const value = await load()
+    const saved = await save(value, [])
+    expect(saved.media).toHaveLength(0)
+    expect(db.writes.map(w => `${w.method} ${w.path}`)).toEqual(['DELETE /items/content_items_files'])
+    expect(db.writes[0].body).toEqual([src.id])
+  })
+
+  it('rejects a duplicate (file, source_document) pair and converges a repeated add', async () => {
+    await expectRejected(save(await load(), [
+      { directus_files_id: SRC, file_role: 'source_document' }, { directus_files_id: SRC, file_role: 'source_document' },
+    ]), 422, /already linked as source_document/)
+    expect(db.writes).toHaveLength(0)
+    db.addLink({ directus_files_id: SRC, file_role: 'source_document' })
+    await save(await load(), [{ directus_files_id: SRC, file_role: 'source_document' }])
+    expect(db.writes.filter(w => w.method === 'POST')).toHaveLength(0)
+    expect([...db.links.values()].filter(l => l.file_role === 'source_document')).toHaveLength(1)
+  })
+
+  it('rejects a link id that belongs to another content item and writes nothing', async () => {
+    const foreign = db.addLink({ directus_files_id: SRC, file_role: 'source_document', content_items_id: 7 })
+    await expectRejected(save(await load(), [{ id: foreign.id, directus_files_id: SRC, file_role: 'source_document' }]), 422, /does not belong to this content item/)
+    expect(db.writes).toHaveLength(0)
+    expect(db.links.get(foreign.id)).toMatchObject({ content_items_id: 7, file_role: 'source_document' })
+  })
+
+  it('rejects an archived or missing Media Library file and download metadata on a source document', async () => {
+    await expectRejected(save(await load(), [{ directus_files_id: ARCHIVED_IMG, file_role: 'source_document' }]), 422, /archived in the Media Library/)
+    await expectRejected(save(await load(), [{ directus_files_id: '12345678-1234-4234-8234-123456789012', file_role: 'source_document' }]), 422, /does not exist/)
+    await expectRejected(save(await load(), [{ directus_files_id: SRC, file_role: 'source_document', language: 'en' }]), 422, /downloads only/)
+    expect(db.writes).toHaveLength(0)
+  })
+
+  it('archived content: refused before writing (409), and a write the database lifecycle guard refuses is 409 lifecycle_changed', async () => {
+    db.item.status = 'archived'
+    await expectRejected(save(await load(), [{ directus_files_id: SRC, file_role: 'source_document' }]), 409, /archived/)
+    expect(db.writes).toHaveLength(0)
+
+    // Archive committed between this request's read and its write.
+    db.item.status = 'draft'
+    const value = await load()
+    db.failOnWrite = 1
+    db.failWith = Object.assign(new Error('unique'), { statusCode: 400, data: { errors: [{ extensions: { code: 'RECORD_NOT_UNIQUE', field: 'content_lifecycle' } }] } })
+    await expectRejected(save(value, [{ directus_files_id: SRC, file_role: 'source_document' }]), 409, /lifecycle_changed/)
+    expect([...db.links.values()].some(l => l.file_role === 'source_document')).toBe(false)
+  })
+
+  it('adding a source document leaves hero, inline, download and og_image rows untouched', async () => {
+    const hero = db.addLink({ directus_files_id: IMG_A, file_role: 'hero', alt_en: 'Cover' })
+    const inline = db.addLink({ directus_files_id: IMG_B, file_role: 'inline', alt_en: 'Inline' })
+    const download = db.addLink({ directus_files_id: PDF, file_role: 'download', language: 'en', version_label: 'v1' })
+    const og = db.addLink({ directus_files_id: OG, file_role: 'og_image', alt_en: 'OG alt' })
+    const before = clone([...db.links.values()])
+    const value = await load()
+    await save(value, [
+      { id: hero.id, directus_files_id: IMG_A, file_role: 'hero', alt: 'Cover' },
+      { id: inline.id, directus_files_id: IMG_B, file_role: 'inline', alt: 'Inline' },
+      { id: download.id, directus_files_id: PDF, file_role: 'download', language: 'en', version_label: 'v1' },
+      { directus_files_id: SRC, file_role: 'source_document' },
+    ])
+    expect(db.writes.map(w => w.method)).toEqual(['POST'])
+    for (const row of before) expect(db.links.get(row.id)).toEqual(row)
+    expect(db.links.get(og.id)).toMatchObject({ file_role: 'og_image', alt_en: 'OG alt' })
+  })
+
+  it('editing hero, inline or download keeps a source document that the page sends back unchanged', async () => {
+    const src = db.addLink({ directus_files_id: SRC, file_role: 'source_document', sort: 0 })
+    const inline = db.addLink({ directus_files_id: IMG_B, file_role: 'inline' })
+    const state = mediaRelationsStateFrom(await load())
+    state.media.find(m => m.id === inline.id)!.alt = 'Updated alt'
+    state.media.push(stagedMediaFromFile({ id: IMG_A, filename_download: 'a.png', title: null, type: 'image/png', filesize: 1, width: null, height: null }, 'hero'))
+    const body = buildMediaRelationsSaveBody(state, (await load()).inventory_version, 'en')
+    expect(body.media.map(m => [m.file_role, m.id])).toEqual([['hero', null], ['inline', inline.id], ['source_document', src.id]])
+    await saveContentMediaRelations(db.fetch, ITEM, body)
+    expect(db.links.get(src.id)).toMatchObject({ file_role: 'source_document', directus_files_id: SRC, enabled: true })
+    expect(db.writes.filter(w => w.method === 'DELETE')).toHaveLength(0)
+    expect(JSON.stringify(db.writes.filter(w => w.method === 'PATCH').map(w => w.body))).not.toContain(String(src.id) + ',')
   })
 })
 
@@ -421,7 +510,7 @@ describe('page helpers', () => {
       { id: 1, directus_files_id: IMG_A, file_role: 'inline', alt: null, caption: null, language: null, version_label: null, file_date: null, enabled: true, sort: 0, used_by_image_blocks: false, file: { filename_download: 'a.png', title: null, type: 'image/png', filesize: 1, width: null, height: null, is_public: false, archived: false } },
       { id: 3, directus_files_id: PDF, file_role: 'download', alt: null, caption: null, language: 'all', version_label: null, file_date: null, enabled: true, sort: 0, used_by_image_blocks: false, file: { filename_download: 'guide.pdf', title: null, type: 'application/pdf', filesize: 1, width: null, height: null, is_public: false, archived: false } },
     ],
-    preserved_role_counts: { og_image: 0, source_document: 0 },
+    preserved_role_counts: { og_image: 0 },
     relations: [{ id: 5, relation_kind: 'product', sort: 0, product: { id: 3, name_en: 'P', product_code: null, status: 'draft' }, content: null }],
     inventory_version: 'v1',
   })

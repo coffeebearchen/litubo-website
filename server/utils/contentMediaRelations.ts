@@ -31,7 +31,7 @@ import type { ContentTypeId } from '../../utils/contentTypes'
  * CC-IMP-04 — Content Center Media & Relations BFF (CONTENT-CENTER-BLUEPRINT-V1 §11, §12, §25).
  *
  * The page sends the complete desired inventory of the links this module owns
- * (hero / inline / download files, product / content relations) plus the
+ * (hero / inline / download / source_document files, product / content relations) plus the
  * `inventory_version` it loaded. The server:
  *   1. validates the whole change set before writing anything (item not archived,
  *      unchanged inventory, roles, files exist, files not archived, image roles are
@@ -46,8 +46,14 @@ import type { ContentTypeId } from '../../utils/contentTypes'
  * Atomicity: each batch request is one Directus transaction; the sequence of up
  * to six requests is not a single transaction. A failure after the first write is
  * reported as a partial save and the inventory version then differs, so the user
- * reloads before saving again. `og_image` and `source_document` rows, file
- * lifecycle, file visibility, content status and blocks are never written here.
+ * reloads before saving again. `og_image` rows, file lifecycle, file visibility,
+ * content status and blocks are never written here.
+ *
+ * CC-IMP-04-R3 — `source_document` (internal, never public) is managed here with
+ * exactly the same checks as the other roles: file exists, not archived, one link
+ * per (file, role), ownership by id, stale-inventory 409, and the PostgreSQL
+ * lifecycle guard for archived items. No alt, caption or download metadata is
+ * needed for it, and nothing here changes the file's own visibility.
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -260,7 +266,6 @@ async function buildResponse(fetch: FetchFn, inventory: LoadedInventory, locale:
     media: managed.map(row => toMediaLink(row, locale, archived, imageLinks)),
     preserved_role_counts: {
       og_image: fileRows.filter(row => row.file_role === 'og_image').length,
-      source_document: fileRows.filter(row => row.file_role === 'source_document').length,
     },
     relations: relationRows.map(row => toRelation(row, locale)),
     inventory_version: mediaRelationsInventoryVersion(fileRows, relationRows),
@@ -349,9 +354,9 @@ export async function saveContentMediaRelations(fetch: FetchFn, itemId: number, 
     const extra = Object.keys(entry).filter(key => !MEDIA_KEYS.includes(key))
     if (extra.length > 0) { errors.push(`${label}: these fields cannot be set here: ${extra.join(', ')}.`); return }
     if (!isManagedContentMediaRole(entry.file_role)) {
-      errors.push(entry.file_role === 'og_image' || entry.file_role === 'source_document'
+      errors.push(entry.file_role === 'og_image'
         ? `${label}: the ${entry.file_role} role is managed in another workspace module.`
-        : `${label}: file_role must be hero, inline or download.`)
+        : `${label}: file_role must be hero, inline, download or source_document.`)
       return
     }
     const role = entry.file_role

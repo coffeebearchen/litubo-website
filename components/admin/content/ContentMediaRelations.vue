@@ -90,6 +90,7 @@ const localeLabel = computed(() => CONTENT_LOCALE_LABELS[current.value.locale])
 const hero = computed(() => mediaOfRole(state.value.media, 'hero')[0] ?? null)
 const inline = computed(() => mediaOfRole(state.value.media, 'inline'))
 const downloads = computed(() => mediaOfRole(state.value.media, 'download'))
+const sources = computed(() => mediaOfRole(state.value.media, 'source_document'))
 const summary = computed(() => summarizeMediaRelations(state.value))
 const selected = computed(() => state.value.media.find(m => m.key === selectedKey.value) ?? null)
 const pickerLinkedIds = computed(() => (pickerRole.value ? mediaOfRole(state.value.media, pickerRole.value).map(m => m.directus_files_id) : []))
@@ -130,7 +131,7 @@ function visibilityLabel(link: StagedMediaLink): string {
 
 function openPicker(role: ContentManagedMediaRole) {
   pickerRole.value = role
-  void browser.openLibrary(role === 'download' ? '' : 'image')
+  void browser.openLibrary(role === 'download' || role === 'source_document' ? '' : 'image')
 }
 
 function closePicker() {
@@ -388,6 +389,38 @@ defineExpose({ save, dirty, canSave })
           </ul>
         </section>
 
+        <!-- Source documents (CC-IMP-04-R3) -->
+        <section class="cmr-card cmr-sources" aria-labelledby="cmr-sources-title">
+          <div class="cmr-card-head">
+            <div>
+              <h2 id="cmr-sources-title" class="cmr-card-title">Source documents</h2>
+              <p class="cmr-card-hint">Internal reference files for AI Source Intake, referenced from Media Library. Never shown publicly or published.</p>
+            </div>
+            <button type="button" class="cmr-btn cmr-btn--primary" @click="openPicker('source_document')">Add source document</button>
+          </div>
+          <p v-if="sources.length === 0" class="cmr-empty">No source documents linked.</p>
+          <ul v-else class="cmr-rows" role="list">
+            <li v-for="link in sources" :key="link.key" class="cmr-row" :class="{ 'cmr-selected': selectedKey === link.key }">
+              <button type="button" class="cmr-row-main" @click="selectedKey = link.key">
+                <span class="cmr-row-kind">{{ fileKind(link.file.type) }}</span>
+                <span class="cmr-row-text">
+                  <span class="cmr-file-name">{{ link.file.filename_download ?? 'Untitled file' }}</span>
+                  <span class="cmr-file-meta">
+                    {{ formatContentFileSize(link.file.filesize) }}<template v-if="!link.enabled"> · Disabled</template>
+                  </span>
+                </span>
+              </button>
+              <p class="cmr-badges">
+                <span v-if="link.id === null" class="cmr-badge cmr-badge--new">New</span>
+                <span v-if="link.file.archived" class="cmr-badge cmr-badge--warn">Archived</span>
+              </p>
+              <div class="cmr-row-actions">
+                <button type="button" class="cmr-link-btn" @click="removeMedia(link.key)">Remove</button>
+              </div>
+            </li>
+          </ul>
+        </section>
+
         <!-- Relations -->
         <section class="cmr-card" aria-labelledby="cmr-relations-title">
           <div class="cmr-card-head">
@@ -433,20 +466,20 @@ defineExpose({ save, dirty, canSave })
             <div><dt>Hero media</dt><dd>{{ summary.hero }}</dd></div>
             <div><dt>Inline media</dt><dd>{{ summary.inline }}</dd></div>
             <div><dt>Downloads</dt><dd>{{ summary.downloads }}</dd></div>
+            <div><dt>Source documents</dt><dd>{{ summary.sources }}</dd></div>
             <div><dt>Related products</dt><dd>{{ summary.products }}</dd></div>
             <div><dt>Related content</dt><dd>{{ summary.content }}</dd></div>
             <div><dt>Related resources</dt><dd>{{ summary.resources }}</dd></div>
           </dl>
           <p v-if="summary.archived" class="cmr-card-hint cmr-warn-text">{{ summary.archived }} linked file(s) are archived in Media Library.</p>
-          <p v-if="current.preserved_role_counts.og_image || current.preserved_role_counts.source_document" class="cmr-card-hint">
-            Kept unchanged here: {{ current.preserved_role_counts.og_image }} Open Graph image link(s) (SEO &amp; locales) and
-            {{ current.preserved_role_counts.source_document }} source document link(s) (AI Source Intake).
+          <p v-if="current.preserved_role_counts.og_image" class="cmr-card-hint">
+            Kept unchanged here: {{ current.preserved_role_counts.og_image }} Open Graph image link(s) (SEO &amp; locales).
           </p>
         </section>
 
         <section class="cmr-card" aria-labelledby="cmr-details-title">
           <h2 id="cmr-details-title" class="cmr-card-title">Selected asset</h2>
-          <p v-if="!selected" class="cmr-card-hint">Select a hero, inline or download file to see its details.</p>
+          <p v-if="!selected" class="cmr-card-hint">Select a hero, inline, download or source document file to see its details.</p>
           <fieldset v-else class="cmr-details" :disabled="locked">
             <legend class="cmr-sr-only">Selected asset details</legend>
             <div v-if="thumb(selected, 320)" class="cmr-details-thumb">
@@ -463,10 +496,13 @@ defineExpose({ save, dirty, canSave })
               <div class="cmr-facts-wide"><dt>Media UUID</dt><dd class="cmr-mono">{{ selected.directus_files_id }}</dd></div>
             </dl>
 
-            <label class="cmr-field-label" for="cmr-alt">Alt text ({{ localeLabel }})</label>
-            <input id="cmr-alt" v-model="selected.alt" class="cmr-input" type="text" :maxlength="CONTENT_MEDIA_ALT_MAX">
-            <label class="cmr-field-label" for="cmr-caption">Caption ({{ localeLabel }})</label>
-            <textarea id="cmr-caption" v-model="selected.caption" class="cmr-input" rows="2" :maxlength="CONTENT_MEDIA_CAPTION_MAX" />
+            <template v-if="selected.file_role !== 'source_document'">
+              <label class="cmr-field-label" for="cmr-alt">Alt text ({{ localeLabel }})</label>
+              <input id="cmr-alt" v-model="selected.alt" class="cmr-input" type="text" :maxlength="CONTENT_MEDIA_ALT_MAX">
+              <label class="cmr-field-label" for="cmr-caption">Caption ({{ localeLabel }})</label>
+              <textarea id="cmr-caption" v-model="selected.caption" class="cmr-input" rows="2" :maxlength="CONTENT_MEDIA_CAPTION_MAX" />
+            </template>
+            <p v-else class="cmr-card-hint">Source documents are internal: they are never published and never shown on the public site.</p>
 
             <template v-if="selected.file_role === 'download'">
               <label class="cmr-field-label" for="cmr-language">Language</label>

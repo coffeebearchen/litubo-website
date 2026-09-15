@@ -3,19 +3,23 @@
  * (CONTENT-CENTER-BLUEPRINT-V1 §11, §12; D-023).
  *
  * Files stay in the Media Library; `content_items_files` stores a Media UUID and
- * a role. This module owns the `hero`, `inline` and `download` links and the
- * product / content relations. `og_image` (SEO & Locales) and `source_document`
- * (AI Source Intake) belong to later modules and are preserved untouched.
+ * a role. This module owns the `hero`, `inline`, `download` and `source_document`
+ * links and the product / content relations. `og_image` (SEO & Locales) belongs
+ * to another module and is preserved untouched.
+ *
+ * CC-IMP-04-R3 — every Content ↔ Media association, including the internal
+ * `source_document` role, is written here (Module Freeze §14: CC-03 "YES
+ * (references)"). AI Source Intake only reads already-linked sources.
  */
 
 import type { ContentMediaRole } from './contentMediaRoles'
 
-export const CONTENT_MEDIA_MANAGED_ROLES = ['hero', 'inline', 'download'] as const satisfies readonly ContentMediaRole[]
+export const CONTENT_MEDIA_MANAGED_ROLES = ['hero', 'inline', 'download', 'source_document'] as const satisfies readonly ContentMediaRole[]
 
 export type ContentManagedMediaRole = (typeof CONTENT_MEDIA_MANAGED_ROLES)[number]
 
 /** Roles another module owns. A Media & Relations save never creates, edits or removes them. */
-export const CONTENT_MEDIA_PRESERVED_ROLES = ['og_image', 'source_document'] as const satisfies readonly ContentMediaRole[]
+export const CONTENT_MEDIA_PRESERVED_ROLES = ['og_image'] as const satisfies readonly ContentMediaRole[]
 
 /** Hero and inline links are pictures (the page cover and image sections). Downloads may be any file. */
 export const CONTENT_IMAGE_ONLY_ROLES: readonly ContentManagedMediaRole[] = ['hero', 'inline']
