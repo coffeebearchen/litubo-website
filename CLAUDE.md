@@ -39,6 +39,10 @@ All LITUBO work follows `docs/project/PROJECT-EXECUTION-PROTOCOL.md` (lifecycle,
 - Within an authorized module, execute through validation, governance closeout and local commit without step-by-step confirmation. Then STOP.
 - Push, merge and deploy each require separate explicit authorization.
 
+## Release safety gates (mandatory for high-risk modules)
+
+Any module that touches **Publish / Unpublish / Archive, Public Delivery, Sitemap / indexing, AI Apply, Locale Publication, Public Media, Permissions, Release or Production** must first read `docs/project/RELEASE-SAFETY-GATES.md`, name the touched gates (`RSG-xx`) and their required evidence in the opening report, prove every touched gate before closeout, and report Gate Results / Open Gates / P0 Violations (protocol §12.1). A work order can add evidence but never weaken a gate; a gate conflict → STOP.
+
 ## Working protocol
 
 1. Work only on the module explicitly authorized by the user.
@@ -270,6 +274,7 @@ Desktop acceptance basis: [which Source Asset defines 1440px, or "no approved de
 Mobile 375px acceptance basis: [which Source Asset defines 375px, or "BLOCKED — no approved
   mobile adaptation contract"; PW-01…PW-06 are blocked until Codex authorises one]
 Acceptance criteria: [including empty / error / no-permission / 1440px + 375px breakpoints]
+Safety gates touched: [RSG-xx from docs/project/RELEASE-SAFETY-GATES.md + required Golden / Negative evidence, or "none"]
 Explicitly out of scope: [files and domains not touched this module]
 ```
 

@@ -142,6 +142,7 @@ Release Review → Push Authorization → Merge Authorization → Production Dep
 | **Module Freeze Gate** | 新模块或改变页面 / 模块职责、路由拓扑、写入边界、域所有权 | 简单 bugfix |
 | **Blueprint Gate** | 进入实施前涉及新 schema、新 API 合同、新生命周期、新跨域关系、新持久化模型、新权限、新发布行为 | 现有 Blueprint 已充分覆盖 |
 | **Release Gate** | 任何 production release：独立 Release Review（见 §13） | — |
+| **Safety Gate** | 触及 Publish / Public Delivery / Sitemap / AI Apply / Locale Publication / Public Media / Permissions / Release / Production 的高风险模块：按 §12.1 与 `docs/project/RELEASE-SAFETY-GATES.md` 取证 | 未触及上述领域的模块（报告写 `Safety gates touched: none`） |
 
 Admin/CMS 模块另受 Register DoR（Register §10.1、Blueprint §10.3a）与 Charter §O.1 约束。
 
@@ -336,6 +337,23 @@ Admin/CMS 代码模块仍须满足 Charter §L.2 / §O.2 与 Blueprint §10.2 �
 **AI 模块：** 引用既有原则——AI = proposal → Human Review → Apply to Draft → 不自动发布（FD-004、D-021 ~ D-031）。付费 Provider 调用须相应授权。
 
 **Media 模块：** 引用既有原则——Media Library 是唯一业务媒体工作区（D-023）。
+
+### 12.1 高风险模块：Safety Gate 流程（`RELEASE-SAFETY-GATES-01`，2026-09-15）
+
+触及 Publish / Unpublish / Archive、Public Delivery、Sitemap / indexing、AI Apply、Locale Publication、Public Media、Permissions、Release / Production 的模块，必须按以下顺序执行（Gate 定义、状态词、Golden / Negative 证据编号见 `docs/project/RELEASE-SAFETY-GATES.md`）：
+
+```text
+identify touched gates
+→ read safety gates
+→ declare required evidence
+→ implement
+→ prove every touched gate
+→ closeout（Gate Results · Open Gates · P0 Violations）
+```
+
+- 任一触及 Gate 的证据显示 `VIOLATED` → P0 → STOP（§8.2）。
+- 证据不足 → 状态写 `OPEN` 并写明 owner，不得写 `PROVEN`。
+- 施工单只能增加 Gate 证据，不能削弱 Gate；Gate 与 Charter / Blueprint 冲突 → STOP（§3.7）。
 
 ---
 

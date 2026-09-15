@@ -53,6 +53,11 @@ historical untracked: <路径列表或数量>
 - Draft / Published 隔离
 - push / merge / deploy：<按授权等级>
 
+## 13a. Safety Gates Touched
+<docs/project/RELEASE-SAFETY-GATES.md 中触及的 RSG-xx；或 none + 理由>
+Required evidence: <每个触及 Gate 的 Golden Path（G-/P-xx）与 Negative Path（N-xx）编号>
+（高风险模块按 PROJECT-EXECUTION-PROTOCOL §12.1 执行；只能增加证据，不能削弱 Gate）
+
 ## 14. Validation
 <风险导向：测试命令、typecheck、lint、build、runtime/security 检查、git diff --check>
 

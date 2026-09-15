@@ -71,6 +71,12 @@ Draft / Published 隔离:
 Provider 调用与费用: 0 / 已授权次数
 DB / Directus / schema 影响:
 
+## 6a. Safety Gates（docs/project/RELEASE-SAFETY-GATES.md）
+Safety Gates Touched: RSG-xx 列表 / none
+Gate Results: 每个触及 Gate → PROVEN（附证据编号）/ OPEN（owner）/ NOT_YET_EXERCISED
+Open Gates: 仍 OPEN 的 Gate 与 owner 模块
+P0 Violations: NONE / 列出（出现即 STOP）
+
 ## 7. Project Records
 CURRENT-STATE: updated
 Register: updated / N/A（理由）

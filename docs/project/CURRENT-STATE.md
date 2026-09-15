@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CC-IMP-04 — Media & Relations（CC-IMP-03 Content Editor 与 CC-IMP-04 经 Controller / 用户视觉签收，由 CC-IMP-05 施工单确认 · local commit 1fafcc2 · not pushed）
-Latest completed module:            CC-IMP-05 — SEO & Locales（LOCAL COMPLETE · awaiting controller / user visual sign-off）
-Active authorized module:           NONE（CC-IMP-05 已收口，等待下一份授权）
+Latest accepted module:             CC-IMP-05 — SEO & Locales（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · local commit 7682193 · not pushed）
+Latest completed module:            RELEASE-SAFETY-GATES-01 — Release Safety Gates（TYPE C · LOCAL COMPLETE）
+Active authorized module:           NONE（RELEASE-SAFETY-GATES-01 已收口，等待下一份授权）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-06 — Preview, Readiness & Publish
+Next candidate:                     CC-IMP-06 — Preview, Readiness & Publish（高风险模块：须按 RELEASE-SAFETY-GATES.md 取证）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：1fafcc2）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：7682193）
 Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9228,3 +9228,70 @@ Next candidate authorized: NO
 Blueprint / Freeze / CLAUDE.md / Protocol / Decision Log / Charter 均未修改。未 push、未 deploy、未 merge。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-05"任务中写入。*
+
+---
+
+## RELEASE-SAFETY-GATES-01 — Release Safety Gates（2026-09-15）
+
+```text
+Module:                 RELEASE-SAFETY-GATES-01
+Type / Authorization:   TYPE C Governance / Safety Contract · A1 GOVERNANCE_DOCS
+Status:                 COMPLETED（LOCAL COMPLETE）
+Branch:                 review/release-safety-gates-01
+Baseline:               76821936f7629e15e4b739108bd14988033113e8（CC-IMP-05）
+Commit:                 docs(project): establish release safety gates（本节所在 commit）
+Canonical:              docs/project/RELEASE-SAFETY-GATES.md（新建；此前不存在同类文件）
+P0 gates frozen:        9（RSG-01 … RSG-09）
+Runtime / API / DB / Directus / AI / Media / Publish / Public route / Sitemap: 0
+Provider calls:         0
+Push / Deploy:          0 / 0
+Production:             NOT APPROVED
+Next candidate:         CC-IMP-06 — Preview, Readiness & Publish
+Next candidate authorized: NO
+```
+
+### CC-IMP-05 签收同步
+
+- Controller 正式签收：`CC-IMP-05 — SEO & Locales = ACCEPTED LOCALLY / VISUALLY VERIFIED`。
+- Register `CC-04` Acceptance → `VISUALLY_VERIFIED`（Register §4.8 规则 12；Implementation 保持 `AUTOMATED_CHECKED`）。
+- 本模块未再次执行 CC-IMP-05 的截图、浏览器验收或 runtime 测试。
+
+### 交付
+
+- **`docs/project/RELEASE-SAFETY-GATES.md`：** 权威关系（受 Charter 约束、不修改 Charter、更严格者为准、冲突 STOP）、触发领域、状态词（PROVEN / NOT_TOUCHED / OPEN / NOT_YET_EXERCISED / VIOLATED）、9 个 P0 Gate、Public Eligibility Contract（Content Center / Products）、Safety Gate Matrix（仓库事实）、Golden Path E2E Contract（G-01～G-12、P-01～P-04）、Negative Safety Path Contract（N-01～N-20）、高风险模块执行流程、与现有 Gate 的关系、变更控制。
+- **P0 Gates：** RSG-01 Draft Never Public · RSG-02 Single Public Eligibility Contract · RSG-03 Human-only Publish · RSG-04 AI Applies to Draft Only · RSG-05 Locale Independent Publication, No Fallback · RSG-06 Public Media Eligibility（is_public 且未归档）· RSG-07 Permissions Fail Closed · RSG-08 Local / Review / Production Separation · RSG-09 Release Layering（local commit ≠ push ≠ merge ≠ deploy）。
+- **CLAUDE.md（最小）：** 新增 "Release safety gates" 小节（触发领域 → 必读 RELEASE-SAFETY-GATES.md）；开工报告字段增加 `Safety gates touched`。
+- **PROJECT-EXECUTION-PROTOCOL.md（最小）：** §5 Gate 表新增 Safety Gate 行；新增 §12.1 高风险模块流程：identify touched gates → read safety gates → declare required evidence → implement → prove every touched gate → closeout。
+- **模板（最小）：** Work Order 新增 §13a Safety Gates Touched；Closeout 报告骨架新增 §6a（Safety Gates Touched / Gate Results / Open Gates / P0 Violations）。
+- **MASTER-ROADMAP（最小）：** RELEASE-SAFETY-GATES-01 ✅；CC-IMP-06 NEXT — NOT AUTHORIZED。
+
+### Safety Gate Matrix 登记的既有 OPEN 项（仓库静态事实，未修改 runtime）
+
+- **RSG-06：** 公开媒体代理 `server/api/cms/media/[id].get.ts` 只检查 `is_public`，未检查 Media Library 归档状态（Blueprint §35 P1 #10，owner CC-IMP-10）。
+- **RSG-02：** 产品详情 / 列表与 `sitemap.xml` 各自手写 `status = published` + 已发布分类过滤（当前条件一致），尚无共享资格判定或等价性测试；无公开站内搜索端点。
+- **RSG-01（Products）：** 已发布产品修改立即上线，无 Revision Draft（Blueprint §3 / §35 既有缺口，与 Charter G.1 意图不一致），阻塞产品 CMS 公开切换 / 生产发布。
+- **RSG-07：** `nuxt-server` 字段 / 行权限未在 schema 快照中、未经测试证实（Blueprint §35 P1 #9）。
+- **RSG-05：** 遗留 `site_content` `home.hero` 经 i18n 回退读取（非 Content Center 发布），ES / PT 公开启用前须复核。
+- **RSG-08：** 既有 Open Release Gates 继续 OPEN（持久 Node 22.22.2、生产 RAM / CPU、原生依赖许可证、容器 / 原生包 CVE、生产 extractor 拓扑、生产公开路由 / sitemap smoke）。
+
+### 冲突检查
+
+- 对照 Charter（E.2 / E.4 / E.5 / G.1 / G.4 / G.5 / H.1–H.4 / L.3–L.4 / N.4 / N.6 / FD-004.2）、Decision Log（D-009 / D-011 / D-020 / D-021 / D-023 / D-031 / D-032）、Content Center Freeze（§9 / §14 / §19）与 Blueprint（§8 / §11 / §15 / §18 / §21–§26 / §29–§31 / §35）、Implementation Blueprint（J-10 / J-11 / BP-DG-09 / BP-DG-10 / BP-DG-15）：**未发现实质冲突**；Gate 均为既有边界的收拢，未削弱、未改变方向。
+- **待 Controller 在 CC-IMP-06 施工单中裁定（非本模块阻塞）：** Content Center Golden Path 若需在本地开发库让 TEST ONLY 记录真实进入 Published，须施工单明确授权并在同次运行内撤回清理；默认以隔离夹具证明（RELEASE-SAFETY-GATES §5.1，按 Charter G.5 与协议 §12 更严格者执行）。
+
+### 登记的 P2 UX debt（只登记，不修 runtime）
+
+- **ADMIN LOGIN NETWORK ERROR MESSAGE：** dev server 未运行或网络失败时，`pages/admin/login.vue` 的 catch 只区分 429 / 403，其余（包括无状态码的网络错误与 5xx）一律显示"邮箱或密码错误"，会误导为凭据问题（2026-09-15 本地登录诊断中实测：`POST /api/admin/auth/login` → `net::ERR_CONNECTION_REFUSED`，Directus 账号 active、无认证错误）。P2，非 Safety Gate；未来单独走 Bug Fix 流程。
+
+### Validation
+
+- TYPE C：`git diff --check` / `git diff --cached --check` 通过；跨文件一致性核对（Gate 编号、协议 §12.1 引用、模板字段、CLAUDE.md 引用路径）。
+- runtime tests / typecheck / lint / build：N/A（0 代码改动）。1440 / 375：N/A（无 UI 改动）。
+
+### Governance
+
+- Charter / Decision Log / Content Center Freeze / Content Center Blueprint / Implementation Blueprint：未修改。
+- Decision Log 未新增：Safety Gates 是对既有 Charter / Decision / Blueprint 边界的收拢与证据合同，不是新的架构决定；其权威入口由 CLAUDE.md 与协议 §12.1 固定。
+- 未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
+
+*最后更新：2026-09-15，由 Claude Code 在"RELEASE-SAFETY-GATES-01"任务中写入。*
