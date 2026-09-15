@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { createError } from 'h3'
 import type { FetchFn } from './mediaLifecycle'
-import { assertJsonObject } from './contentDraft'
+import { assertJsonObject, failLifecycleChanged, isLifecycleGuardRejection } from './contentDraft'
 import { validateBlocks } from './contentBlocks'
 import { archivedAmong } from './contentMediaRelations'
 import { CONTENT_BLOCK_LABELS, CONTENT_LOCALE_LABELS, contentLocaleState } from '../../utils/contentCenter'
@@ -729,6 +729,8 @@ export async function executePublicationPlan(fetch: FetchFn, plan: PublicationPl
       completed++
     }
   } catch (err) {
+    // Review Fix 02 — Archive won the race; the database refused the rest of this plan.
+    if (isLifecycleGuardRejection(err)) failLifecycleChanged({ completedSteps: completed, totalSteps: plan.steps.length })
     if (completed === 0) throw err
     fail(500, plan.kind === 'publish'
       ? 'Publishing stopped part-way. Nothing new is public yet — publish again to finish.'

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { createError } from 'h3'
 import type { FetchFn } from './mediaLifecycle'
-import { assertJsonObject } from './contentDraft'
+import { assertJsonObject, failLifecycleChanged, isLifecycleGuardRejection } from './contentDraft'
 import { CONTENT_LOCALES, DEFAULT_CONTENT_LOCALE, isContentLocale, type ContentLocale } from '../../utils/contentLocales'
 import type {
   AdminContentLifecycle,
@@ -185,6 +185,8 @@ export async function executeLifecyclePlan(fetch: FetchFn, plan: LifecyclePlan):
       completed++
     }
   } catch (err) {
+    // Review Fix 02 — another Archive / Restore committed first; the database refused this one.
+    if (isLifecycleGuardRejection(err)) failLifecycleChanged({ completedSteps: completed, totalSteps: plan.steps.length })
     if (completed === 0) throw err
     fail(500, 'Restoring stopped part-way. The content is still archived and not public — reload and restore again to finish.', {
       partial: true, retryable: true, completedSteps: completed, totalSteps: plan.steps.length,

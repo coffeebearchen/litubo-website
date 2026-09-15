@@ -8,14 +8,14 @@
 
 ```text
 Latest accepted module:             CC-IMP-06 — Preview, Readiness & Publish（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · core 97bf4d8 + Review Fix 01 404ed94 · not pushed）
-Latest completed module:            CC-IMP-07 — Archive, Restore & Change History（TYPE A/B · A2 · LOCAL COMPLETE · awaiting controller / user visual sign-off）
-Active authorized module:           NONE（CC-IMP-07 已收口，等待下一份授权）
+Latest completed module:            CC-IMP-07 — Archive, Restore & Change History（TYPE A/B · A2 · LOCAL COMPLETE，含 Review Fix 02 PostgreSQL lifecycle concurrency guard · awaiting controller final acceptance）
+Active authorized module:           NONE（CC-IMP-07 Review Fix 02 已收口，等待下一份授权）
 Active module authorization level:  —
 Next candidate:                     CC-IMP-08 — Content AI Target & Source Intake（高风险模块：RSG-04 / RSG-06，须按 RELEASE-SAFETY-GATES.md 取证）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：404ed94）
-Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：76e77af）
+Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
 
@@ -9546,3 +9546,74 @@ Golden / Negative：G-19 生命周期侧（Archive → 不可发布；Restore �
 Blueprint / Freeze / RELEASE-SAFETY-GATES / D-033 / Charter / CLAUDE.md / Protocol / Decision Log 均未修改。Register：CC-05 Acceptance → `VISUALLY_VERIFIED`（规则 15）；CC-HIST Implementation → `AUTOMATED_CHECKED`、Acceptance `NOT_STARTED`（规则 16）。Node 实际 24.14.0，Node 22.22.2 Release Gate 仍 OPEN。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-07"任务中写入。*
+
+### Review Fix 02 — PostgreSQL Lifecycle Concurrency Guard（Controller 审查修正，2026-09-15）
+
+```text
+Status:                       COMPLETED（LOCAL COMPLETE）
+Authorization:                A2 LOCAL_IMPLEMENTATION（CC-IMP-07 REVIEW FIX 02 施工单）
+Base commit:                  76e77af4c27a83fa39f40dde8c78ff4dd4425d39
+Commit:                       fix(content): enforce lifecycle concurrency guards（本小节所在 commit）
+Lifecycle DB guard:           ACTIVE LOCALLY（7 个用户 trigger：原 revision guard + 6 个 lifecycle guard）
+Concurrency matrix:           PASS（真实 PostgreSQL，A–J + OG，19 / 19）
+Directus accountability:      PRESERVED（成功写入仍经 contentAdminFetch → Directus；被拒写入 activity 0 / revision 0）
+Production provisioning:      STILL OPEN（RELEASE-SAFETY-GATES §3A.8 已登记新 SQL）
+Schema / dependency:          0 collection / 0 column / 0 index / 0 package；新增 database-native function + trigger（已跟踪 SQL）
+Register:                     未修改（CC-HIST 仍 AUTOMATED_CHECKED / NOT_STARTED）
+P0 Violations:                NONE
+```
+
+本小节修正并取代上文"并发"条目中"Directus REST 无条件原子写，采用写前重读 + 指纹，无直接 SQL"的描述：Review Fix 01 复现了读写之间的 TOCTOU（归档后仍可被发布 / 编辑 / 改媒体 / 重复归档 / 重复恢复）。写前重读 + 指纹仍保留作为友好预检，**最终权威改为 PostgreSQL**（与 CC-IMP-01-FIX-01-R1 revision guard 同一模式）。上文"Schema / dependency: 0 / 0"对 CC-IMP-07 核心 commit 仍成立；本小节新增的是 database-native 对象。
+
+**SQL 工件：** `directus/schema/cc-imp-07-fix-02-lifecycle-guard.sql`（幂等、含验证查询与回滚顺序；Directus YAML 快照不捕获；应用顺序 constraints → revision guard → lifecycle guard）。本地已应用（两次应用验证幂等）；应用前四张内容表 pg_dump 备份存于会话 scratchpad（不入库）。
+
+**合同：**
+
+- `content_items` BEFORE UPDATE：archived 行只允许 Restore 形态（archived → draft、`archived_at` → null、`content_type` / `first_published_at` 不变、全部语言发布字段已清空），其余（Archived → Published、重复 Archive、空写）一律拒绝；`status = archived ⇔ archived_at IS NOT NULL`；Draft ↔ Published、Draft | Published → Archived 不变。Directus 审计字段（`date_updated` / `user_updated`）不计为业务字段。
+- `content_items` BEFORE UPDATE OF `archived_at`：只有 Archive / Restore 写 `archived_at`（静态测试保证）；对非 archived 条目写 `archived_at = null` 即过期 Restore → 拒绝（重复 Restore 的 item 步骤，无需新 schema marker）。
+- `content_item_locales` BEFORE INSERT / UPDATE：对父 item 取 `FOR SHARE`（与 item UPDATE 行锁互斥，真实锁测试证明两种顺序）；父 archived → 全部拒绝，唯一例外为 Restore 清空：`last_change_kind = restore`、working copy / `draft_revision` / `first_published_at` / locale / item 不变、发布字段全部置 null。过期 Unpublish（`unpublish`）/ Publish 被拒。
+- `content_item_locales` BEFORE UPDATE OF `last_change_kind`：写入 `restore` 标记要求父 item 仍 archived（重复 Restore 的语言步骤被拒）。
+- `content_items_files` / `content_relations` BEFORE INSERT / UPDATE / DELETE：对 OLD 与 NEW owner 取 `FOR SHARE`（按 id 顺序），任一 archived → 拒绝（含移入 / 移出）；只校验 owner，不新增关系目标规则；外键级联删除（`pg_trigger_depth() > 1`）不拦截。`content_item_locales` 无 BFF 删除入口，不设 DELETE guard。
+- 触发顺序：`content_item_locales_draft_revision_guard_trg` 按名称先于 lifecycle guard 执行；过期 revision 仍报 revision 冲突，正确 revision 在归档条目上报 lifecycle 拒绝（真实测试）。
+
+**错误合同：** SQLSTATE 23505、DETAIL `Key (content_lifecycle)=(…)`、TABLE、COLUMN `content_lifecycle`、消息前缀 `content_lifecycle_guard:`。INSERT / UPDATE：Directus 翻译为 `RECORD_NOT_UNIQUE`（field `content_lifecycle`，无同名列）。DELETE：Directus 不翻译，对管理员返回 knex 格式原始消息（`delete from … - content_lifecycle_guard: …`）——首次真实复测发现 BFF 只匹配消息开头，DELETE 返回 500；已修正为匹配该标记并以真实 Directus 复测 409。BFF（`isLifecycleGuardRejection` / `failLifecycleChanged`，`server/utils/contentDraft.ts`）在 Editor / Start locale / SEO（`writeOrConflict`）、OG 与 Media & Relations 执行器、Publication 执行器、Lifecycle 执行器中先于 slug / OG / 部分失败判断映射为 **409 `lifecycle_changed`**（已有写入步骤时附 `partial: true` 与步骤数），不再是 500。其他错误含义不变（revision 409、slug 409、503 部分失败 500）。
+
+**真实 PostgreSQL 并发矩阵（`tests/contentLifecycleGuardDbIntegration.test.ts`，两个独立 psql 连接 + 第三连接观察 `pg_stat_activity`，屏障确认后者真实阻塞于锁后再提交；TEST ONLY 负 id 夹具，前后清理）：**
+
+| 用例 | 胜者 | 败者（等待锁 / 被拒） | 败者错误 | 最终状态 |
+|---|---|---|---|---|
+| A1 Archive vs Publish（部分发布） | Archive（在 publish 语言步骤提交后） | Publish item 步骤 | 23505 `content_items … (archived)` | archived；en 快照保留但不可读；item 从未 published |
+| A2 Archive 先 | Archive | Publish 语言步骤（等锁） | 23505 `content_item_locales … (archived)` | archived；无快照 |
+| B1 Editor 先 | 两者串行 | 无 | — | archived；编辑保留（rev 2） |
+| B2 Archive 先 vs Editor | Archive | Editor（等父 FOR SHARE） | 23505 `(archived)`；过期 revision 仍为 revision guard | archived；标题 / revision 不变 |
+| C Archive vs SEO | Archive | SEO 保存 | 23505 `(archived)` | archived；SEO 不变（SEO 先则串行保留） |
+| D Archive vs Media | Archive | 链接新增（等锁）/ 更新 / 删除 / 移入移出 | 23505 `content_items_files … (archived)` | archived；链接不变 |
+| OG Archive vs Open Graph | Archive | OG 新增（等锁）/ 替换 / 移除 | 23505 `(archived)` | archived；OG 链接不变 |
+| E Archive vs Relations | Archive | 关系新增（等锁）/ 排序 / 删除 / 移入移出 | 23505 `content_relations … (archived)` | archived；关系不变；FK 级联仍可用 |
+| F Archive vs Start locale | Archive | 语言 INSERT（等锁） | 23505 `(archived)` | archived；无 pt 行 |
+| G Archive vs Unpublish | Archive | 非默认语言 Unpublish（等锁）/ 默认 item 步骤 / 迟到的语言清空 | 23505 `(archived)` | archived；快照保留至 Restore；Restore 例外的 4 种越界写法均被拒 |
+| H 重复 Archive | 第一个 Archive | 第二个 Archive（等锁） | 23505 `(archived)` | archived；`archived_at` 为胜者值 |
+| I1 重复 Restore（步骤交错） | 第一个 Restore | 第二个 item 步骤 | 23505 `(not_archived)` | draft；`archived_at` null；快照清空 |
+| I2 重复 Restore（顺序） | 第一个 Restore | 第二个语言步骤（marker guard） | 23505 `(not_archived)` | draft |
+| I3 Restore item 步骤竞争 | 第一个 Restore | 第二个（等锁）；快照未清空的 Restore 被拒 | 23505 `(not_archived)` / `(restore_before_publication_cleared)` | draft |
+| J Restore vs Editor | Restore | 归档期间的 Editor（等语言行锁） | 23505 `(archived)` | draft；等待 item 步骤的编辑在恢复后的 Draft 上成功 |
+
+另含：安装与触发顺序、错误传输（DETAIL / COLUMN / TABLE）、非归档条目正常 Draft / Published / 媒体 / 关系 / 语言 / 迁移全部照常、`status` ⇔ `archived_at` 一致性、归档条目与关系目标级联删除不受阻。SQL 层用例无 Directus，activity / revision 影响由下方真实 Directus 验证证明。
+
+**真实 Directus / BFF 验证（本地 dev，TEST ONLY 内容 4；脚本对 `content_items` 4 持 `FOR UPDATE` 行锁〔不写入〕，待 N 个 Directus 语句真实排队后提交，使并发顺序确定）：**
+
+- R1（3 个排队）：Archive → 200；重复 Archive → **409 `lifecycle_changed`**；Editor PATCH（UPDATE 路径）→ **409 `lifecycle_changed`**。activity 仅 1090（`content_items` update，dev@litubo.com）/ revision 仅 846；败者 0 / 0；locale revision 仍 1。
+- R2（3 个排队）：Archive → 200；OG 设置（INSERT 路径）→ **409 `lifecycle_changed`**；Media 解绑（DELETE 路径）→ 500（发现上述前缀匹配缺陷，数据仍 fail closed：链接 140 保留，activity 仅 1094 / revision 仅 850）。修正后 R2b（2 个排队）：Archive → 200；Media 解绑 → **409 `lifecycle_changed`**；activity 仅 1097 / revision 仅 853；链接保留。
+- 验证准备与清理均经 BFF（Restore、添加 / 移除 1 个 inline 链接）。自基线 1089 / 845 起全部 activity：`content_items` update 8、`content_item_locales` update 4、`content_items_files` create 1 / delete 1——均为成功的合法写入。
+
+**浏览器定向回归（375 级窄面板，新标签页）：** History 加载、console error 0；过期页面点击 Archive 确认 → 409 提示 "This content changed since the page was loaded. Reload to see its current state." + Reload（截图可辨认）→ Reload 显示 "Archived · Read only." 与 Restore to draft → 确认 Restore → "The content was restored to draft. It is not published."、Draft、Archive content 返回。该标签页 console 仅 1 条为故意触发的 409 网络响应记录；另开干净新标签页加载 History：console 0。无 UI 改动。
+
+**Safety Gates：** RSG-01 PROVEN（归档后迟到的 Publish item 迁移与语言发布被数据库拒绝，Archived → Published 不可能）· RSG-03 PROVEN（生命周期迁移只接受 Archive / Restore 形态，过期 / 重复 fail closed 409）· RSG-05 PROVEN（语言行写入受父锁串行化，Restore 例外只允许发布字段置 null）· RSG-07 PROVEN（路由面未变，被拒写入 0 写入、409 非 500）· RSG-08 PROVEN（仅本地库；production provisioning 仍 OPEN，§3A.8 已登记）· RSG-09 PROVEN（local commit only）· RSG-06 NOT_TOUCHED · RSG-02 NOT_YET_EXERCISED。P0 Violations：NONE。
+
+**测试：** 新增真实 PostgreSQL 并发套件 19 / 19；`tests/contentLifecycle.test.ts` 新增 guard 映射（Editor / SEO / Start locale / OG / SEO+OG 部分 / Media DELETE / Publish 部分 / 重复 Archive / Restore 部分 / 仅 marker 映射）与静态边界（只有 lifecycle 服务写 `archived_at` 与 restore 标记），30 / 30；`tests/contentPublicationDbIntegration.test.ts` 快照计数改为只统计非夹具行（与并行 DB 套件互不干扰）。全量 vitest（含真实 DB）70 files passed / 2 skipped，2558 passed / 45 skipped；revision guard 6 / 6；publish lifecycle 5 / 5；typecheck 0；lint 0；`nuxt build` Build complete；`git diff --check` 通过。
+
+**最终本地数据：** 内容 1 / 2 / 4 / 5 / 6 全部 draft；内容 4 `archived_at` null、0 链接 / 0 关系、en revision 1（`last_change_kind` restore）；负 id 夹具 0；非空快照 0；published 0；archived 0；`media_file_lifecycle` 20（未归档 2）不变；provider calls 0。
+
+**Governance：** RELEASE-SAFETY-GATES 仅 §3A.8 provisioning 登记新 SQL（P0 语义未改）。Blueprint / Freeze / Charter / Decision Log / D-033 / Protocol / CLAUDE.md / Register / MASTER-ROADMAP 未修改（Roadmap 已为 CC-IMP-08 NEXT — NOT AUTHORIZED）。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-07 Review Fix 02"任务中写入。*

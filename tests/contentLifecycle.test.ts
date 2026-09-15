@@ -13,7 +13,7 @@ import { join, relative } from 'node:path'
 import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createLocaleDraft, getContentDraft, listContentDrafts, updateLocaleDraft } from '../server/utils/contentDraft'
+import { createLocaleDraft, getContentDraft, isLifecycleGuardRejection, listContentDrafts, updateLocaleDraft } from '../server/utils/contentDraft'
 import { getContentMediaRelations, saveContentMediaRelations } from '../server/utils/contentMediaRelations'
 import { getContentPreviewPublish, publishContentLocale, unpublishContentLocale, type PublicationOptions } from '../server/utils/contentPublication'
 import { getContentSeoLocales, saveContentSeoLocales } from '../server/utils/contentSeoLocales'
@@ -74,6 +74,7 @@ class FakeDirectus {
   revisions: Array<Record<string, unknown>> = []
   writes: Array<{ method: string, path: string, body: unknown }> = []
   failWrite: RegExp | null = null
+  failWriteError: unknown = null
   private nextLocale = 30
 
   constructor() {
@@ -126,8 +127,10 @@ class FakeDirectus {
     if (method !== 'GET') {
       this.writes.push({ method, path: url.pathname, body: clone(body) })
       if (this.failWrite?.test(`${method} ${url.pathname}`)) {
+        const error = this.failWriteError ?? Object.assign(new Error('Directus unavailable'), { statusCode: 503 })
         this.failWrite = null
-        throw Object.assign(new Error('Directus unavailable'), { statusCode: 503 })
+        this.failWriteError = null
+        throw error
       }
     }
     const p = url.pathname
@@ -569,6 +572,115 @@ describe('static boundaries (RSG-03, RSG-04)', () => {
 
   it('the committed registry keeps every content type non-public', () => {
     for (const def of Object.values(CONTENT_TYPES)) expect(def.publicEnabled).toBe(false)
+  })
+
+  it('only the lifecycle service writes archived_at or the restore marker — the database restore guards rely on it', () => {
+    const contentServer = runtimeFiles.filter(f => f.startsWith('server/') && /content/i.test(f))
+    expect(contentServer.filter(f => /archived_at: (null|now)\b/.test(text(f)))).toEqual(['server/utils/contentLifecycle.ts'])
+    expect(contentServer.filter(f => /last_change_kind: 'restore'/.test(text(f)))).toEqual(['server/utils/contentLifecycle.ts'])
+  })
+})
+
+// ── Review Fix 02: database lifecycle guard rejections (RSG-01, RSG-03) ─────────────────
+
+const guardRejection = () => uniqueError('content_lifecycle')
+/** Directus does not translate DELETE errors; an administrator receives the raw database message as knex formats it. */
+const guardDeleteRejection = () => Object.assign(new Error('Internal'), {
+  statusCode: 500,
+  data: { errors: [{
+    message: 'delete from "content_items_files" where "id" in ($1) - content_lifecycle_guard: content_items_files rejected for content item 6 (archived)',
+    extensions: { code: 'INTERNAL_SERVER_ERROR' },
+  }] },
+})
+
+function rejectNextWrite(pattern: RegExp, error: unknown) {
+  db.failWrite = pattern
+  db.failWriteError = error
+}
+
+describe('Review Fix 02 — a write refused by the database lifecycle guard is 409 lifecycle_changed, never 500', () => {
+  // In each case the BFF read the item as draft and Archive (or another Restore) committed before this
+  // request's write reached PostgreSQL; the guard refused the write and nothing was stored.
+  it('Editor, SEO, Start locale and Open Graph', async () => {
+    rejectNextWrite(/^PATCH \/items\/content_item_locales\/20$/, guardRejection())
+    const editor = await rejection(updateLocaleDraft(db.fetch, ITEM, 'en', { expectedDraftRevision: 4, title: 'x' }))
+    expect(editor).toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed' } })
+    expect(editor.data.partial).toBeUndefined()
+
+    rejectNextWrite(/^PATCH \/items\/content_item_locales\/20$/, guardRejection())
+    expect(await rejection(saveContentSeoLocales(db.fetch, ITEM, { locale: 'en', expectedDraftRevision: 4, fields: { seo_title: 'x' } }, ['en'])))
+      .toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed' } })
+
+    rejectNextWrite(/^POST \/items\/content_item_locales$/, guardRejection())
+    expect(await rejection(createLocaleDraft(db.fetch, ITEM, { locale: 'pt', title: 'TEST ONLY PT', slug: 'test-only-pt' })))
+      .toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed' } })
+
+    const ogVersion = (await getContentSeoLocales(db.fetch, ITEM, ['en'])).og_version
+    rejectNextWrite(/^POST \/items\/content_items_files$/, guardRejection())
+    expect(await rejection(saveContentSeoLocales(db.fetch, ITEM, { locale: 'en', og_image: { directus_files_id: HERO, expectedOgVersion: ogVersion } }, ['en'])))
+      .toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed' } })
+
+    rejectNextWrite(/^POST \/items\/content_items_files$/, guardRejection())
+    expect(await rejection(saveContentSeoLocales(db.fetch, ITEM, {
+      locale: 'en', expectedDraftRevision: 4, fields: { seo_title: 'TEST ONLY SEO' }, og_image: { directus_files_id: HERO, expectedOgVersion: ogVersion },
+    }, ['en']))).toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed', partial: true, completedSteps: 1, totalSteps: 2 } })
+  })
+
+  it('Media & Relations: a refused DELETE (untranslated by Directus) is 409; after a saved step it is 409 partial', async () => {
+    const inventory = await getContentMediaRelations(db.fetch, ITEM)
+    const body = (heroAlt: string) => ({
+      expectedInventoryVersion: inventory.inventory_version,
+      media: inventory.media.filter(m => m.file_role !== 'download')
+        .map(m => ({ id: m.id, directus_files_id: m.directus_files_id, file_role: m.file_role, alt: m.file_role === 'hero' ? heroAlt : m.alt })),
+      relations: inventory.relations.map(r => ({ id: r.id, relation_kind: r.relation_kind, product_id: r.product?.id })),
+    })
+    rejectNextWrite(/^DELETE \/items\/content_items_files$/, guardDeleteRejection())
+    const first = await rejection(saveContentMediaRelations(db.fetch, ITEM, body('TEST ONLY hero alt')))
+    expect(first).toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed' } })
+    expect(first.data.partial).toBeUndefined()
+
+    rejectNextWrite(/^DELETE \/items\/content_items_files$/, guardDeleteRejection())
+    expect(await rejection(saveContentMediaRelations(db.fetch, ITEM, body('TEST ONLY hero alt v2'))))
+      .toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed', partial: true, completedSteps: 1, totalSteps: 2 } })
+  })
+
+  it('Publish: snapshot step saved, item step refused (Archive won) → 409 partial, not 500', async () => {
+    const options: PublicationOptions = { publishedLocales: ['en'], resolveType: publicRegistry() }
+    const review = await reviewed('en', options)
+    rejectNextWrite(new RegExp(`^PATCH /items/content_items/${ITEM}$`), guardRejection())
+    expect(await rejection(publishContentLocale(db.fetch, ITEM, 'en', review, { ...options, now: () => NOW })))
+      .toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed', partial: true, completedSteps: 1, totalSteps: 2 } })
+    expect(db.item.status).toBe('draft')
+  })
+
+  it('duplicate Archive and duplicate Restore refused by the guard are 409 lifecycle_changed, not 500 partial', async () => {
+    rejectNextWrite(new RegExp(`^PATCH /items/content_items/${ITEM}$`), guardRejection())
+    const duplicateArchive = await rejection(archive())
+    expect(duplicateArchive).toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed' } })
+    expect(duplicateArchive.data.partial).toBeUndefined()
+
+    await archive()
+    rejectNextWrite(new RegExp(`^PATCH /items/content_items/${ITEM}$`), guardRejection())
+    expect(await rejection(restore()))
+      .toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed', partial: true, completedSteps: 1, totalSteps: 2 } })
+    expect(db.item.status).toBe('archived')
+  })
+
+  it('only the guard marker maps to lifecycle_changed; revision, slug and unexpected errors keep their meaning', async () => {
+    expect(isLifecycleGuardRejection(guardRejection())).toBe(true)
+    expect(isLifecycleGuardRejection(guardDeleteRejection())).toBe(true)
+    expect(isLifecycleGuardRejection(uniqueError('draft_revision'))).toBe(false)
+    expect(isLifecycleGuardRejection(uniqueError('locale, slug'))).toBe(false)
+    expect(isLifecycleGuardRejection({ data: { errors: [{ message: 'An unexpected error occurred.', extensions: { code: 'INTERNAL_SERVER_ERROR' } }] } })).toBe(false)
+    expect(isLifecycleGuardRejection({ data: { errors: [{ message: 'content_lifecycle_guard: x', extensions: { code: 'FORBIDDEN' } }] } })).toBe(false)
+
+    rejectNextWrite(/^PATCH \/items\/content_item_locales\/20$/, uniqueError('draft_revision'))
+    expect(await rejection(updateLocaleDraft(db.fetch, ITEM, 'en', { expectedDraftRevision: 4, title: 'x' })))
+      .toMatchObject({ statusCode: 409, data: { currentDraftRevision: 4 } })
+
+    await archive()
+    db.failWrite = new RegExp(`^PATCH /items/content_items/${ITEM}$`)
+    expect(await rejection(restore())).toMatchObject({ statusCode: 500, data: { partial: true, retryable: true } })
   })
 })
 

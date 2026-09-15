@@ -219,7 +219,7 @@ media   = linked row enabled AND RSG-06
 
 ### 3A.8 Production Provisioning Contract（RSG-08）
 
-- Directus YAML schema snapshot（`directus/schema/*.yaml`）**不包含** `content_item_locales_draft_revision_guard` 函数与 `content_item_locales_draft_revision_guard_trg` 触发器；它们只存在于已跟踪的 SQL 工件 `directus/schema/cc-imp-01-fix-01-revision-guard.sql`。Content Foundation 的数据库约束另有已跟踪 SQL 工件 `directus/schema/cc-imp-01-constraints.sql`。
+- Directus YAML schema snapshot（`directus/schema/*.yaml`）**不包含** `content_item_locales_draft_revision_guard` 函数与 `content_item_locales_draft_revision_guard_trg` 触发器；它们只存在于已跟踪的 SQL 工件 `directus/schema/cc-imp-01-fix-01-revision-guard.sql`。Content Foundation 的数据库约束另有已跟踪 SQL 工件 `directus/schema/cc-imp-01-constraints.sql`。Content Center 生命周期并发 guard（`content_lifecycle_*` 函数与 `content_items_lifecycle_guard_trg`、`content_items_lifecycle_restore_guard_trg`、`content_item_locales_lifecycle_guard_trg`、`content_item_locales_lifecycle_marker_guard_trg`、`content_items_files_lifecycle_guard_trg`、`content_relations_lifecycle_guard_trg` 触发器）同样不在 YAML 快照中，只存在于已跟踪 SQL 工件 `directus/schema/cc-imp-07-fix-02-lifecycle-guard.sql`（CC-IMP-07 Review Fix 02；应用顺序：constraints → revision guard → lifecycle guard）。
 - 因此任何生产或新环境 provisioning 必须显式完成并留证：
   1. apply schema（Directus 快照）；
   2. apply tracked SQL（约束与 trigger / function）；

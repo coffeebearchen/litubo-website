@@ -123,7 +123,7 @@ describe.skipIf(!CONTAINER)('publish lifecycle — real PostgreSQL, TEST ONLY fi
 
   beforeAll(async () => {
     await psql(`DELETE FROM content_items WHERE id = ${ITEM_ID};`)
-    snapshotsBefore = await sqlOk('SELECT count(*) FROM content_item_locales WHERE published_snapshot IS NOT NULL;')
+    snapshotsBefore = await sqlOk('SELECT count(*) FROM content_item_locales WHERE published_snapshot IS NOT NULL AND content_items_id >= 0;')
     const blocks = JSON.stringify([
       { id: '0b6f0f8e-0000-4000-8000-000000000001', type: 'text', data: { heading: 'TEST ONLY intro', paragraphs: ['TEST ONLY paragraph.'] } },
       { id: '0b6f0f8e-0000-4000-8000-000000000002', type: 'faq', data: { items: [{ question: 'TEST ONLY question?', answer: 'TEST ONLY answer.' }] } },
@@ -140,7 +140,7 @@ describe.skipIf(!CONTAINER)('publish lifecycle — real PostgreSQL, TEST ONLY fi
     await psql(`DELETE FROM content_items WHERE id = ${ITEM_ID};`)
     const left = await psql(`SELECT count(*) FROM content_items WHERE id = ${ITEM_ID};`)
     expect(left.stdout.trim()).toBe('0')
-    const snapshotsAfter = await psql('SELECT count(*) FROM content_item_locales WHERE published_snapshot IS NOT NULL;')
+    const snapshotsAfter = await psql('SELECT count(*) FROM content_item_locales WHERE published_snapshot IS NOT NULL AND content_items_id >= 0;')
     expect(snapshotsAfter.stdout.trim()).toBe(snapshotsBefore)
     // The committed registry never changed.
     expect(Object.values(CONTENT_TYPES).every(def => def.publicEnabled === false)).toBe(true)

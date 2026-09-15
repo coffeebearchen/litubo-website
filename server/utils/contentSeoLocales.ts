@@ -6,7 +6,9 @@ import {
   assertJsonObject,
   commitLocaleDraftUpdate,
   getContentDraft,
+  failLifecycleChanged,
   getItemCore,
+  isLifecycleGuardRejection,
   prepareLocaleDraftUpdate,
   uniqueViolationField,
   type PreparedLocaleUpdate,
@@ -247,6 +249,9 @@ export async function saveContentSeoLocales(
       completed++
     }
   } catch (err) {
+    if (isLifecycleGuardRejection(err)) {
+      failLifecycleChanged({ completedSteps: (prepared ? 1 : 0) + completed, totalSteps: (prepared ? 1 : 0) + ogSteps.length })
+    }
     if (prepared || completed > 0) {
       fail(500, prepared && completed === 0
         ? 'Search settings were saved, but the Open Graph image was not. The image change is still staged — save again to retry.'

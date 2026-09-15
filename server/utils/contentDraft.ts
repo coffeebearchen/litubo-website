@@ -150,10 +150,40 @@ export function isDraftRevisionConflict(err: unknown): boolean {
   return uniqueViolationField(err) === DRAFT_REVISION_GUARD_FIELD
 }
 
+/**
+ * CC-IMP-07 Review Fix 02 — the database lifecycle guard
+ * (directus/schema/cc-imp-07-fix-02-lifecycle-guard.sql) rejects a write to an archived
+ * item and a stale Archive / Restore, atomically. Directus reports an INSERT / UPDATE
+ * rejection as RECORD_NOT_UNIQUE on the field `content_lifecycle` (no column has that
+ * name, so only the guard produces it). Directus does not translate DELETE errors: an
+ * administrator receives the raw database message, which knex prefixes with the SQL
+ * statement (`delete from "…" where … - content_lifecycle_guard: …`).
+ */
+export const LIFECYCLE_GUARD_FIELD = 'content_lifecycle'
+const LIFECYCLE_GUARD_MESSAGE_RE = /(?:^| - )content_lifecycle_guard: /
+
+export function isLifecycleGuardRejection(err: unknown): boolean {
+  if (uniqueViolationField(err) === LIFECYCLE_GUARD_FIELD) return true
+  const errors = (err as { data?: { errors?: Array<{ message?: unknown, extensions?: { code?: string } }> } })?.data?.errors
+  return Array.isArray(errors) && errors.some(e => e?.extensions?.code === 'INTERNAL_SERVER_ERROR'
+    && typeof e.message === 'string' && LIFECYCLE_GUARD_MESSAGE_RE.test(e.message))
+}
+
+/** 409 `lifecycle_changed`: the item was archived or restored by another request while this one was writing. */
+export function failLifecycleChanged(progress?: { completedSteps: number, totalSteps: number }): never {
+  if (progress && progress.completedSteps > 0) {
+    fail(409, 'This content was archived or restored while saving. Part of the change was saved and the rest was refused — reload to see its current state.', {
+      code: 'lifecycle_changed', partial: true, ...progress,
+    })
+  }
+  fail(409, 'This content was archived or restored by another action. Nothing was saved — reload to see its current state.', { code: 'lifecycle_changed' })
+}
+
 async function writeOrConflict<T>(write: Promise<T>): Promise<T> {
   try {
     return await write
   } catch (err) {
+    if (isLifecycleGuardRejection(err)) failLifecycleChanged()
     if (isDraftRevisionConflict(err)) throw err
     const field = uniqueViolationField(err)
     if (field !== null) {

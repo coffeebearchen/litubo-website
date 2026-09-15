@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { createError } from 'h3'
 import type { FetchFn } from './mediaLifecycle'
-import { assertJsonObject, uniqueViolationField } from './contentDraft'
+import { assertJsonObject, failLifecycleChanged, isLifecycleGuardRejection, uniqueViolationField } from './contentDraft'
 import { DEFAULT_CONTENT_LOCALE, isContentLocale, type ContentLocale } from '../../utils/contentLocales'
 import { validateContentRelationInput } from '../../utils/contentRelations'
 import {
@@ -544,6 +544,7 @@ export async function saveContentMediaRelations(fetch: FetchFn, itemId: number, 
       completed++
     }
   } catch (err) {
+    if (isLifecycleGuardRejection(err)) failLifecycleChanged({ completedSteps: completed, totalSteps: steps.length })
     const partial = completed > 0
     const data = { partial, completedSteps: completed, totalSteps: steps.length }
     if (partial) {
