@@ -41,26 +41,9 @@ useSeoHead({
   canonicalPath: '/',
 })
 
-const demoResources = [
-  {
-    tag: 'GUIDE',
-    title: 'What to look for in an X-ray inspection system',
-    excerpt: 'Key parameters and performance checklist for evaluating X-ray detection on your production line.',
-    to: '/resources',
-  },
-  {
-    tag: 'INSIGHT',
-    title: 'Managing false rejects: common causes and solutions',
-    excerpt: 'How to reduce costly product waste without compromising contaminant detection performance.',
-    to: '/resources',
-  },
-  {
-    tag: 'GUIDE',
-    title: 'Selecting the right checkweigher for your line',
-    excerpt: 'Speed, accuracy, and integration requirements — a practical guide to checkweigher selection.',
-    to: '/resources',
-  },
-]
+// "Latest from LITUBO" lists real published resources only (D-014). No public source feeds the home page yet, so
+// the section is not rendered. The hard-coded demo cards and their DEMO notice were removed (D-020, FINAL-RELEASE-FIX-D).
+const latestResources: { tag: string; title: string; excerpt: string; to: string }[] = []
 
 const faqQuestions = [
   'What contaminants can X-ray inspection detect?',
@@ -176,7 +159,7 @@ const faqQuestions = [
     </section>
 
     <!-- ─── Latest from LITUBO ────────────────────────── -->
-    <section class="home-latest section-gap section-alt" aria-label="Latest resources">
+    <section v-if="latestResources.length" class="home-latest section-gap section-alt" aria-label="Latest resources">
       <div class="container">
         <div class="home-latest__header">
           <h2 class="home-section-title">{{ t('pages.home.latestTitle') }}</h2>
@@ -187,10 +170,8 @@ const faqQuestions = [
             </svg>
           </NuxtLink>
         </div>
-        <!-- DEMO notice -->
-        <p class="demo-notice" aria-label="Demo content notice">{{ t('pages.home.demoNotice') }}</p>
         <div class="home-latest__grid">
-          <article v-for="item in demoResources" :key="item.title" class="resource-card">
+          <article v-for="item in latestResources" :key="item.title" class="resource-card">
             <NuxtLink :to="localePath(item.to)" class="resource-card__link">
               <div class="resource-card__photo" aria-hidden="true" />
               <div class="resource-card__body">
@@ -293,19 +274,6 @@ const faqQuestions = [
 }
 
 .home-all-link:hover { color: #b85f15; }
-
-.demo-notice {
-  display: inline-block;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--color-white);
-  background: #b85f15;
-  padding: 2px 8px;
-  border-radius: 2px;
-  margin-bottom: var(--space-6);
-}
 
 /* ─── Hero ─────────────────────────────────────────────── */
 .home-hero {

@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-FIX-B — Published TEST Data Cleanup + Release Guard（Controller 接受 · 12a45b6 · not pushed · P0-02 CLOSED）；FINAL-RELEASE-FIX-A 已接受（926be4d · P0-01 CLOSED）
-Latest completed module:            FINAL-RELEASE-FIX-C — Public Route Correctness + Locale Isolation + Fixture Fail-closed（A2 · LOCAL COMPLETE · P1-01 / P1-02 / P1-03 / P1-04 FIXED · 等待 Controller 审查）
-Active authorized module:           NONE（FINAL-RELEASE-FIX-C 已收口，等待 Controller 审查）
+Latest accepted module:             FINAL-RELEASE-FIX-C — Public Route Correctness + Locale Isolation + Fixture Fail-closed（Controller 接受 · 9a30b1b · not pushed · P1-01～P1-04 CLOSED）；FIX-A 926be4d、FIX-B 12a45b6 已接受
+Latest completed module:            FINAL-RELEASE-FIX-D — Public Business Truth + Production Presentation Cleanup（A2 · LOCAL COMPLETE · P1-05 FIXED · 等待 Controller 审查）
+Active authorized module:           NONE（FINAL-RELEASE-FIX-D 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；FINAL-RELEASE-FIX-D NOT AUTHORIZED）
+Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-04 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：12a45b6）
+Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：9a30b1b）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10145,3 +10145,77 @@ Next candidate:                 NONE — 等待 Controller（FINAL-RELEASE-FIX-D
 - 本地没有 published 产品 / Technical Guide / FAQ，有效详情页的 200 未能用真实数据演示。
 
 *最后更新：2026-09-16，由 Claude Code 在"FINAL-RELEASE-FIX-C"任务中写入。*
+
+---
+
+## FINAL-RELEASE-FIX-D — Public Business Truth + Production Presentation Cleanup（2026-09-16）
+
+```text
+Module:                         FINAL-RELEASE-FIX-D — Public Business Truth + Production Presentation Cleanup（仅处理 FINAL-RELEASE-AUDIT-01 P1-05 与首页 DEMO 提示）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller 施工单）
+Branch:                         review/final-release-fix-d-public-truth-01（基线 9a30b1b；FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b 均已由 Controller 接受）
+Status:                         LOCAL COMPLETE · P1-05 FIXED · 等待 Controller 审查
+Business truth rule:            仓库内无明确业务确认或已验证正式资料 → 不公开；不猜测，不替换成其他未确认声明，不新写营销文案
+Evidence for certifications:    NONE（仓库文档、public/images/certifications、assets/source、Media Library 均无证书文件或业务确认）
+Decision:                       无新增（CLAUDE.md "Do not invent … certifications"、D-008、D-014、D-020 已覆盖；下一个空闲 ID 仍为 D-036）
+Schema / permissions / data:    未修改（DB 写入 0；Media Library 只做只读查询）
+Safety gates touched:           RSG-01（内部说明 / 未审核文字不公开）· RSG-08（DEMO 内容不进入生产公开输出）· RSG-09
+MASTER-ROADMAP:                 未修改
+Push / merge / deploy:          NONE
+Remaining P1:                   P1-06～P1-17（本模块未处理）
+Next candidate:                 NONE — 等待 Controller（下一模块 NOT AUTHORIZED）
+```
+
+**修改前清点（源码 + dev server 实际渲染，只读）：**
+- 首页 `pages/index.vue`：`<p class="demo-notice" aria-label="Demo content notice">` 渲染 `pages.home.demoNotice`（en 为 "DEMO — NOT FOR PUBLIC"，es / pt 为 TODO_TRANSLATION），标注 "Latest from LITUBO" 下 3 张写死的 demo 资源卡片（"What to look for in an X-ray inspection system"、"Managing false rejects: common causes and solutions"、"Selecting the right checkweigher for your line"，都链接到 `/resources`，没有对应的真实内容）。两者都来自 commit 6c13940（2026-09-01 视觉母版），`docs/IMAGE-ASSET-LIST.md` 也把这三张卡片标为 DEMO。用户可见：是（FIX-C 实测，生产构建三种 CMS 模式下都出现）。
+- Quality & Manufacturing `pages/company/quality-manufacturing.vue`（来自 commit 2a008f9）：
+  - 认证：`certSlots` 渲染 ISO 9001、CE Marking、FDA Compliance、HACCP Ready 四个标签（img alt 同名）；图片 `/images/certifications/cert-*.jpg` 都不存在（目录只有 `.gitkeep`），加载失败后显示灰色占位块。
+  - 内部施工说明："Certification documentation is being updated. Images below are placeholder slots — supply certificate scans or official badge artwork."
+  - 合规声明：hero 副标题 "… inspection systems that meet international food-safety standards."
+  - 设施 / 流程陈述："Each LITUBO system is assembled, tested and validated at our facility in Kunshan, Jiangsu Province. Production processes are documented and follow defined quality control checkpoints at every stage — from component incoming inspection through final functional testing before despatch."；"Production environment at LITUBO's Kunshan facility. Photography coming soon."；图片 alt "Quality and testing laboratory"、"LITUBO production facility"（两张图片都不存在）。
+  - 占位与文档陈述："Detailed manufacturing and quality documentation is being prepared for this page."；"For technical specifications or compliance documentation relevant to a specific product, please contact our team."
+  - 整页请求 6 张不存在的图片。
+
+**证据核对：** CURRENT-STATE 全文（分 5 段并行完整读取）、`08-decision-log.md`、PROJECT-EXECUTION-PROTOCOL、RELEASE-SAFETY-GATES、`CLAUDE.md` 以及另外 49 个已跟踪文档，都没有任何认证或设施 / 质量流程的业务确认。只有规划性引用：`docs/IMAGE-ASSET-LIST.md` 的 cert-*.jpg 素材需求、`docs/MEDIA-LIBRARY-GUIDE.md` 的 certifications 目录说明、`docs/ADMIN-CMS-SPEC.md` §6.3 Certificates 模块的验收示例（"替换 ISO 9001 证书扫描件"）——都是素材或功能规划，不是业务确认。`docs/content/contact-information-draft.md` 中的法定名称与昆山地址写明 "confirmed for development use … must be verified by management before live deployment"，并规定地址只出现在 Footer 与 About 页。`assets/source/` 各子目录为空；`public/images/certifications/` 只有 `.gitkeep`。Media Library 只读查询：名称含 certif 的目录 1 个（`certifications`，conflict-frozen），证书类文件 0 个，`products_files` 中 `file_role = certificate` 0 行。
+
+**修复：**
+- 首页：移除 DEMO 提示（模板、`.demo-notice` 样式、en / es / pt 的 `pages.home.demoNotice` 键）和 3 张写死的 demo 卡片。"Latest from LITUBO" 保留原有结构，但只列真实已发布资源（`latestResources`，目前为空，D-014）；没有条目时整个区块不渲染。fixture 架构、Hero（`site_content`）、FAQ 预告、CTA 均未改。
+- Quality & Manufacturing：移除认证区块（四个标签、四个图片位、内部施工说明）、hero 副标题中的合规从句、设施 / 流程段落、"being prepared" 占位句、"Production Facility" 区块（设施说明 + "Photography coming soon"）以及两个指向不存在图片的 img；文档句删去 "or compliance documentation"。保留：面包屑、标题、hero 副标题 "Our design and manufacturing processes are engineered to produce reliable, high-performance inspection systems."（通用定位，不含认证、标准、地点或流程事实）、"For technical specifications relevant to a specific product, please contact our team."（有 D-012 技术支持 / 手册请求与 D-017 联系表单支撑）、CTA。没有新增任何文案、图片、徽章或证书。
+
+**测试：** 新增 `tests/publicBusinessTruth.test.ts`（10 项，静态源码检查）：
+- 首页模板无 DEMO / NOT FOR PUBLIC，无 demo 卡片与 demoNotice，Latest 区块只在有真实条目时渲染；三个 locale 文件都没有 demoNotice。
+- Quality 模板没有认证 / 合规 / 标准措辞、施工说明、占位句、设施与流程陈述，仍渲染标题、联系路径和 CTA。
+- `public/images/certifications` 没有证书文件；公开页面、组件、布局和英文文案不引用认证图片。
+- 公开页面、组件、布局、app.vue、error.vue、en.json 中没有 NOT FOR PUBLIC、TEST ONLY 或施工说明标记。
+- FIX-C 的 `tests/publicRouteCorrectness.test.ts` 21 项同时通过。
+
+**验证：**
+- 定向：`tests/publicBusinessTruth.test.ts` 10/10，`tests/publicRouteCorrectness.test.ts` 21/21。
+- 全量（`CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run --no-file-parallelism`）：81 files passed / 2 skipped，2822 passed / 45 skipped，0 failed，117.66 s（FIX-C 基线 80 files / 2812 passed，新增 1 个文件 10 项）。
+- 串行门禁（全量之后）：`npm run release:check-test-data` PASS（exit 0）；typecheck 0 error；lint 0 error；`npm run build` Build complete；`git diff --check` 通过（暂存后 `git diff --cached --check` 另行复核）。
+- 本机 Node v24.14.0（`.nvmrc` 为 22.22.2，Node 22 合同仍 OPEN，P1-10）。
+
+**真实 HTTP（dev server，修改后）：** `/` 与 `/company/quality-manufacturing` 均为 200。可见文本（去掉 script / style，并计入 alt / title / aria-label）中，DEMO、NOT FOR PUBLIC、TEST ONLY、NOT FOR PUBLICATION、TODO_CONTENT、ISO 9001、CE Marking、FDA、HACCP、supply certificate、badge artwork、coming soon、being prepared 全部为 0。修改前首页 DEMO × 2，Quality 页四个认证标签各 × 2、施工说明 × 1、合规声明 × 1。
+
+**浏览器验收：** dev server 稳定后新开标签页，1440 与 375：首页 200，区块为 hero / path / faq / cta（Latest 区块不渲染），无标记；Quality 页 200，区块为 hero / 联系句 / CTA，图片请求 0（修改前请求 6 张不存在的图片）。`scrollWidth = clientWidth`（1440：1425 / 1425；375：375 / 375），损坏图片 0，console error 0，hydration 消息 0。375 截图可辨认；1440 截图在面板中缩放后不可辨认，以 DOM 几何取证。视口已重置。
+
+**Release Safety Gates：**
+- RSG-01：Quality 页的内部施工说明与未经确认的认证 / 合规 / 设施 / 流程陈述已从公开输出移除（本地范围，静态测试 + 实页检查）。
+- RSG-08：首页 DEMO 提示与 demo 卡片已从公开输出移除；FIX-C 的 CMS 模式 fail closed 未改。
+- RSG-09：无 push / merge / deploy。
+- 已按事实更新 `RELEASE-SAFETY-GATES.md` §4.3 的 RSG-01、RSG-08 行（状态列不变）。P0 Violations：NONE。
+- 施工单未列出 Gate；按 RELEASE-SAFETY-GATES §0.2，修改公开页面属于 Public Delivery 领域。本模块的 Gate 声明在修改开始后才补齐，如实记录。
+
+**Additional public findings（未修改，交 Controller）：**
+- `/company/about`：未经业务确认的陈述，例如 "LITUBO is a global manufacturer … headquartered in Kunshan"、"serves distributors and end-users across Asia, Europe, the Americas and beyond"、"… required by food retailers, regulators and HACCP programmes"、"IP-rated enclosures, stainless steel construction, and redundant detection channels"、"A distributor network across multiple regions …"。公司名称与地址来自 `contact-information-draft.md`，上线前须管理层核实。
+- `/company/global-service`：分销网络、工厂培训工程师、备件库存、随机手册等服务陈述未经确认；页面显示 "Distribution coverage map being prepared."（图片缺失时另显示 "Global coverage map — image coming soon"）。
+- 首页 FAQ 预告的 6 个写死问题都链接到 `/support/faq`，而目前没有已发布的 FAQ。
+- `/es`、`/pt` 下的静态页面（首页、Company 页等）渲染 TODO_TRANSLATION（首页 59 处，noindex）；locale 架构不在本模块范围。
+- Applications（D-035 保持现状，未修改）：页面可见输出没有 DEMO / TEST ONLY / NOT FOR PUBLICATION / TODO_CONTENT 标记，但内容仍来自 DEMO fixtures（`useContentAdapter`），推荐产品分类也是 fixture 数据。
+
+**已知 / 记录：**
+- 本模块开始时 Docker Desktop 未运行（`com.docker.service` 为 Stopped，dev server 与浏览器标签页也已不存在）。已启动 Docker Desktop（用户同时确认已启动）；容器恢复后 Directus ping 为 pong，`directus_permissions_verify: OK`。
+- Quality 页现在内容较少；要恢复更丰富的质量 / 制造内容或展示证书，需要业务方提供并确认资料（证书按 D-003 放在 Resources > Downloads）。
+- 首页 `cmsText()` 的 `|| obj.en` 回退（RSG-05 OPEN）与 P2-06 均未改。
+
+*最后更新：2026-09-16，由 Claude Code 在"FINAL-RELEASE-FIX-D"任务中写入。*
