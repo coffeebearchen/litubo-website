@@ -14,7 +14,7 @@ Active module authorization level:  —
 Next candidate:                     CC-IMP-06 — Preview, Readiness & Publish（高风险模块：须按 RELEASE-SAFETY-GATES.md 取证）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：7682193）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：a43c10a）
 Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9291,7 +9291,33 @@ Next candidate authorized: NO
 ### Governance
 
 - Charter / Decision Log / Content Center Freeze / Content Center Blueprint / Implementation Blueprint：未修改。
-- Decision Log 未新增：Safety Gates 是对既有 Charter / Decision / Blueprint 边界的收拢与证据合同，不是新的架构决定；其权威入口由 CLAUDE.md 与协议 §12.1 固定。
+- Decision Log：首个 commit（`a43c10a`）未新增；随后 Controller 裁定新增 D-033，见下方 Delta completion。
 - 未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
 
-*最后更新：2026-09-15，由 Claude Code 在"RELEASE-SAFETY-GATES-01"任务中写入。*
+### Delta completion（Plan A，同分支追加 commit，2026-09-15）
+
+完整版施工单以 `76821936` 为基线，与已提交的 `a43c10a` 不符而 STOP；Controller 授权方案 A：以 `a43c10a` 为新基线，在 `review/release-safety-gates-01` 上追加一个本地 commit（不 reset、不 amend、不重建文件），补齐 12 项差距：
+
+- `RELEASE-SAFETY-GATES.md`：HARD SAFETY CONTRACT 地位与"不得削弱 / 不得发明例外 / 冲突 STOP"；§0.4 Safe Autopilot 三方职责与执行模型；Public Eligibility 显式补入 not archived 与 "noindex ≠ unpublished"；§3A 配套硬性条款（Public DTO Allowlist、Sitemap、Search、Related Rendering、Readiness、Runtime Layout Changes Must Not Weaken Gates、Frontend Is Not Security Authority、Production Provisioning）；§4.1 Gate Contract Matrix（Gate / Risk / Must never happen / Required evidence / Primary modules）与 §4.2 Module Mapping（CC-IMP-05 / 06 / 07 / 08 / 09 / 10 / FINAL-RELEASE-AUDIT）；Golden Path 补齐 AI Source → Proposal → Human Review → Apply（G-01～G-14，延续 G-15～G-19）与 §5.5 Final Release Audit 真实跑通要求；Negative Path 新增 N-21～N-24 并收紧 N-02 / N-08 / N-11；§7 开工未识别 Gate 不得实现、P0 Violations 须为 NONE 才能 PASS。
+- **Production provisioning 登记：** Directus YAML 快照不含 `content_item_locales_draft_revision_guard` 函数与 `content_item_locales_draft_revision_guard_trg` 触发器（已静态核实），生产 / 新环境必须显式应用 `directus/schema/cc-imp-01-fix-01-revision-guard.sql` 与约束 SQL 并验证。
+- **Decision Log：** 核实最新为 D-032 后新增 **D-033 — Repository-Governed Safe Autopilot and Mandatory Release Safety Gates**（只记录长期治理原则，不复制 Gate 全文）。
+
+```text
+RELEASE-SAFETY-GATES-01:              COMPLETE
+Release Safety Contract:              ACTIVE（HARD SAFETY CONTRACT）
+Safe Autopilot method:                FROZEN（D-033）
+Claude mandatory auto-read:           ACTIVE
+High-risk module gate declaration:    REQUIRED
+High-risk closeout evidence:          REQUIRED
+P0 weakening:                         PROHIBITED
+Claude:                               repository executor
+GPT / Codex:                          controller + independent reviewer
+User:                                 business / visual / inter-module / release authorization
+Runtime changes:                      0
+Next candidate:                       CC-IMP-06 — NOT AUTHORIZED
+Production:                           NOT APPROVED
+```
+
+Charter / Content Center Freeze / Content Center Blueprint / Implementation Blueprint / CLAUDE.md / 协议 / 模板在本次补齐中均未修改；0 runtime、0 schema、0 API、0 UI、0 DB；未 push。
+
+*最后更新：2026-09-15，由 Claude Code 在"RELEASE-SAFETY-GATES-01 Delta completion"任务中写入。*

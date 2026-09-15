@@ -1,7 +1,8 @@
 # LITUBO — Release Safety Gates
 
-> **状态：** ACTIVE（`RELEASE-SAFETY-GATES-01`，TYPE C · A1 GOVERNANCE_DOCS，用户 / Controller 授权，2026-09-15）
-> **角色：** 全项目唯一 canonical 的公开安全红线与高风险模块证据合同。定义 P0 Safety Gate、Gate 矩阵、Golden Path E2E 合同与 Negative Safety Path 合同。
+> **状态：** ACTIVE（`RELEASE-SAFETY-GATES-01`，TYPE C · A1 GOVERNANCE_DOCS，用户 / Controller 授权，2026-09-15；同日 Delta completion（Plan A）补齐；长期治理决定见 `08-decision-log.md` D-033）
+> **地位：** **HARD SAFETY CONTRACT**（硬性安全合同）——不是参考、建议或最佳实践。
+> **角色：** 全项目唯一 canonical 的公开安全红线与高风险模块证据合同。定义 Safe Autopilot 方法、P0 Safety Gate、配套硬性条款、Gate 矩阵、Golden Path E2E 合同与 Negative Safety Path 合同。
 > **Runtime effect：** none。本文件不创建、不修改任何路由、API、权限、数据库、Directus、AI、媒体或发布行为，也不关闭任何现有 Gate。
 
 ---
@@ -12,7 +13,9 @@
 
 - 受 `docs/project/ADMIN-CMS-GOVERNING-CHARTER-V1.md`（V1.1）约束；**不修改 Charter**。本文件把 Charter、Decision Log、Content Center Freeze / Blueprint、`PROJECT-EXECUTION-PROTOCOL.md` 中已经存在的公开安全边界，收拢为一份可逐项证明的清单。
 - 与 Charter / Decision / Freeze / Blueprint / 施工单同时适用时，**以更严格者为准**。
-- 施工单、Blueprint 细化、模块报告**不得削弱**任何 Gate；只允许增加更严格的证据要求。
+- 本文件是 **HARD SAFETY CONTRACT**。Work Order、Blueprint 细化、implementation、runtime convenience（实现便利）与模块报告**都不得削弱**任何 Gate，也**不得降低** Gate 的标准或证据要求；只允许增加更严格的证据要求。
+- **不得自行发明例外。** 本文件没有写明的例外就不存在；"这次先放宽""临时绕过""只是本地"都不构成例外。
+- 若 Blueprint、implementation、Work Order 或 runtime 方案与任一 P0 Gate 冲突：**STOP · REPORT TO CONTROLLER · DO NOT WEAKEN THE GATE · DO NOT INVENT AN EXCEPTION**。
 - 若本文件与 Charter / Blueprint 出现无法按职责边界解释的实质冲突：**STOP · REPORT · DO NOT GUESS**（协议 §3.7），不得自行削弱 Gate 或改变方向。
 - 修改、放宽或删除 Gate，只能由用户 / Controller 明确授权的 TYPE C 治理模块进行（§9）。
 
@@ -44,6 +47,24 @@
 | `VIOLATED` | 证据显示 Gate 被破坏 → P0 → STOP |
 
 `PROVEN` 只对证据覆盖的范围有效。功能签收 ≠ Gate 关闭 ≠ 生产发布批准。
+
+### 0.4 Safe Autopilot 方法（冻结，D-033）
+
+| 角色 | 职责 |
+|---|---|
+| **Claude** | repository executor：在授权模块内读取、施工、验证、治理收口、本地 commit、输出证据报告 |
+| **GPT / Codex** | controller + independent reviewer：编排、施工单、风险控制、独立审查 Claude 的报告与证据 |
+| **User** | business decision · visual approval · inter-module authorization · release authorization（push / merge / deploy） |
+
+```text
+Within one explicitly authorized module:  AUTOPILOT
+Between modules:                          HUMAN AUTHORIZATION REQUIRED
+
+成功模块：implement → validate → governance closeout → local commit → evidence report → STOP
+```
+
+- 不得自行进入 Next Candidate；Roadmap / CURRENT-STATE 中的 Next Candidate 不是授权。
+- 自动驾驶只减少模块内的逐步确认，不降低任何 Gate，也不提升授权等级（协议 §6、§8）。
 
 ---
 
@@ -120,8 +141,9 @@
 ```text
 eligible(item, locale) =
       item.status = 'published'
-  AND locale_row.published_snapshot IS NOT NULL
-  AND locale ∈ runtimeConfig.public.publishedLocales
+  AND item is not archived（status ≠ 'archived'，显式要求）
+  AND requested locale row has its own published_snapshot（IS NOT NULL）
+  AND requested locale ∈ runtimeConfig.public.publishedLocales
   AND contentTypes[item.content_type].publicEnabled = true
   AND (locale = default OR default locale is published)
 
@@ -131,6 +153,8 @@ files in output    = RSG-06
 relations rendered = target itself eligible in the same locale（产品目标：product status = published）
 archived / unpublished / restored-not-republished → not eligible
 ```
+
+**noindex ≠ unpublished。** `noindex = true` 只影响 sitemap 与 indexing eligibility（robots noindex、sitemap / search 排除）；它不改变内容是否已发布，已发布且 noindex 的页面仍按资格合同正常解析。
 
 ### 3.2 Products（Charter E.5 / G.1，产品公开切换 J-10 前须统一）
 
@@ -152,7 +176,92 @@ media   = linked row enabled AND RSG-06
 
 ---
 
-## 4. Safety Gate Matrix（仓库事实，2026-09-15）
+## 3A. 配套硬性条款
+
+### 3A.1 Public DTO Allowlist（RSG-01、RSG-07）
+
+- Public BFF / public API 的每个响应必须经 **explicit allowlist mapping** 构造：逐字段列出允许输出的键。
+- 禁止：直接返回 Directus 原始记录（raw record passthrough）；对 Directus 行做对象展开（object spread）；因新增字段而意外输出内部字段。
+- 测试必须证明公开 payload 不包含：Draft-only 数据（working copy 字段）、AI Proposal、Sources / 来源文档、History / Revisions、内部 readiness / review 状态、admin 元数据、内部 Directus 字段（如 `user_created`、`draft_revision`、`last_change_kind`、路由不需要的内部 id）。
+- 新增公开字段必须同时更新 allowlist 与对应测试。
+
+### 3A.2 Sitemap Contract（RSG-02）
+
+- Sitemap 只能使用 Public Eligibility semantics（§3）；在其上只可收窄（排除 noindex、非 sitemap-eligible 类型），不得放宽。
+- 不得从所有内容行、所有语言行或 working copy 直接生成。
+- Unpublish、Archive、Restore 后，条目通过同一判定自动移出 sitemap，不依赖人工清理。
+
+### 3A.3 Search Contract（RSG-02、RSG-05）
+
+- 若存在站内搜索、外部索引推送或 feed：不得索引 Draft、Archived、noindex、未发布语言、非 public 内容类型；资格判定同 §3。
+
+### 3A.4 Related Rendering Contract（RSG-01、RSG-02）
+
+- 后台关系可以引用 Draft 或未发布目标。
+- 公开侧只能渲染本身符合 public eligibility 的目标：内容目标按 §3.1（同一语言），产品目标按 §3.2。不符合的目标不渲染，且不得泄露其标题、slug 或存在性。
+
+### 3A.5 Readiness Contract（RSG-03）
+
+- Readiness 是确定性的人工辅助检查清单，不是自动发布决定、AI 评分或百分比。Hard / Soft 规则引用 Content Center Blueprint §21，本文件不重新设计。
+- Hard blocker 未通过 → Publish 必须由服务端拒绝（发布时服务端重新计算，不信任客户端结果）。
+- Soft warning → 只提示，不得改变 public state。
+- Readiness PASS ≠ Publish：全部通过仍必须由人工明确发布。
+
+### 3A.6 Runtime Layout Changes Must Not Weaken Gates
+
+- 颜色、按钮位置、卡片布局、移动端布局、区块顺序可以改变；UI 改动不得成为任何 Gate 的唯一实现，也不得改变 Gate 结果。
+- 关键 Gate 必须由服务端、数据库约束、权限、公开查询与自动化测试保证。
+
+### 3A.7 Frontend Is Not Security Authority
+
+- hidden UI、disabled button、client validation **不能替代** server authorization、server validation、DB constraints、permissions、public query。
+- UI 中被禁用或隐藏的每个危险动作，服务端都必须独立拒绝，并有伪造请求（crafted request）的测试或真实验证。
+
+### 3A.8 Production Provisioning Contract（RSG-08）
+
+- Directus YAML schema snapshot（`directus/schema/*.yaml`）**不包含** `content_item_locales_draft_revision_guard` 函数与 `content_item_locales_draft_revision_guard_trg` 触发器；它们只存在于已跟踪的 SQL 工件 `directus/schema/cc-imp-01-fix-01-revision-guard.sql`。Content Foundation 的数据库约束另有已跟踪 SQL 工件 `directus/schema/cc-imp-01-constraints.sql`。
+- 因此任何生产或新环境 provisioning 必须显式完成并留证：
+  1. apply schema（Directus 快照）；
+  2. apply tracked SQL（约束与 trigger / function）；
+  3. verify trigger / function 与约束实际存在；
+  4. verify permissions（含 `nuxt-server` 最小字段 / 行权限，RSG-07）；
+  5. verify supported Node runtime（22.22.2，`.nvmrc` / `engines`）；
+  6. verify dependencies（生产依赖安装；许可证 / CVE 审查按 Open Release Gates）；
+  7. backup（变更前可恢复的备份）；
+  8. rollback plan（书面回滚步骤）。
+- Local schema success 不是 Production proof：本地通过的迁移、触发器或权限不得被推定已存在于生产。
+
+---
+
+## 4. Safety Gate Matrix
+
+### 4.1 Gate Contract Matrix
+
+| Gate | Risk | Must never happen | Required evidence | Primary modules |
+|---|---|---|---|---|
+| RSG-01 Draft Never Public | 未审核文字或内部资料公开 | Draft / working copy / 归档内容 / Proposal / Sources / History 出现在任何公开出口 | N-01～N-05、N-17；§3A.1 allowlist 测试；G-13 | CC-IMP-06、CC-IMP-10、FINAL-RELEASE-AUDIT |
+| RSG-02 Single Public Eligibility Contract | 页面、sitemap、搜索规则漂移 | 任一公开出口使用比 §3 更宽或不同的判定 | 共享判定或等价性测试；N-01、N-03、N-04、N-16；G-14 | CC-IMP-10、FINAL-RELEASE-AUDIT |
+| RSG-03 Human-only Publish | 自动或越权发布 | Save、AI、Apply、Readiness、脚本创建或更新发布快照 | N-06～N-08、N-13、N-14；readiness 服务端重算测试；G-11、G-12 | CC-IMP-06、CC-IMP-07、FINAL-RELEASE-AUDIT |
+| RSG-04 AI Applies to Draft Only | AI 越过 Draft / Publish 边界 | AI 写快照或 status、调用发布、改变 sitemap / 权限 / 媒体公开性 | N-06、N-21～N-23；proposal binding 测试（Blueprint §18）；G-06～G-09 | CC-IMP-08、CC-IMP-09、FINAL-RELEASE-AUDIT |
+| RSG-05 Locale Independent, No Fallback | 未审核译文公开或错语言内容 | 发布默认语言连带发布译文；缺失语言回退显示其他语言 | N-09、N-10、N-22；G-17 | CC-IMP-05（Locale / SEO foundation）、CC-IMP-06、CC-IMP-10、FINAL-RELEASE-AUDIT |
+| RSG-06 Public Media Eligibility | 私有或已归档文件公开 | 公开输出 `is_public = false`、已归档、未启用或 `source_document` 文件；新链接已归档文件 | N-11、N-24；公开媒体代理归档检查测试 | CC-IMP-06、CC-IMP-10、FINAL-RELEASE-AUDIT |
+| RSG-07 Permissions Fail Closed | 越权读写或字段泄露 | 未明确授权即可访问；公开身份可读 working copy 整表；前端隐藏代替服务端拒绝 | N-12～N-15、N-18；§3A.1、§3A.7 | CC-IMP-10、FINAL-RELEASE-AUDIT |
+| RSG-08 Environment Separation | 本地结果被当作生产事实 | 本地 schema / trigger / 数据被推定已在生产；生产被用于测试 | §3A.8 provisioning 证据；Open Release Gates；N-17、N-18 | TYPE D Release、FINAL-RELEASE-AUDIT |
+| RSG-09 Release Layering | 未授权 push / merge / deploy | 授权自动升级；把"继续"当作 push / deploy | N-19；报告分列 local HEAD / checkpoint / `origin/master` | 所有模块、FINAL-RELEASE-AUDIT |
+
+### 4.2 Module Mapping
+
+| 模块 | 触及 Gate | 要求 |
+|---|---|---|
+| CC-IMP-05 SEO & Locales | RSG-05 基础（语言行独立、无回退、服务端 slug 锁） | 已完成；Locale / SEO foundation only，不含公开发布 |
+| CC-IMP-06 Preview, Readiness & Publish | RSG-01、RSG-02、RSG-03、RSG-05、RSG-06、RSG-07 | **MANDATORY GATES** |
+| CC-IMP-07 Archive, Restore & History | RSG-01、RSG-03 | 按 §7 声明与取证 |
+| CC-IMP-08 AI Source Intake / Target | RSG-04、RSG-06（归档来源排除） | **MANDATORY GATES** |
+| CC-IMP-09 AI Proposal Review / Apply | RSG-03、RSG-04、RSG-05 | **MANDATORY GATES** |
+| CC-IMP-10 Public Delivery & Sitemap | RSG-01、RSG-02、RSG-05、RSG-06、RSG-07 | **MANDATORY GATES** |
+| FINAL-RELEASE-AUDIT | RSG-01～RSG-09 | **ALL GATES**；§5.5 真实 Golden Path |
+
+### 4.3 当前事实与状态（仓库事实，2026-09-15）
 
 "当前事实"只记录静态读取可证实的内容；未验证项写 OPEN，不推测。
 
@@ -181,24 +290,38 @@ Golden Path 证明"正确的人工流程确实能让合格内容公开，并能�
 - 若需要在本地开发库让一条记录真实进入 Published，必须：施工单明确授权、记录为 `TEST ONLY — NOT FOR PUBLICATION`、只存在于本地、同一次运行内撤回并清理、报告复核快照 / 状态已恢复。这不改变 Charter G.5（TEST ONLY 产品不得进入 published）与协议 §12（未验证数据不得进入 Published 或公开输出）对产品与真实环境的约束；有冲突时按更严格者执行，必要时 STOP 请求 Controller 裁定。
 - 每一步记录：动作、请求 / 状态码、数据库或公开出口的观察结果。
 
-### 5.2 Content Center Golden Path（CC-IMP-06 / CC-IMP-07 / CC-IMP-10 合计须覆盖）
+### 5.2 Content Center Golden Path（完整正向路径）
 
 ```text
-G-01 创建 Draft（默认语言）
-G-02 编辑内容、链接 is_public 且未归档的媒体、设置 SEO
-G-03 Admin 预览：noindex、无 canonical、仅管理员可见
-G-04 Readiness 硬检查通过（无分数）
-G-05 管理员人工 Publish（expectedDraftRevision 匹配）
-G-06 公开详情 200，输出仅来自 published_snapshot 的 allowlist 字段
-G-07 符合条件时出现在 sitemap；noindex=false 与 robots 一致
-G-08 发布后继续编辑 working copy → 公开内容不变
-G-09 再次 Publish → 公开内容更新
-G-10 非默认语言：在 publishedLocales 中且默认语言已发布时才可公开
-G-11 Unpublish → 404 + sitemap 移除
-G-12 Archive → 404 + sitemap 移除 + 关系停止渲染；Restore → Draft、无快照、仍不公开
+G-01 Admin Login（已认证管理员）
+G-02 Create Draft
+G-03 Edit（Content Editor）
+G-04 Media & Relations（只链接 is_public 且未归档的 Media Library 文件）
+G-05 SEO & Locale
+G-06 AI Source（明确选择、允许、未归档的来源）
+G-07 AI Proposal（只生成建议，不写入）
+G-08 Human Review（Accept / Edit / Reject）
+G-09 Apply to Draft（只写 working copy；status 与 published_snapshot 不变）
+G-10 Preview（仅管理员、noindex、无 canonical）
+G-11 Readiness（Hard 检查通过；无分数；PASS ≠ Publish）
+G-12 Manual Publish（人工动作；expectedDraftRevision 匹配；服务端重算 readiness）
+G-13 Public Page 200（输出只来自 published_snapshot 的 allowlist 字段）
+G-14 Sitemap / indexing eligibility 与公开资格一致（noindex = false 才进入 sitemap）
 ```
 
-### 5.3 Products Golden Path（产品公开切换 J-10 前须覆盖）
+### 5.3 生命周期延续路径
+
+```text
+G-15 发布后继续编辑 working copy → 公开内容不变
+G-16 再次 Publish → 公开内容更新
+G-17 非默认语言：自己的快照 + 在 publishedLocales 中 + 默认语言已发布，才公开
+G-18 Unpublish → 404 + sitemap 移除
+G-19 Archive → 404 + sitemap 移除 + 关系停止渲染；Restore → Draft、无快照、仍不公开
+```
+
+分工：G-01～G-05 由 CC-IMP-02～CC-IMP-05 提供基础；G-06～G-09 由 CC-IMP-08 / CC-IMP-09 证明；G-10～G-12、G-15、G-16 由 CC-IMP-06 证明；G-17 由 CC-IMP-06（发布）与 CC-IMP-10（公开）共同证明；G-18、G-19 由 CC-IMP-06 / CC-IMP-07 证明；G-13、G-14 由 CC-IMP-10 证明；完整串联由 FINAL-RELEASE-AUDIT 证明（§5.5）。
+
+### 5.4 Products Golden Path（产品公开切换 J-10 前须覆盖）
 
 ```text
 P-01 draft → review → published（人工，满足发布门禁）
@@ -206,6 +329,11 @@ P-02 公开详情 / 分类列表 200，sitemap 收录（seo_noindex = false）
 P-03 published → draft（撤回）→ 详情 404、列表消失、sitemap 排除
 P-04 已发布后修改：按确认的修订合同处理，未审核修改不公开
 ```
+
+### 5.5 Final Release Audit Golden Path
+
+- FINAL-RELEASE-AUDIT 必须**至少真实跑一条**完整 Golden Path（G-01～G-14），使用 TEST ONLY 记录或专用 release fixture，并按 §5.1 执行：发布与公开步骤只在已授权的非生产环境进行，结束后撤回、清理并留证。
+- Production public exposure（生产环境中的真实公开与生产公开 smoke）不在 Golden Path 授权内，仍由 Release policy（协议 §4 TYPE D、§13.4）单独控制。
 
 ---
 
@@ -216,16 +344,16 @@ Negative Path 证明"错误的路径全部被拒绝"。触及某 Gate 的模块�
 | ID | 负向路径 | 期望结果 | Gate |
 |---|---|---|---|
 | N-01 | Draft-only 条目 / 语言请求公开详情、列表、sitemap、搜索 | 404 / 不出现 | RSG-01、RSG-02 |
-| N-02 | 已发布条目有未发布修改 | 公开只返回快照；payload 不含 working copy、revision、`last_change_kind`、内部 id 等键（allowlist 测试） | RSG-01 |
+| N-02 | 已发布条目有未发布修改；任意公开 payload | 公开只返回快照；payload 不含 Draft-only 数据、Proposal、Sources、History、内部 readiness、admin 元数据、内部 Directus 字段（§3A.1 allowlist 测试） | RSG-01、RSG-07 |
 | N-03 | Unpublish 后请求 | 404 且 sitemap 移除 | RSG-01、RSG-02 |
 | N-04 | Archive 后请求（含作为关系目标） | 404、sitemap 移除、关系不渲染 | RSG-01、RSG-02 |
 | N-05 | Restore 后未重新发布 | 仍不公开 | RSG-01 |
 | N-06 | AI / Apply 尝试写 status、`published_snapshot` 或调用发布 | 不可能（无导入路径）或被拒且不写入 | RSG-03、RSG-04 |
 | N-07 | 未认证或错误 Origin 调用发布端点 | 401 / 403，不写入 | RSG-03、RSG-07 |
-| N-08 | 发布时 `expectedDraftRevision` 过期 | 409 `changed_since_review`，不写入 | RSG-03 |
+| N-08 | 保存、Apply 或发布时 Draft revision 过期（stale `expectedDraftRevision` 或 proposal 分析时的 revision） | 409（发布为 `changed_since_review`），不写入 | RSG-03、RSG-04 |
 | N-09 | 请求不在 `publishedLocales` 的语言，或该语言无快照 | 404；绝不回退显示默认语言内容 | RSG-05 |
 | N-10 | 默认语言未发布时发布非默认语言 | 拒绝，不写入 | RSG-05 |
-| N-11 | 公开请求 `is_public = false`、已归档、关联未启用或 `source_document` 文件 | 404；快照 / DTO 不含该文件 | RSG-06 |
+| N-11 | 公开渲染或请求 private（`is_public = false`）、已归档、关联未启用或 `source_document` 文件 | 不渲染 / 404；快照 / DTO 不含该文件 | RSG-06 |
 | N-12 | `nuxt-server` 身份读取 working copy 列、junction、proposal、revision | 被拒 / 字段不可见 | RSG-07、RSG-01 |
 | N-13 | 非管理员访问 `/admin/*`、`/api/admin/*` | 302 登录 / 401 / 403 | RSG-07 |
 | N-14 | 通过通用 PATCH 设置 status、`published_snapshot`、revision、发布时间 | 422 或忽略，不写入 | RSG-03、RSG-07 |
@@ -235,6 +363,10 @@ Negative Path 证明"错误的路径全部被拒绝"。触及某 Gate 的模块�
 | N-18 | 生产环境访问 Directus Admin（:8055） | 不可从公网访问 | RSG-07、RSG-08 |
 | N-19 | 未经明确授权执行 push / merge / deploy | 不执行；报告如实列出三方 hash | RSG-09 |
 | N-20 | 凭证、token、cookie、`.env` 值 | 永不出现在日志、提交、报告、公开输出 | RSG-07、RSG-08 |
+| N-21 | 把条目 A 的 proposal 应用到条目 B（wrong content） | 409 拒绝，Draft 不变 | RSG-04 |
+| N-22 | 把某语言的 proposal 应用到另一语言（wrong locale） | 409 拒绝，Draft 不变 | RSG-04、RSG-05 |
+| N-23 | 应用已过期、已应用或服务重启后丢失的 proposal | 409 拒绝，不重建、不写入 | RSG-04 |
+| N-24 | 新链接一个已在 Media Library 归档的文件（内容媒体、OG 图片、AI 来源） | 422 拒绝，不写入 | RSG-06 |
 
 ---
 
@@ -249,6 +381,8 @@ Negative Path 证明"错误的路径全部被拒绝"。触及某 Gate 的模块�
 6. Closeout                   —— 报告 Gate Results / Open Gates / P0 Violations，更新本文件 §4 矩阵中受影响的行（仅限事实变化）
 ```
 
+- 开工报告未识别触及的 Gate（或未写 `none` 并说明理由）时，不得开始实现。
+- 高风险模块的收口报告必须包含 Safety Gates Touched、Gate Results、Evidence、Open Gates、P0 Violations；P0 Violations 必须为 `NONE` 才能 PASS。
 - 模块自己引入的 Gate 破坏：必须在模块内修复并重新取证，否则 STOP，不得提交破坏性变更。
 - 发现既有（非本模块引入）的 Gate 缺口：登记为 `OPEN` 并写明 owner，不隐藏、不顺手扩大范围修复；若它阻塞本模块 → STOP。
 - 证据不足以证明时，状态写 `OPEN`，不得写 `PROVEN`。
@@ -260,6 +394,7 @@ Negative Path 证明"错误的路径全部被拒绝"。触及某 Gate 的模块�
 - `CURRENT-STATE.md` 的 Open Release Gates、Charter N.6（J-10 上线门槛）、Implementation Blueprint J-11 与 `BP-DG-15`、`BP-DG-09`（Locale / canonical / noindex / SEO release）、`BP-DG-10`（角色矩阵 / final publisher）、`CH-DG-09`、`CH-DG-14` 全部继续有效。本文件**不解除、不关闭、不重新编号**任何 Decision Gate。
 - FD-004.2 的 P0 边界继续有效；RSG-03 / RSG-04 与之一致并更具体。
 - Content Center Blueprint §31 的 P0 public isolation contract 与 §32 测试矩阵继续有效；§5、§6 是它们在模块验收层面的证据清单。
+- `08-decision-log.md` D-033 记录本文件与 Safe Autopilot 方法的长期治理地位；Gate 细则只在本文件维护。
 - 生产发布状态：**NOT APPROVED**。
 
 ## 9. 变更控制
