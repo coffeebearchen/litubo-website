@@ -38,6 +38,8 @@
 
 **RELEASE-SAFETY-GATES-01（2026-09-15）补充：** ✅ COMPLETED——`docs/project/RELEASE-SAFETY-GATES.md` 生效：9 个 P0 Safety Gate（Draft 永不公开 · 单一公开资格合同 · 仅人工发布 · AI 只 Apply 到 Draft · 语言独立发布无回退 · 公开媒体须 is_public 且未归档 · 权限 fail closed · 本地 / Review / 生产分离 · local commit ≠ push ≠ merge ≠ deploy）、Safety Gate Matrix、Golden Path 与 Negative Path 合同；CLAUDE.md、执行协议 §12.1 与两个模板最小挂钩。CC-IMP-05 已由 Controller 签收（VISUALLY VERIFIED）。纯治理：0 runtime、0 DB、0 Directus；里程碑顺序不变。NEXT：`CC-IMP-06` Preview, Readiness & Publish — NOT AUTHORIZED（首个须按 Safety Gate 流程取证的模块）。
 
+**CC-IMP-06（2026-09-15）补充：** ✅ COMPLETED（LOCAL COMPLETE）——`/admin/content-center/:id/preview-publish`：仅管理员可见的 Draft 预览（纯文本 block 渲染、noindex、无 canonical）、服务端确定性 hard / soft readiness（无分数 / 百分比）、按语言的人工 Publish / Unpublish（`expectedDraftRevision`、服务端重算 readiness、服务端 allowlist 快照、幂等与部分失败可重试）。所有内容类型仍 `publicEnabled=false`，正常 runtime 下 Publish 被阻止；正向生命周期由隔离 TEST ONLY 测试（含真实 PostgreSQL）证明。0 公开路由 / API / sitemap / AI / schema；未 push、未部署。NEXT：`CC-IMP-07` Archive, Restore & Change History — NOT AUTHORIZED。
+
 ---
 
 ## 总览
@@ -239,8 +241,9 @@ Content Center Visual Direction      ✅ APPROVED（2026-09-14）
 → CC-IMP-04 Media & Relations        ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；Media Library 引用 + 产品 / 内容关系，未 push / 未部署）
 → CC-IMP-05 SEO & Locales            ✅ COMPLETED（2026-09-15，LOCAL COMPLETE · VISUALLY VERIFIED；按语言 SEO + 语言 Draft + slug 锁 + OG 图片，未 push / 未部署）
 → RELEASE-SAFETY-GATES-01            ✅ COMPLETED（2026-09-15，治理；P0 Safety Gates + Golden / Negative Path 合同，docs/project/RELEASE-SAFETY-GATES.md）
-→ CC-IMP-06 Preview, Readiness & Publish  NEXT — NOT AUTHORIZED（须按 Safety Gate 流程取证）
-→ CC-IMP-07 … CC-IMP-10              未开始，每个模块须单独授权（顺序见 Blueprint §34）
+→ CC-IMP-06 Preview, Readiness & Publish  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；Admin Draft 预览 + 确定性 readiness + 人工 Publish / Unpublish；首个按 Safety Gate 取证的模块；0 公开交付，未 push / 未部署）
+→ CC-IMP-07 Archive, Restore & Change History  NEXT — NOT AUTHORIZED（须按 Safety Gate 流程取证）
+→ CC-IMP-08 … CC-IMP-10              未开始，每个模块须单独授权（顺序见 Blueprint §34）
 ```
 
 #### M4-Next-6：真实产品资料录入与正式上线
@@ -312,7 +315,7 @@ AI-DOCUMENT-SOURCE-V1-PREFLIGHT      ✅ PASS WITH ARCHITECTURE DECISIONS
 → AI-IMAGE-OCR-SOURCE-01             ✅ COMPLETED（JPG / PNG / WebP 经现有隔离 document-extractor 本地 libvips + Tesseract OCR 读取可见文字；非 Vision；低置信度 [?]；每次 Analyze 最多 3 张；AI 可读 TXT / CSV / TSV / PDF / XLSX / DOCX / JPG / PNG / WebP；未部署）
 → AI-DOCUMENT-MIXED-SOURCE-BETA-01   ✅ COMPLETED（新建 TEST ONLY Draft 产品 LT-180C-MIXED-BETA-01 上 TXT / PDF / XLSX / DOCX / PNG 五来源一次真实 DeepSeek Analyze；无跨型号 / 隐藏表 / UNKNOWN 泄漏；Power supply 冲突人工选 220 V, 50 Hz；Apply 一次写入 4 条，仍为 Draft；未部署）
 → AI-DOCUMENT-SOURCE-V1-FINAL        ✅ FEATURE COMPLETE / SIGNED OFF（TXT / CSV / TSV / PDF text-layer / XLSX / DOCX / JPG / PNG / WebP OCR；一个 Proposal Engine；Human Review 必需；原始二进制不发往 Provider；Production release gates remain open — 生产发布未批准，不代表网站可上线）
-→ 后续主线转入 Content Center（M4-Next-5）：Module Freeze ✅ · Blueprint ✅ · CC-IMP-01 ✅ · CC-IMP-02 ✅ · CC-IMP-03 ✅ · CC-IMP-04 ✅ · CC-IMP-05 ✅ · RELEASE-SAFETY-GATES-01 ✅；CC-IMP-06 NEXT — 未授权
+→ 后续主线转入 Content Center（M4-Next-5）：Module Freeze ✅ · Blueprint ✅ · CC-IMP-01 ✅ · CC-IMP-02 ✅ · CC-IMP-03 ✅ · CC-IMP-04 ✅ · CC-IMP-05 ✅ · RELEASE-SAFETY-GATES-01 ✅ · CC-IMP-06 ✅；CC-IMP-07 NEXT — 未授权
 ```
 
 ### 禁止（M5）

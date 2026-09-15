@@ -47,7 +47,7 @@ export const CONTENT_WORKSPACE_MODULES: readonly ContentWorkspaceModule[] = [
   { key: 'seo-locales', label: 'SEO & locales', icon: 'seo-locales', enabled: true },
   { key: 'ai-source-intake', label: 'AI Source Intake', icon: 'ai-source-intake', enabled: false, disabledReason: 'Not built yet' },
   { key: 'ai-proposal-review', label: 'AI Proposal Review', icon: 'sources-evidence', enabled: false, disabledReason: 'Not built yet' },
-  { key: 'preview-publish', label: 'Preview & publish readiness', icon: 'share-distribution', enabled: false, disabledReason: 'Not built yet' },
+  { key: 'preview-publish', label: 'Preview & publish readiness', icon: 'share-distribution', enabled: true },
   { key: 'history', label: 'Change history', icon: 'change-history', enabled: false, disabledReason: 'Not built yet' },
 ]
 
@@ -73,12 +73,19 @@ export function contentEditorLocaleRoute(id: number | string, locale: string): s
   return locale === DEFAULT_CONTENT_LOCALE ? base : `${base}?locale=${encodeURIComponent(locale)}`
 }
 
+/** CC-IMP-06 — CC-05 Preview & Publish Readiness, optionally opened on one language. */
+export function contentPreviewPublishRoute(id: number | string, locale?: string): string {
+  const base = `/admin/content-center/${encodeURIComponent(String(id))}/preview-publish`
+  return locale && locale !== DEFAULT_CONTENT_LOCALE ? `${base}?locale=${encodeURIComponent(locale)}` : base
+}
+
 /** Routes exist only for enabled modules. */
 export function contentWorkspaceModuleRoute(key: string, id: number | string): string | null {
   if (key === 'overview') return contentOverviewRoute(id)
   if (key === 'editor') return contentEditorRoute(id)
   if (key === 'media-relations') return contentMediaRelationsRoute(id)
   if (key === 'seo-locales') return contentSeoLocalesRoute(id)
+  if (key === 'preview-publish') return contentPreviewPublishRoute(id)
   return null
 }
 
@@ -131,6 +138,8 @@ export function contentTypeLabel(id: unknown): string {
 }
 
 export const CONTENT_READINESS_UNAVAILABLE = 'Not available yet'
+/** CC-IMP-06 — the Overview does not compute readiness; it points to the module that does. */
+export const CONTENT_READINESS_ELSEWHERE = 'Checked in Preview & publish'
 export const CONTENT_AI_UNAVAILABLE = 'AI workflow not configured'
 
 /** UTC so the server-rendered and hydrated text are identical. */

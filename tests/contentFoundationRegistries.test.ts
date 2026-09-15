@@ -110,14 +110,17 @@ function listFiles(dir: string): string[] {
 describe('route surface', () => {
   const adminDir = join(ROOT, 'server', 'api', 'admin', 'content-center')
 
-  it('exposes only the Draft Foundation, Media & Relations (CC-IMP-04) and SEO & Locales (CC-IMP-05) routes', () => {
+  it('exposes only the Draft Foundation, Media & Relations (CC-IMP-04), SEO & Locales (CC-IMP-05) and Preview & Publish (CC-IMP-06) routes', () => {
     const files = listFiles(adminDir).map(f => relative(adminDir, f).split('\\').join('/')).sort()
     expect(files).toEqual([
       '[id].get.ts',
       '[id]/locales/[locale].patch.ts',
+      '[id]/locales/[locale]/publish.post.ts',
+      '[id]/locales/[locale]/unpublish.post.ts',
       '[id]/locales/index.post.ts',
       '[id]/media-relations.get.ts',
       '[id]/media-relations.put.ts',
+      '[id]/preview-publish.get.ts',
       '[id]/seo-locales.get.ts',
       '[id]/seo-locales.put.ts',
       'index.get.ts',
@@ -125,10 +128,15 @@ describe('route surface', () => {
     ])
   })
 
-  it('has no item-level PATCH (content_type is immutable) and no lifecycle routes', () => {
-    const files = listFiles(adminDir).map(f => relative(adminDir, f))
+  it('has no item-level PATCH (content_type is immutable); lifecycle actions are only per-locale publish / unpublish', () => {
+    const files = listFiles(adminDir).map(f => relative(adminDir, f).split('\\').join('/'))
     expect(files.some(f => /\[id\]\.patch\.ts$/.test(f))).toBe(false)
-    expect(files.some(f => /publish|unpublish|archive|restore|delete/i.test(f))).toBe(false)
+    expect(files.some(f => /archive|restore|delete/i.test(f))).toBe(false)
+    expect(files.filter(f => /publish/i.test(f)).sort()).toEqual([
+      '[id]/locales/[locale]/publish.post.ts',
+      '[id]/locales/[locale]/unpublish.post.ts',
+      '[id]/preview-publish.get.ts',
+    ])
   })
 
   it('adds no public Content Center API', () => {

@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             CC-IMP-05 — SEO & Locales（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · local commit 7682193 · not pushed）
-Latest completed module:            RELEASE-SAFETY-GATES-01 — Release Safety Gates（TYPE C · LOCAL COMPLETE）
-Active authorized module:           NONE（RELEASE-SAFETY-GATES-01 已收口，等待下一份授权）
+Latest completed module:            CC-IMP-06 — Preview, Readiness & Publish（TYPE A/B · A2 · LOCAL COMPLETE · awaiting controller / user visual sign-off）
+Active authorized module:           NONE（CC-IMP-06 已收口，等待下一份授权）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-06 — Preview, Readiness & Publish（高风险模块：须按 RELEASE-SAFETY-GATES.md 取证）
+Next candidate:                     CC-IMP-07 — Archive, Restore & Change History（高风险模块：RSG-01 / RSG-03，须按 RELEASE-SAFETY-GATES.md 取证）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：a43c10a）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：49b56c8）
 Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9321,3 +9321,116 @@ Production:                           NOT APPROVED
 Charter / Content Center Freeze / Content Center Blueprint / Implementation Blueprint / CLAUDE.md / 协议 / 模板在本次补齐中均未修改；0 runtime、0 schema、0 API、0 UI、0 DB；未 push。
 
 *最后更新：2026-09-15，由 Claude Code 在"RELEASE-SAFETY-GATES-01 Delta completion"任务中写入。*
+
+---
+
+## CC-IMP-06 — Preview, Readiness & Publish（2026-09-15）
+
+```text
+Module:                 CC-IMP-06 — Preview, Readiness & Publish（Register CC-05）
+Type / Authorization:   TYPE A/B · A2 LOCAL_IMPLEMENTATION（首个 Release-Safety-Gated 高风险模块）
+Status:                 COMPLETED（LOCAL COMPLETE · awaiting controller / user visual sign-off）
+Branch:                 review/cc-imp-06-preview-readiness-publish
+Baseline:               49b56c80398f878a922c1e9aa8870ed6ae0f1323（Controller 修正后的合法起点；原施工单 a43c10a 已作废）
+Commit:                 feat(content): add preview readiness and publish（本节所在 commit）
+Admin Preview:          implemented
+Readiness:              implemented（deterministic hard / soft，无分数 / 百分比）
+Manual Publish:         implemented（normal runtime BLOCKED：所有类型 publicEnabled=false）
+Manual Unpublish:       implemented
+Public Delivery:        NO
+Sitemap:                NO
+AI:                     NO（provider calls 0）
+Schema:                 0（collections / fields / indexes / triggers / functions 均未变）
+Dependencies:           0 new
+1440:                   PASS
+375:                    PASS
+RSG touched:            RSG-01 · RSG-03 · RSG-04 · RSG-05 · RSG-06 · RSG-07 · RSG-08 · RSG-09（RSG-02 NOT_YET_EXERCISED）
+P0 violations:          NONE
+Next candidate:         CC-IMP-07 — Archive, Restore & Change History
+Next candidate authorized: NO
+```
+
+### 范围与实现
+
+- **路由：** `/admin/content-center/:id/preview-publish`（`pages/admin/content-center/[id]/preview-publish.vue` + `components/admin/content/ContentPreviewPublish.vue`）。工作台导航 `Preview & publish readiness` 原位启用；Freeze 顺序不变；AI Source Intake / AI Proposal Review / Change history 仍 disabled。
+- **Admin Draft Preview（Blueprint §22 策略 A）：** 仅 admin SSR 中间件后可达；页面 `robots: noindex, nofollow`、无 canonical；"Draft preview · Not public" 横幅；按语言 tab（`?locale=`）；未开始的语言显示 "has not been started"，不借用其他语言内容；关系标题只取当前语言。Hero / inline 图片经 Media Library 预览路由（admin），并标注 Missing file / Disabled link / Archived / Not public。无 `?preview=1`、无 token、无签名链接。
+- **安全渲染器：** `components/content/ContentBlocksRenderer.vue` —— text / key_points / faq / cta / image / related_content / downloads 纯文本渲染，无 `v-html`；未知或畸形 block 跳过（预览模式显示提示）；CTA 在预览中不可点击（只显示 href）；非预览模式只链接内部路径或 https。只服务 Admin Preview，未建公开页面。
+- **Readiness（Blueprint §21，`server/utils/contentPublication.ts#computeContentReadiness`）：**
+  - Hard：item not archived · locale started · title · summary · slug 有效 / 非保留 / 本语言唯一 · sections valid（registry）· sections complete（必填纯文本非空）· required sections（类型 min 规则，只计已填写 section）· hero（heroRequired 类型）· media public（快照内每个文件存在、链接启用、未归档、`is_public`；image section 指向的 inline 链接存在且启用）· download file（resource_download ≥1 启用下载）· type publicEnabled（文案 "This content type is not enabled for public delivery yet."）· locale ∈ publishedLocales · 非默认语言要求默认语言已发布（快照 + item published）。
+  - Soft：SEO title / meta description 缺失（回退）· 无 OG（hero 回退）· 无关系 · 未应用 AI proposal（best-effort，Content AI 未建，恒 pass，永不阻塞）· noindex · 其他站点语言未开始 · 存在未发布改动。
+  - 读取不写入；PASS ≠ Publish。
+- **Publish（`POST …/locales/:locale/publish`，body 只允许 `expectedDraftRevision`）：** admin-auth + CSRF Origin（既有中间件）；过期 revision → 409 `changed_since_review`；服务端重算 readiness，任一 hard fail → 422 `not_ready` + blockers；快照由服务端 allowlist builder 生成（不接受客户端快照 / ready 标志）。写入顺序：① locale 行 `published_snapshot` / `published_revision = draft_revision` / `published_at` / `first_published_at ??=` / `last_change_kind = publish` ② 默认语言时 item `status = published`、`first_published_at ??=`。① 成功 ② 失败 → 500 `partial`，此时 item 仍 draft（不满足公开资格），重试只补 ②。同 revision 且快照相同 → `already_published`（不再写快照，仍补 ②）；同 revision 但媒体元数据 / 关系变化 → 视为未发布改动，可再次发布覆盖唯一快照。
+- **快照 allowlist：** version、contentType、locale、publishedRevision、title、slug、summary、blocks（经 registry 校验后的副本）、SEO（有效 title / description、canonicalPath、noindex）、media（hero、ogImage=OG 否则 hero、image section 使用的 inline、downloads section 存在时的启用下载：linkId / fileId / 当前语言 alt / caption / language / versionLabel / fileDate）、relations（product ids、content ids）。排除：`source_document`、禁用链接、draft_revision / last_change_kind / 日期 / 用户 / Directus 字段、文件可见性与归档状态、文件名、AI proposal / review、readiness、history、admin 元数据。
+- **Unpublish（`POST …/unpublish`，body 为空或 `{}`）：** 非默认语言只清该行发布字段；默认语言先 item → draft（此刻起整条不公开），再一次批量清空所有语言发布字段（不会留下"有 ES 快照而无 EN"的非法状态）；保留 working copy、blocks、SEO、媒体链接、关系、`first_published_at`（slug 锁持续）；archived → 409；无可撤内容 → `already_unpublished`；中断可重试。
+- **Overview：** Readiness 卡片改为指向 Preview & publish（"Checked in Preview & publish"），Lifecycle 提示改为 "Publishing is a manual action…"。Overview 仍不计算 readiness、不发请求。
+- **未做（范围外）：** 公开路由 / API / 权限、sitemap、搜索、AI、Archive / Restore、History、定时 / 批量发布、签名预览链接、Legal / Brand review、QR、Share / Distribution、百分比。
+
+### Safety Gates（RELEASE-SAFETY-GATES.md §7 收口）
+
+```text
+Safety Gates Touched:  RSG-01, RSG-03, RSG-04, RSG-05, RSG-06, RSG-07, RSG-08, RSG-09（RSG-02 未触及公开出口）
+Gate Results:
+  RSG-01 Draft Never Public         PROVEN（本模块范围）  快照 allowlist 精确结构 + 排除测试（N-02）；preview 仅 admin、noindex、无 canonical；
+                                                         0 公开路由 / API / sitemap 静态测试；匿名 Directus content_items / content_item_locales → 403；nuxt-server content_* 权限 0
+  RSG-02 Single Public Eligibility  NOT_YET_EXERCISED    公开交付 / sitemap / 搜索属 CC-IMP-10
+  RSG-03 Human-only Publish         PROVEN（本模块范围）  只有两个 admin POST 路由与 preview GET 导入发布服务（静态测试）；Save / SEO / Media 服务不写发布字段；
+                                                         readiness 与 GET 零写入；服务端重算；stale 409（N-08）；通用 PATCH 设发布字段 422（N-14，单测 + 真实 BFF）
+  RSG-04 AI Draft-only              PROVEN（静态）        所有 AI 模块不引用发布服务 / publish 路由 / published_snapshot（N-06）；AI runtime 未改
+  RSG-05 Locale Isolation           PROVEN（发布侧）      EN 发布不写 ES / PT；ES 在 publishedLocales 外 422；默认语言未发布时非默认语言 422（N-10）；
+                                                         未开始语言 preview 为 null、无回退（N-09 admin 侧）；公开侧无回退属 CC-IMP-10
+  RSG-06 Public Media Eligibility   PROVEN（发布侧）      private / archived / missing / disabled 链接 → 422（N-11 快照侧）；source_document 与禁用下载不进快照；
+                                                         发布从不写文件；公开媒体代理归档检查仍 OPEN（CC-IMP-10）
+  RSG-07 Permissions Fail Closed    PROVEN（admin 路由）  真实中间件单测：未认证 401、非管理员 403、缺 / 错 Origin 403；curl 无 cookie publish / unpublish / preview → 401，
+                                                         页面 → 302 /admin/login；nuxt-server 未扩大；nuxt-server 字段 / 行权限整体仍 OPEN（CC-IMP-10）
+  RSG-08 Environment Separation     PROVEN（本模块范围）  全部生命周期测试仅本地开发库；production changes 0；生产 provisioning 仍 OPEN
+  RSG-09 Release Layering           PROVEN                local commit only；push 0 / merge 0 / deploy 0
+Open Gates:
+  RSG-02（CC-IMP-10）· RSG-06 公开媒体代理归档检查（CC-IMP-10）· RSG-07 nuxt-server 字段 / 行权限（CC-IMP-10）·
+  RSG-08 生产 provisioning + Node 22.22.2（TYPE D / FINAL-RELEASE-AUDIT）·
+  publish / unpublish 的真实 Directus revisions 记录：NOT_YET_EXERCISED（见下）
+P0 Violations:         NONE
+```
+
+Golden Path 覆盖：G-10（Preview）、G-11（Readiness）、G-12（Manual Publish，隔离测试）、G-15 / G-16（发布后编辑快照不变 / 再发布更新）、G-17 发布侧、G-18 后台侧（Unpublish 清快照、Draft 保留）。G-13 / G-14 属 CC-IMP-10。`RELEASE-SAFETY-GATES.md` 按本施工单要求未修改（§4.3 事实行的更新留待授权的治理收口）。
+
+### 正向生命周期测试（隔离 · TEST ONLY）
+
+- **方法：** 服务调用注入 TEST ONLY 类型注册表（`resolveType`，只在测试内把 technical_article 视为 public）；提交的 `utils/contentTypes.ts` 未改，测试断言所有类型仍 `publicEnabled=false` 且源码无 `publicEnabled: true`。
+- **单元（内存 Directus 替身，模拟 revision guard，记录每次写入）：** Draft → Publish（写入顺序 / 字段）→ 幂等 → 部分失败重试 → Draft 编辑后快照不变 → 再发布（`first_published_at` 保持、slug 锁）→ 媒体元数据变化可再发布 → ES 独立发布 → 非默认 / 默认 Unpublish → 中断 Unpublish 重试。
+- **真实 PostgreSQL（`CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run tests/contentPublicationDbIntegration.test.ts`）：** TEST ONLY 负 id 夹具（-9301，无媒体链接），真实 plan 函数决定写入，SQL 执行：runtime registry 拒绝且不写 → Publish（trigger 接受仅发布字段更新，revision 不变，item published）→ already_published → 不加 revision 的 Draft 修改被 trigger 拒绝 → 合法编辑后快照不变、stale 409 → 再发布（first_published_at 不变）→ ES 在 site 外拒绝、站点含 ES 时独立发布与独立撤回 → 默认语言 Unpublish 中断后 item 已 draft、重试清空全部语言、Draft 完整。5 / 5 通过；夹具前后删除；全库非空快照数前后一致（0）。
+- **真实 Directus revisions：** publish / unpublish 经 Directus 的 revisions 在本地无法走通（正常 runtime 下无 public 类型，且不得为演示开启）。已核实：`content_items` / `content_item_locales` accountability=`all`；写入走 `contentAdminFetch(event)`（与 CC-IMP-01 已证实产生 revisions 的 manual_edit 同一路径），并写 `last_change_kind = publish / unpublish`；浏览器负向请求后内容 6 相关 revisions 13 → 13、activity 总数 1047 → 1047（被拒请求零写入）。状态：NOT_YET_EXERCISED（owner：CC-IMP-10 / FINAL-RELEASE-AUDIT）。
+
+### Register 同步
+
+- CC-05 Implementation → `AUTOMATED_CHECKED`，Acceptance `NOT_STARTED`（Register §4.8 规则 13）。其他 CC 行不变。
+
+### 测试
+
+- 新增：`tests/contentPublication.test.ts`（readiness 每条 hard 失败、soft 不阻塞、快照精确结构与排除、publish / unpublish / 幂等 / partial、locale 隔离、N-14、静态边界 RSG-03 / RSG-04 / RSG-01、真实 admin-auth 中间件、页面 helpers）、`tests/components/ContentPreviewPublish.component.test.ts`（Draft 横幅、纯文本、CTA 不可点击、无分数 / Legal / Brand / QR、blocked 原因、未开始语言无回退、语言切换、确认后 Publish / Unpublish、409 Reload、422 重载 readiness、渲染器非预览模式）、`tests/contentPublicationDbIntegration.test.ts`（真实 PostgreSQL，需环境变量）。
+- 更新：`contentCenterUi`（模块启用）、`ContentWorkspace.component`（导航 / Overview 文案）、`contentFoundationRegistries`（route surface +3；仍无 archive / restore / delete）。
+- 全量 vitest：65 files passed / 4 skipped，2477 passed / 56 skipped（跳过项为需环境变量的外部 / 容器集成测试）。
+- 真实 PostgreSQL：revision guard 6 / 6；publish lifecycle 5 / 5（顺序执行）。
+- typecheck 0 · lint 0 · `nuxt build` Build complete。
+
+### 真实浏览器验收（本地 dev，内容 ID 6，TEST ONLY — NOT FOR PUBLICATION）
+
+- **1440（干净新标签页）：** 标题 "Preview & publish readiness"，Draft 徽章；横幅 "Draft preview · Not public"；preview 575 + side 300；scrollWidth 1425（滚动条）无越界元素；robots `noindex, nofollow`，canonical 0；header 与卡片 "Publish English" 均 disabled，原因 "Some media cannot be published (+1 more)"；hard：Pass ×8 + Blocker（hero / OG 文件非 public）+ Blocker "This content type is not enabled for public delivery yet." + Pass（English published on site）；soft：1 Warning（noindex）；"2 blockers · 1 warning"；无 Unpublish；无 % / Legal / Brand / QR / Share / Distribution / score；预览内无 `<a>`、CTA inert；hero 图加载并标注 "Not public"；console error 0。
+- **真实 BFF 负向（同一登录会话，fetch）：** EN publish rev 6 → 422 `not_ready` [media_public, type_public]；rev 5 → 409 `changed_since_review`；ES → 422 [sections_complete, required_sections, media_public, type_public, locale_site_published, default_locale_published]；PT → 404；body 含 `published_snapshot` / `ready` → 422；缺 revision → 422；unpublish EN / ES → 200 `already_unpublished`（零写入）；`PATCH /locales/en` 设 `published_snapshot` / `published_revision` → 422；preview `?locale=zh` → 422；不存在的条目 → 404。前后核对：内容 6 两行 draft_revision 6、blocks md5 不变、快照 0、item draft、4 个文件 `is_public` 仍 false。
+- **375（干净新标签页）：** scrollWidth 375、越界 0；单列（grid 343）、右侧面板在预览之下；header "Publish English" 可达（disabled）；语言 tab 可达；Modules 可展开（导航链接可见）；FAQ 可展开显示答案；ES tab → URL `?locale=es`、ES 标题、无英文正文、空 section 占位 5 个；PT tab → "Portuguese has not been started … Nothing from another language is shown in its place."；清单 / Publication / Readiness / Publishing rules 截图清晰；console error 0（负向请求只在负向测试标签页产生 4xx 资源错误）。
+- **数据：** 全库非空快照 0、published item 0、负 id 夹具 0。
+- **dev server：** 首次启动出现已知 P2 `#app-manifest`，干净重启后无服务端错误；验收结束已停止，viewport 已复位。
+
+### 已知限制 / P2
+
+- 默认语言 Unpublish 与 Publish 均为多请求有序写入（非单一事务），以"公开资格需要 item published + 快照"保证中断不暴露，重试完成。
+- 发布与并发 Draft 保存：发布 PATCH 不含 draft 字段，若读取后另一保存将 revision +1，快照仍是已检查的 revision N（状态显示 Published · unpublished changes），不会发布未检查内容。
+- `sections_complete`（必填纯文本非空）是对 Blueprint "Blocks valid" 的更严格细化（CC-IMP-01 已注明完整性属于 Publish 模块）。
+- 下载按 enabled 全部进入快照（带 language 标签），不按语言过滤；公开渲染规则由 CC-IMP-10 决定。
+- 1440 截图在 Browser 面板中缩放后可读性有限，证据以 DOM 几何为主（最终视觉签收以用户 / Controller 为准）。
+- Node：实际 24.14.0；Node 22.22.2 Release Gate 仍 OPEN（本模块未处理）。
+
+### Governance
+
+Blueprint / Freeze / RELEASE-SAFETY-GATES / CLAUDE.md / Protocol / Decision Log / Charter 均未修改。Product runtime、AI runtime、Media 生命周期未改。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-06"任务中写入。*

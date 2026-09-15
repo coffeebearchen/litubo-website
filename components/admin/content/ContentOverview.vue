@@ -4,11 +4,12 @@ import type { AdminContentDraftDetail } from '~/types/content-center'
 import {
   CONTENT_AI_UNAVAILABLE,
   CONTENT_LOCALE_LABELS,
-  CONTENT_READINESS_UNAVAILABLE,
+  CONTENT_READINESS_ELSEWHERE,
   CONTENT_WORKSPACE_MODULES,
   contentAllowedBlockLabels,
   contentBlockSummary,
   contentLocaleSummary,
+  contentPreviewPublishRoute,
   contentSeoLocalesRoute,
   contentSeoSummary,
   contentTypeLabel,
@@ -91,14 +92,17 @@ const seo = computed(() => contentSeoSummary(primary.value))
           <dd>{{ draft.first_published_at ? formatContentDateTime(draft.first_published_at) : 'Never published' }}</dd>
         </div>
       </dl>
-      <p class="cc-card-note">Publishing is not available yet. Nothing here is public.</p>
+      <p class="cc-card-note">Publishing is a manual action in Preview &amp; publish readiness. Public pages for content are not enabled yet.</p>
     </section>
 
     <section class="cc-card" aria-labelledby="cc-readiness-heading">
       <h2 id="cc-readiness-heading" class="cc-card-title">Readiness</h2>
       <p class="cc-card-hint">Publishing checks for this record.</p>
-      <p class="cc-pill cc-pill--neutral">{{ CONTENT_READINESS_UNAVAILABLE }}</p>
-      <p class="cc-card-note">Readiness checks arrive with Preview &amp; publish readiness.</p>
+      <p class="cc-pill cc-pill--neutral">{{ CONTENT_READINESS_ELSEWHERE }}</p>
+      <p class="cc-card-note">
+        Pass / blocker / warning checks per language are in
+        <NuxtLink :to="contentPreviewPublishRoute(draft.id)" class="cc-note-link">Preview &amp; publish readiness</NuxtLink>.
+      </p>
     </section>
 
     <section class="cc-card" aria-labelledby="cc-locales-heading">

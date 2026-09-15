@@ -71,16 +71,16 @@ describe('ContentWorkspaceNav — mounted', () => {
     expect(active.text()).toBe('Overview')
     const disabled = wrapper.findAll('button.cc-nav-item--disabled')
     expect(disabled.map(b => b.find('.cc-nav-item-label').text())).toEqual([
-      'AI Source Intake', 'AI Proposal Review', 'Preview & publish readiness', 'Change history',
+      'AI Source Intake', 'AI Proposal Review', 'Change history',
     ])
     for (const button of disabled) {
       expect(button.attributes('disabled')).toBeDefined()
       expect(button.text()).toContain('Not built yet')
     }
-    // Only the back link and the built modules are anchors.
+    // Only the back link and the built modules are anchors (CC-IMP-06 enables Preview & publish readiness in place).
     expect(wrapper.findAll('a').map(a => a.attributes('href'))).toEqual([
       '/admin/content-center', '/admin/content-center/5/editor', '/admin/content-center/5/media-relations',
-      '/admin/content-center/5/seo-locales',
+      '/admin/content-center/5/seo-locales', '/admin/content-center/5/preview-publish',
     ])
   })
 
@@ -141,8 +141,11 @@ describe('ContentOverview — mounted', () => {
     expect(wrapper.findAll('input, textarea, select, button')).toHaveLength(0)
   })
 
-  it('states readiness and AI as unavailable, never as a score', () => {
-    expect(card('Readiness').text()).toContain('Not available yet')
+  it('points readiness to Preview & publish and states AI as unavailable, never as a score', () => {
+    // CC-IMP-06 — the Overview does not compute readiness; it links to the module that does.
+    expect(card('Readiness').text()).toContain('Checked in Preview & publish')
+    expect(card('Readiness').find('a').attributes('href')).toBe('/admin/content-center/5/preview-publish')
+    expect(card('Lifecycle status').text()).toContain('Publishing is a manual action')
     expect(card('AI-assisted content').text()).toContain('AI workflow not configured')
     expect(wrapper.text()).not.toMatch(/%|score|confidence|suggestions ready/i)
     const modules = card('Workspace modules').findAll('li').map(li => li.text())
@@ -150,7 +153,8 @@ describe('ContentOverview — mounted', () => {
     expect(modules[1]).toMatch(/Content editor\s*Available/)
     expect(modules[2]).toMatch(/Media & relations\s*Available/)
     expect(modules[3]).toMatch(/SEO & locales\s*Available/)
-    expect(modules.slice(4).every(text => text.includes('Not built yet'))).toBe(true)
+    expect(modules[6]).toMatch(/Preview & publish readiness\s*Available/)
+    expect([modules[4], modules[5], modules[7]].every(text => text.includes('Not built yet'))).toBe(true)
     // CC-IMP-05 — the Overview points to SEO & locales for languages; it edits nothing itself.
     expect(card('Language status').find('a').attributes('href')).toBe('/admin/content-center/5/seo-locales')
   })

@@ -134,6 +134,184 @@ export interface AdminContentSeoLocales {
   og_version: string
 }
 
+/** CC-IMP-06 — one deterministic readiness result (Blueprint §21): no score, weight or percentage. */
+export type ContentReadinessState = 'pass' | 'fail' | 'warn'
+
+export interface ContentReadinessCheck {
+  key: string
+  /** Hard checks are `pass` / `fail`; soft checks are `pass` / `warn`. */
+  state: ContentReadinessState
+  label: string
+  detail: string | null
+}
+
+export interface ContentReadiness {
+  locale: ContentLocale
+  /** Every hard check passes. Being ready never publishes anything. */
+  ready: boolean
+  hard: ContentReadinessCheck[]
+  soft: ContentReadinessCheck[]
+}
+
+/** CC-IMP-06 — a Media Library file as the admin Draft preview shows it. */
+export interface AdminContentPreviewMedia {
+  link_id: number
+  role: 'hero' | 'og_image' | 'inline' | 'download'
+  directus_files_id: string
+  alt: string | null
+  caption: string | null
+  enabled: boolean
+  language: string | null
+  version_label: string | null
+  file_date: string | null
+  /** The link exists but its Media Library file does not. */
+  missing: boolean
+  file: {
+    filename_download: string | null
+    title: string | null
+    type: string | null
+    width: number | null
+    height: number | null
+    is_public: boolean
+    archived: boolean
+  } | null
+}
+
+export interface AdminContentPreviewRelation {
+  id: number
+  relation_kind: 'product' | 'content'
+  /** Admin label: product name / code, or the related content's title in the previewed language only. */
+  label: string | null
+  target_id: number | null
+  status: string | null
+}
+
+/** CC-IMP-06 — the working copy of one language as the admin Draft preview renders it. Never public. */
+export interface AdminContentPreview {
+  title: string
+  slug: string
+  summary: string | null
+  blocks: unknown[]
+  seo: {
+    title: string
+    title_source: 'seo' | 'fallback' | 'none'
+    description: string
+    description_source: 'seo' | 'fallback' | 'none'
+    canonical_path: string | null
+    noindex: boolean
+  }
+  hero: AdminContentPreviewMedia | null
+  og_image: AdminContentPreviewMedia | null
+  /** Inline links referenced by this language's image sections. */
+  inline: AdminContentPreviewMedia[]
+  /** Enabled download links, shown by a downloads section. */
+  downloads: AdminContentPreviewMedia[]
+  relations: AdminContentPreviewRelation[]
+}
+
+export interface AdminContentPublicationLocale {
+  locale: ContentLocale
+  started: boolean
+  state: 'not_started' | 'draft' | 'published' | 'published_with_changes'
+  draft_revision: number | null
+  published_revision: number | null
+  published_at: string | null
+  first_published_at: string | null
+}
+
+/** CC-IMP-06 — `GET /api/admin/content-center/:id/preview-publish?locale=`. */
+export interface AdminContentPreviewPublish {
+  item: {
+    id: number
+    content_type: ContentTypeId
+    status: ContentItemStatus
+    first_published_at: string | null
+    archived_at: string | null
+    title: string | null
+  }
+  type: { label: string, public_enabled: boolean, hero_required: boolean, requires_download_file: boolean }
+  default_locale: ContentLocale
+  site_locales: ContentLocale[]
+  published_locales: ContentLocale[]
+  locale: ContentLocale
+  locales: AdminContentPublicationLocale[]
+  /** `null` when this language has not been started — never another language's content. */
+  preview: AdminContentPreview | null
+  readiness: ContentReadiness
+  publication: {
+    has_snapshot: boolean
+    published_revision: number | null
+    published_at: string | null
+    first_published_at: string | null
+    /** The Draft differs from the published snapshot (text, media or relations). */
+    unpublished_changes: boolean
+  }
+  /** Something of this language (or, for the default language, of the item) is published. */
+  can_unpublish: boolean
+}
+
+/** CC-IMP-06 — inputs of the safe structured-content renderer, already resolved by the caller. */
+export interface ContentRendererImage {
+  src: string | null
+  alt: string
+  caption: string | null
+  note: string | null
+}
+
+export interface ContentRendererListEntry {
+  key: string | number
+  label: string
+  meta: string | null
+  note: string | null
+}
+
+export type ContentPublicationOutcome = 'published' | 'already_published' | 'unpublished' | 'already_unpublished'
+
+/** CC-IMP-06 — `POST …/locales/:locale/publish` and `…/unpublish`. */
+export interface AdminContentPublicationResult {
+  result: ContentPublicationOutcome
+  state: AdminContentPreviewPublish
+}
+
+/**
+ * CC-IMP-06 — the published snapshot stored in `content_item_locales.published_snapshot`
+ * (Blueprint §23). Built server-side by an explicit allowlist; it is the only content
+ * a future public reader may use. It never holds working-copy metadata, AI, readiness,
+ * history, `source_document` files or Directus system fields.
+ */
+export interface ContentSnapshotFileRef {
+  linkId: number
+  fileId: string
+  alt: string | null
+  caption: string | null
+}
+
+export interface ContentSnapshotDownloadRef extends ContentSnapshotFileRef {
+  language: string | null
+  versionLabel: string | null
+  fileDate: string | null
+}
+
+export interface ContentPublishedSnapshot {
+  version: 1
+  contentType: ContentTypeId
+  locale: ContentLocale
+  publishedRevision: number
+  title: string
+  slug: string
+  summary: string
+  blocks: ContentBlock[]
+  seo: { title: string, description: string, canonicalPath: string | null, noindex: boolean }
+  media: {
+    hero: ContentSnapshotFileRef | null
+    /** Open Graph image, or the hero when there is none (fallback resolved at publish). */
+    ogImage: ContentSnapshotFileRef | null
+    inline: ContentSnapshotFileRef[]
+    downloads: ContentSnapshotDownloadRef[]
+  }
+  relations: { products: number[], content: number[] }
+}
+
 export interface AdminContentListItem {
   id: number
   content_type: ContentTypeId
