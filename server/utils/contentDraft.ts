@@ -271,6 +271,9 @@ export async function listContentDrafts(fetch: FetchFn, query: Record<string, un
   if (query.status !== undefined && query.status !== '') {
     if (!ITEM_STATUSES.includes(query.status as ContentItemStatus)) fail(422, 'Unknown status filter.')
     filters.push(`filter[status][_eq]=${query.status}`)
+  } else {
+    // CC-IMP-07 — Blueprint §24: archived items are hidden from the default list; the Archived status filter shows them.
+    filters.push('filter[status][_neq]=archived')
   }
   // CC-IMP-02 — "has a draft in this locale" and a title/slug search across the
   // item's locale drafts. Both are allowlisted/bounded and URL-encoded values;

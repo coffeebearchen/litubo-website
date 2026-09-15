@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CC-IMP-05 — SEO & Locales（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · local commit 7682193 · not pushed）
-Latest completed module:            CC-IMP-06 — Preview, Readiness & Publish（TYPE A/B · A2 · LOCAL COMPLETE + Review Fix 01 · awaiting controller final sign-off）
-Active authorized module:           NONE（CC-IMP-06 已收口，等待下一份授权）
+Latest accepted module:             CC-IMP-06 — Preview, Readiness & Publish（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · core 97bf4d8 + Review Fix 01 404ed94 · not pushed）
+Latest completed module:            CC-IMP-07 — Archive, Restore & Change History（TYPE A/B · A2 · LOCAL COMPLETE · awaiting controller / user visual sign-off）
+Active authorized module:           NONE（CC-IMP-07 已收口，等待下一份授权）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-07 — Archive, Restore & Change History（高风险模块：RSG-01 / RSG-03，须按 RELEASE-SAFETY-GATES.md 取证）
+Next candidate:                     CC-IMP-08 — Content AI Target & Source Intake（高风险模块：RSG-04 / RSG-06，须按 RELEASE-SAFETY-GATES.md 取证）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：97bf4d8）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：404ed94）
 Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9457,3 +9457,92 @@ P0 violations:          NONE
 - **浏览器（本地 dev，内容 6，TEST ONLY；会话过期后由用户本人重新登录）：** 1440 干净新标签页：Hard 9 项（不含 sections_complete）Pass ×7 + Blocker "Some media cannot be published" + Blocker "This content type is not enabled for public delivery yet."；Soft 首项 "Every section has text"；header Publish disabled 并显示原因；越界 0；robots noindex、canonical 0；console error 0。375 干净新标签页（`?locale=es`）：scrollWidth 375、越界 0、单列、侧栏在下方；"Publish Spanish" disabled；Warning "Some sections have empty text — Check: Text 1, Key points 1, Call to action 1, FAQ 1, Text 2."；无英文正文；console error 0。真实 BFF：指纹两次读取一致、EN / ES 指纹不同；带当前指纹 publish → 422 `not_ready` [media_public, type_public]；过期指纹 → 409 `changed_since_review`；缺指纹 → 422（field `expectedPublicationInputFingerprint`）；过期 revision → 409。前后核对：非空快照 0、published item 0、内容 6 revisions 13 → 13、两行 draft_revision 6 与 blocks md5 不变、4 个文件 `is_public` 仍 false；`publicEnabled` 未开启。dev server 首次启动已知 P2 `#app-manifest`，干净重启后无错误；验收后已停止。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-06 Review Fix 01"任务中写入。*
+
+---
+
+## CC-IMP-07 — Archive, Restore & Change History（2026-09-15）
+
+```text
+Module:                 CC-IMP-07 — Archive, Restore & Change History（Register CC-HIST）
+Type / Authorization:   TYPE A/B · A2 LOCAL_IMPLEMENTATION（Release-Safety-Gated 高风险模块）
+Status:                 COMPLETED（LOCAL COMPLETE · awaiting controller / user visual sign-off）
+Branch:                 review/cc-imp-07-archive-history
+Baseline:               404ed948281249dc9bfc0dc36d282d063135d806（CC-IMP-06 Review Fix 01）
+Commit:                 feat(content): add archive restore and history（本节所在 commit）
+CC-IMP-06 sign-off:     ACCEPTED LOCALLY / VISUALLY VERIFIED（Register CC-05 Acceptance → VISUALLY_VERIFIED，规则 15）
+Archive:                implemented
+Restore:                implemented
+Archived write protection: implemented（全部既有写入路径 fail closed）
+Change History:         implemented（只读）
+Rollback:               NO
+Permanent Delete:       NO
+AI:                     NO（provider calls 0）
+Public Delivery:        NO
+Sitemap:                NO
+Schema / dependency:    0 / 0
+1440 / 375:             PASS / PASS
+P0 Violations:          NONE
+Next candidate:         CC-IMP-08 — Content AI Target & Source Intake
+Next candidate authorized: NO
+```
+
+### 生命周期合同（Blueprint §8.2 / §14 / §23 / §24，原文执行）
+
+- **draft | published ─archive→ archived：** 一次 item PATCH `status = archived`、`archived_at = now`；全部语言快照保留但不可读（公开资格要求 item published）；locale 行、working copy、媒体链接、关系不变；不删除任何数据。
+- **archived ─restore→ draft：** 先一次批量 PATCH 全部语言行 `published_snapshot / published_revision / published_at = null`、`last_change_kind = restore`（item 仍 archived，不公开），再 item `status = draft`、`archived_at = null`。中断时 item 仍 archived 且不公开，reload 后重试完成；不会出现"draft item 仍持有已发布译文"。`first_published_at`（item 与各语言）保留，slug 锁持续。Restore 从不发布。
+- **非法迁移**（archive 已归档、restore 非归档）→ 403 `invalid_transition`（Blueprint §8.2 "403 on anything else"），0 写入。
+- **并发：** 请求必须带 `expectedLifecycleFingerprint`（服务端 sha256：item id、status、archived_at、first_published_at、各语言 id / locale / published_revision / published_at / first_published_at / 是否有快照；不含 Draft 文本）。服务端写入前重新读取，不一致 → 409 `lifecycle_changed`，0 写入。这是在 Blueprint "archive / restore body: none" 上经本施工单授权的更严格细化；Directus REST 无条件原子写，采用"写前重读 + 指纹"fail-closed，写入仍走 `contentAdminFetch`（无直接 SQL，保留 activity / revisions / actor）。
+- **路由：** `POST /api/admin/content-center/:id/archive`、`…/restore`（Blueprint §23 路径），admin-auth + CSRF Origin；`GET …/history?page=`。无 DELETE / purge / rollback 路由。
+- **默认列表：** 未选状态时隐藏已归档条目（`status ≠ archived`，Blueprint §24）；Status = Archived 可找到。
+- **Publication review 失效：** CC-IMP-06 的 `publicationInputFingerprint` 增加所请求语言行的 `last_change_kind`，Archive（status 变化）与 Restore（`last_change_kind = restore`）后旧审核一律 409 `changed_since_review`；归档状态下 readiness 另有 `item_not_archived` 阻断。
+
+### Archived 写保护（真实 BFF 与单元测试一致）
+
+Editor `PATCH /locales/:locale` 409 · SEO / OG `PUT /seo-locales` 409 · Start locale `POST /locales` 409 · Media & Relations `PUT` 409 · Unpublish 409 · Publish 422（`item_not_archived`；旧审核 409）。Overview / Editor / SEO / Media / Preview / History GET 仍 200。Workspace Shell 在归档状态显示 "Archived · Read only." 横幅；编辑组件原有的 archived 锁定继续生效。Restore 后 Editor / Start locale / Media & Relations 重新可写，Publish 仍受 readiness 与 `publicEnabled=false` 约束。
+
+### Change History
+
+- **路由 / UI：** `/admin/content-center/:id/history`（`pages/admin/content-center/[id]/history.vue` + `components/admin/content/ContentHistory.vue`），沿用 `PW-VIS-09` 模式：左侧 "Content audit trail"（时间、类别徽章、事件、语言 / 区域 / 变更字段名 / revision、操作人），右侧 Lifecycle 卡片（状态、首次发布、已发布语言、归档时间、Archive content 或 Restore to draft）与 Audit records 说明 + 限制。导航 Change history 原位启用；AI Source Intake / AI Proposal Review 仍 disabled。Overview Lifecycle 卡片链接到 Change history。
+- **来源：** 仅 Directus revisions（含 activity 的 action / timestamp / user）——`content_items`（本条）、`content_item_locales`（本条语言行）、`content_items_files` 与 `content_relations`（本条当前行）+ `last_change_kind`。无 audit 集合、无 history 表。
+- **事件映射（仅按记录证据）：** Content created · Language draft created · Draft updated / SEO updated（manual_edit，按字段）· AI proposal applied to draft（ai_apply）· Published / Unpublished（locale publish / unpublish）· Content status set to Published / Draft（item 状态）· Archived · Restored to draft · Publication cleared by restore · Media linked / Media details updated · Relation added / Relation updated · 其他一律 "Content updated"。操作人：姓名 → email → "System / Unknown"。
+- **安全：** 只输出事件标签与变更字段名，不输出值、raw revision JSON、IP、user agent；服务端二次过滤只保留本条行；最新在前，同时间按 revision id 稳定排序；25 条 / 页；每来源最多读 2000 条（超出标注 truncated）；只读、无回滚。
+- **已知限制（页面如实显示）：** Directus 对媒体链接 / 关系的 revision 不记录所属 content item，删除也无 revision，已移除的链接 / 关系无法归属，不列出；历史从现有 revisions 开始。
+
+### Safety Gates（RELEASE-SAFETY-GATES.md §7 收口）
+
+```text
+Safety Gates Touched:  RSG-01, RSG-03, RSG-04, RSG-05, RSG-07, RSG-08, RSG-09（RSG-06 NOT_TOUCHED · RSG-02 NOT_YET_EXERCISED）
+Gate Results:
+  RSG-01 Draft / Public isolation    PROVEN  归档不可发布（422）；Restore 回 Draft、清空全部快照、不发布（runtime Publish 仍 422）；旧审核 409；0 公开路由（route surface 测试）
+  RSG-03 Human-controlled lifecycle  PROVEN  Archive / Restore 仅独立 admin POST + 确认对话框 + lifecycle fingerprint；Save / Publish 代码不含 archive / restore；stale 409、非法 403，0 写入
+  RSG-04 AI no lifecycle authority   PROVEN  AI 模块不引用 lifecycle / history 服务或路由（静态测试）；AI runtime 未改
+  RSG-05 Locale publication integrity PROVEN Restore 一次清空所有语言快照、保留 EN / ES Draft 行与 first_published_at；无孤立已发布语言（单测 + 真实）
+  RSG-06 Public media                NOT_TOUCHED  Archive / Restore 只写 content_items / content_item_locales；真实核对 media_file_lifecycle 20 / 18 前后不变，无文件 / 链接写入
+  RSG-07 Permissions fail closed     PROVEN  真实中间件单测：未认证 401、非管理员 403、缺 / 错 Origin 403；nuxt-server 未改
+  RSG-08 Environment separation      PROVEN  仅本地开发库；production changes 0
+  RSG-09 Release layering            PROVEN  local commit only；push / merge / deploy 0
+Open Gates:            RSG-02（CC-IMP-10）· RSG-06 公开媒体代理归档检查（CC-IMP-10）· RSG-07 nuxt-server 字段 / 行权限（CC-IMP-10）· RSG-08 生产 provisioning + Node 22.22.2
+P0 Violations:         NONE
+```
+
+Golden / Negative：G-19 生命周期侧（Archive → 不可发布；Restore → Draft、无快照、仍不公开）、N-05 生命周期侧、N-07、N-08（lifecycle / publication 双指纹）、N-13、N-14。上一模块 OPEN 的"真实 Directus lifecycle accountability"已由 Archive / Restore 真实走通（见下）；publish / unpublish 的真实 revisions 仍需 public 类型（CC-IMP-10 / FINAL-RELEASE-AUDIT）。
+
+### 真实验证（本地 dev，TEST ONLY 内容 ID 4 "TEST ONLY — NOT FOR PUBLICATION B"，同次会话内恢复）
+
+- **真实 BFF：** restore（draft）→ 403 `invalid_transition`；过期指纹 archive → 409 `lifecycle_changed`；缺指纹 → 422；archive → 200（archived_at 写入、can_restore）；再 archive → 403；旧指纹 restore → 409；归档期间 Editor / SEO / Start locale / Media & Relations / Unpublish → 409，Publish（当前审核）→ 422 [item_not_archived, summary, type_public]，Publish（归档前审核）→ 409；5 个 GET → 200；默认列表不含 4，Archived 过滤 → [4]；restore → 200（draft、archived_at null、published_locales []）；再 restore → 403；归档前审核 Publish → 409；新审核 → 422（type_public）。
+- **Directus activity / revisions（SQL 核对，actor 均为管理员）：** revision 840 `content_items` 4 update `{status: archived, archived_at, …}`；841 `content_item_locales` 11 update `{published_* null, last_change_kind: restore}`；842 `content_items` 4 update `{status: draft, archived_at: null}`；随后 UI 流程产生同类记录。自基线以来 activity 只涉及 `content_items` / `content_item_locales`，无媒体、文件或其他集合写入。
+- **1440（干净新标签页，History）：** 标题 "Change history"、nav 当前项 Change history、disabled 仅 AI 两项；grid 575 + 300；越界 0；事件 5 条最新在前；Lifecycle Draft；按钮仅 "Archive content"；无 rollback / revert / delete 控件；console error 0。点击 Archive → alertdialog "Archive this content?" 三句原文、焦点在 Cancel；确认 → 成功提示、Archived 徽章与 "Archived · Read only." 横幅、"Restore to draft"、首条事件 Archived。
+- **375（同标签页 reload）：** scrollWidth 375、越界 0、单列 343、横幅 343 宽、Modules 可达、事件卡片可读（时间在正文下方）、Restore 按钮 309 宽；Restore 对话框 left 16 / right 359 / bottom 796 < 812，按钮 303 宽纵向堆叠、三句含 "Restoring does not publish the content."；确认 → Draft、横幅消失、"Archive content" 返回；console error 0。
+- **最终数据：** 内容 4 draft、archived_at null、working copy md5 不变（`last_change_kind` 为 restore）；内容 6 draft 未触碰；全库非空快照 0、published 0、archived 0；`media_file_lifecycle` 20 / 18 不变；负 id 夹具 0。dev server 首次启动已知 P2 `#app-manifest`，干净重启后无错误；验收后已停止。
+
+### 测试
+
+- 新增：`tests/contentLifecycle.test.ts`（archive / restore 合同、并发 409 / 非法 403 / 422、部分失败重试、快照与 first_published_at、slug 锁、Restore 不发布、全部归档写保护与只读 GET、Restore 后可写、旧 publication 审核 409、媒体不触碰、history 映射 / 回退 / 排序 / 分页 / 安全 DTO / 本条过滤、默认列表隐藏归档、静态边界 RSG-03 / RSG-04、真实 admin-auth 中间件）、`tests/components/ContentHistory.component.test.ts`（只读 trail、无回滚控件、确认对话框原文、带指纹 Archive / Restore、冲突 Reload、分页、归档横幅）。
+- 更新：`contentCenterUi`、`ContentWorkspace.component`、`contentFoundationRegistries`（route surface：archive / restore / history；仍无 delete / purge / rollback）。
+- 全量 vitest：67 files passed / 4 skipped，2522 passed / 56 skipped；真实 PostgreSQL revision guard 6 / 6、publish lifecycle 5 / 5；typecheck 0；lint 0；`nuxt build` Build complete。
+
+### Governance
+
+Blueprint / Freeze / RELEASE-SAFETY-GATES / D-033 / Charter / CLAUDE.md / Protocol / Decision Log 均未修改。Register：CC-05 Acceptance → `VISUALLY_VERIFIED`（规则 15）；CC-HIST Implementation → `AUTOMATED_CHECKED`、Acceptance `NOT_STARTED`（规则 16）。Node 实际 24.14.0，Node 22.22.2 Release Gate 仍 OPEN。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-07"任务中写入。*

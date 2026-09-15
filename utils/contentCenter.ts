@@ -48,7 +48,7 @@ export const CONTENT_WORKSPACE_MODULES: readonly ContentWorkspaceModule[] = [
   { key: 'ai-source-intake', label: 'AI Source Intake', icon: 'ai-source-intake', enabled: false, disabledReason: 'Not built yet' },
   { key: 'ai-proposal-review', label: 'AI Proposal Review', icon: 'sources-evidence', enabled: false, disabledReason: 'Not built yet' },
   { key: 'preview-publish', label: 'Preview & publish readiness', icon: 'share-distribution', enabled: true },
-  { key: 'history', label: 'Change history', icon: 'change-history', enabled: false, disabledReason: 'Not built yet' },
+  { key: 'history', label: 'Change history', icon: 'change-history', enabled: true },
 ]
 
 /** CC-IMP-03 — CC-02 Content Editor. */
@@ -86,7 +86,13 @@ export function contentWorkspaceModuleRoute(key: string, id: number | string): s
   if (key === 'media-relations') return contentMediaRelationsRoute(id)
   if (key === 'seo-locales') return contentSeoLocalesRoute(id)
   if (key === 'preview-publish') return contentPreviewPublishRoute(id)
+  if (key === 'history') return contentHistoryRoute(id)
   return null
+}
+
+/** CC-IMP-07 — CC-HIST Change History (also where Archive / Restore live). */
+export function contentHistoryRoute(id: number | string): string {
+  return `/admin/content-center/${encodeURIComponent(String(id))}/history`
 }
 
 /**

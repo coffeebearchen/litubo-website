@@ -508,6 +508,8 @@ export function publicationInputFingerprint(ctx: PublicationContext, locale: Con
       ? {
           title: row.title, slug: row.slug, summary: row.summary, blocks: row.blocks, seoTitle: row.seo_title,
           seoDescription: row.seo_description, canonicalPath: row.canonical_path, noindex: row.noindex, draftRevision: row.draft_revision,
+          // CC-IMP-07 — Restore writes `restore` on every locale row, so a review made before Archive / Restore is stale.
+          lastChangeKind: row.last_change_kind,
         }
       : null,
     slugTaken: ctx.slugTaken.has(locale),

@@ -8,6 +8,7 @@ import {
   CONTENT_WORKSPACE_MODULES,
   contentAllowedBlockLabels,
   contentBlockSummary,
+  contentHistoryRoute,
   contentLocaleSummary,
   contentPreviewPublishRoute,
   contentSeoLocalesRoute,
@@ -91,7 +92,15 @@ const seo = computed(() => contentSeoSummary(primary.value))
           <dt>First published</dt>
           <dd>{{ draft.first_published_at ? formatContentDateTime(draft.first_published_at) : 'Never published' }}</dd>
         </div>
+        <div v-if="draft.archived_at" class="cc-row">
+          <dt>Archived</dt>
+          <dd>{{ formatContentDateTime(draft.archived_at) }}</dd>
+        </div>
       </dl>
+      <p class="cc-card-note">
+        Archive, restore and the record's history are in
+        <NuxtLink :to="contentHistoryRoute(draft.id)" class="cc-note-link">Change history</NuxtLink>.
+      </p>
       <p class="cc-card-note">Publishing is a manual action in Preview &amp; publish readiness. Public pages for content are not enabled yet.</p>
     </section>
 

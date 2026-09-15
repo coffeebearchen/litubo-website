@@ -314,6 +314,64 @@ export interface ContentPublishedSnapshot {
   relations: { products: number[], content: number[] }
 }
 
+/** CC-IMP-07 — item lifecycle as the Change History page shows it (Blueprint §8, §24). */
+export interface AdminContentLifecycle {
+  status: ContentItemStatus
+  archived_at: string | null
+  first_published_at: string | null
+  /** Languages that currently hold a published snapshot (kept but unreadable while archived). */
+  published_locales: ContentLocale[]
+  /** Server fingerprint of the lifecycle and publication state; Archive / Restore must send it back. */
+  lifecycleFingerprint: string
+  can_archive: boolean
+  can_restore: boolean
+}
+
+export type ContentLifecycleOutcome = 'archived' | 'restored'
+
+/** CC-IMP-07 — `POST /api/admin/content-center/:id/archive` and `…/restore`. */
+export interface AdminContentLifecycleResult {
+  result: ContentLifecycleOutcome
+  lifecycle: AdminContentLifecycle
+}
+
+export type ContentHistoryEventKind =
+  | 'created' | 'locale_started' | 'draft_updated' | 'seo_updated' | 'ai_applied'
+  | 'published' | 'unpublished' | 'archived' | 'restored' | 'status_changed'
+  | 'media_linked' | 'media_updated' | 'relation_added' | 'relation_updated' | 'updated'
+
+export type ContentHistoryCategory = 'Lifecycle' | 'Publication' | 'Draft' | 'SEO' | 'Language' | 'Media' | 'Relations' | 'AI' | 'Other'
+
+/** CC-IMP-07 — one read-only event derived from a Directus revision. Only safe, human-readable fields. */
+export interface AdminContentHistoryEvent {
+  id: string
+  timestamp: string | null
+  kind: ContentHistoryEventKind
+  category: ContentHistoryCategory
+  label: string
+  locale: ContentLocale | null
+  /** What the event concerns, e.g. "Hero image · hero.png" or "Product". */
+  area: string | null
+  /** Changed field names in plain words — never the values. */
+  changes: string[]
+  actor: string
+  revision: number | null
+}
+
+/** CC-IMP-07 — `GET /api/admin/content-center/:id/history?page=`. */
+export interface AdminContentHistory {
+  item: { id: number, content_type: ContentTypeId, status: ContentItemStatus, title: string | null }
+  lifecycle: AdminContentLifecycle
+  events: AdminContentHistoryEvent[]
+  page: number
+  limit: number
+  total: number
+  pages: number
+  /** A source reached its read cap; older events may be missing. */
+  truncated: boolean
+  limitations: string[]
+}
+
 export interface AdminContentListItem {
   id: number
   content_type: ContentTypeId

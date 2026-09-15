@@ -114,6 +114,8 @@ describe('route surface', () => {
     const files = listFiles(adminDir).map(f => relative(adminDir, f).split('\\').join('/')).sort()
     expect(files).toEqual([
       '[id].get.ts',
+      '[id]/archive.post.ts',
+      '[id]/history.get.ts',
       '[id]/locales/[locale].patch.ts',
       '[id]/locales/[locale]/publish.post.ts',
       '[id]/locales/[locale]/unpublish.post.ts',
@@ -121,6 +123,7 @@ describe('route surface', () => {
       '[id]/media-relations.get.ts',
       '[id]/media-relations.put.ts',
       '[id]/preview-publish.get.ts',
+      '[id]/restore.post.ts',
       '[id]/seo-locales.get.ts',
       '[id]/seo-locales.put.ts',
       'index.get.ts',
@@ -128,10 +131,11 @@ describe('route surface', () => {
     ])
   })
 
-  it('has no item-level PATCH (content_type is immutable); lifecycle actions are only per-locale publish / unpublish', () => {
+  it('has no item-level PATCH or DELETE (content_type is immutable, no permanent delete); lifecycle actions are publish / unpublish / archive / restore', () => {
     const files = listFiles(adminDir).map(f => relative(adminDir, f).split('\\').join('/'))
     expect(files.some(f => /\[id\]\.patch\.ts$/.test(f))).toBe(false)
-    expect(files.some(f => /archive|restore|delete/i.test(f))).toBe(false)
+    expect(files.some(f => /delete|purge|trash|rollback|revert/i.test(f))).toBe(false)
+    expect(files.filter(f => /archive|restore/i.test(f)).sort()).toEqual(['[id]/archive.post.ts', '[id]/restore.post.ts'])
     expect(files.filter(f => /publish/i.test(f)).sort()).toEqual([
       '[id]/locales/[locale]/publish.post.ts',
       '[id]/locales/[locale]/unpublish.post.ts',

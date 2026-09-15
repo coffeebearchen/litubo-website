@@ -71,7 +71,7 @@ describe('ContentWorkspaceNav — mounted', () => {
     expect(active.text()).toBe('Overview')
     const disabled = wrapper.findAll('button.cc-nav-item--disabled')
     expect(disabled.map(b => b.find('.cc-nav-item-label').text())).toEqual([
-      'AI Source Intake', 'AI Proposal Review', 'Change history',
+      'AI Source Intake', 'AI Proposal Review',
     ])
     for (const button of disabled) {
       expect(button.attributes('disabled')).toBeDefined()
@@ -80,7 +80,7 @@ describe('ContentWorkspaceNav — mounted', () => {
     // Only the back link and the built modules are anchors (CC-IMP-06 enables Preview & publish readiness in place).
     expect(wrapper.findAll('a').map(a => a.attributes('href'))).toEqual([
       '/admin/content-center', '/admin/content-center/5/editor', '/admin/content-center/5/media-relations',
-      '/admin/content-center/5/seo-locales', '/admin/content-center/5/preview-publish',
+      '/admin/content-center/5/seo-locales', '/admin/content-center/5/preview-publish', '/admin/content-center/5/history',
     ])
   })
 
@@ -154,7 +154,10 @@ describe('ContentOverview — mounted', () => {
     expect(modules[2]).toMatch(/Media & relations\s*Available/)
     expect(modules[3]).toMatch(/SEO & locales\s*Available/)
     expect(modules[6]).toMatch(/Preview & publish readiness\s*Available/)
-    expect([modules[4], modules[5], modules[7]].every(text => text.includes('Not built yet'))).toBe(true)
+    expect(modules[7]).toMatch(/Change history\s*Available/)
+    expect([modules[4], modules[5]].every(text => text.includes('Not built yet'))).toBe(true)
+    // CC-IMP-07 — lifecycle actions live in Change history; the Overview only links there.
+    expect(card('Lifecycle status').findAll('a').map(a => a.attributes('href'))).toEqual(['/admin/content-center/5/history'])
     // CC-IMP-05 — the Overview points to SEO & locales for languages; it edits nothing itself.
     expect(card('Language status').find('a').attributes('href')).toBe('/admin/content-center/5/seo-locales')
   })

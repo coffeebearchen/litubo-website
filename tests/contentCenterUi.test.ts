@@ -72,7 +72,8 @@ describe('routes and workspace module rail', () => {
       'Overview', 'Content editor', 'Media & relations', 'SEO & locales',
       'AI Source Intake', 'AI Proposal Review', 'Preview & publish readiness', 'Change history',
     ])
-    expect(CONTENT_WORKSPACE_MODULES.filter(m => m.enabled).map(m => m.key)).toEqual(['overview', 'editor', 'media-relations', 'seo-locales', 'preview-publish'])
+    expect(CONTENT_WORKSPACE_MODULES.filter(m => m.enabled).map(m => m.key)).toEqual(['overview', 'editor', 'media-relations', 'seo-locales', 'preview-publish', 'history'])
+    expect(contentWorkspaceModuleRoute('history', 5)).toBe('/admin/content-center/5/history')
     expect(contentWorkspaceModuleRoute('editor', 5)).toBe('/admin/content-center/5/editor')
     expect(contentWorkspaceModuleRoute('media-relations', 5)).toBe('/admin/content-center/5/media-relations')
     expect(contentWorkspaceModuleRoute('seo-locales', 5)).toBe('/admin/content-center/5/seo-locales')
@@ -88,7 +89,7 @@ describe('routes and workspace module rail', () => {
     for (const file of UI_FILES) expect(existsSync(resolve(process.cwd(), file)), file).toBe(true)
     expect(existsSync(resolve(process.cwd(), 'pages/admin/content-center/[id].vue'))).toBe(false)
     expect(existsSync(resolve(process.cwd(), 'pages/admin/content-center.vue'))).toBe(false)
-    for (const future of ['ai-source-intake', 'ai-proposal-review', 'history']) {
+    for (const future of ['ai-source-intake', 'ai-proposal-review']) {
       expect(existsSync(resolve(process.cwd(), `pages/admin/content-center/[id]/${future}.vue`)), future).toBe(false)
     }
   })

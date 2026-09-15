@@ -47,6 +47,11 @@ const emit = defineEmits<{ refresh: [] }>()
       </div>
     </div>
 
+    <p v-if="status === 'archived'" class="cc-archived" role="status">
+      <strong>Archived · Read only.</strong>
+      This content cannot be edited or published. It can be restored to draft in Change history.
+    </p>
+
     <div class="cc-body">
       <slot name="nav" />
       <div class="cc-main">
@@ -138,6 +143,17 @@ const emit = defineEmits<{ refresh: [] }>()
 
 .cc-btn:hover:not(:disabled) { background: var(--color-surface-alt); }
 .cc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cc-archived {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid #E3C9A0;
+  border-radius: var(--radius-sm);
+  background: #FFF6E8;
+  color: #6B4300;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
 
 .cc-body {
   display: flex;
