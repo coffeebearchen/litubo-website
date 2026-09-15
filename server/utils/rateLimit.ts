@@ -1,5 +1,6 @@
 // In-process rate limiter. State resets on server restart.
-// Key format: `${ipHash}:${inquiryType}`
+// Key format: `inquiry:${ipHash}` — one bucket per client across every public inquiry endpoint
+// (server/utils/publicInquiry.ts); no request body field is part of the key.
 const store = new Map<string, number[]>()
 const WINDOW_MS = 60_000
 const MAX_REQUESTS = 3

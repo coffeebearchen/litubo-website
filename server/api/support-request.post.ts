@@ -1,36 +1,9 @@
-import { writeFile, mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { defineEventHandler } from 'h3'
+import { legacySupportRequestFields } from '~/server/utils/legacyInquiryAdapters'
+import { handlePublicInquiry } from '~/server/utils/publicInquiry'
 
-export default defineEventHandler(async (event) => {
-  const body = await readBody(event)
-
-  const { name, email, formId } = body
-  if (!name || !email || !formId) {
-    throw createError({ statusCode: 400, message: 'Missing required fields' })
-  }
-
-  const submission = {
-    id: `${formId}-${Date.now()}`,
-    formId,
-    locale: body.locale ?? 'en',
-    values: body,
-    consentAt: new Date().toISOString(),
-    sourceUrl: body.sourceUrl ?? '',
-    submittedAt: new Date().toISOString(),
-    status: 'new',
-  }
-
-  try {
-    const dir = join(process.cwd(), '.data', 'submissions')
-    await mkdir(dir, { recursive: true })
-    await writeFile(
-      join(dir, `${submission.id}.json`),
-      JSON.stringify(submission, null, 2),
-      'utf8'
-    )
-  } catch (err) {
-    console.error('[support-request API] Failed to write submission:', err)
-  }
-
-  return { ok: true, id: submission.id }
-})
+/**
+ * Legacy `/api/support-request`: a narrow compatibility adapter onto the canonical inquiry pipeline
+ * (FINAL-RELEASE-FIX-A). No page calls it; support pages use `/api/inquiries`. Nothing is written locally.
+ */
+export default defineEventHandler(event => handlePublicInquiry(event, legacySupportRequestFields))

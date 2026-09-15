@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CC-IMP-10 — Public Delivery & Sitemap V2（功能实现 Controller 签收 · b06c1d5 · not pushed；release readiness 曾被真实 DB 集成测试超时抖动阻塞 → TEST-INFRA-CONTENT-DB-STABILITY-01）
-Latest completed module:            TEST-INFRA-CONTENT-DB-STABILITY-01 — Real PostgreSQL Integration Test Stability（A2 · LOCAL COMPLETE · 等待 Controller 审查）
-Active authorized module:           NONE（TEST-INFRA-CONTENT-DB-STABILITY-01 已收口，等待 Controller 审查）
+Latest accepted module:             TEST-INFRA-CONTENT-DB-STABILITY-01 — Real PostgreSQL Integration Test Stability（Controller 接受为基线 · 4c66687 · not pushed）；其后 FINAL-RELEASE-AUDIT-01（A0 只读审计，未落盘）结论 RELEASE BLOCKED：P0-01 公开表单写本地文件 · P0-02 已发布 TEST 数据
+Latest completed module:            FINAL-RELEASE-FIX-A — Public Form Safety（A2 · LOCAL COMPLETE · P0-01 FIXED · 等待 Controller 审查）
+Active authorized module:           NONE（FINAL-RELEASE-FIX-A 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     NONE — 等待 Controller（不得自行启动 FINAL-RELEASE-AUDIT 或其他模块）
+Next candidate:                     NONE — 等待 Controller（P0-02 Published TEST data 仍 OPEN；后续修复模块未授权）
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：b06c1d5）
+Production release:                 NOT APPROVED（RELEASE BLOCKED：P0-02 仍 OPEN）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：4c66687）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9984,3 +9984,55 @@ Next candidate:                 NONE — 等待 Controller
 - 每条 SQL 一次 docker exec 的 helper 结构未优化（多个测试文件各自复制 helper），属可选的后续测试基础设施工作。
 
 *最后更新：2026-09-15，由 Claude Code 在"TEST-INFRA-CONTENT-DB-STABILITY-01"任务中写入。*
+
+---
+
+## FINAL-RELEASE-FIX-A — Public Form Safety（2026-09-15）
+
+```text
+Module:                         FINAL-RELEASE-FIX-A — Public Form Safety（仅修复 FINAL-RELEASE-AUDIT-01 P0-01）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller 施工单）
+Branch:                         review/final-release-fix-a-public-form-safety-01（基线 4c66687）
+Status:                         LOCAL COMPLETE · P0-01 FIXED · 等待 Controller 审查
+Public form filesystem writes:  0（修复前：三个遗留端点写本地 JSON，文件名含客户端 formId）
+Decision:                       无新增（Phase 6 已确立 inquiries 为全部公开表单的统一存储；下一个空闲 ID 仍为 D-036）
+Schema / permissions / flows:   未修改（前后 SELECT 一致：inquiries 22 行、nuxt-server 的 inquiries create / read / update 行、public policy 0、flows 0）
+Safety gates touched:           RSG-07（公开未认证写入端点）· RSG-09
+MASTER-ROADMAP:                 未修改（无 Final Release Fix 小节，里程碑未变）
+Push / merge / deploy:          NONE
+Next candidate:                 NONE — 等待 Controller（P0-02 Published TEST data 仍 OPEN）
+```
+
+**背景：** FINAL-RELEASE-AUDIT-01（A0 只读，报告未落盘）结论 RELEASE BLOCKED。P0-01：`server/api/contact.post.ts`、`support-request.post.ts` 用客户端 `formId` 拼出 `.data/submissions/<formId>-<时间戳>.json` 并写入原始请求体（可路径穿越），`spare-parts.post.ts` 同样落盘；三者均无请求体上限、限流、honeypot，consentAt 由服务端直接生成。仍在调用的只有 Become a Partner（`/api/contact`）；`/api/support-request`、`/api/spare-parts` 自 Phase 6（`6975a56`）起无页面调用，但仍可公开访问。其他未认证写端点只有 `/api/admin/auth/*`（不写文件），无 `useStorage`。本地 `.data/` 不存在，没有需要导入的历史 JSON。
+
+**实现：**
+- `server/utils/publicInquiry.ts`：唯一询盘管道——64 KB 字节级请求体上限（413，只接受 JSON 对象）→ 按客户端地址 hash 限流，四个端点共用一个桶（`inquiry:<hash>`，60 s 内 3 次，429）→ honeypot（`website` 有值：正常成功、不写入）→ 端点映射 → 校验（consent 必须严格为 `true`；邮箱；inquiry_type；locale ∈ en / es / pt；文本字段必须是字符串，否则 400）→ 显式 allowlist 构造记录（`consented_at` 只在校验通过后由服务端生成）→ 经 `nuxt-server` create 权限写 Directus `inquiries` → 既有 best-effort 通知与 HubSpot 同步（逻辑未改，仍分别受 `SMTP_HOST`、`HUBSPOT_ACCESS_TOKEN` 配置控制）。
+- `server/utils/legacyInquiryAdapters.ts`：三个遗留端点改为窄适配器——inquiry type 由服务端按端点指定（contact / support_request / spare_parts）；只读取各自遗留字段（来自其最后调用方，git `a2d1c4e`）；`formId` 只与本端点的遗留值比对（contact：contact、become-a-partner；support-request：technical-support、manual-request、service-training；spare-parts：spare-parts，可省略），不存储、不参与路径；客户端 `sourceUrl` 忽略，`source_url` 仍取同源 Referer。
+- `/api/inquiries` 改为调用同一管道。行为变化：consent 由"真值即可"收紧为严格 `true`；限流 key 不再包含请求体 `inquiry_type`；新增请求体上限、非对象 / 非字符串 400、未知 locale 400。
+- `server/utils/writeInquiry.ts`：任何存储失败统一 503（不再透传 Directus 的 400 / 403 / 500），日志只记录上游状态码。
+- `pages/company/become-a-partner.vue`（`/api/contact` 唯一调用方）：原先在提交处理函数内调用 `useRoute()` / `useI18n()`，vue-i18n 在 setup 之外直接抛错，请求从未发出、页面也无提示（浏览器实测：`status = error`，`/api/contact` 0 请求）。改为 setup 中读取，请求体格式不变；失败时显示既有文案 `common.errorBody`。
+
+**测试：** 新增 `tests/publicInquirySafety.test.ts`（28 项）：四个真实路由挂在 h3 + 真实 HTTP/1.1 上，Directus / 邮件 / HubSpot 为替身，所有文件写入函数为 no-op spy。覆盖路径穿越（7 种 formId × 3 端点 → 400、0 写入、仓库及上级目录无逃逸文件、源码静态检查）、413（声明长度与 chunked）、consent（true 通过；false / 缺失 / null / "true" / 1 / "yes" / {} / [true] 均 400）、honeypot、限流（第 4 次 429、四端点共用、改 body 字段不开新桶、honeypot 也计数）、校验、allowlist（存储键恰好等于 `nuxt-server` create 权限字段）、三个适配器与 `/api/inquiries` 的字段映射、HubSpot 仅在配置 token 时调用、Directus 各类失败均 503、日志不含 PII。红灯验证：临时换回修复前 `/api/contact` → 21 / 28 失败（含 50 次被拦截的文件写入调用），恢复后逐字节一致；修复后连续 5 次 28/28。
+
+**验证：**
+- 全量（`CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run --no-file-parallelism`）：78 files passed / 2 skipped，2779 passed / 45 skipped，0 failed，126.29 s（基线 77 files / 2751 passed，新增 1 个文件 28 项）。
+- typecheck 0 error；lint 0 error；`npm run build` Build complete；`git diff --check` 通过（暂存后 `git diff --cached --check` 另行复核）。
+- 本机 Node v24.14.0（`.nvmrc` 为 22.22.2，Node 22 合同仍 OPEN）。
+
+**真实本地验证（dev server，只走拒绝路径）：** 28/28——穿越 formId → 400 `Invalid form.`；consent false / 缺失 / "true" → 400；无效邮箱 / 非法 JSON / 数组 body → 400；四端点 70 KB → 413；四端点 honeypot → 200 且不写入；同一客户端第 4 次 → 429；六个 Phase 6 表单类型的布尔 consent 均通过（止于无效邮箱 400）。前后 SELECT 完全一致（`inquiries` 22 行、权限行、flows）；`.data/` 不存在；dev server 日志无提交内容。
+
+**未做真实有效提交（施工单 §19）：** `/api/inquiries` 管道含受配置控制的外部动作（SMTP 通知、HubSpot 同步）。不读取 `.env` 就无法证明本地未配置，因此没有做任何会写入的真实提交；有效写入路径由自动化测试证明。TEST ONLY 询盘 0 条，无需清理。真实写入证据留待获授权的 live validation（需先确认本地未配置 SMTP / HubSpot）。
+
+**浏览器验收：** 1440 与 375，新标签页，7 个调用页（become-a-partner、contact、technical-matching、find-a-distributor、support/technical-support、support/send-product-test、support/request-spare-parts）：表单渲染、同意框可见且默认未勾选、`scrollWidth = clientWidth`（1425/1425、375/375）、console error 0。Become a Partner：空提交 → 4 × `Required` + 同意提示；375 真实点击勾选同意框成功，提示均在视口内（right 351），截图可辨认；无效邮箱 → POST 400 → 错误框可见（1440：640 × 56，位于表单列内；此步 console 有 1 条预期的 400 资源错误）。1440 模拟视口下面板鼠标 / 键盘事件无法到达页面（既有工具限制），1440 提交以 `requestSubmit()` 触发页面自身提交处理并以 DOM 几何取证；1440 截图在面板中不可辨认。
+
+**Release Safety Gates：** RSG-07 公开询盘写入 PROVEN（本地范围：0 文件写入、字段 allowlist、只经 `nuxt-server` create 权限、fail closed 503、权限未扩大；已更新 `RELEASE-SAFETY-GATES.md` §4.3 RSG-07 行）；RSG-09 无 push / merge / deploy。Open：P0-02 Published TEST data；限流按 `x-forwarded-for` 首个地址计数，可信度取决于生产代理；无 Turnstile（P1-14）。P0 Violations：NONE。
+
+**已知 / 记录（不修复）：**
+- 限流为单实例内存 Map、无过期清理；伪造 `x-forwarded-for` 可绕过限流并使 Map 增长（生产代理配置 / P1-14）。
+- `inquiries.referrer`、`source_url` 为 varchar(255)，超长 Referer 会使写入失败（现为 503）；`tm_*` 长度上限 500 大于列宽 255，technical_matching 长字段同样写入失败（既有，P2）。
+- technical-matching、find-a-distributor、support/*、request-spare-parts 页面无服务端失败提示（既有，P2）。
+- Directus `hubspot_sync_status` 选项（success / error / timeout）与代码写入值（synced / failed）不一致（既有，P2）。
+- dev 模式错误 JSON 含 stack（Nitro dev 行为）。
+- `docs/ADMIN-CMS-SPEC.md` 仍把"三个 API 写本地 JSON"描述为待迁移计划（文档滞后，P2）。
+
+*最后更新：2026-09-15，由 Claude Code 在"FINAL-RELEASE-FIX-A"任务中写入。*

@@ -15,8 +15,11 @@ export async function writeInquiry(
     return { id: res?.data?.id ?? null }
   }
   catch (err: unknown) {
-    // Surface Directus connection failures as 503 to the client
+    // Any failure to store the inquiry (Directus down, not configured, or refusing the write) is
+    // 503 to the public client: never a fake success, never Directus's own status or body.
+    // Only the upstream status code is logged, never the payload.
     const status = (err as { response?: { status?: number } })?.response?.status
-    throw createError({ statusCode: status && status >= 400 && status < 600 ? status : 503, message: 'CMS unavailable. Please try again later.' })
+    console.error('[inquiry] Directus write failed', { status: status ?? null })
+    throw createError({ statusCode: 503, message: 'CMS unavailable. Please try again later.' })
   }
 }

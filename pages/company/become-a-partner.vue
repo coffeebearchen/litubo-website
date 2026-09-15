@@ -1,6 +1,7 @@
 <script setup lang="ts">
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
+const route = useRoute()
 useSeoHead({ title: t('seo.partner.title'), description: t('seo.partner.description'), canonicalPath: '/company/become-a-partner' })
 
 const form = reactive({ name: '', company: '', email: '', country: '', message: '', consent: false })
@@ -23,7 +24,8 @@ async function submit() {
   try {
     await $fetch('/api/contact', {
       method: 'POST',
-      body: { ...form, formId: 'become-a-partner', sourceUrl: useRoute().fullPath, locale: useI18n().locale.value },
+      // Route and locale are read in setup: useRoute() / useI18n() called inside this handler threw before the request was sent.
+      body: { ...form, formId: 'become-a-partner', sourceUrl: route.fullPath, locale: locale.value },
     })
     status.value = 'success'
   } catch {
@@ -59,6 +61,7 @@ async function submit() {
             <span>I agree to the processing of my personal data in accordance with the <NuxtLink :to="localePath('/privacy-policy')">Privacy Policy</NuxtLink>.</span>
           </label>
           <p v-if="errors.consent" class="consent-error" role="alert">{{ errors.consent }}</p>
+          <p v-if="status === 'error'" class="form-error" role="alert">{{ t('common.errorBody') }}</p>
           <BaseButton type="submit" variant="primary" size="lg" :disabled="status === 'loading'" class="submit-btn">
             {{ status === 'loading' ? t('common.loading') : t('pages.partner.submitLabel') }}
           </BaseButton>
@@ -80,6 +83,7 @@ async function submit() {
 .consent-checkbox { margin-top: 3px; flex-shrink: 0; accent-color: var(--color-primary); }
 .consent-label a { color: var(--color-primary); text-decoration: underline; }
 .consent-error { font-size: var(--text-xs); color: #c0392b; margin-bottom: var(--space-4); }
+.form-error { margin-top: var(--space-4); padding: var(--space-4); background: #fff5f5; border: 1px solid #f5c6c6; border-radius: var(--radius-sm); color: #c0392b; font-size: var(--text-sm); }
 .submit-btn { margin-top: var(--space-5); }
 .form-success { padding: var(--space-8); background: var(--color-canvas); border: 1px solid var(--color-line); border-radius: var(--radius-sm); }
 .form-success h2 { font-family: var(--font-display); font-size: var(--text-2xl); color: var(--color-primary); margin-bottom: var(--space-3); }
