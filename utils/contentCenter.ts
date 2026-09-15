@@ -44,7 +44,7 @@ export const CONTENT_WORKSPACE_MODULES: readonly ContentWorkspaceModule[] = [
   { key: 'overview', label: 'Overview', icon: 'overview', enabled: true },
   { key: 'editor', label: 'Content editor', icon: 'page-content', enabled: true },
   { key: 'media-relations', label: 'Media & relations', icon: 'media-resources', enabled: true },
-  { key: 'seo-locales', label: 'SEO & locales', icon: 'seo-locales', enabled: false, disabledReason: 'Not built yet' },
+  { key: 'seo-locales', label: 'SEO & locales', icon: 'seo-locales', enabled: true },
   { key: 'ai-source-intake', label: 'AI Source Intake', icon: 'ai-source-intake', enabled: false, disabledReason: 'Not built yet' },
   { key: 'ai-proposal-review', label: 'AI Proposal Review', icon: 'sources-evidence', enabled: false, disabledReason: 'Not built yet' },
   { key: 'preview-publish', label: 'Preview & publish readiness', icon: 'share-distribution', enabled: false, disabledReason: 'Not built yet' },
@@ -61,12 +61,36 @@ export function contentMediaRelationsRoute(id: number | string): string {
   return `/admin/content-center/${encodeURIComponent(String(id))}/media-relations`
 }
 
+/** CC-IMP-05 — CC-04 SEO & Locales, optionally opened on one language. */
+export function contentSeoLocalesRoute(id: number | string, locale?: string): string {
+  const base = `/admin/content-center/${encodeURIComponent(String(id))}/seo-locales`
+  return locale && locale !== DEFAULT_CONTENT_LOCALE ? `${base}?locale=${encodeURIComponent(locale)}` : base
+}
+
+/** CC-IMP-05 — the Content Editor on one language; the default language needs no query. */
+export function contentEditorLocaleRoute(id: number | string, locale: string): string {
+  const base = contentEditorRoute(id)
+  return locale === DEFAULT_CONTENT_LOCALE ? base : `${base}?locale=${encodeURIComponent(locale)}`
+}
+
 /** Routes exist only for enabled modules. */
 export function contentWorkspaceModuleRoute(key: string, id: number | string): string | null {
   if (key === 'overview') return contentOverviewRoute(id)
   if (key === 'editor') return contentEditorRoute(id)
   if (key === 'media-relations') return contentMediaRelationsRoute(id)
+  if (key === 'seo-locales') return contentSeoLocalesRoute(id)
   return null
+}
+
+/**
+ * CC-IMP-05 — `?locale=` on a workspace page. Missing or empty means the default
+ * language; anything that is not a site language is `null` (shown as an error,
+ * never created).
+ */
+export function parseContentLocaleQuery(value: unknown): ContentLocale | null {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (raw === undefined || raw === null || raw === '') return DEFAULT_CONTENT_LOCALE
+  return isContentLocale(raw) ? raw : null
 }
 
 // ── Labels ──────────────────────────────────────────────────────────────────

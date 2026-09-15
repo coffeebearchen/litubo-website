@@ -9,6 +9,7 @@ import {
   contentAllowedBlockLabels,
   contentBlockSummary,
   contentLocaleSummary,
+  contentSeoLocalesRoute,
   contentSeoSummary,
   contentTypeLabel,
   formatContentDateTime,
@@ -114,6 +115,10 @@ const seo = computed(() => contentSeoSummary(primary.value))
           </span>
         </li>
       </ul>
+      <p class="cc-card-note">
+        Languages are started and their search settings edited in
+        <NuxtLink :to="contentSeoLocalesRoute(draft.id)" class="cc-note-link">SEO &amp; locales</NuxtLink>.
+      </p>
     </section>
 
     <section class="cc-card" aria-labelledby="cc-structure-heading">
@@ -255,6 +260,7 @@ const seo = computed(() => contentSeoSummary(primary.value))
 }
 
 .cc-mono { font-family: 'Courier New', monospace; }
+.cc-note-link { color: var(--color-primary); }
 .cc-muted { color: var(--color-ink-muted) !important; font-style: italic; }
 
 .cc-type-value {

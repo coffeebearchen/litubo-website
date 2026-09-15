@@ -4,6 +4,14 @@ import type { FetchFn } from './mediaLifecycle'
 import { blockStructureForNewLocale, createDefaultBlocks, validateBlocks } from './contentBlocks'
 import { MAX_BLOCKS_JSON_BYTES, type ContentBlock } from '../../utils/contentBlocks'
 import { CONTENT_LOCALES, DEFAULT_CONTENT_LOCALE, isContentLocale, type ContentLocale } from '../../utils/contentLocales'
+import {
+  CONTENT_SEO_DESCRIPTION_MAX,
+  CONTENT_SEO_TITLE_MAX,
+  CONTENT_SUMMARY_MAX,
+  CONTENT_TITLE_MAX,
+  validateCanonicalPath,
+} from '../../utils/contentSeo'
+import { validateContentSlug } from '../../utils/contentSlug'
 import { getContentType, isContentTypeId } from '../../utils/contentTypes'
 import type {
   AdminContentDraft,
@@ -33,9 +41,7 @@ import type {
  * Every rejection writes nothing.
  */
 
-export const CONTENT_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-export const CONTENT_SLUG_MAX = 100
-export const RESERVED_CONTENT_SLUGS = ['new', 'index', 'preview', 'draft', 'edit', 'admin', 'api', 'search', 'page', 'all'] as const
+export { CONTENT_SLUG_MAX, CONTENT_SLUG_RE, RESERVED_CONTENT_SLUGS, validateContentSlug, type SlugValidation } from '../../utils/contentSlug'
 
 export const CONTENT_CREATE_FIELDS = ['content_type', 'title', 'slug', 'summary'] as const
 export const LOCALE_CREATE_FIELDS = ['locale', 'title', 'slug', 'summary'] as const
@@ -44,11 +50,10 @@ export const LOCALE_UPDATE_FIELDS = ['title', 'slug', 'summary', 'blocks', 'seo_
 export const CREATE_BODY_MAX_BYTES = 16 * 1024
 export const UPDATE_BODY_MAX_BYTES = MAX_BLOCKS_JSON_BYTES + 64 * 1024
 
-const TITLE_MAX = 160
-const SUMMARY_MAX = 400
-const SEO_TITLE_MAX = 120
-const SEO_DESCRIPTION_MAX = 320
-const CANONICAL_PATH_MAX = 255
+const TITLE_MAX = CONTENT_TITLE_MAX
+const SUMMARY_MAX = CONTENT_SUMMARY_MAX
+const SEO_TITLE_MAX = CONTENT_SEO_TITLE_MAX
+const SEO_DESCRIPTION_MAX = CONTENT_SEO_DESCRIPTION_MAX
 const LIST_LIMIT_MAX = 100
 const LIST_LIMIT_DEFAULT = 25
 const LIST_SEARCH_MAX = 100
@@ -97,20 +102,6 @@ export function parseContentItemId(raw: unknown): number {
   return id
 }
 
-export type SlugValidation = { ok: true, slug: string } | { ok: false, message: string }
-
-export function validateContentSlug(value: unknown): SlugValidation {
-  if (typeof value !== 'string' || value.length === 0) return { ok: false, message: 'slug is required.' }
-  if (value.length > CONTENT_SLUG_MAX) return { ok: false, message: `slug must be at most ${CONTENT_SLUG_MAX} characters.` }
-  if (!CONTENT_SLUG_RE.test(value)) {
-    return { ok: false, message: 'slug may contain only lowercase letters, digits and single hyphens between them.' }
-  }
-  if ((RESERVED_CONTENT_SLUGS as readonly string[]).includes(value)) {
-    return { ok: false, message: `"${value}" is a reserved slug.` }
-  }
-  return { ok: true, slug: value }
-}
-
 function requireSlug(value: unknown): string {
   const result = validateContentSlug(value)
   if (!result.ok) fail(422, result.message, { field: 'slug' })
@@ -132,12 +123,11 @@ function optionalText(value: unknown, field: string, max: number): string | null
   return text.length > 0 ? text : null
 }
 
+/** Same-site path only (utils/contentSeo.ts): never an external, protocol-relative or scheme URL. */
 function optionalCanonicalPath(value: unknown): string | null {
-  const path = optionalText(value, 'canonical_path', CANONICAL_PATH_MAX)
-  if (path !== null && !/^\/(?!\/)\S*$/.test(path)) {
-    fail(422, 'canonical_path must be an internal path starting with "/".', { field: 'canonical_path' })
-  }
-  return path
+  const result = validateCanonicalPath(value)
+  if (!result.ok) fail(422, result.message, { field: 'canonical_path' })
+  return result.path
 }
 
 /** Directus reports a violated unique constraint/index as RECORD_NOT_UNIQUE. */
@@ -185,7 +175,7 @@ async function assertSlugAvailable(fetch: FetchFn, locale: ContentLocale, slug: 
   }
 }
 
-async function getItemCore(fetch: FetchFn, itemId: number): Promise<ItemCore> {
+export async function getItemCore(fetch: FetchFn, itemId: number): Promise<ItemCore> {
   const res = await fetch<{ data: ItemCore[] }>(
     `/items/content_items?filter[id][_eq]=${itemId}&fields=id,content_type,status&limit=1`,
   )
@@ -194,7 +184,7 @@ async function getItemCore(fetch: FetchFn, itemId: number): Promise<ItemCore> {
   return row
 }
 
-function assertEditable(item: ItemCore): void {
+export function assertEditable(item: ItemCore): void {
   if (item.status === 'archived') fail(409, 'This content item is archived and cannot be edited.')
 }
 
@@ -384,17 +374,37 @@ export async function createLocaleDraft(fetch: FetchFn, itemId: number, rawBody:
   return getContentDraft(fetch, itemId)
 }
 
-export async function updateLocaleDraft(fetch: FetchFn, itemId: number, rawLocale: unknown, rawBody: unknown): Promise<AdminContentDraft> {
+export const SLUG_LOCKED_MESSAGE = 'The slug is locked because this language has been published. A published URL cannot be changed.'
+
+/** A validated locale working-copy change that has not been written yet. */
+export interface PreparedLocaleUpdate {
+  locale: ContentLocale
+  row: AdminContentLocaleDraft
+  patch: Body
+}
+
+/**
+ * Every check a locale save needs — route, allowlist, revision, archive state,
+ * slug lock and field rules — without writing. `allowedFields` narrows the
+ * allowlist for a module that edits only some fields (CC-IMP-05 SEO & Locales).
+ */
+export async function prepareLocaleDraftUpdate(
+  fetch: FetchFn,
+  itemId: number,
+  rawLocale: unknown,
+  rawBody: unknown,
+  allowedFields: readonly (typeof LOCALE_UPDATE_FIELDS)[number][] = LOCALE_UPDATE_FIELDS,
+): Promise<PreparedLocaleUpdate> {
   if (!isContentLocale(rawLocale)) fail(404, 'Unknown locale.')
   const locale = rawLocale
   const body = assertJsonObject(rawBody)
-  assertOnlyAllowedFields(body, ['expectedDraftRevision', ...LOCALE_UPDATE_FIELDS])
+  assertOnlyAllowedFields(body, ['expectedDraftRevision', ...allowedFields])
 
   const expected = body.expectedDraftRevision
   if (!Number.isInteger(expected) || (expected as number) < 1) {
     fail(422, 'expectedDraftRevision is required.', { field: 'expectedDraftRevision' })
   }
-  const fieldKeys = LOCALE_UPDATE_FIELDS.filter(key => body[key] !== undefined)
+  const fieldKeys = allowedFields.filter(key => body[key] !== undefined)
   if (fieldKeys.length === 0) fail(400, 'No updatable fields provided.')
 
   const item = await getItemCore(fetch, itemId)
@@ -411,6 +421,11 @@ export async function updateLocaleDraft(fetch: FetchFn, itemId: number, rawLocal
   const patch: Body = {}
   if (body.title !== undefined) patch.title = requireTitle(body.title)
   if (body.slug !== undefined) {
+    // CC-IMP-05 — Blueprint §14: the slug is locked once this locale has been
+    // published; unpublish, archive and restore do not unlock it.
+    if (row.first_published_at && body.slug !== row.slug) {
+      fail(422, SLUG_LOCKED_MESSAGE, { field: 'slug', slugLocked: true })
+    }
     const slug = requireSlug(body.slug)
     if (slug !== row.slug) await assertSlugAvailable(fetch, locale, slug, row.id)
     patch.slug = slug
@@ -432,18 +447,27 @@ export async function updateLocaleDraft(fetch: FetchFn, itemId: number, rawLocal
 
   patch.draft_revision = row.draft_revision + 1
   patch.last_change_kind = 'manual_edit'
+  return { locale, row, patch }
+}
 
+/** One PATCH of the prepared locale row; the database revision guard is the final authority. */
+export async function commitLocaleDraftUpdate(fetch: FetchFn, itemId: number, prepared: PreparedLocaleUpdate): Promise<void> {
   try {
-    await writeOrConflict(fetch(`/items/content_item_locales/${row.id}?fields=id`, { method: 'PATCH', body: patch }))
+    await writeOrConflict(fetch(`/items/content_item_locales/${prepared.row.id}?fields=id`, { method: 'PATCH', body: prepared.patch }))
   } catch (err) {
     // CC-IMP-01-FIX-01-R1 — the database guard rejected a concurrent save that
     // passed the pre-check with the same revision. Nothing was written.
     if (isDraftRevisionConflict(err)) {
-      const current = await getLocaleRow(fetch, itemId, locale)
+      const current = await getLocaleRow(fetch, itemId, prepared.locale)
       fail(409, 'This draft was changed since it was loaded. Reload it before saving.', { currentDraftRevision: current?.draft_revision ?? null })
     }
     throw err
   }
+}
+
+export async function updateLocaleDraft(fetch: FetchFn, itemId: number, rawLocale: unknown, rawBody: unknown): Promise<AdminContentDraft> {
+  const prepared = await prepareLocaleDraftUpdate(fetch, itemId, rawLocale, rawBody)
+  await commitLocaleDraftUpdate(fetch, itemId, prepared)
   // The revision returned here is read back from the database after the write.
   return getContentDraft(fetch, itemId)
 }

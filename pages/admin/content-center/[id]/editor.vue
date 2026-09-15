@@ -1,20 +1,37 @@
 <script setup lang="ts">
+import type { RouteLocationNormalized } from 'vue-router'
 import type { AdminContentDraft, AdminContentDraftDetail } from '~/types/content-center'
 import ContentEditor from '~/components/admin/content/ContentEditor.vue'
 import {
   CONTENT_CENTER_LIST_ROUTE,
+  CONTENT_LOCALE_LABELS,
+  CONTENT_LOCALE_OPTIONS,
   contentApiErrorStatus,
+  contentEditorLocaleRoute,
+  contentEditorRoute,
+  contentLocaleSummary,
+  contentSeoLocalesRoute,
   contentTypeLabel,
   interpretContentApiError,
+  parseContentLocaleQuery,
   primaryContentLocale,
 } from '~/utils/contentCenter'
+import { DEFAULT_CONTENT_LOCALE, type ContentLocale } from '~/utils/contentLocales'
 import { EDITOR_LEAVE_MESSAGE } from '~/utils/contentEditor'
 
-/** CC-IMP-03 — CC-02 Content Editor for the default-locale working copy. */
+/**
+ * CC-IMP-03 — CC-02 Content Editor.
+ * CC-IMP-05 — `?locale=es|pt` edits that language's own draft; no query is the
+ * default language. An unknown language is an error and a language without a
+ * draft is never created here (SEO & locales starts languages).
+ */
 definePageMeta({ layout: 'admin' })
 
 const route = useRoute()
 const id = String(route.params.id)
+const rawLocale = computed(() => (Array.isArray(route.query.locale) ? route.query.locale[0] : route.query.locale))
+const locale = computed<ContentLocale | null>(() => parseContentLocaleQuery(route.query.locale))
+const localeLabel = computed<string>(() => CONTENT_LOCALE_OPTIONS.find(option => option.value === locale.value)?.label ?? '')
 
 const { data, pending, error, refresh } = await useFetch<AdminContentDraftDetail>(
   `/api/admin/content-center/${encodeURIComponent(id)}`,
@@ -30,6 +47,8 @@ const recordTitle = computed(() => {
   if (!draft) return ''
   return primaryContentLocale(draft.locales)?.title || `Untitled content #${draft.id}`
 })
+
+const languages = computed(() => (data.value ? contentLocaleSummary(data.value) : []))
 
 const editorRef = ref<InstanceType<typeof ContentEditor> | null>(null)
 const status = ref({ dirty: false, saving: false, justSaved: false, conflict: false, revision: 0 })
@@ -48,6 +67,11 @@ function syncShell(draft: AdminContentDraft) {
 
 onBeforeRouteLeave(() => {
   if (status.value.dirty && !window.confirm(EDITOR_LEAVE_MESSAGE)) return false
+})
+
+/** Switching language stays on this page; unsaved edits are never dropped silently. */
+onBeforeRouteUpdate((to: RouteLocationNormalized, from: RouteLocationNormalized) => {
+  if (to.query.locale !== from.query.locale && status.value.dirty && !window.confirm(EDITOR_LEAVE_MESSAGE)) return false
 })
 </script>
 
@@ -68,6 +92,15 @@ onBeforeRouteLeave(() => {
     <div class="cc-page-state-actions">
       <button type="button" class="cc-page-state-retry" @click="refresh()">Retry</button>
       <NuxtLink :to="CONTENT_CENTER_LIST_ROUTE" class="cc-page-state-link">← Back to Content Center</NuxtLink>
+    </div>
+  </div>
+
+  <div v-else-if="locale === null" class="cc-page-state" role="alert">
+    <p class="cc-page-state-title">Unknown language</p>
+    <p class="cc-page-state-hint">“{{ rawLocale }}” is not a language of this site. Nothing was created.</p>
+    <div class="cc-page-state-actions">
+      <NuxtLink :to="contentEditorRoute(data.id)" class="cc-page-state-link">Open the {{ CONTENT_LOCALE_LABELS[DEFAULT_CONTENT_LOCALE] }} draft</NuxtLink>
+      <NuxtLink :to="contentSeoLocalesRoute(data.id)" class="cc-page-state-link">SEO &amp; locales</NuxtLink>
     </div>
   </div>
 
@@ -101,9 +134,25 @@ onBeforeRouteLeave(() => {
       />
     </template>
 
+    <nav class="cc-locale-bar" aria-label="Draft language">
+      <p class="cc-locale-current">
+        Editing language: <strong>{{ localeLabel }}</strong><template v-if="locale === DEFAULT_CONTENT_LOCALE"> (default)</template>
+      </p>
+      <ul class="cc-locale-links" role="list">
+        <li v-for="language in languages" :key="language.code">
+          <span v-if="language.code === locale" class="cc-locale-link cc-locale-link--current" aria-current="true">{{ language.label }}</span>
+          <NuxtLink v-else-if="language.state !== 'not_started'" :to="contentEditorLocaleRoute(data.id, language.code)" class="cc-locale-link">{{ language.label }}</NuxtLink>
+          <span v-else class="cc-locale-link cc-locale-link--off">{{ language.label }} · Not started</span>
+        </li>
+        <li><NuxtLink :to="contentSeoLocalesRoute(data.id, locale)" class="cc-locale-link cc-locale-link--manage">Manage languages</NuxtLink></li>
+      </ul>
+    </nav>
+
     <ContentEditor
       ref="editorRef"
+      :key="locale"
       :draft="data"
+      :locale="locale"
       @status="status = $event"
       @saved="syncShell"
       @reloaded="syncShell"
@@ -133,6 +182,28 @@ onBeforeRouteLeave(() => {
 .cc-editor-save:hover:not(:disabled) { background: var(--color-primary-deep); }
 .cc-editor-save:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.cc-locale-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.cc-locale-current { margin: 0; font-size: var(--text-sm); color: var(--color-ink); }
+.cc-locale-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.cc-locale-link { font-size: var(--text-xs); color: var(--color-primary); text-decoration: none; }
+.cc-locale-link:hover { text-decoration: underline; }
+.cc-locale-link--current { color: var(--color-ink); font-weight: 600; }
+.cc-locale-link--off { color: var(--color-ink-muted); }
+.cc-locale-link--manage { font-weight: 500; }
+
 .cc-page-state {
   max-width: 520px;
   margin: var(--space-8) auto;
@@ -159,5 +230,7 @@ onBeforeRouteLeave(() => {
 @media (max-width: 767px) {
   .cc-editor-actions { flex: 1 1 100%; justify-content: space-between; }
   .cc-editor-save { flex: 1 1 auto; }
+  .cc-locale-bar { flex-direction: column; align-items: flex-start; }
+  .cc-locale-link { display: inline-flex; min-height: 32px; align-items: center; }
 }
 </style>

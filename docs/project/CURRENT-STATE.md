@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CC-IMP-01 Content Foundation + CC-IMP-01-FIX-01-R1（accepted locally by the CC-IMP-02 work order · local commit 5a8a640 · not pushed）
-Latest completed module:            CC-IMP-04 — Media & Relations（LOCAL COMPLETE · awaiting controller review）
-Active authorized module:           NONE（CC-IMP-04 已收口，等待下一份授权）
+Latest accepted module:             CC-IMP-04 — Media & Relations（CC-IMP-03 Content Editor 与 CC-IMP-04 经 Controller / 用户视觉签收，由 CC-IMP-05 施工单确认 · local commit 1fafcc2 · not pushed）
+Latest completed module:            CC-IMP-05 — SEO & Locales（LOCAL COMPLETE · awaiting controller / user visual sign-off）
+Active authorized module:           NONE（CC-IMP-05 已收口，等待下一份授权）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-05 — SEO & Locales
+Next candidate:                     CC-IMP-06 — Preview, Readiness & Publish
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：12fe880）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：1fafcc2）
 Local Directus schema:              Content Foundation + draft revision guard trigger (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9142,3 +9142,89 @@ CC-IMP-05:                     NOT STARTED · NOT AUTHORIZED
 ```
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-04"任务中写入。*
+
+---
+
+## CC-IMP-05 — SEO & Locales（2026-09-15）
+
+```text
+Module:                 CC-IMP-05 — SEO & Locales（Register CC-04）
+Type / Authorization:   TYPE A/B · A2 LOCAL_IMPLEMENTATION
+Status:                 COMPLETED（LOCAL COMPLETE · awaiting controller / user visual sign-off）
+Branch:                 review/cc-imp-05-seo-locales
+Baseline:               1fafcc262880098e980de0bf23e18b34846307a5
+Commit:                 feat(content): add seo and locale workspace（本节所在 commit）
+SEO:                    implemented
+Locale-aware Draft:     implemented
+Locale start:           implemented
+Editor locale support:  implemented
+Slug lock:              implemented（server + UI）
+OG image:               implemented
+AI:                     0（provider calls 0）
+Translation:            0
+Publish:                0
+Public:                 0（无公开路由 / sitemap / nuxt-server 权限变更）
+Schema:                 0（collections / fields / indexes / triggers / functions 均未变）
+1440:                   PASS
+375:                    PASS
+Next candidate:         CC-IMP-06 — Preview, Readiness & Publish
+Next candidate authorized: NO
+```
+
+### 范围与实现
+
+- **路由：** `/admin/content-center/:id/seo-locales`（`pages/admin/content-center/[id]/seo-locales.vue` + `components/admin/content/ContentSeoLocales.vue`）。工作台导航 `SEO & locales` 启用；AI Source Intake / AI Proposal Review / Preview & publish / Change history 仍为 disabled，未建路由。
+- **语言来源：** `utils/contentLocales.ts`（与 nuxt.config i18n `locales` / `defaultLocale` 有测试守护）+ `runtimeConfig.public.publishedLocales`（由 BFF 返回为 `published_locales`，当前 `['en']`）。未新增 Settings、表或字段。
+- **语言状态（Blueprint §8.1，派生不存储）：** 无行 = Not started；`published_revision` 为空 = Draft；`draft_revision > published_revision` = Published · unpublished changes；否则 Published。无 fallback：未开始的语言显示 Not started，预览为空。
+- **Start locale：** 复用 `POST /api/admin/content-center/:id/locales`，只发送用户输入的 `locale` / `title` / `slug`（slug 预填默认语言 slug，可编辑）。Foundation 要求 title 非空，且按 Blueprint §15 复制默认语言 block 结构、文本为空；实测 ES 行 blocks 类型与 EN 一致、全部文本为空，未复制英文内容。UI 明示 "Nothing is translated or published automatically."；页面有未保存改动时不可开始。
+- **Locale-aware Editor：** `editor?locale=es|pt`；无 query = 默认语言；未知值（如 `xx`）显示 "Unknown language … Nothing was created."；未开始语言显示 "Go to SEO & locales to start this language"，不发请求、不创建。页面顶部 locale 栏明示 "Editing language: Spanish"；切换语言有未保存保护（`onBeforeRouteUpdate`）。
+- **SEO 字段：** slug、`seo_title`（≤120，空则回退 title）、`seo_description`（≤320，空则回退 summary）、`canonical_path`、`noindex`。只发送变化字段 + `expectedDraftRevision`；409 保留本地编辑，确认后才 Reload。
+- **Canonical：** 共享规则 `utils/contentSeo.ts#validateCanonicalPath`（BFF 与页面同一份）：空 = 默认；否则必须以单个 `/` 开头，拒绝 `//`、空白、反斜杠、控制字符（因此 `http(s)://`、`javascript:`、协议相对 URL 均被拒）。UI 不显示任何生产 URL："Default public canonical will be resolved when Public Delivery is enabled."
+- **Slug lock（Blueprint §14）：** `server/utils/contentDraft.ts` 抽出 `prepareLocaleDraftUpdate` / `commitLocaleDraftUpdate`（原 `updateLocaleDraft` 行为不变），在 prepare 中：locale 行 `first_published_at` 非空且 slug 变化 → 422 `{ field: 'slug', slugLocked: true }`。普通 locale PATCH 与 SEO PUT 共用同一检查；重复发送相同 slug 不算修改；其他字段仍可编辑。Editor 与 SEO 页 slug 输入框同样禁用。slug 格式 / 保留字规则移至 `utils/contentSlug.ts`（规则未变，`contentDraft.ts` re-export）。
+- **Open Graph 图片：** item 级 `og_image`（`content_items_files`），只存 Media Library UUID；复用 `MediaLibraryPicker.vue` + `useMediaLibraryBrowser`（type=image、archived=exclude）；最多一个（多余行删除）；服务端校验存在、是图片、未归档、`expectedOgVersion`。只写 `og_image` 行，从不写 hero / inline / download / source_document、文件可见性或生命周期。无 OG 时预览回退 hero，但不创建任何关联。Media & Relations 保存继续保留 `og_image`（新增测试 + 实测 "Kept unchanged here: 1 Open Graph image link(s)"）。
+- **BFF：** `GET` / `PUT /api/admin/content-center/:id/seo-locales`（`server/utils/contentSeoLocales.ts`）。PUT 先全部校验（locale 字段经同一 prepare、OG 校验），再按顺序写：① locale 行一次 PATCH（数据库 revision guard 最终裁决）② `og_image` 一次 create / update / delete。两者跨 collection，**不是单一事务**：① 成功而 ② 失败时返回 500 `partial: true, saved: ['seo'], notSaved: ['og_image'], ogImageRetryable, currentDraftRevision`；页面更新 SEO 基线与 revision，图片改动保持暂存并提示重试。
+- **预览与检查清单：** 搜索预览 / 社交预览只用 Draft 值，标注 "Draft preview — public route not enabled" / "Not public"，不显示 URL。SEO checklist 为固定 6 项确定性事实（slug、title、description、canonical、image、indexing），状态 ok / note / attention，无分数、无百分比，不是 Readiness engine。未实现 Improve with AI、Focus terms、Social title / description。
+- **Overview：** Language status 卡片增加指向 SEO & locales 的链接（Overview 仍不发请求、不编辑）。Content Editor 中过期的 "not built yet" 提示已更正。
+
+### Register 同步
+
+- CC-02 / CC-03 Acceptance → `VISUALLY_VERIFIED`（Register §3 中表示 "evidence has been accepted" 的合法状态；词表无 `ACCEPTED`，未发明新词）。Implementation 保持 `AUTOMATED_CHECKED`。
+- CC-04 Implementation → `AUTOMATED_CHECKED`，Acceptance `NOT_STARTED`（Register §4.8 规则 10、11）。
+
+### 测试
+
+- 新增：`tests/contentSeoLocales.test.ts`（BFF / slug lock / OG / 隔离 / partial / 共享规则 / 源码证据，FakeDirectus 带唯一约束与 revision guard）、`tests/components/ContentSeoLocales.component.test.ts`（15）、`tests/components/ContentEditorLocale.component.test.ts`（3）。
+- 更新：`contentCenterUi`、`contentFoundationRegistries`（route surface +2）、`ContentWorkspace.component`。
+- 全量 vitest：63 files passed / 3 skipped，2425 passed / 51 skipped（跳过项为需要环境变量的外部集成测试）。
+- 真实 PostgreSQL revision guard 集成测试（`CONTENT_DB_TEST_CONTAINER`）：6 / 6 通过。
+- typecheck 0 · lint 0 · `nuxt build` Build complete · `git diff --check` 通过。
+
+### 真实浏览器验收（本地 dev，内容 ID 6，TEST ONLY — NOT FOR PUBLICATION）
+
+- **EN SEO：** 键盘输入 SEO title / meta description / canonical `/test-only-cc-imp-05` / noindex → Save（PUT 200，rev 5→6）→ 刷新后全部持久化。
+- **Start Spanish：** 输入 ES 标题、将建议 slug 改为 `cc-imp-05-test-only-es` → POST 201 → 状态 Draft、rev 1。编辑 ES SEO → PUT 200（rev 2）。
+- **ES Content Editor：** 从 "Edit Spanish content" 进入 `editor?locale=es`，修改 title / summary → `PATCH /locales/es` 200（rev 3）。
+- **EN 未受影响：** EN 行 title / summary / blocks md5 与保存前基线一致（blocks md5 `e98e6b736f8e907a16a722eaaeb55134`），rev 保持 6。
+- **Stale conflict：** Tab A 打开 ES rev 3 并修改描述；Tab B 经 BFF PATCH → rev 4；Tab A Save → PUT 409，横幅 "revision 4"，本地编辑仍在；确认后 Reload 恢复干净状态。
+- **Slug lock（真实 BFF）：** 临时对 TEST ONLY ES 行设置 `first_published_at`（无快照、item 仍为 draft）→ 伪造 `PATCH /locales/es` 改 slug：422 slugLocked；伪造 SEO PUT 改 slug：422；同 slug + seo_title：200（rev 5）；两页 slug 输入框禁用。随后立即还原为 NULL（复核 `first_published_at` 非空行数 0）。
+- **OG：** 1440 选择器标题 "Select an Open Graph image from Media Library"、type=image、13 个文件、无归档文件、弹窗 880 宽；选择 TEST ONLY `ZZ-ML-CLOUD-V1FINAL … TEST ONLY — NOT FOR PUBLICATION.jpg`（d48f1b45…）→ Save → 新增 `og_image` 行（id 4）；EN rev 仍为 6；hero / inline / download 行不变；文件 `is_public` 未变。伪造已归档图片（df058914…）→ 422；PDF（cee597e6…）→ 422 "must be an image"；过期 og 版本 → 409；均无写入。
+- **Unknown / not-started locale：** `editor?locale=xx` 安全错误；`editor?locale=pt` Not started 提示，无 `/locales` 请求。
+- **1440：** rail 220 / main 555 / aside 320；scrollWidth 1425 = clientWidth；越界元素 0；无 Improve with AI / 分数 / 伪造 URL；OG 与社交预览图片正常加载。1440 截图在 Browser 面板中不可辨认，证据为 DOM 几何（最终视觉签收以用户本机截图为准）。
+- **375：** scrollWidth 375；语言标签纵向排列 309 宽 × 46 高；slug / SEO title / canonical 309 宽、描述 textarea 309×118；header Save 与底部保存栏可达；Modules 可展开；搜索 / 社交预览与检查清单可读（截图清晰）；真实键盘修改 ES 描述并保存（rev 6）；OG 选择器 343 宽、底部 796 < 812、搜索 "9C1" → 3 个文件、关闭按钮可达、无归档文件；Editor locale 栏 16–359。
+- **Console：** 负向测试（409 / 422）只在负向测试标签页出现；干净新标签页在 375 与 1440 下访问 SEO & locales、Editor（es）、Media & relations、Overview：console error 0。
+- **数据：** 内容 6 仍为 draft；全库 `published_snapshot` 非空行 0；published item 0；PT 行 0。
+- **dev server：** 首次启动出现已知 P2 `#app-manifest`（build 后共享 `.nuxt`），干净重启后无服务端错误；验收结束已停止。
+
+### 已知限制 / P2
+
+- 跨 collection 保存（locale 行 + `og_image`）不是单一数据库事务，采用 CC-IMP-04 同类的"先全部校验 + 有序写入 + 明确 partial 报告"。
+- 新 locale 的 block 结构复制沿用 Blueprint §15（空文本）；结构同步工具仍为 P2。
+- 语言显示名为代码注册表中的英文名（`CONTENT_LOCALE_LABELS`，按 `ContentLocale` 类型强制覆盖），语言代码本身由 i18n 配置派生。
+- slug 重定向历史仍为 P2（Blueprint §14）；公开 canonical / noindex / sitemap 行为属于 CC-IMP-10。
+- Node：实际 24.14.0；Node 22.22.2 Release Gate 仍 OPEN（本模块未处理）。
+
+### Governance
+
+Blueprint / Freeze / CLAUDE.md / Protocol / Decision Log / Charter 均未修改。未 push、未 deploy、未 merge。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-05"任务中写入。*

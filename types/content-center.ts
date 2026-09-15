@@ -97,6 +97,43 @@ export interface AdminContentMediaRelations {
   inventory_version: string
 }
 
+/** CC-IMP-05 — a hero or Open Graph image link as the SEO & Locales page needs it. */
+export interface AdminContentSeoImage {
+  link_id: number
+  directus_files_id: string
+  enabled: boolean
+  file: {
+    filename_download: string | null
+    title: string | null
+    type: string | null
+    width: number | null
+    height: number | null
+    filesize: number | null
+    is_public: boolean
+    archived: boolean
+  }
+}
+
+/** CC-IMP-05 — a locale draft without its blocks (the SEO page does not edit sections). */
+export type AdminContentSeoLocaleRow = Omit<AdminContentLocaleDraft, 'blocks'> & { block_count: number }
+
+/** CC-IMP-05 — `GET` / `PUT /api/admin/content-center/:id/seo-locales`. */
+export interface AdminContentSeoLocales {
+  item: { id: number, content_type: ContentTypeId, status: ContentItemStatus, title: string | null }
+  default_locale: ContentLocale
+  /** i18n `locales`, in configuration order. */
+  site_locales: ContentLocale[]
+  /** `runtimeConfig.public.publishedLocales` — languages the public site serves. */
+  published_locales: ContentLocale[]
+  /** Existing locale rows only; a site locale without a row is "Not started". */
+  locales: AdminContentSeoLocaleRow[]
+  og_image: AdminContentSeoImage | null
+  /** Enabled hero, shown as the preview fallback when there is no Open Graph image. */
+  hero: AdminContentSeoImage | null
+  /** Fingerprint of the item's `og_image` links; an image change must send the one it loaded. */
+  og_version: string
+}
+
 export interface AdminContentListItem {
   id: number
   content_type: ContentTypeId

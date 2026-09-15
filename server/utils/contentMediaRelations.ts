@@ -149,7 +149,7 @@ async function loadRelationRows(fetch: FetchFn, itemId: number): Promise<RawRela
 }
 
 /** The archived subset of `fileIds` — the same rule the Media Library uses (`media_file_lifecycle.archived`). */
-async function archivedAmong(fetch: FetchFn, fileIds: string[]): Promise<Set<string>> {
+export async function archivedAmong(fetch: FetchFn, fileIds: string[]): Promise<Set<string>> {
   const ids = [...new Set(fileIds.filter(id => UUID_RE.test(id)))]
   if (ids.length === 0) return new Set()
   const res = await fetch<{ data: Array<{ file_id: string | null }> }>(

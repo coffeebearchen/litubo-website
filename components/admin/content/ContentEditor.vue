@@ -3,7 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import type { AdminContentDraft } from '~/types/content-center'
 import { MAX_BLOCKS_PER_LOCALE } from '~/utils/contentBlocks'
 import { DEFAULT_CONTENT_LOCALE, type ContentLocale } from '~/utils/contentLocales'
-import { CONTENT_BLOCK_LABELS, CONTENT_LOCALE_LABELS, contentTypeLabel, formatContentDateTime } from '~/utils/contentCenter'
+import { CONTENT_BLOCK_LABELS, CONTENT_LOCALE_LABELS, contentSeoLocalesRoute, contentTypeLabel, formatContentDateTime } from '~/utils/contentCenter'
+import { isContentSlugLocked } from '~/utils/contentSeo'
 import {
   EDITOR_BLOCK_LIMIT_MESSAGE,
   EDITOR_CONFLICT_MESSAGE,
@@ -53,6 +54,8 @@ const current = ref<AdminContentDraft>(props.draft)
 const original = ref<ContentEditorState | null>(null)
 const state = ref<ContentEditorState | null>(null)
 const revision = ref(0)
+/** CC-IMP-05 — Blueprint §14: a language published once keeps its slug (the server enforces it too). */
+const slugLocked = ref(false)
 
 function initialize(draft: AdminContentDraft) {
   current.value = draft
@@ -60,6 +63,7 @@ function initialize(draft: AdminContentDraft) {
   original.value = row ? editorStateFromLocale(row) : null
   state.value = original.value ? cloneEditorState(original.value) : null
   revision.value = row?.draft_revision ?? 0
+  slugLocked.value = isContentSlugLocked(row)
 }
 
 initialize(props.draft)
@@ -220,9 +224,11 @@ defineExpose({ save, dirty, canSave, saving })
 
 <template>
   <div class="cce">
-    <p v-if="!state" class="cce-notice" role="status">
-      No {{ localeLabel }} draft exists for this content record. Language drafts are managed in SEO &amp; locales, which is not built yet.
-    </p>
+    <div v-if="!state" class="cce-notice" role="status">
+      <p class="cce-notice-title">{{ localeLabel }} has not been started</p>
+      <p>No {{ localeLabel }} draft exists for this content record, and none is created here.</p>
+      <NuxtLink :to="contentSeoLocalesRoute(current.id, props.locale)" class="cce-notice-link">Go to SEO &amp; locales to start this language</NuxtLink>
+    </div>
 
     <template v-else>
       <div v-if="conflict" class="cce-conflict" role="alert">
@@ -292,11 +298,13 @@ defineExpose({ save, dirty, canSave, saving })
                   maxlength="100"
                   autocomplete="off"
                   spellcheck="false"
+                  :disabled="slugLocked"
                   :aria-invalid="fieldError?.field === 'slug'"
                   :aria-describedby="fieldError?.field === 'slug' ? 'cce-slug-error' : 'cce-slug-hint'"
                 >
                 <div class="cce-field-meta">
                   <p v-if="fieldError?.field === 'slug'" id="cce-slug-error" class="cce-field-error">{{ fieldError.message }}</p>
+                  <p v-else-if="slugLocked" id="cce-slug-hint" class="cce-hint">Locked — this language has been published. A published URL cannot change.</p>
                   <p v-else id="cce-slug-hint" class="cce-hint">Lowercase letters, numbers and hyphens. Unique for {{ localeLabel }}.</p>
                   <span class="cce-count">{{ state.slug.length }} / 100</span>
                 </div>
@@ -322,7 +330,7 @@ defineExpose({ save, dirty, canSave, saving })
 
           <section class="cce-card cce-card--quiet" aria-labelledby="cce-hero-title">
             <h2 id="cce-hero-title" class="cce-card-title">Hero image</h2>
-            <p class="cce-hint">Chosen in Media &amp; relations, which is not built yet. The hero is part of the page header, not a content section.</p>
+            <p class="cce-hint">Chosen in Media &amp; relations. The hero is part of the page header, not a content section.</p>
           </section>
 
           <section class="cce-sections" aria-labelledby="cce-sections-title">
@@ -517,6 +525,11 @@ defineExpose({ save, dirty, canSave, saving })
   border-radius: var(--radius-md);
   background: var(--color-surface);
 }
+
+.cce-notice p { margin: 0 0 var(--space-2); }
+.cce-notice-title { font-weight: 600; color: var(--color-ink); }
+.cce-notice-link { color: var(--color-primary); font-weight: 500; }
+.cce-field input:disabled { background: var(--color-surface-alt); color: var(--color-ink-muted); cursor: not-allowed; }
 
 .cce-add-option { display: inline-flex; flex-direction: column; align-items: flex-start; text-align: left; }
 .cce-add-note { font-size: 0.75rem; color: var(--color-ink-muted); }
