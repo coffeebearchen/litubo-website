@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CC-IMP-07 — Archive, Restore & Change History（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · core 76e77af + Review Fix 02 ae337e0 + Review Fix 03 f5d020b · not pushed）
-Latest completed module:            CC-IMP-08 — Content AI Target & Source Intake（A2 · LOCAL COMPLETE · 等待 Controller 审查；前置窄修复 CC-IMP-04-R3 c491774）
-Active authorized module:           NONE（CC-IMP-08 已收口，等待 Controller 审查）
+Latest accepted module:             CC-IMP-08 — Content AI Target & Source Intake（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · bc98b8e + 只读 Proposal Binding 核验 READY · not pushed）
+Latest completed module:            CC-IMP-09 — AI Proposal Review & Apply（A2 · LOCAL COMPLETE · 等待 Controller 审查）
+Active authorized module:           NONE（CC-IMP-09 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-09 — AI Proposal Review & Apply（高风险模块：RSG-04 / RSG-05，须按 RELEASE-SAFETY-GATES.md 取证；Controller 审查 CC-IMP-08 前不授权）
+Next candidate:                     CC-IMP-10 — Public Delivery & Sitemap（高风险模块：RSG-01 / RSG-02 / RSG-05 / RSG-06 / RSG-07，须按 RELEASE-SAFETY-GATES.md 取证；需 Blueprint §35 用户路由决定）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：c491774）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：bc98b8e）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9754,3 +9754,81 @@ P0 Violations:                  NONE
 **已知 / 记录（不修复）：** Product AI Apply 未按存储 proposal 校验提交内容、Product generate 无 Draft gate（Blueprint §18 / §35 既有债务）；Product 来源未检查 Media Library 归档状态（Product archived-source gap）。P2：未开始语言页头显示 "Untitled content #6"（该语言无标题，如实显示，无回退）。Proposal 仅存内存，2 小时或服务重启后失效。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-08"任务中写入。*
+
+---
+
+## CC-IMP-09 — AI Proposal Review & Apply（2026-09-15）
+
+```text
+Module:                         CC-IMP-09 — AI Proposal Review & Apply（CC-AI-02）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（高风险模块，RELEASE-SAFETY-GATES）
+Status:                         COMPLETED（LOCAL COMPLETE · 等待 Controller 审查）
+Branch:                         review/cc-imp-09-ai-proposal-review-apply
+Baseline:                       bc98b8ee068fbb4e3e31d5dce29397ffffbea411
+Commit:                         feat(content): add ai proposal review and apply（本节所在 commit）
+Primary visual:                 06-CC-AI-02-PROPOSAL-REVIEW-D1440.png（仓库 Admin shell 优先；无 confidence / 页码引用）
+Proposal Review:                implemented
+Accept / Edit / Reject:         implemented（Edit 只改值）
+Conflict Review:                implemented（选择候选 / 自定义值 / 拒绝；Accept all safe 不触碰冲突）
+Apply to Draft:                 implemented（该语言 working copy）
+Apply atomicity:                one locale PATCH（draft_revision + 1 一次、last_change_kind = ai_apply）
+Content expiry / restart:       tested（409 proposal_unavailable，Draft 不变）
+AI Publish / Public Delivery:   NO / NO
+Real provider calls / API fees: 0 / 0
+Schema / dependency / service:  0 / 0 / 0
+Register:                       CC-AI-01 Acceptance → VISUALLY_VERIFIED（规则 19）；CC-AI-02 Implementation AUTOMATED_CHECKED · Acceptance NOT_STARTED（规则 20）
+MASTER-ROADMAP:                 CC-IMP-09 ✅；CC-IMP-10 NEXT — NOT AUTHORIZED
+P0 Violations:                  NONE
+```
+
+**同步：** Controller 已签收 CC-IMP-08（`bc98b8e`，ACCEPTED LOCALLY / VISUALLY VERIFIED）及只读 Proposal Binding 核验（全部 YES，CC-IMP-09 前提 READY）；Register CC-AI-01 Acceptance 同步为 VISUALLY_VERIFIED。
+
+**实现：**
+
+- `server/utils/aiContentApply.ts`（新）：
+  - Review 读取：`findLatestProposal`（replay guard 新增只读函数，按 admin + subject 取最新有效 Proposal，proposalRef 不进 URL）→ 安全 DTO（目标标签、existing / proposed、`Source N` 证据、来源列表、冲突候选、`stale` / `lifecycleChanged`；无指纹 / binding 内部值）。
+  - Apply 请求：`{ locale, proposalRef, decisions[{ proposalItemId, decision: accept|edit|reject|choose, value? | blockData? | candidateIndex?, target?/operation? 仅回显比对 }] }`，zod strict；其余字段 400。
+  - 服务端权威：readProposal（admin + `content:<id>:<locale>`）+ binding 校验（kind / id / locale / targetId）；target / operation / block 类型 / 顺序全部取自存储 Proposal；冲突以 `output.conflicts` 判定（不看 operation）；每个 item 与冲突必须恰有一个 decision（缺失 409 `review_incomplete`、未知 / 重复 / 回显不符 / 决定与类别不符 409 `decision_mismatch`）；冲突不可 accept；同一目标两个批准 422；零批准 422。
+  - 前置（全部 0 写）：Proposal 可用且非 applied / applying；claimApply 在任何 DB 读取前占用；条目非 archived；`content_items.date_updated` 等于 Analyze 时记录的 `itemUpdatedAt`（Archive / Restore / 默认语言 Publish 状态变化使 Proposal 失效）；locale 行存在且 `draft_revision` 等于分析时 revision（否则 409 `stale_draft`）。
+  - 写入：内存中构造下一个 working copy——字段值（trim + 长度）、`block:<id>` 同类型原位替换、`block:new` 按存储顺序追加且服务端生成 UUID、整个 blocks 数组经既有 `validateBlocks`（422）——然后对 `content_item_locales` 只 PATCH 一次（批准字段 + blocks + `draft_revision + 1` + `last_change_kind = ai_apply`）；DB revision guard → 409 stale、lifecycle guard → 409 `lifecycle_changed`，均 `releaseApply`；结果不确定时回读，仍为原 revision 才 release（502），否则标 `partial`（终态不可重放，500），绝不误标成功。成功返回 `applied_count`、新 `draft_revision`、`proposalItemId → blockId` 映射。
+- CC-IMP-08 窄扩展（`server/utils/aiContentIntake.ts`）：Analyze 读取 `content_items.date_updated`，写入 binding `itemUpdatedAt` 与内容指纹（Restore 后重新 Analyze 不会复用旧 Proposal），分析前后复查；存储 Proposal 增加 `sources`（`Source N` → 显示名）。Product 调用形状不变。
+- 路由：`GET` / `POST /api/admin/content-center/:id/ai-proposal-review`（全局 admin-auth：Administrator + CSRF Origin；POST 256 KB 字节上限；`Cache-Control: private, no-store`）。
+- UI：`pages/admin/content-center/[id]/ai-proposal-review.vue` + `components/admin/content/ContentAiProposalReview.vue` + `utils/contentAiReview.ts`：当前内容 / 语言 / Proposal 状态；来源 chips 与冲突计数；逐项卡片（Existing value / AI proposal、证据、Accept / Edit / Reject，Edit 只改值——字段文本框、section 按类型的纯文本字段）；冲突卡片（Review required、候选单选 + Use selected value、Edit value、Reject）；Review summary（Proposals / Pending / Accepted / Edited / Rejected / Conflicts）、Accept all safe、Apply approved changes（不满足条件时显示原因）、成功 "Applied N approved changes to Draft." + Open Content editor（不自动跳转 Preview / Publish）；无 Proposal 空态 "Proposal expired or unavailable. Return to AI Source Intake and analyze again."；stale / 内容已变 / 已应用只读；未应用决定离开页面或切换语言时确认。Workspace 导航启用 AI Proposal Review；AI Source Intake 的 "Proposal prepared" 增加 "Review proposal" 链接。
+
+**测试：**
+
+- `tests/aiContentApply.test.ts` 45 / 45：Review 读取（最新 Proposal、标签、existing / proposed、证据 / 来源、无内部值、跨 admin / 语言 / 未开始 / 重启为空、stale / lifecycleChanged 标记、422 / 404）；有效矩阵（accept title、edit summary、reject seo、block 替换、两个 `block:new` 不同服务端 UUID 且按 Proposal 顺序、冲突选择、冲突自定义值、section 编辑；text / key_points / faq / cta 通过 registry，image 不可插入）——一次 PATCH、键集合精确、revision 3→4、`ai_apply`、item / slug / canonical / noindex / 发布字段 / 其他语言逐字段不变；已发布条目 snapshot 与 status 不变；篡改矩阵（未知 / 重复 / 缺失 id、title→status、title→slug、operation、block id 互换、额外 change、客户端 subject、冲突自动接受、候选越界、字段 / section 负载错配、无效 section、section 未知键、空标题、超长标题、全部拒绝、非法 locale、同一目标重复批准）全部 0 写且 Proposal 保持 ready；A/en→A/es、A/en→B/en、Admin A→B 409 unavailable；stale revision 409；过期 409；重启（清空 replay guard）409；已应用重放 409；并发双 Apply 一胜一 409、revision 只 +1；不同 Proposal 同 revision 第二个 409；Editor 抢先提交 → guard 拒绝 Apply 且 Editor 内容保留；archived 409；Apply 中途 Archive → lifecycle guard 409；Archive → Restore 后（revision 不变）409 `lifecycle_changed`；写入失败且可证实未写 → 502 仍 ready；结果不确定 → partial 终态、重试 409；History 映射 `ai_apply` → "AI proposal applied to draft"（Title / Sections）；静态边界（不导入发布 / 生命周期 / 历史服务、无发布字段、唯一写入为一次 locale PATCH、组件无 Publish / confidence / 页码）；admin-auth GET / POST 401、非管理员 403、缺失 / 错误 Origin 403。
+- `tests/components/ContentAiProposalReview.component.test.ts` 10 / 10：展示（证据、来源、冲突、无 confidence / 页码 / Publish）、无 Proposal 空态链接（保留 locale）、stale 只读、Accept all safe 不接受冲突且 Apply 禁用、Edit 仅值与空值拒绝、全部拒绝不发请求、Apply 只发送 decisions（无 target / operation / subject）与成功态、服务端拒绝提示、冲突自定义值校验。
+- `tests/contentAiApplyDbIntegration.test.ts`（真实 PostgreSQL，负 id TEST ONLY 夹具）5 / 5：Apply 同形 UPDATE 写入全部批准字段 + revision + 1 + `ai_apply`，发布列 / item status / 其他语言不变；提交后重放被 revision guard 拒绝；并发两个 Apply 仅一个提交；Editor 先提交后 stale Apply 被拒且不覆盖；archived 条目在分析 revision 下被 lifecycle guard 拒绝。
+- 同步：`contentCenterUi`、`ContentWorkspace` 组件、`contentFoundationRegistries`（路由面）、`aiContentIntake`（AI 路由集合）、`ContentAiSourceIntake` 组件（Review 链接）。
+- 全量 vitest（含真实 PostgreSQL，串行，无 build 并行）：75 files passed / 2 skipped，2692 passed / 45 skipped（含 Product AI 回归：aiProposalEngine、aiDuplicateGuard、aiEndpointBoundaries、aiSpecificationApply、productModelRelevanceGuard、aiSourceRef、各格式来源；CC-IMP-08 回归；lifecycle / revision guard / publication DB 套件）。typecheck 0；lint 0；`nuxt build` Build complete；`git diff --check` 通过。
+
+**浏览器验收（本地 dev，build 后首启 `#app-manifest` 已知 P2 经重启消除；用户手动登录一次；新标签页）：**
+
+- 真实浏览器无法产生 active Proposal（需真实 Analyze，Provider 未授权；不增加 dev 后门 / 测试端点）。active Proposal 的审核、冲突、Apply 交互由组件测试（happy-dom fixture）与服务 / 真实 DB 测试证明；active 状态的像素布局未在真实浏览器验收（如实记录）。
+- 1440（DOM 实测）：`/admin/content-center/6/ai-proposal-review` 标题 "AI Proposal Review"；主列 575 + 右栏 300；scrollWidth 1425 ≤ 1440；状态 "No proposal"；空态 "Proposal expired or unavailable. Return to AI Source Intake and analyze again." + 链接 `/admin/content-center/6/ai-source-intake`；语言 English 当前 / Spanish / Portuguese · Not started；Workspace 8 个模块全部启用、AI Proposal Review 为当前；无 Apply / Publish / Accept 按钮（无 Proposal）；console error 0。
+- 375（375×480）：`?locale=es` scrollWidth 375、无越界元素、空态卡 343 宽、链接保留 `?locale=es`；`?locale=pt` 显示未开始提示 + SEO & locales 链接、无 Apply、scrollWidth 375；Modules 展开后 8 个模块全部可达（宽 321，AI Proposal Review 为当前，截图可辨认 "Hide modules"）；console error 0。说明：Browser 面板缩放下对 "Modules" 的坐标 / ref 真实点击未落到按钮（elementFromPoint 命中按钮但指针事件未触发），展开以 JS `click()` 证明；该共享导航组件的真实点击已在既往模块验收，组件测试覆盖 toggle。
+- 0 写入证明（SQL 前后）：`directus_revisions` max 865 不变；`directus_activity` 1111 → 1112，唯一新增为用户登录（`login` / `directus_users`）；全部 locale 行 draft_revision / last_change_kind 不变；`ai_apply` 行 0；非空快照 0；`content_items_files` 4；负 id 夹具 0。未创建测试内容。
+
+**Release Safety Gates：**
+
+- RSG-04 AI Applies to Draft Only（PRIMARY）：PROVEN（范围：Content AI Apply）——G-07 / G-08 / G-09（Proposal → 人工 Accept / Edit / Reject → 只写 working copy）；N-06（静态无发布 / 生命周期导入、Apply 不改 status / 发布列，单元 + 真实 DB）；N-08（stale revision 409，单元 + 真实 DB）；N-21（跨条目 409）；N-22（跨语言 409）；N-23（过期 / 已应用 / 重启 409，不重建）；篡改矩阵 0 写。
+- RSG-03 Human-only Publish：PROVEN（Apply ≠ Publish：Apply 不调用发布处理器、不写快照 / status；成功后不自动 Preview / Publish）。
+- RSG-05 Locale Independent：PROVEN（Apply 只写精确语言行，另一语言逐字段不变；未开始语言不创建、不回退）。
+- RSG-01 Draft Never Public：Apply 范围 PROVEN（发布快照 / 发布时间 / 发布 revision 不变；无公开路由）；公开交付仍 NOT_YET_EXERCISED（CC-IMP-10）。
+- RSG-07 Permissions Fail Closed：Admin 路由 PROVEN（401 / 403 / 缺失或错误 Origin 403）；`nuxt-server` 公开权限仍 OPEN（CC-IMP-10）。
+- RSG-08 Environment Separation：本地开发库；production 0；OPEN（TYPE D release）。
+- RSG-09 Release Layering：local commit only；push 0 / merge 0 / deploy 0。
+- RSG-02：NOT_YET_EXERCISED。RSG-06：NOT_TOUCHED。
+- Open Gates：RSG-01 / 02 / 05 / 06 / 07 公开部分 → CC-IMP-10；RSG-08 → TYPE D Release；FINAL-RELEASE-AUDIT 完整 Golden Path。P0 Violations：NONE。
+
+**已知 / 记录（不修复）：**
+
+- Source 变化不在 Apply 前置条件内：Blueprint §18 Apply 前置条件为 Administrator、非归档、locale 行存在、draft_revision 等于分析时、Proposal 可用 / 未过期 / 未应用；来源指纹只绑定 Analyze 身份与复用，未增加 Apply 时的来源复核（按 Blueprint，不弱化、不扩展）。
+- `itemUpdatedAt` 标记更严格：Analyze 后默认语言 Publish / Unpublish（会写 item 行）也会使 Proposal 失效，需重新 Analyze（fail closed）。Archive + Restore 在单次 Apply 的检查与 PATCH 之间毫秒级连续提交的竞态无法被 DB guard 识别（P2，单管理员单实例）。
+- Charter H.2 已人工确认字段锁未实现：Apply 按人工批准覆盖现有 Draft 值（与 Product AI V1 一致）。
+- Review 决定仅保存在页面内存；Proposal 仅在服务端内存（2 小时 / 重启失效，单实例）。
+- Product Apply 完整性债务、Product 归档来源缺口继续登记，未修改。
+- 未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-09"任务中写入。*

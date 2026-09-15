@@ -652,7 +652,8 @@ describe('static boundaries — AI Intake never manages associations, applies or
 
   it('K. there is no content_items_files mutation endpoint or action in AI Intake', () => {
     const aiRoutes = readdirSync(resolve(process.cwd(), ROUTE_DIR)).filter(f => f.startsWith('ai'))
-    expect(aiRoutes.sort()).toEqual(['ai-source-intake.get.ts', 'ai-source-intake.post.ts'])
+    // CC-IMP-09 adds the Review / Apply routes; none of them manages associations.
+    expect(aiRoutes.sort()).toEqual(['ai-proposal-review.get.ts', 'ai-proposal-review.post.ts', 'ai-source-intake.get.ts', 'ai-source-intake.post.ts'])
     expect(existsSync(resolve(process.cwd(), ROUTE_DIR, 'ai-source-intake'))).toBe(false)
     for (const file of INTAKE_FILES) {
       const source = code(file)
@@ -677,7 +678,8 @@ describe('static boundaries — AI Intake never manages associations, applies or
     const intake = code('server/utils/aiContentIntake.ts')
     expect(intake).toContain('runSubjectProposalEngine')
     expect(intake).not.toMatch(/generateStructured\(|extractTextFromFile|streamAsset/)
-    expect(existsSync(resolve(process.cwd(), 'pages/admin/content-center/[id]/ai-proposal-review.vue'))).toBe(false)
+    // CC-IMP-09 — Apply lives only in AI Proposal Review, never in the intake files above.
+    expect(existsSync(resolve(process.cwd(), 'pages/admin/content-center/[id]/ai-proposal-review.vue'))).toBe(true)
   })
 })
 

@@ -72,12 +72,13 @@ describe('routes and workspace module rail', () => {
       'Overview', 'Content editor', 'Media & relations', 'SEO & locales',
       'AI Source Intake', 'AI Proposal Review', 'Preview & publish readiness', 'Change history',
     ])
-    expect(CONTENT_WORKSPACE_MODULES.filter(m => m.enabled).map(m => m.key)).toEqual(['overview', 'editor', 'media-relations', 'seo-locales', 'ai-source-intake', 'preview-publish', 'history'])
+    expect(CONTENT_WORKSPACE_MODULES.filter(m => m.enabled).map(m => m.key)).toEqual(['overview', 'editor', 'media-relations', 'seo-locales', 'ai-source-intake', 'ai-proposal-review', 'preview-publish', 'history'])
     expect(contentWorkspaceModuleRoute('history', 5)).toBe('/admin/content-center/5/history')
     expect(contentWorkspaceModuleRoute('editor', 5)).toBe('/admin/content-center/5/editor')
     expect(contentWorkspaceModuleRoute('media-relations', 5)).toBe('/admin/content-center/5/media-relations')
     expect(contentWorkspaceModuleRoute('seo-locales', 5)).toBe('/admin/content-center/5/seo-locales')
     expect(contentWorkspaceModuleRoute('ai-source-intake', 5)).toBe('/admin/content-center/5/ai-source-intake')
+    expect(contentWorkspaceModuleRoute('ai-proposal-review', 5)).toBe('/admin/content-center/5/ai-proposal-review')
     expect(contentWorkspaceModuleRoute('preview-publish', 5)).toBe('/admin/content-center/5/preview-publish')
     for (const module of CONTENT_WORKSPACE_MODULES.filter(m => !m.enabled)) {
       expect(module.disabledReason).toBe('Not built yet')
@@ -90,10 +91,9 @@ describe('routes and workspace module rail', () => {
     for (const file of UI_FILES) expect(existsSync(resolve(process.cwd(), file)), file).toBe(true)
     expect(existsSync(resolve(process.cwd(), 'pages/admin/content-center/[id].vue'))).toBe(false)
     expect(existsSync(resolve(process.cwd(), 'pages/admin/content-center.vue'))).toBe(false)
-    // CC-IMP-08 — AI Source Intake exists; AI Proposal Review is still a future module (CC-IMP-09).
-    expect(existsSync(resolve(process.cwd(), 'pages/admin/content-center/[id]/ai-source-intake.vue'))).toBe(true)
-    for (const future of ['ai-proposal-review']) {
-      expect(existsSync(resolve(process.cwd(), `pages/admin/content-center/[id]/${future}.vue`)), future).toBe(false)
+    // CC-IMP-08 / CC-IMP-09 — every workspace module page now exists.
+    for (const module of ['ai-source-intake', 'ai-proposal-review']) {
+      expect(existsSync(resolve(process.cwd(), `pages/admin/content-center/[id]/${module}.vue`)), module).toBe(true)
     }
   })
 

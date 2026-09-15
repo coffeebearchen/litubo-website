@@ -1,4 +1,4 @@
-import type { ContentBlock } from '../utils/contentBlocks'
+import type { ContentBlock, ContentBlockType } from '../utils/contentBlocks'
 import type { ContentLocale } from '../utils/contentLocales'
 import type { ContentTypeId } from '../utils/contentTypes'
 
@@ -146,6 +146,92 @@ export type AdminContentAiAnalyzeResult =
       fileResults: AdminContentAiFileResult[]
     }
   | { ok: false, error: string, fileResults: AdminContentAiFileResult[] }
+
+/** CC-IMP-09 — a block value in a proposal (type + data), validated by the block registry. */
+export interface AdminContentAiBlockValue {
+  type: ContentBlockType
+  data: Record<string, unknown>
+}
+
+export interface AdminContentAiReviewEvidence {
+  label: string
+  displayName: string | null
+}
+
+/** CC-IMP-09 — one proposal item as the Review page shows it. Target, operation and block type come from the server-held proposal. */
+export interface AdminContentAiReviewItem {
+  proposalItemId: string
+  target: string
+  targetLabel: string
+  kind: 'field' | 'block_replace' | 'block_insert'
+  operation: 'set' | 'replace' | 'insert'
+  /** Character limit of a field target; null for sections. */
+  maxLength: number | null
+  existingValue: string | AdminContentAiBlockValue | null
+  proposedValue: string | AdminContentAiBlockValue
+  evidence: AdminContentAiReviewEvidence[]
+}
+
+/** CC-IMP-09 — a field the sources disagree on; resolved only by a human choice, edit or rejection. */
+export interface AdminContentAiReviewConflict {
+  proposalItemId: string
+  target: string
+  targetLabel: string
+  maxLength: number
+  existingValue: string | null
+  candidateValues: string[]
+}
+
+export type ContentAiProposalApplyState = 'ready' | 'applying' | 'applied' | 'partial'
+
+/** CC-IMP-09 — `GET /api/admin/content-center/:id/ai-proposal-review?locale=`. */
+export interface AdminContentAiReview {
+  item: { id: number, content_type: ContentTypeId, status: ContentItemStatus, title: string | null }
+  locale: ContentLocale
+  default_locale: ContentLocale
+  site_locales: ContentLocale[]
+  started_locales: ContentLocale[]
+  locale_started: boolean
+  draft_revision: number | null
+  proposal: null | {
+    proposalRef: string
+    applyState: ContentAiProposalApplyState
+    expiresAt: string
+    draftRevision: number
+    /** The draft revision changed since the analysis — Apply is refused. */
+    stale: boolean
+    /** Archive / Restore / Publish status changed since the analysis — Apply is refused. */
+    lifecycleChanged: boolean
+    sources: AdminContentAiReviewEvidence[]
+    items: AdminContentAiReviewItem[]
+    conflicts: AdminContentAiReviewConflict[]
+  }
+}
+
+export type ContentAiReviewDecisionKind = 'accept' | 'edit' | 'reject' | 'choose'
+
+/** CC-IMP-09 — the only thing the browser sends per proposal item. */
+export interface ContentAiApplyDecision {
+  proposalItemId: string
+  decision: ContentAiReviewDecisionKind
+  value?: string
+  blockData?: Record<string, unknown>
+  candidateIndex?: number
+}
+
+export interface ContentAiApplyRequest {
+  locale: ContentLocale
+  proposalRef: string
+  decisions: ContentAiApplyDecision[]
+}
+
+/** CC-IMP-09 — `POST /api/admin/content-center/:id/ai-proposal-review`. Never a publication state. */
+export interface AdminContentAiApplyResult {
+  ok: true
+  applied_count: number
+  draft_revision: number
+  new_blocks: Array<{ proposalItemId: string, blockId: string }>
+}
 
 /** CC-IMP-05 — a hero or Open Graph image link as the SEO & Locales page needs it. */
 export interface AdminContentSeoImage {

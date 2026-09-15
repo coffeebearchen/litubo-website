@@ -79,7 +79,8 @@ function fail(statusCode: number, message: string, data?: Record<string, unknown
 }
 
 interface ContentAiDraft {
-  item: { id: number, content_type: string, status: ContentItemStatus }
+  /** `date_updated` changes with every item-level write (Archive, Restore, Publish status); CC-IMP-09 binds it. */
+  item: { id: number, content_type: string, status: ContentItemStatus, date_updated: string | null }
   row: {
     id: number
     locale: ContentLocale
@@ -107,7 +108,7 @@ function parseLocale(raw: unknown, required: boolean): ContentLocale {
 
 /** The working copy of one locale — never the published snapshot. */
 async function loadDraft(fetch: FetchFn, itemId: number, locale: ContentLocale): Promise<ContentAiDraft | null> {
-  const items = await fetch<{ data: Array<Row> }>(`/items/content_items?filter[id][_eq]=${itemId}&fields=id,content_type,status&limit=1`)
+  const items = await fetch<{ data: Array<Row> }>(`/items/content_items?filter[id][_eq]=${itemId}&fields=id,content_type,status,date_updated&limit=1`)
   const item = (items.data ?? []).find(r => r.id === itemId)
   if (!item) return null
   const rows = await fetch<{ data: Array<Row> }>(
@@ -116,7 +117,12 @@ async function loadDraft(fetch: FetchFn, itemId: number, locale: ContentLocale):
   )
   const row = (rows.data ?? []).find(r => r.content_items_id === itemId && r.locale === locale)
   return {
-    item: { id: itemId, content_type: String(item.content_type), status: item.status as ContentItemStatus },
+    item: {
+      id: itemId,
+      content_type: String(item.content_type),
+      status: item.status as ContentItemStatus,
+      date_updated: typeof item.date_updated === 'string' ? item.date_updated : null,
+    },
     row: row
       ? {
           id: row.id as number,
@@ -226,12 +232,16 @@ export interface ContentAiProposalConflict {
 export interface ContentAiProposal {
   items: ContentAiProposalItem[]
   conflicts: ContentAiProposalConflict[]
+  /** CC-IMP-09 — every source read in this analysis (`Source N` → display name), for the Review page. */
+  sources: Array<{ label: string, displayName: string | null }>
 }
 
 /** Server-held binding CC-IMP-09 Apply must match (subject, locale, draft revision, items, fingerprint, prompt version). */
 export interface ContentProposalBinding {
   subject: { kind: 'content', id: number, locale: ContentLocale }
   draftRevision: number
+  /** CC-IMP-09 — the item's `date_updated` at analysis; Archive / Restore / Publish status changes invalidate the proposal. */
+  itemUpdatedAt: string | null
   targetId: typeof CONTENT_DRAFT_TARGET_ID
   items: Array<{ proposalItemId: string, target: string, operation: 'set' | 'replace' | 'insert' }>
   sourceFingerprint: string
@@ -268,7 +278,8 @@ function buildStoredProposal(output: ContentDraftModelOutput, draft: ContentAiDr
   const conflicts = output.conflicts.map(c => ({
     proposalItemId: nextId(), target: c.target, existingValue: row[FIELD_OF[c.target]!] ?? null, candidateValues: c.candidateValues,
   }))
-  return { items, conflicts }
+  const sources = readNames.map((displayName, index) => ({ label: `Source ${index + 1}`, displayName }))
+  return { items, conflicts, sources }
 }
 
 // ── Subject ─────────────────────────────────────────────────────────────────
@@ -298,6 +309,7 @@ function createContentProposalSubject(
       if (current.item.status === 'archived') return ARCHIVED_ERROR
       if (!current.row) return LOCALE_NOT_STARTED_ERROR
       if (current.row.draft_revision !== draftRevision) return CHANGED_DURING_ANALYSIS_ERROR
+      if (current.item.date_updated !== draft.item.date_updated) return CHANGED_DURING_ANALYSIS_ERROR
       return null
     },
     async resolveSources(ids) {
@@ -319,7 +331,7 @@ function createContentProposalSubject(
         targetId,
         providerId,
         promptContractVersion: PROMPT_CONTRACT_VERSION,
-        identity,
+        identity: { content: identity, itemUpdatedAt: draft.item.date_updated },
         sources: rows.map(r => ({
           linkId: r.id,
           fileId: r.directus_files_id?.id ?? '',
@@ -334,7 +346,8 @@ function createContentProposalSubject(
     },
     async verifyUnchanged() {
       const current = await loadDraft(fetch, itemId, locale)
-      if (!current || current.item.status === 'archived' || !current.row || current.row.draft_revision !== draftRevision) {
+      if (!current || current.item.status === 'archived' || !current.row || current.row.draft_revision !== draftRevision
+        || current.item.date_updated !== draft.item.date_updated) {
         return CHANGED_DURING_ANALYSIS_ERROR
       }
       if (resolved.length === 0) return null
@@ -485,6 +498,7 @@ export async function analyzeContentAiSources(
       const binding: ContentProposalBinding = {
         subject: { kind: 'content', id: itemId, locale },
         draftRevision: draft.row.draft_revision,
+        itemUpdatedAt: draft.item.date_updated,
         targetId: CONTENT_DRAFT_TARGET_ID,
         items: [...proposal.items, ...proposal.conflicts.map(c => ({ ...c, operation: 'set' as const }))]
           .map(i => ({ proposalItemId: i.proposalItemId, target: i.target, operation: i.operation })),

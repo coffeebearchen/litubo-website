@@ -434,6 +434,33 @@ export function readProposal<TOutput, TBinding>(
   }
 }
 
+/**
+ * CC-IMP-09 — the newest still-applicable proposal of this administrator for this
+ * subject, so a Review page can find it without the reference ever travelling in
+ * a URL. Same ownership rule as `readProposal`; read-only.
+ */
+export function findLatestProposal<TOutput, TBinding>(
+  access: AiSubjectBinding & { adminUserId: string },
+  now = Date.now(),
+): (StoredProposal<TOutput, TBinding> & { proposalRef: string }) | null {
+  dropExpired(now)
+  const subjectKey = subjectKeyOf(access)
+  let latest: ProposalRecord | null = null
+  for (const record of byRef.values()) {
+    if (!isApplicable(record, now) || record.adminUserId !== access.adminUserId || record.subjectKey !== subjectKey) continue
+    // Map order is insertion order, so `>=` keeps the later of two records minted in the same millisecond.
+    if (!latest || record.applyExpiresAt >= latest.applyExpiresAt) latest = record
+  }
+  if (!latest) return null
+  return {
+    proposalRef: latest.proposalRef,
+    output: latest.output as TOutput,
+    binding: latest.binding as TBinding,
+    applyState: latest.applyState,
+    applyExpiresAt: latest.applyExpiresAt,
+  }
+}
+
 /** Test-only reset. Never called by a request handler. */
 export function resetProposalGuard(): void {
   byScope.clear()

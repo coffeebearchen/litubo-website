@@ -172,7 +172,8 @@ describe('ContentAiSourceIntake — Analyze', () => {
     expect(prepared.text()).toContain('Proposal prepared')
     expect(prepared.text()).toContain('4 suggested change(s) and 1 conflict(s)')
     expect(prepared.text()).toContain('Nothing was written to the draft.')
-    expect(prepared.text()).toContain('Proposal Review is not available yet')
+    expect(prepared.text()).toContain('Review it in AI Proposal Review')
+    expect(prepared.find('a').attributes('href')).toBe('/admin/content-center/6/ai-proposal-review')
     expect(w.findAll('button').map(b => b.text()).some(t => /Accept|Reject|Apply|Edit/.test(t))).toBe(false)
   })
 

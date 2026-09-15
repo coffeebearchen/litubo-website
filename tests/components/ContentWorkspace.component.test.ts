@@ -70,9 +70,7 @@ describe('ContentWorkspaceNav — mounted', () => {
     const active = wrapper.find('[aria-current="page"]')
     expect(active.text()).toBe('Overview')
     const disabled = wrapper.findAll('button.cc-nav-item--disabled')
-    expect(disabled.map(b => b.find('.cc-nav-item-label').text())).toEqual([
-      'AI Proposal Review',
-    ])
+    expect(disabled.map(b => b.find('.cc-nav-item-label').text())).toEqual([])
     for (const button of disabled) {
       expect(button.attributes('disabled')).toBeDefined()
       expect(button.text()).toContain('Not built yet')
@@ -80,7 +78,7 @@ describe('ContentWorkspaceNav — mounted', () => {
     // Only the back link and the built modules are anchors (CC-IMP-06 enables Preview & publish readiness in place).
     expect(wrapper.findAll('a').map(a => a.attributes('href'))).toEqual([
       '/admin/content-center', '/admin/content-center/5/editor', '/admin/content-center/5/media-relations',
-      '/admin/content-center/5/seo-locales', '/admin/content-center/5/ai-source-intake', '/admin/content-center/5/preview-publish', '/admin/content-center/5/history',
+      '/admin/content-center/5/seo-locales', '/admin/content-center/5/ai-source-intake', '/admin/content-center/5/ai-proposal-review', '/admin/content-center/5/preview-publish', '/admin/content-center/5/history',
     ])
   })
 
@@ -156,7 +154,7 @@ describe('ContentOverview — mounted', () => {
     expect(modules[6]).toMatch(/Preview & publish readiness\s*Available/)
     expect(modules[7]).toMatch(/Change history\s*Available/)
     expect(modules[4]).toMatch(/AI Source Intake\s*Available/)
-    expect(modules[5]).toContain('Not built yet')
+    expect(modules[5]).toMatch(/AI Proposal Review\s*Available/)
     // CC-IMP-07 — lifecycle actions live in Change history; the Overview only links there.
     expect(card('Lifecycle status').findAll('a').map(a => a.attributes('href'))).toEqual(['/admin/content-center/5/history'])
     // CC-IMP-05 — the Overview points to SEO & locales for languages; it edits nothing itself.

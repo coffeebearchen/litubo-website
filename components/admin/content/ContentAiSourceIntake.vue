@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import type { AdminContentAiAnalyzeResult, AdminContentAiSourceIntake } from '~/types/content-center'
 import type { ContentLocale } from '~/utils/contentLocales'
-import { CONTENT_LOCALE_LABELS, contentMediaRelationsRoute, contentSeoLocalesRoute, contentTypeLabel } from '~/utils/contentCenter'
+import { CONTENT_LOCALE_LABELS, contentAiProposalReviewRoute, contentMediaRelationsRoute, contentSeoLocalesRoute, contentTypeLabel } from '~/utils/contentCenter'
 import { AI_READABLE_FORMATS_LABEL } from '~/utils/aiSourceFormats'
 import {
   CONTENT_AI_ANALYZE_DISCLOSURE,
@@ -27,7 +27,7 @@ interface AiProviderSummary { id: string, label: string, configured: boolean, is
  * reach an AI provider is the explicit "Analyze selected sources" call, which
  * writes nothing and prepares an in-memory proposal. There is no Add / Remove /
  * Upload here — links belong to Media & Relations — and no Accept / Edit /
- * Reject / Apply (CC-IMP-09).
+ * Reject / Apply: those live in AI Proposal Review (CC-IMP-09).
  */
 const props = defineProps<{
   intake: AdminContentAiSourceIntake
@@ -52,6 +52,7 @@ const limits = computed(() => props.intake.limits)
 const atImageCap = computed(() => counts.value.images >= limits.value.max_images)
 const mediaHref = computed(() => contentMediaRelationsRoute(props.intake.item.id))
 const seoHref = computed(() => contentSeoLocalesRoute(props.intake.item.id, props.intake.locale))
+const reviewHref = computed(() => contentAiProposalReviewRoute(props.intake.item.id, props.intake.locale))
 const canAnalyze = computed(() => !readOnly.value && !analyzing.value && selected.value.length > 0 && providerId.value !== null)
 
 function isChecked(ref: string) {
@@ -210,6 +211,7 @@ const failedFiles = computed(() => (result.value?.fileResults ?? []).filter(f =>
             for {{ CONTENT_LOCALE_LABELS[intake.locale] }} draft revision {{ result.draft_revision }}. Nothing was written to the draft.
           </p>
           <p class="cai-hint">{{ CONTENT_AI_PROPOSAL_NOTE }}</p>
+          <NuxtLink :to="reviewHref" class="cai-link">Review proposal</NuxtLink>
         </section>
       </div>
 

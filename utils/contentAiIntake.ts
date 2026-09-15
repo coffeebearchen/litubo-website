@@ -15,7 +15,7 @@ export const CONTENT_AI_SELECTION_DISCLOSURE = 'Selecting a source never calls a
 export const CONTENT_AI_ANALYZE_DISCLOSURE = 'Only clicking "Analyze selected sources" sends text extracted from the selected sources to the configured AI provider.'
 export const CONTENT_AI_DATA_DISCLOSURE = 'Extracted text from the selected sources will be sent to the configured AI provider for analysis. Original files are not sent to the AI provider. Nothing will be written or published.'
 export const CONTENT_AI_OWNERSHIP_NOTE = 'These are the files already linked to this content item. Links are added or removed in Media & Relations.'
-export const CONTENT_AI_PROPOSAL_NOTE = 'Proposal Review is not available yet — it arrives in the next module. The prepared proposal is kept in server memory only: it expires after two hours or on a server restart. If it is no longer available, analyze again.'
+export const CONTENT_AI_PROPOSAL_NOTE = 'The prepared proposal is kept in server memory only: it expires after two hours or on a server restart. Review it in AI Proposal Review — nothing is written until you apply approved changes. If it is no longer available, analyze again.'
 
 export interface ContentAiLimits {
   max_files: number
