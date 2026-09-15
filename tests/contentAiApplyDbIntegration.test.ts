@@ -23,6 +23,11 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 const CONTAINER = process.env.CONTENT_DB_TEST_CONTAINER ?? ''
 const ITEM_ID = -9901
+// Real PostgreSQL through `docker exec psql`: each test runs 4–7 statements, each paying a
+// docker exec start-up (≈ 1.4–3.7 s per test alone), and exceeded Vitest's 5 s default in a
+// loaded full suite. 15 s leaves headroom while still failing a real hang long before the
+// helper's 60 s kill.
+const REAL_DB_TEST_TIMEOUT_MS = 15_000
 const TITLE = 'TEST ONLY — NOT FOR PUBLICATION CC-IMP-09 apply'
 const SNAPSHOT = '{"title":"TEST ONLY — NOT FOR PUBLICATION snapshot"}'
 
@@ -63,7 +68,7 @@ const rowState = (locale: string) => sqlOk(
      coalesce(published_at::text, ''), coalesce(first_published_at::text, ''), slug, noindex::text FROM content_item_locales WHERE ${where(locale)};`,
 )
 
-describe.skipIf(!CONTAINER)('Content AI Apply write — real PostgreSQL guards', () => {
+describe.skipIf(!CONTAINER)('Content AI Apply write — real PostgreSQL guards', { timeout: REAL_DB_TEST_TIMEOUT_MS }, () => {
   beforeEach(async () => {
     await psql(`DELETE FROM content_items WHERE id = ${ITEM_ID};`)
     await sqlOk(`

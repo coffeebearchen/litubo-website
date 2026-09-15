@@ -17,6 +17,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const CONTAINER = process.env.CONTENT_DB_TEST_CONTAINER ?? ''
 const ITEM_ID = -9201
+// Real PostgreSQL through `docker exec psql`: the concurrent test deliberately holds a row
+// lock for 4 s (≈ 4.7 s alone) and every statement pays a docker exec start-up, which reached
+// ≈ 8.3 s in a loaded full suite. Vitest's 5 s default sits below that design floor; 15 s
+// leaves headroom while still failing a real hang long before the helper's 60 s kill.
+const REAL_DB_TEST_TIMEOUT_MS = 15_000
 const TITLE = 'TEST ONLY — NOT FOR PUBLICATION guard'
 
 interface PsqlResult {
@@ -47,7 +52,7 @@ async function currentRow(): Promise<{ title: string, summary: string, revision:
   return { title, summary, revision: Number(revision), snapshot }
 }
 
-describe.skipIf(!CONTAINER)('draft revision guard — real PostgreSQL', () => {
+describe.skipIf(!CONTAINER)('draft revision guard — real PostgreSQL', { timeout: REAL_DB_TEST_TIMEOUT_MS }, () => {
   beforeAll(async () => {
     await psql(`DELETE FROM content_items WHERE id = ${ITEM_ID};`)
     const setup = await psql(`

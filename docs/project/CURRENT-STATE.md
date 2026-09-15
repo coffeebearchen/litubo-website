@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CC-IMP-09 — AI Proposal Review & Apply（ACCEPTED LOCALLY / TECHNICAL PASS，Controller 签收 · f905fea · not pushed）
-Latest completed module:            CC-IMP-10 — Public Delivery & Sitemap V2（A2 · LOCAL COMPLETE · D-035 · 等待 Controller 审查）
-Active authorized module:           NONE（CC-IMP-10 已收口，等待 Controller 审查）
+Latest accepted module:             CC-IMP-10 — Public Delivery & Sitemap V2（功能实现 Controller 签收 · b06c1d5 · not pushed；release readiness 曾被真实 DB 集成测试超时抖动阻塞 → TEST-INFRA-CONTENT-DB-STABILITY-01）
+Latest completed module:            TEST-INFRA-CONTENT-DB-STABILITY-01 — Real PostgreSQL Integration Test Stability（A2 · LOCAL COMPLETE · 等待 Controller 审查）
+Active authorized module:           NONE（TEST-INFRA-CONTENT-DB-STABILITY-01 已收口，等待 Controller 审查）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（不得自行启动 FINAL-RELEASE-AUDIT 或其他模块）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：30faa55）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：b06c1d5）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9937,3 +9937,50 @@ Push / merge / deploy:          NONE
 **Release Safety Gates：** RSG-01 / 02 / 05 / 06 / 07 Content 公开部分 PROVEN（本地范围）；Products RSG-01 / 02、遗留回退（RSG-05）、遗留权限（RSG-07）OPEN；RSG-08 → TYPE D Release；完整串联 → FINAL-RELEASE-AUDIT。P0 Violations：NONE。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-10"任务中写入。*
+
+---
+
+## TEST-INFRA-CONTENT-DB-STABILITY-01 — Real PostgreSQL Integration Test Stability（2026-09-15）
+
+```text
+Module:                         TEST-INFRA-CONTENT-DB-STABILITY-01（测试基础设施稳定性修复）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller 施工单）
+Branch:                         review/test-infra-content-db-stability-01（基线 b06c1d5）
+Status:                         LOCAL COMPLETE · 等待 Controller 审查
+Root cause class:               C — 真实 DB 集成测试的合理耗时高于 Vitest 默认 5 s（B：每条 SQL 经 docker exec 为加重因素）
+Production code:                未修改（仅 2 个测试文件的 describe 级 timeout）
+Schema / permissions / guards:  未修改
+Safety gates touched:           none（测试时限，不改变任何 Gate 行为或证据强度）
+MASTER-ROADMAP:                 CC-IMP-10 行后补一行前置完成标记
+Push / merge / deploy:          NONE
+Next candidate:                 NONE — 等待 Controller
+```
+
+**背景：** CC-IMP-10 功能实现（`b06c1d5`）已由 Controller 签收；release readiness 被全量串行运行中的真实 PostgreSQL 集成测试超时抖动阻塞：CC-IMP-10 收口两次全量各 1 个文件 5 s 超时（`contentRevisionGuardIntegration` 并发保存用例；`contentAiApplyDbIntegration` 2 个用例），CC-IMP-10-VERIFY-01 干净全量再次在 revision guard 并发用例超时（8329 ms，套件 164 s）；断言失败 0，单独重跑均通过。此前 CURRENT-STATE 亦记录过同类负载敏感超时（与 build 并行时 revision guard / publication DB 超时；P2 负载敏感测试）。
+
+**诊断（修复前）：**
+- `docker exec psql` 单次往返：Node `execFile` 约 330–360 ms（bash 循环约 800–930 ms）；无连接池，每条 SQL 一次进程启动与连接。
+- 并发用例时间构成（临时 scratch 脚本复现，同样 SQL 与 TEST ONLY 夹具，已清理）：A 持行锁 `pg_sleep(4)`，4382 ms 结束；B 在 2009 ms 启动，等锁后被 guard 以 23505 拒绝，4385 ms 结束；最终行读取 272 ms；测试主体 4657 ms。其中 4000 ms 为刻意持锁，约 650 ms 为 docker exec 开销；无 retry / 额外 sleep。
+- 复现矩阵：revision guard 文件单独 3 次均 PASS，并发用例 4734 / 4653 / 4663 ms（距 5 s 仅约 300 ms）；AI Apply 单独 2 次均 PASS（文件 12.84 / 13.15 s，单用例最长 3674 ms）；干净全量一次 PASS（118.09 s，77 files passed / 2 skipped，2751 passed / 45 skipped）——同一命令在 164–194 s 的较重负载运行中超时，属负载敏感抖动。
+- 超时来源：`vitest.config.ts` 未设 `testTimeout`，继承 Vitest 默认 5000 ms；`contentLifecycleGuardDbIntegration` 已使用 describe 级 timeout，其余 4 个真实 DB 文件未设。
+- 资源：每次运行后 `pg_stat_activity` 连接数稳定为 3，宿主 docker exec 进程残留 0，负 id 夹具 0；PostgreSQL 无 FATAL / PANIC / deadlock，ERROR 行均为测试刻意触发的 guard / provisioning 负向路径；Directus error 0。
+
+**修复：** 仅在 `tests/contentRevisionGuardIntegration.test.ts` 与 `tests/contentAiApplyDbIntegration.test.ts` 的 describe 上设置局部 `{ timeout: REAL_DB_TEST_TIMEOUT_MS }`（15 000 ms，附测量依据注释）。依据：revision guard 并发用例单独约 4.6–4.7 s、负载下实测 8.3 s；AI Apply 单用例单独最长约 3.7 s、负载下超过 5 s。15 s 为负载实测最大值约 1.8 倍余量，仍远早于 helper 的 60 s 进程超时暴露真实挂起。未改全局 timeout、未改 hookTimeout、未改 helper、SQL、并发流程或断言；并发用例仍证明两个并发保存恰好一个成功、失败方被 revision guard 拒绝且确实等待了锁、最终行只等于胜者。未采用"缩短持锁时间"：负载下 B 可能来不及在 A 持锁期间启动，反而使"B 等锁"断言更不稳定。
+- 作用域证明（scratch，未提交）：同一 6 s 测试在 describe `{ timeout: 15_000 }` 下通过（6017 ms），无该选项时在 5 s 默认值超时（5014 ms）。
+
+**测试约定（长期）：** 经 `docker exec psql` 的真实 PostgreSQL 集成测试，在 describe 上声明基于实测、有上限的局部 timeout；不修改全局 timeout，不用 mock 替代真实数据库，不以重试或跳过换取通过。
+
+**验证（修复后）：**
+- revision guard 单独连续 5 次：全部 PASS（并发用例 4578 / 4639 / 4579 / 4616 / 4616 ms，文件 9.62–9.74 s）。
+- AI Apply 单独连续 3 次：全部 PASS（文件 9.80 / 9.88 / 10.03 s）。
+- 全量 #1（`CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run --no-file-parallelism`）：77 files passed / 2 skipped，2751 passed / 45 skipped，0 failed，111.78 s。
+- 全量 #2（两次之间无代码修改）：77 files passed / 2 skipped，2751 passed / 45 skipped，0 failed，108.30 s。
+- typecheck 0 error；lint 0 error；`nuxt build` Build complete；`git diff --check` 通过。
+- 权限工件 `directus_permissions_verify: OK`；连接数 3、docker exec 残留 0、负 id 夹具 0。
+
+**已知限制：**
+- 两次修复后全量耗时约 108–112 s，负载低于此前超时的 164–194 s 运行；15 s 余量按负载实测最大值设定，但不能证明任意更重负载（如与 build 并行）下永不超时——全量验证仍须串行、不与 build / typecheck 并行。
+- `contentPublicationDbIntegration`、`directusPermissionsProvisioningDbIntegration` 仍用默认 5 s（本次与此前 CC-IMP-10 全量中未超时；历史上与 build 并行时 publication DB 曾超时），按施工单范围未改，登记为观察项。
+- 每条 SQL 一次 docker exec 的 helper 结构未优化（多个测试文件各自复制 helper），属可选的后续测试基础设施工作。
+
+*最后更新：2026-09-15，由 Claude Code 在"TEST-INFRA-CONTENT-DB-STABILITY-01"任务中写入。*

@@ -256,6 +256,7 @@ Content Center Visual Direction      ✅ APPROVED（2026-09-14）
 → CC-IMP-09 AI Proposal Review & Apply  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；人工 Accept / Edit / Reject + 冲突人工决定 + 按服务端 Proposal 绑定一次 PATCH 写入该语言 working Draft；无发布、真实 Provider 调用 0，未 push / 未部署）
 → DIRECTUS-PERMISSIONS-PROVISIONING-01  ✅ COMPLETED（2026-09-15，CC-IMP-10 prerequisite：已跟踪、幂等、fail-closed 的 nuxt-server Content 最小读取权限工件，D-034；公开策略 Content 权限 0；未 push / 未部署）
 → CC-IMP-10 Public Delivery & Sitemap V2  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；D-035：Technical Article / Case Study 仅英文、仅快照公开，News 等其他类型不公开，sitemap 去除 `date_updated` 并纳入合格内容，媒体代理归档检查；未 push / 未部署）
+→ TEST-INFRA-CONTENT-DB-STABILITY-01  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；CC-IMP-10 release readiness 前置：两个真实 PostgreSQL 集成测试文件设置基于实测的局部 15 s timeout，生产代码 / 断言未改，串行全量两次全绿；未 push / 未部署）
 → NEXT：NONE — 等待 Controller 审查（未授权任何后续模块）
 ```
 
