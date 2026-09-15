@@ -7,15 +7,15 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CC-IMP-08 — Content AI Target & Source Intake（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · bc98b8e + 只读 Proposal Binding 核验 READY · not pushed）
-Latest completed module:            CC-IMP-09 — AI Proposal Review & Apply（A2 · LOCAL COMPLETE · 等待 Controller 审查）
-Active authorized module:           NONE（CC-IMP-09 已收口，等待 Controller 审查）
+Latest accepted module:             CC-IMP-09 — AI Proposal Review & Apply（ACCEPTED LOCALLY / TECHNICAL PASS，Controller 签收 · f905fea · not pushed）
+Latest completed module:            DIRECTUS-PERMISSIONS-PROVISIONING-01 — Tracked Directus Permission Provisioning（A2 · LOCAL COMPLETE · CC-IMP-10 prerequisite · 等待 Controller 审查）
+Active authorized module:           NONE（DIRECTUS-PERMISSIONS-PROVISIONING-01 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-10 — Public Delivery & Sitemap（高风险模块：RSG-01 / RSG-02 / RSG-05 / RSG-06 / RSG-07，须按 RELEASE-SAFETY-GATES.md 取证；需 Blueprint §35 用户路由决定）
+Next candidate:                     CC-IMP-10 — Public Delivery & Sitemap（高风险模块；Phase 1 路由决定已由用户确认；前置权限工件已完成；本地 nuxt-server token 401 = ENVIRONMENT BLOCKED）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：bc98b8e）
-Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers (LOCAL DEVELOPMENT ONLY)
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：f905fea）
+Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
 
@@ -9832,3 +9832,54 @@ P0 Violations:                  NONE
 - 未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-09"任务中写入。*
+
+---
+
+## DIRECTUS-PERMISSIONS-PROVISIONING-01 — Tracked Directus Permission Provisioning（2026-09-15）
+
+```text
+Module:                            DIRECTUS-PERMISSIONS-PROVISIONING-01（TYPE C 基础设施治理 + 本地实施；CC-IMP-10 前置）
+Authorization:                     A2 LOCAL_IMPLEMENTATION（Controller 审查 CC-IMP-10 STOP §16 后授权）
+Status:                            COMPLETED（LOCAL COMPLETE · 等待 Controller 审查）
+Branch:                            review/directus-permissions-provisioning-01
+Baseline:                          f905fea6f7a8c5636a0d3c7f97fe64346d38b257
+Commit:                            infra(directus): track content read permissions（本节所在 commit）
+Tracked permission provisioning:   ESTABLISHED（D-034）
+Local content permissions applied: YES（3 行 read，site-readonly-policy）
+Public policy Content permissions: 0（匿名 Directus 请求 403）
+Legacy site-readonly permissions:  17 行逐字段、逐 id 未变化
+nuxt-server token status:          401 — LOCAL PUBLIC SERVICE ACCOUNT ENVIRONMENT BLOCKED（未读 / 未改 token）
+Schema / dependency / service:     0 / 0 / 0（权限行属基础设施配置）
+CC-IMP-10:                         NOT STARTED（其分支 review/cc-imp-10-public-delivery-sitemap 停在 f905fea，0 commit）
+P0 Violations:                     NONE
+```
+
+**背景：** CC-IMP-10 开工核查触发 STOP §16——Directus YAML 快照只含 collections / fields / relations，不含 roles / policies / permissions；此前全部 nuxt-server 权限（products、product_*、products_files、site_content、posts、inquiries 等 17 行）均为手工配置、仅文字记录，无法在其他环境复现。Controller 决定：建立已跟踪 SQL 权限工件模式，只为 CC-IMP-10 提供最小 Content 读取权限，不重写既有 17 行。
+
+**事实核查（只读）：** Directus 运行版本 11.17.4（docker-compose 为浮动标签 `directus/directus:11`，由 verify 的系统表形状检查兜底）。`directus_permissions`：id serial（`directus_permissions_id_seq`）、collection、action、permissions json、validation json、presets json、fields text、policy uuid → `directus_policies` ON DELETE CASCADE；无 (policy, collection, action) 唯一约束。角色 `nuxt-server`、策略 `site-readonly-policy` 名称在数据中唯一，二者之间恰有 1 条 `directus_access`；公开策略 = role 与 user 均为空的 access 行。`content_item_locales.content_items_id → content_items` 在 `directus_relations` 注册（关系型权限过滤可表达）。`media_file_lifecycle` 字段：id、file_id、archived、archived_at、archived_by、restored_at、restored_by。
+
+**工件（`directus/schema/`）：**
+
+- `directus-permissions-01-nuxt-server-content-read.sql`（apply）：`LOCK TABLE directus_permissions IN SHARE ROW EXCLUSIVE MODE`；fail closed——系统表列形状、角色 / 策略 / access 各恰 1、策略无 admin / app access、3 个 collection 已注册、该策略在 content_items_files / content_relations / directus_revisions / directus_activity 上无权限、任何公开策略无 Content 权限、owned collection 无非 read 行、read 行不超过 1；owned 行缺失则插入、漂移则原位（同 id）规范化、一致则不动。
+- `….verify.sql`：只读；系统表形状、策略解析、每个 owned collection 恰 1 行且字段 / 过滤器 / validation / presets 精确、禁止权限 0、公开策略 Content 权限 0、重复行 0；通过输出 `directus_permissions_verify: OK`。
+- `….rollback.sql`：只删除与工件精确一致的 owned 行；漂移行拒绝删除并报错；不删策略 / 角色 / access / 其他权限 / 用户 / token。
+- 拥有的 3 行（`site-readonly-policy`，action `read`，validation / presets NULL）：
+  - `content_items`：fields `id,content_type,status,archived_at`；filter `status = published` 且 `archived_at IS NULL` 且 `content_type IN (technical_article, case_study)`。
+  - `content_item_locales`：fields `content_items_id,locale,slug,published_snapshot,published_at`；filter `published_snapshot IS NOT NULL` 且 `locale = en` 且父条目 `status = published`、`archived_at IS NULL`、`content_type IN (technical_article, case_study)`（关系型过滤）。不开放 working title / summary / blocks / SEO、draft_revision、last_change_kind、user_* 等；`slug` 为 Blueprint §26 允许的路由查找列，Reader 仍须比对 `published_snapshot.slug`。
+  - `media_file_lifecycle`：fields `file_id,archived`；filter `archived = true`（公开媒体代理只需判断是否已归档；需要该行是因为代理只能使用 nuxt-server 身份）。
+- 未授予：`content_items_files`、`content_relations`、`directus_revisions`、`directus_activity`、任何 AI / Proposal / Admin-only collection；公开策略、Administrator 策略未修改。
+
+**本地证据：**
+
+- apply #1：`inserted 3, normalized 0, unchanged 0`；verify OK。apply #2：`inserted 0, normalized 0, unchanged 3`；整个 `directus_permissions` 表（含 id 的规范 JSON）哈希、行数、序列值与 #1 完全一致。
+- 既有 17 行：apply 前的逐行转储（id、collection、action、fields、permissions、validation、presets）与 apply 后逐字 diff 一致；集成测试再次逐 id 比对。
+- Directus 在进程内存中保存权限与 schema，直接 SQL 变更需重启：`docker compose restart directus` 后 `/server/ping` = pong，日志无权限错误（仅既有 PostGIS 提示）；匿名请求 `content_items`、`content_item_locales`、`media_file_lifecycle`、`content_items_files`、`content_relations`、`/revisions`、`/activity` 均 403。
+- nuxt-server 运行时：重启后公开产品 / posts 端点与 sitemap 仍收到 Directus `401 Unauthorized` → 本地公开服务账户 ENVIRONMENT BLOCKED（本模块不修 token；未读 `.env`、未输出 token）。CC-IMP-10 的真实公开读取验收需先恢复该账户。
+
+**测试：** `tests/directusPermissionsProvisioningDbIntegration.test.ts`（真实 PostgreSQL，15 / 15）——工件无 users / token / 策略写入；apply 两次整表（含 id）与序列一致且 verify OK；最小 3 行精确、禁止权限 0、非 read 0、公开策略 0、重复 0、working-copy 列不在字段中；既有行逐 id 不变；漂移行原位规范化；fail closed（同名第二策略、第二 access、策略获得 app access、owned 非 read 行、重复 read 行、junction 权限、公开策略 Content 权限——均报错且整表不变，事务回滚）；verify 对漂移与公开授权报错；rollback 拒删漂移行；rollback 只删 owned 行 → verify 失败 → 重新 apply → verify OK、既有行不变。全量 vitest（含真实 PostgreSQL，串行）：76 passed | 2 skipped (78)；2707 passed | 45 skipped (2752)。typecheck 0；lint 0；`nuxt build` Build complete；`git diff --check` 通过。
+
+**治理：** Decision Log 新增 D-034 Tracked Directus Permission Provisioning。RELEASE-SAFETY-GATES §3A.8 最小补充：权限不在 YAML 快照中、由已跟踪权限工件提供；provisioning 第 2 步在 SQL 工件后按顺序 apply 权限工件并重启 Directus；第 4 步运行每个工件的 `.verify.sql` 并留证（P0 语义、Golden / Negative Path 未改）。MASTER-ROADMAP 在 CC-IMP-10 前增加前置完成标记。Register、Blueprint、Freeze、Charter 未修改。
+
+**已知 / 记录：** 既有 17 行 legacy 权限仍为手工来源（未纳入追踪，按 Controller 决定不重写），其中 `products_files` 读取无行过滤、product_* 为 `*` 字段（产品侧既有 P2）。docker-compose 使用浮动 `directus:11` 标签：升级到系统表形状不同的版本时 apply / verify 会 fail closed。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
+
+*最后更新：2026-09-15，由 Claude Code 在"DIRECTUS-PERMISSIONS-PROVISIONING-01"任务中写入。*

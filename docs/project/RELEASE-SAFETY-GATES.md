@@ -219,12 +219,12 @@ media   = linked row enabled AND RSG-06
 
 ### 3A.8 Production Provisioning Contract（RSG-08）
 
-- Directus YAML schema snapshot（`directus/schema/*.yaml`）**不包含** `content_item_locales_draft_revision_guard` 函数与 `content_item_locales_draft_revision_guard_trg` 触发器；它们只存在于已跟踪的 SQL 工件 `directus/schema/cc-imp-01-fix-01-revision-guard.sql`。Content Foundation 的数据库约束另有已跟踪 SQL 工件 `directus/schema/cc-imp-01-constraints.sql`。Content Center 生命周期并发 guard（`content_lifecycle_*` 函数与 `content_items_lifecycle_guard_trg`、`content_items_lifecycle_restore_guard_trg`、`content_item_locales_lifecycle_guard_trg`、`content_item_locales_lifecycle_marker_guard_trg`、`content_items_files_lifecycle_guard_trg`、`content_relations_lifecycle_guard_trg` 触发器）同样不在 YAML 快照中，只存在于已跟踪 SQL 工件 `directus/schema/cc-imp-07-fix-02-lifecycle-guard.sql`（CC-IMP-07 Review Fix 02；应用顺序：constraints → revision guard → lifecycle guard）。
+- Directus YAML schema snapshot（`directus/schema/*.yaml`）**不包含** `content_item_locales_draft_revision_guard` 函数与 `content_item_locales_draft_revision_guard_trg` 触发器；它们只存在于已跟踪的 SQL 工件 `directus/schema/cc-imp-01-fix-01-revision-guard.sql`。Content Foundation 的数据库约束另有已跟踪 SQL 工件 `directus/schema/cc-imp-01-constraints.sql`。Content Center 生命周期并发 guard（`content_lifecycle_*` 函数与 `content_items_lifecycle_guard_trg`、`content_items_lifecycle_restore_guard_trg`、`content_item_locales_lifecycle_guard_trg`、`content_item_locales_lifecycle_marker_guard_trg`、`content_items_files_lifecycle_guard_trg`、`content_relations_lifecycle_guard_trg` 触发器）同样不在 YAML 快照中，只存在于已跟踪 SQL 工件 `directus/schema/cc-imp-07-fix-02-lifecycle-guard.sql`（CC-IMP-07 Review Fix 02；应用顺序：constraints → revision guard → lifecycle guard）。Directus 权限（roles / policies / permissions）同样不在 YAML 快照中；基线之外的权限只由已跟踪的权限工件提供（`directus/schema/directus-permissions-*.sql` 及其 `.verify.sql` / `.rollback.sql`，D-034），在上述 SQL 工件之后应用。
 - 因此任何生产或新环境 provisioning 必须显式完成并留证：
   1. apply schema（Directus 快照）；
-  2. apply tracked SQL（约束与 trigger / function）；
+  2. apply tracked SQL（约束与 trigger / function），随后按顺序 apply 已跟踪的 Directus 权限工件并重启 Directus（D-034）；
   3. verify trigger / function 与约束实际存在；
-  4. verify permissions（含 `nuxt-server` 最小字段 / 行权限，RSG-07）；
+  4. verify permissions（含 `nuxt-server` 最小字段 / 行权限，RSG-07）：运行每个权限工件的 `.verify.sql` 并留证；
   5. verify supported Node runtime（22.22.2，`.nvmrc` / `engines`）；
   6. verify dependencies（生产依赖安装；许可证 / CVE 审查按 Open Release Gates）；
   7. backup（变更前可恢复的备份）；

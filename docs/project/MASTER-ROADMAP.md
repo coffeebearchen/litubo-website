@@ -252,6 +252,7 @@ Content Center Visual Direction      ✅ APPROVED（2026-09-14）
 → CC-IMP-04-R3 Source Document Association  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；CC-IMP-08 前置窄修复：source_document 关联归 CC-03 Media & Relations，未 push / 未部署）
 → CC-IMP-08 Content AI Target & Source Intake  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；只读已关联来源 + 浏览器本地选择 + 单一 Proposal Engine 的 content-draft Target，一次 Analyze 一个内存 Proposal；0 关联 / Draft / 发布写入，无 Apply，真实 Provider 调用 0，未 push / 未部署）
 → CC-IMP-09 AI Proposal Review & Apply  ✅ COMPLETED（2026-09-15，LOCAL COMPLETE；人工 Accept / Edit / Reject + 冲突人工决定 + 按服务端 Proposal 绑定一次 PATCH 写入该语言 working Draft；无发布、真实 Provider 调用 0，未 push / 未部署）
+→ DIRECTUS-PERMISSIONS-PROVISIONING-01  ✅ COMPLETED（2026-09-15，CC-IMP-10 prerequisite：已跟踪、幂等、fail-closed 的 nuxt-server Content 最小读取权限工件，D-034；公开策略 Content 权限 0；未 push / 未部署）
 → CC-IMP-10 Public Delivery & Sitemap  NEXT — NOT AUTHORIZED（须按 Safety Gate 流程取证；Blueprint §35 用户路由决定）
 ```
 
