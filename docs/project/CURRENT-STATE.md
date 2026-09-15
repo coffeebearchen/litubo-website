@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             CC-IMP-06 — Preview, Readiness & Publish（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · core 97bf4d8 + Review Fix 01 404ed94 · not pushed）
-Latest completed module:            CC-IMP-07 — Archive, Restore & Change History（TYPE A/B · A2 · LOCAL COMPLETE，含 Review Fix 02 PostgreSQL lifecycle concurrency guard · awaiting controller final acceptance）
-Active authorized module:           NONE（CC-IMP-07 Review Fix 02 已收口，等待下一份授权）
+Latest completed module:            CC-IMP-07 — Archive, Restore & Change History（TYPE A/B · A2 · LOCAL COMPLETE，含 Review Fix 02 PostgreSQL lifecycle concurrency guard + Review Fix 03 duplicate restore audit cleanup · awaiting controller final acceptance）
+Active authorized module:           NONE（CC-IMP-07 Review Fix 03 已收口，等待下一份授权）
 Active module authorization level:  —
 Next candidate:                     CC-IMP-08 — Content AI Target & Source Intake（高风险模块：RSG-04 / RSG-06，须按 RELEASE-SAFETY-GATES.md 取证）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：76e77af）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：ae337e0）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9617,3 +9617,49 @@ P0 Violations:                NONE
 **Governance：** RELEASE-SAFETY-GATES 仅 §3A.8 provisioning 登记新 SQL（P0 语义未改）。Blueprint / Freeze / Charter / Decision Log / D-033 / Protocol / CLAUDE.md / Register / MASTER-ROADMAP 未修改（Roadmap 已为 CC-IMP-08 NEXT — NOT AUTHORIZED）。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-07 Review Fix 02"任务中写入。*
+
+### Review Fix 03 — Duplicate Restore Audit Cleanup（Controller 审查修正，2026-09-15）
+
+```text
+Status:                         COMPLETED（LOCAL COMPLETE）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（CC-IMP-07 REVIEW FIX 03 施工单）
+Base commit:                    ae337e0c5b6427213720fcbc7d3afcbec1cfb614
+Commit:                         fix(content): suppress duplicate restore audit writes（本小节所在 commit）
+Duplicate Restore loser:        0 writes / 0 activity / 0 revisions（真实 Directus）
+Partial Restore retry:          PASS（已清理的语言行跳过，其余清理后 item 回 draft）
+History:                        只出现成功 Restore 的真实事件
+Schema / dependency:            0 field / 0 table / 0 index / 0 package（仅更新已跟踪 SQL 中的 guard 函数）
+Register:                       未修改（CC-HIST Implementation AUTOMATED_CHECKED · Acceptance NOT_STARTED，等待 Controller 最终签收）
+Roadmap:                        未修改（CC-IMP-08 NOT AUTHORIZED）
+P0 Violations:                  NONE
+```
+
+本小节修正并取代 Review Fix 02 已知限制中"I1 交错下败者的语言清理步骤会先写入一次无害 no-op（产生 activity / revision），随后 item 步骤 409 partial"的描述。
+
+**根因：** `planRestore` 对全部语言行无条件 PATCH 清理字段；数据库 restore 例外只校验 NEW 形态，允许对已清理（发布字段均 null 且 `last_change_kind = restore`）的行再次写入。两个基于同一 Archived 状态的 Restore 都会写语言行，败者的 no-op 写入经 Directus 记为 "Publication cleared by restore"，之后才在 item 步骤被拒。
+
+**最小修正：**
+
+- **BFF（`server/utils/contentLifecycle.ts`）：** fresh read 读取各语言 `last_change_kind`；Restore 只 PATCH 仍需清理的语言行（`isRestoreCleared`：无快照、`published_revision` / `published_at` 为 null 且标记为 restore 的行跳过）；全部已清理时只写 item。`lifecycleFingerprint` 加入各语言 `last_change_kind`，使另一 Restore 已提交的语言清理即使不改变发布字段（从未发布的条目）也会让同屏重复请求在预检中 409 且 0 写入。
+- **数据库（`directus/schema/cc-imp-07-fix-02-lifecycle-guard.sql`，`content_lifecycle_locale_guard`，已重新应用、幂等）：** restore 例外要求确有清理——OLD 已清理且带 restore 标记的行被拒（`restore_already_cleared`）。持有旧 payload 的并发请求在语言步骤即被拒，整个 Directus 事务回滚。
+- 错误仍映射 409 `lifecycle_changed`（语言步骤为首步，无 `partial`）。无新字段 / 表 / 锁表 / 依赖；History 架构、Archive UI、Blueprint、Safety Gates 未改。
+
+**真实 PostgreSQL（`tests/contentLifecycleGuardDbIntegration.test.ts`，20 / 20）：**
+
+- I1 重写：A 持有 Restore 语言清理事务，B 以相同 payload 等待行锁；A 提交后 B 被拒 `restore_already_cleared`（23505）；同一 stale payload 迟到写入同样被拒；A 完成 item 步骤；B 的 item 步骤 `not_archived`。最终 draft、快照清空、败者 0 行写入。
+- 新增 Partial Restore retry：en 已清理、es 仍有快照、item archived → item 步骤被拒（`restore_before_publication_cleared`）→ 重写 en 被拒 → 只清理 es → item draft；从未发布的归档条目仍可写入一次 restore 标记，第二次被拒。
+- I2 / I3 / J / G 及其余矩阵照常通过。
+
+**真实 Directus / BFF（本地 dev，TEST ONLY 内容 4；准备：Editor 保存〔标题不变，rev 1 → 2，manual_edit〕→ Archive；脚本持 `content_items` 4 `FOR UPDATE` 行锁〔不写入〕至 2 个语言清理语句真实排队后提交）：**
+
+- 两个 Restore 使用同一 lifecycle fingerprint：R1 → **200 restored**（draft）；R2 → **409 `lifecycle_changed`**（无 partial）。Directus：一次 `PATCH /items/content_item_locales` 400（guard 拒绝）、一次 200、一次 item PATCH 200。
+- activity 自 1105 起仅 1106（`content_item_locales` 11 update，delta 清理 + restore）与 1107（`content_items` 4 update，draft / archived_at null），revision 仅 861 / 862，actor dev@litubo.com——败者 **0 writes / 0 activity / 0 revisions**。
+- History（真实 API）：Archived 之后只有一条 "Publication cleared by restore"（en）与一条 "Restored to draft"，无失败请求的伪事件。
+- 语言均已清理的条目再次 Archive → Restore：200；只产生 2 条 `content_items` update（1108 / 1109），无语言行重写。
+- 新标签页 History 加载：console error 0。无 UI 改动。
+
+**测试：** `tests/contentLifecycle.test.ts` 新增 3 项（partial 重试只写需清理行；全部已清理时只写 item；另一 Restore 已清理后同屏重复请求 409 且 0 写入），33 / 33。全量 vitest（含真实 DB）70 files passed / 2 skipped，2562 passed / 45 skipped；真实 PostgreSQL lifecycle guard 20 / 20、revision guard 6 / 6、publish lifecycle 5 / 5；History 组件 7 / 7；CC-IMP-06 publication 56 / 56；typecheck 0；lint 0；`nuxt build` Build complete；`git diff --check` 通过。
+
+**最终本地数据：** 内容 1 / 2 / 4 / 5 / 6 全部 draft；内容 4 en revision 2（`last_change_kind` restore，标题不变）、0 链接 / 0 关系；负 id 夹具 0；非空快照 0；published 0；archived 0；trigger 7；`media_file_lifecycle` 20 不变；provider calls 0。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-07 Review Fix 03"任务中写入。*

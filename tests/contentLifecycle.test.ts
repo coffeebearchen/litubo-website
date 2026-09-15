@@ -332,6 +332,43 @@ describe('restore — archived → draft, snapshots cleared, never published (Bl
     expect(db.item.status).toBe('draft')
   })
 
+  it('Review Fix 03 — a retry after a partial Restore writes only the locale rows that still need cleanup', async () => {
+    await publishBoth()
+    await archive()
+    // An interrupted earlier Restore already cleared en; es still holds its snapshot.
+    db.locales.set(20, { ...db.locales.get(20)!, published_snapshot: null, published_revision: null, published_at: null, last_change_kind: 'restore' })
+    db.writes = []
+    expect((await restore()).result).toBe('restored')
+    expect(db.writes.map(w => `${w.method} ${w.path}`)).toEqual(['PATCH /items/content_item_locales', `PATCH /items/content_items/${ITEM}`])
+    expect(db.writes[0].body).toEqual([{ id: 21, published_snapshot: null, published_revision: null, published_at: null, last_change_kind: 'restore' }])
+    expect(db.item.status).toBe('draft')
+    expect([...db.locales.values()].every(r => r.published_snapshot === null && r.last_change_kind === 'restore')).toBe(true)
+  })
+
+  it('Review Fix 03 — when every locale is already cleared, Restore writes only the item', async () => {
+    await publishBoth()
+    await archive()
+    for (const [id, row] of db.locales) {
+      db.locales.set(id, { ...row, published_snapshot: null, published_revision: null, published_at: null, last_change_kind: 'restore' })
+    }
+    db.writes = []
+    expect((await restore()).result).toBe('restored')
+    expect(db.writes.map(w => `${w.method} ${w.path}`)).toEqual([`PATCH /items/content_items/${ITEM}`])
+  })
+
+  it('Review Fix 03 — a duplicate Restore shown the same state is 409 with no write once the other Restore cleared the locales', async () => {
+    await archive()
+    const shown = (await lifecycle()).lifecycleFingerprint
+    // The first Restore's locale step committed; this item was never published, so only the change kind moved.
+    for (const [id, row] of db.locales) db.locales.set(id, { ...row, last_change_kind: 'restore' })
+    db.writes = []
+    const duplicate = await rejection(restore(shown))
+    expect(duplicate).toMatchObject({ statusCode: 409, data: { code: 'lifecycle_changed' } })
+    expect(duplicate.data.partial).toBeUndefined()
+    expect(db.writes).toHaveLength(0)
+    expect(db.item.status).toBe('archived')
+  })
+
   it('never leaves a draft item holding a published translation', async () => {
     await publishBoth()
     await archive()

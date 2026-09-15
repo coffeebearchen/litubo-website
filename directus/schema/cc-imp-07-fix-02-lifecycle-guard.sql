@@ -35,6 +35,10 @@
 --        working-copy fields / draft_revision / first_published_at unchanged,
 --        and published_snapshot, published_revision, published_at all NULL.
 --        A stale Unpublish (last_change_kind = 'unpublish') or Publish is rejected.
+--        The Restore clear must change something (Review Fix 03): a row that is
+--        already cleared with last_change_kind = 'restore' is rejected
+--        (restore_already_cleared), so a duplicate Restore records no no-op
+--        revision; the BFF skips such rows, which keeps a partial Restore retryable.
 --   content_item_locales (BEFORE UPDATE OF last_change_kind)
 --     7. A write that sets last_change_kind = 'restore' requires the parent to be
 --        archived (a duplicate Restore after the first one committed → rejected).
@@ -209,6 +213,15 @@ BEGIN
      AND NEW.published_snapshot IS NULL
      AND NEW.published_revision IS NULL
      AND NEW.published_at IS NULL THEN
+    -- Review Fix 03: a row that is already cleared with the restore marker needs no cleanup. A
+    -- second Restore that prepared its payload before the first one committed is refused here, so
+    -- it writes nothing and Directus records no activity or revision for it.
+    IF OLD.published_snapshot IS NULL
+       AND OLD.published_revision IS NULL
+       AND OLD.published_at IS NULL
+       AND OLD.last_change_kind = 'restore' THEN
+      PERFORM content_lifecycle_reject('content_item_locales', NEW.content_items_id, 'restore_already_cleared');
+    END IF;
     RETURN NEW;
   END IF;
 

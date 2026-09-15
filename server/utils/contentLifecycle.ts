@@ -45,6 +45,7 @@ export interface LifecycleLocaleRow {
   published_revision: number | null
   published_at: string | null
   first_published_at: string | null
+  last_change_kind: string | null
   has_snapshot: boolean
 }
 
@@ -59,7 +60,7 @@ export interface LifecycleContext {
   locales: LifecycleLocaleRow[]
 }
 
-const LOCALE_FIELDS = ['id', 'content_items_id', 'locale', 'title', 'published_revision', 'published_at', 'first_published_at', 'published_snapshot']
+const LOCALE_FIELDS = ['id', 'content_items_id', 'locale', 'title', 'published_revision', 'published_at', 'first_published_at', 'last_change_kind', 'published_snapshot']
 
 export async function loadLifecycleContext(fetch: FetchFn, itemId: number): Promise<LifecycleContext> {
   const fields = ['id', 'content_type', 'status', 'archived_at', 'first_published_at', ...LOCALE_FIELDS.map(f => `locales.${f}`)].join(',')
@@ -75,6 +76,7 @@ export async function loadLifecycleContext(fetch: FetchFn, itemId: number): Prom
       published_revision: (l.published_revision as number | null) ?? null,
       published_at: (l.published_at as string | null) ?? null,
       first_published_at: (l.first_published_at as string | null) ?? null,
+      last_change_kind: (l.last_change_kind as string | null) ?? null,
       has_snapshot: l.published_snapshot !== null && l.published_snapshot !== undefined,
     }))
     .sort((a, b) => CONTENT_LOCALES.indexOf(a.locale) - CONTENT_LOCALES.indexOf(b.locale))
@@ -90,14 +92,18 @@ export async function loadLifecycleContext(fetch: FetchFn, itemId: number): Prom
   }
 }
 
-/** Item id, status, archive / first-publish dates and every locale's publication state. Draft text is not included. */
+/**
+ * Item id, status, archive / first-publish dates and every locale's publication state and change
+ * kind. Draft text is not included. The change kind makes a concurrent Restore's locale cleanup
+ * visible even when no publication field changes (Review Fix 03).
+ */
 export function lifecycleFingerprint(ctx: LifecycleContext): string {
   const input = {
     id: ctx.item.id,
     status: ctx.item.status,
     archivedAt: ctx.item.archived_at,
     firstPublishedAt: ctx.item.first_published_at,
-    locales: ctx.locales.map(l => [l.id, l.locale, l.published_revision, l.published_at, l.first_published_at, l.has_snapshot]),
+    locales: ctx.locales.map(l => [l.id, l.locale, l.published_revision, l.published_at, l.first_published_at, l.has_snapshot, l.last_change_kind]),
   }
   return createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 32)
 }
@@ -155,6 +161,10 @@ export function planArchive(ctx: LifecycleContext, expectedFingerprint: string, 
   return { kind: 'archived', steps: [{ collection: 'content_items', id: ctx.item.id, patch: { status: 'archived', archived_at: now } }] }
 }
 
+export function isRestoreCleared(l: LifecycleLocaleRow): boolean {
+  return !l.has_snapshot && l.published_revision === null && l.published_at === null && l.last_change_kind === 'restore'
+}
+
 /**
  * Locale publication fields are cleared first while the item is still archived (not public),
  * then the item returns to draft. An interrupted restore leaves the item archived — never a
@@ -166,10 +176,14 @@ export function planRestore(ctx: LifecycleContext, expectedFingerprint: string):
     fail(403, 'Only archived content can be restored.', { code: 'invalid_transition', status: ctx.item.status })
   }
   const steps: LifecycleStep[] = []
-  if (ctx.locales.length > 0) {
+  // Review Fix 03 — only rows that still need the cleanup are written. A row already cleared with
+  // the restore marker (an interrupted earlier Restore) is skipped, so a retry finishes the rest and
+  // no request records a no-op "Publication cleared by restore" revision.
+  const pending = ctx.locales.filter(l => !isRestoreCleared(l))
+  if (pending.length > 0) {
     steps.push({
       collection: 'content_item_locales',
-      rows: ctx.locales.map(l => ({ id: l.id, published_snapshot: null, published_revision: null, published_at: null, last_change_kind: 'restore' })),
+      rows: pending.map(l => ({ id: l.id, published_snapshot: null, published_revision: null, published_at: null, last_change_kind: 'restore' })),
     })
   }
   steps.push({ collection: 'content_items', id: ctx.item.id, patch: { status: 'draft', archived_at: null } })

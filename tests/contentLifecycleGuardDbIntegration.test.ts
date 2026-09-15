@@ -508,16 +508,39 @@ describe.skipIf(!CONTAINER)('lifecycle concurrency guard — real PostgreSQL, TE
 
   // ── I. Duplicate Restore ───────────────────────────────────────────────────────────────
 
-  it('I1. Duplicate Restore, both locale steps before either item step — the second item step is refused', async () => {
+  it('I1. Duplicate Restore with the same prepared locale cleanup — the second locale write waits, is refused and records nothing', async () => {
     const f = await fixture({ published: true, archived: true })
-    await ok(A, `BEGIN;\n${W.restoreLocales([f.en, f.es])}\nCOMMIT;`)
-    await ok(B, `BEGIN;\n${W.restoreLocales([f.en, f.es])}\nCOMMIT;`)
+    const { waited } = await barrier(A, W.restoreLocales([f.en, f.es]), B, W.restoreLocales([f.en]))
+    expectGuard(waited, 'restore_already_cleared')
+    // The same stale payload arriving after the first cleanup committed (not waiting) is refused too.
+    const late = await refused(B, W.restoreLocales([f.es]), 'restore_already_cleared')
     await ok(A, W.restoreItem(f.id))
-    const second = await refused(B, W.restoreItem(f.id), 'not_archived')
+    await refused(B, W.restoreItem(f.id), 'not_archived')
     const after = await state(f.id)
     expect(after).toMatchObject({ status: 'draft', archived: false })
     expect(Object.values(after.locales).every(l => !l.has_snapshot && l.last_change_kind === 'restore')).toBe(true)
-    record({ case: 'I1 Duplicate Restore (interleaved steps)', winner: 'first Restore', loser: 'second Restore item step', loserError: `${second.sqlstate} ${second.message}`, final: 'draft; archived_at null; snapshots cleared' })
+    record({ case: 'I1 Duplicate Restore (same prepared locale cleanup)', winner: 'first Restore', loser: 'second Restore locale step (waited on row lock, and a late copy)', loserError: `${waited.sqlstate} ${waited.message}; late: ${late.message}`, final: 'draft; archived_at null; snapshots cleared; loser wrote no row' })
+  })
+
+  it('Partial Restore retry — cleared rows are skipped, the remaining row is cleared, then the item restores', async () => {
+    const f = await fixture({ published: true, archived: true })
+    // An interrupted earlier Restore cleared en only; es still holds its snapshot and the item is archived.
+    await ok(A, W.restoreLocales([f.en]))
+    await refused(A, W.restoreItem(f.id), 'restore_before_publication_cleared')
+    // The retry plans only es; rewriting the cleared en row would be a no-op and is refused.
+    await refused(B, W.restoreLocales([f.en]), 'restore_already_cleared')
+    await ok(B, W.restoreLocales([f.es]))
+    await ok(B, W.restoreItem(f.id))
+    const after = await state(f.id)
+    expect(after).toMatchObject({ status: 'draft', archived: false })
+    expect(Object.values(after.locales).every(l => !l.has_snapshot && l.last_change_kind === 'restore')).toBe(true)
+
+    // A never-published archived item still needs its restore marker written once.
+    const never = await fixture({ archived: true })
+    await ok(A, W.restoreLocales([never.en, never.es]))
+    await refused(B, W.restoreLocales([never.en]), 'restore_already_cleared')
+    await ok(A, W.restoreItem(never.id))
+    record({ case: 'Partial Restore retry', winner: 'retry', loser: 'none (rewrite of an already cleared row refused)', final: 'draft; remaining locale cleared; cleared locale not rewritten' })
   })
 
   it('I2. Duplicate Restore after the first finished — the second locale step is refused by the restore marker guard', async () => {
