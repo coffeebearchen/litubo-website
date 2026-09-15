@@ -97,6 +97,56 @@ export interface AdminContentMediaRelations {
   inventory_version: string
 }
 
+/** CC-IMP-08 — the association roles Content AI may read (hero and og_image never). */
+export type ContentAiSourceRole = 'source_document' | 'download' | 'inline'
+
+/** CC-IMP-08 — one already-linked source as AI Source Intake receives it. No Directus id, UUID, path or URL. */
+export interface AdminContentAiSource {
+  /** Opaque, encrypted, short-lived; resolves only for this admin, content item and locale. */
+  sourceRef: string
+  displayName: string
+  typeLabel: string
+  role: ContentAiSourceRole
+  roleLabel: string
+  analyzable: boolean
+  unavailableReason: string | null
+  isImage: boolean
+}
+
+/** CC-IMP-08 — `GET /api/admin/content-center/:id/ai-source-intake?locale=`. */
+export interface AdminContentAiSourceIntake {
+  item: { id: number, content_type: ContentTypeId, status: ContentItemStatus, title: string | null }
+  locale: ContentLocale
+  default_locale: ContentLocale
+  site_locales: ContentLocale[]
+  started_locales: ContentLocale[]
+  /** False when this locale has no Draft row — nothing is created automatically. */
+  locale_started: boolean
+  draft_revision: number | null
+  sources: AdminContentAiSource[]
+  limits: { max_files: number, max_images: number }
+}
+
+export interface AdminContentAiFileResult {
+  displayName: string
+  status: 'read' | 'duplicate' | 'unsupported' | 'unreadable'
+  reason?: string
+}
+
+/** CC-IMP-08 — `POST …/ai-source-intake/analyze`. The proposal itself stays on the server (Review is CC-IMP-09). */
+export type AdminContentAiAnalyzeResult =
+  | {
+      ok: true
+      proposalRef: string
+      reused: boolean
+      alreadyApplied: boolean
+      item_count: number
+      conflict_count: number
+      draft_revision: number
+      fileResults: AdminContentAiFileResult[]
+    }
+  | { ok: false, error: string, fileResults: AdminContentAiFileResult[] }
+
 /** CC-IMP-05 — a hero or Open Graph image link as the SEO & Locales page needs it. */
 export interface AdminContentSeoImage {
   link_id: number

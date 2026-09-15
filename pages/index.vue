@@ -6,7 +6,7 @@ const localePath = useLocalePath()
 
 const { data: homeContent } = await useAsyncData<HomeContent>(
   'home-content',
-  () => $fetch('/api/cms/home'),
+  () => $fetch<HomeContent>('/api/cms/home'),
   { server: true, lazy: false }
 )
 

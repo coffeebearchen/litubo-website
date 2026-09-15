@@ -303,9 +303,9 @@ describe('OCR text and product attribution', () => {
     expect(prompt).not.toContain('Filtered to exact product code')
   })
 
-  it('[?] regression: the shared prompt contract still forbids inferring from [?], unchanged at version 2', () => {
+  it('[?] regression: the shared prompt contract still forbids inferring from [?]; version 3 since the CC-IMP-08 Content Attribution Guard', () => {
     expect(PRODUCT_MODEL_RELEVANCE_GUARD).toContain('Text marked [?] could not be read reliably. Never infer a value from text marked [?].')
-    expect(PROMPT_CONTRACT_VERSION).toBe(2)
+    expect(PROMPT_CONTRACT_VERSION).toBe(3)
     expect(OCR_TRANSCRIPTION_HEADER).toBe('OCR transcription — low-confidence text is marked [?].')
     expect(OCR_TRANSCRIPTION_HEADER).not.toMatch(/verified|confirmed|accurate/i)
   })

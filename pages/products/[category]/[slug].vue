@@ -14,7 +14,7 @@ function loc(s: LocalizedString): string {
 
 const { data: product, error: productError } = await useAsyncData<Product>(
   `product-${categorySlug}-${slug}`,
-  () => $fetch(`/api/cms/products/${categorySlug}/${slug}`)
+  () => $fetch<Product>(`/api/cms/products/${categorySlug}/${slug}`)
 )
 
 if (productError.value || !product.value) {
@@ -23,7 +23,7 @@ if (productError.value || !product.value) {
 
 const { data: categoryData } = await useAsyncData<{ category: ProductCategory; products: Product[] }>(
   `product-category-${categorySlug}`,
-  () => $fetch(`/api/cms/products/${categorySlug}`)
+  () => $fetch<{ category: ProductCategory; products: Product[] }>(`/api/cms/products/${categorySlug}`)
 )
 const category = computed(() => categoryData.value?.category)
 

@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   // Fetch file metadata to check is_public
   let meta: { data?: { is_public?: boolean; type?: string; filename_download?: string } }
   try {
-    meta = await $fetch(`${base}/files/${id}?fields=is_public,type,filename_download`, {
+    meta = await $fetch<typeof meta>(`${base}/files/${id}?fields=is_public,type,filename_download`, {
       headers: { Authorization: `Bearer ${token}` },
     })
   } catch {

@@ -1,4 +1,4 @@
-import type { AiGenerationInput, TargetDefinition, TargetGenerationResult } from './aiTargetContract'
+import type { AiGenerationInput, AiGenerationInputBase, TargetDefinition, TargetGenerationResult } from './aiTargetContract'
 
 /**
  * PWS-AI-ENGINE-01R — provider-neutral, Target-neutral registry. Neither
@@ -33,9 +33,10 @@ export function parseAiProviderId(raw: unknown, fallback: AiProviderId): AiProvi
 /** The one interface every provider adapter (OpenAI, DeepSeek, and any future one) implements. Target-neutral. */
 export interface AiStructuredProvider {
   isConfigured(): boolean
-  generateStructured<TOutput>(
-    target: TargetDefinition<TOutput>,
-    input: AiGenerationInput,
+  /** CC-IMP-08 — generic over the subject's input shape; the adapter only hands `input` to `target.buildUserInput()`. */
+  generateStructured<TOutput, TInput extends AiGenerationInputBase = AiGenerationInput>(
+    target: TargetDefinition<TOutput, TInput>,
+    input: TInput,
   ): Promise<TargetGenerationResult<TOutput>>
 }
 
@@ -57,10 +58,10 @@ export interface AiProviderRegistry {
   getProvider(providerId: AiProviderId): AiStructuredProvider
   listConfiguredProviders(): AiProviderSummary[]
   getDefaultProvider(): AiProviderId
-  generateStructured<TOutput>(
+  generateStructured<TOutput, TInput extends AiGenerationInputBase = AiGenerationInput>(
     providerId: AiProviderId,
-    target: TargetDefinition<TOutput>,
-    input: AiGenerationInput,
+    target: TargetDefinition<TOutput, TInput>,
+    input: TInput,
   ): Promise<TargetGenerationResult<TOutput>>
 }
 
@@ -96,10 +97,10 @@ export function createAiProviderRegistry(options: {
    * requested one fails or is unconfigured, and never invokes more than one
    * adapter per call.
    */
-  async function generateStructured<TOutput>(
+  async function generateStructured<TOutput, TInput extends AiGenerationInputBase = AiGenerationInput>(
     providerId: AiProviderId,
-    target: TargetDefinition<TOutput>,
-    input: AiGenerationInput,
+    target: TargetDefinition<TOutput, TInput>,
+    input: TInput,
   ): Promise<TargetGenerationResult<TOutput>> {
     if (!isAiProviderId(providerId)) return { ok: false, error: UNKNOWN_PROVIDER_ERROR }
     const provider = getProvider(providerId)

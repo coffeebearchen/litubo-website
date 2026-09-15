@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto'
+import { subjectKeyOf, type AiSubjectBinding } from './aiSubject'
 
 /**
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — opaque references to a product's source
@@ -76,10 +77,10 @@ function refKey(): Buffer {
 }
 
 interface SourceRefPayload {
-  /** `products_files.id` — the association row, never a Directus file UUID. */
+  /** The association row id (`products_files.id` or `content_items_files.id`), never a Directus file UUID. */
   m: number
-  /** Product this ref was minted for. */
-  p: number
+  /** CC-IMP-08 — subject key this ref was minted for (`product:<id>` or `content:<id>:<locale>`). */
+  s: string
   /** Admin user this ref was minted for. */
   u: string
   /** Expiry, epoch milliseconds. */
@@ -127,16 +128,18 @@ function open(ref: string): SourceRefPayload | null {
   }
 }
 
-export interface SourceRefBinding {
-  productId: number
-  adminUserId: string
-}
+/**
+ * CC-IMP-08 — bound to one admin and one subject: the existing product shape
+ * `{ productId, adminUserId }` (key `product:<id>`) or `{ subjectKey, adminUserId }`
+ * for a content item and locale. A ref minted for one subject never resolves for another.
+ */
+export type SourceRefBinding = AiSubjectBinding & { adminUserId: string }
 
-/** Mints an opaque ref for one association row, bound to this admin and product. */
+/** Mints an opaque ref for one association row, bound to this admin and subject. */
 export function createSourceRef(mediaId: number, binding: SourceRefBinding, now = Date.now()): string {
   const payload: SourceRefPayload = {
     m: mediaId,
-    p: binding.productId,
+    s: subjectKeyOf(binding),
     u: binding.adminUserId,
     e: now + SOURCE_REF_TTL_MS,
   }
@@ -160,7 +163,7 @@ export function resolveSourceRef(ref: unknown, binding: SourceRefBinding, now = 
   if (!payload) return null
 
   if (typeof payload?.m !== 'number' || !Number.isInteger(payload.m) || payload.m <= 0) return null
-  if (payload.p !== binding.productId) return null
+  if (payload.s !== subjectKeyOf(binding)) return null
   if (payload.u !== binding.adminUserId) return null
   if (typeof payload.e !== 'number' || payload.e <= now) return null
 

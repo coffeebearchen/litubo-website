@@ -8,7 +8,7 @@ const categorySlug = route.params.category as string
 
 const { data, error } = await useAsyncData<{ category: ProductCategory; products: Product[]; cmsError?: boolean }>(
   `product-category-${categorySlug}`,
-  () => $fetch(`/api/cms/products/${categorySlug}`)
+  () => $fetch<{ category: ProductCategory; products: Product[]; cmsError?: boolean }>(`/api/cms/products/${categorySlug}`)
 )
 
 if (error.value || !data.value) {

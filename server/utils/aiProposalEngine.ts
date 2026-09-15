@@ -13,7 +13,8 @@ import {
 import { aiSourceFormatFor, aiSourceFormatRefusal, sourceFailureMessage, type SourceFailureCode } from '../../utils/aiSourceFormats'
 import { digestSourceText, buildAnalysisFingerprint } from './aiProposalReplayGuard'
 import { isAiProviderId, type AiProviderId, type AiProviderRegistry } from './aiProviderRegistry'
-import { PROMPT_CONTRACT_VERSION, type AiGenerationInput, type TargetDefinition } from './aiTargetContract'
+import { PROMPT_CONTRACT_VERSION, type AiGenerationInput, type AiGenerationInputBase, type TargetDefinition } from './aiTargetContract'
+import { productSubjectKey } from './aiSubject'
 import type { FetchFn } from './mediaLifecycle'
 
 /**
@@ -110,14 +111,52 @@ export interface ProposalReuseHooks<TOutput> {
   store(fingerprint: string, output: TOutput): void
 }
 
-interface ProductsFilesRow {
+/**
+ * One association row the engine may read (`products_files` or, CC-IMP-08,
+ * `content_items_files`): its id and the linked file's trusted metadata. A
+ * content subject also returns the role and enabled state it resolved the row
+ * with, so the analysis fingerprint can bind them.
+ */
+export interface AiSourceFileRow {
   id: number
+  file_role?: string | null
+  enabled?: boolean | null
   directus_files_id: {
     id: string
     filename_download: string | null
     type: string | null
     filesize: number | string | null
   } | null
+}
+
+/**
+ * CC-IMP-08 — the subject of one analysis (Blueprint §17: one engine, generalized
+ * subject). Everything the engine used to hard-code for a product — does the
+ * subject exist, which association rows it owns, who it is in the prompt, what
+ * the fingerprint binds — is supplied here, built on the server from the route
+ * and the database. The reading pipeline, limits, dedupe, provider dispatch and
+ * validation below stay one shared implementation.
+ */
+export interface ProposalSubject<TInput extends AiGenerationInputBase> {
+  /** `product:<id>` or `content:<id>:<locale>`. */
+  key: string
+  /** Null when this subject can be analyzed now; otherwise a short, safe error. Runs before anything else. */
+  precheck(): Promise<string | null>
+  /** Resolves requested association ids to rows of THIS subject only. Rows it does not own are simply absent. */
+  resolveSources(ids: number[]): Promise<AiSourceFileRow[]>
+  /**
+   * When set, a requested id that does not resolve (another item, disabled, wrong role, archived, unreadable)
+   * refuses the whole analysis with this message before anything is downloaded.
+   */
+  missingSourcesError?: string
+  /** A workbook may be narrowed to this code while it is read (product subject only). */
+  extractionProductCode?: () => Promise<string | null>
+  /** The provider input for the readable, capped sources. */
+  buildInput(sources: ExtractedSource[]): Promise<TInput>
+  /** The analysis fingerprint (see `buildAnalysisFingerprint` / `buildContentAnalysisFingerprint`). */
+  fingerprint(parts: { targetId: string, providerId: AiProviderId, sourceDigests: string[], rows: AiSourceFileRow[] }): Promise<string>
+  /** Re-checked right before the provider call and again before a result is returned; a non-null error fails closed. */
+  verifyUnchanged?(): Promise<string | null>
 }
 
 async function assertProductExistsViaFetch(fetch: FetchFn, productId: number): Promise<boolean> {
@@ -139,9 +178,9 @@ async function resolveProductSourceFiles(
   fetch: FetchFn,
   productId: number,
   mediaIds: number[],
-): Promise<ProductsFilesRow[]> {
+): Promise<AiSourceFileRow[]> {
   const idsParam = mediaIds.join(',')
-  const result = await fetch<{ data: ProductsFilesRow[] }>(
+  const result = await fetch<{ data: AiSourceFileRow[] }>(
     `/items/products_files?filter[products_id][_eq]=${productId}&filter[id][_in]=${idsParam}&filter[enabled][_eq]=true` +
     '&fields=id,directus_files_id.id,directus_files_id.filename_download,directus_files_id.type,directus_files_id.filesize' +
     `&limit=${mediaIds.length}`,
@@ -326,10 +365,61 @@ function notAnalyzed(displayName: string, code: SourceFailureCode, mimeType?: st
 }
 
 /**
- * The single generation entry point, for whichever `TargetDefinition` the
- * caller supplies. `mediaIds` are `products_files.id` values only — this
- * function never accepts, trusts, or forwards a raw Directus file UUID from
- * the caller.
+ * The Product AI subject — exactly the product behaviour the engine had before
+ * CC-IMP-08: existence check, `products_files` rows of this product that are
+ * enabled, `name_en` / `product_code` read once, the product fingerprint, and the
+ * workbook narrowed to the product code.
+ */
+export function createProductProposalSubject(fetch: FetchFn, productId: number): ProposalSubject<AiGenerationInput> {
+  // AI-XLSX-SOURCE-01 — read once, when first needed: a workbook asks for the
+  // code while it is being read, and the prompt needs the identity afterwards.
+  let identity: ReturnType<typeof fetchProductIdentity> | null = null
+  const productIdentity = () => (identity ??= fetchProductIdentity(fetch, productId))
+  return {
+    key: productSubjectKey(productId),
+    precheck: async () => (await assertProductExistsViaFetch(fetch, productId)) ? null : NOT_FOUND_ERROR,
+    resolveSources: ids => resolveProductSourceFiles(fetch, productId, ids),
+    extractionProductCode: async () => (await productIdentity()).productCode,
+    async buildInput(sources) {
+      const { productName, productCode } = await productIdentity()
+      return {
+        productName,
+        productCode,
+        sourceFileSummaries: sources.map(s => ({ displayName: s.displayName, fileType: s.fileType })),
+        extractedSourceTexts: sources.map(s => ({ displayName: s.displayName, text: s.text })),
+      }
+    },
+    /**
+     * The identity of this analysis, computed from what will actually be sent:
+     * the product, the Target, the provider, the product name and code, the
+     * version of the shared prompt contract, and the content digests of the
+     * unique sources. It carries no filename, no Directus id, no sourceRef and no
+     * source text.
+     *
+     * PRODUCT-MODEL-RELEVANCE-GUARD-01 — the code and the contract version are
+     * both part of it: a product whose code changes is a different analysis, and
+     * an analysis made before the relevance guard existed can never be served as
+     * though it had been made with it.
+     */
+    async fingerprint({ targetId, providerId, sourceDigests }) {
+      const { productName, productCode } = await productIdentity()
+      return buildAnalysisFingerprint({
+        productId,
+        targetId,
+        providerId,
+        productName,
+        productCode,
+        promptContractVersion: PROMPT_CONTRACT_VERSION,
+        sourceDigests,
+      })
+    },
+  }
+}
+
+/**
+ * The single Product AI generation entry point, unchanged for its callers.
+ * `mediaIds` are `products_files.id` values only — this function never accepts,
+ * trusts, or forwards a raw Directus file UUID from the caller.
  */
 export async function runProposalEngine<TOutput>(
   fetch: FetchFn,
@@ -339,9 +429,28 @@ export async function runProposalEngine<TOutput>(
   reuse?: ProposalReuseHooks<TOutput>,
   readers?: SourceReaders,
 ): Promise<ProposalEngineResult<TOutput>> {
-  const productExists = await assertProductExistsViaFetch(fetch, params.productId)
-  if (!productExists) {
-    return { ok: false, error: NOT_FOUND_ERROR, fileResults: [] }
+  return runSubjectProposalEngine(
+    fetch, registry, target, createProductProposalSubject(fetch, params.productId),
+    { providerId: params.providerId, mediaIds: params.mediaIds }, reuse, readers,
+  )
+}
+
+/**
+ * CC-IMP-08 — the one engine, for whichever subject and Target the caller
+ * supplies. `mediaIds` are association row ids of that subject only.
+ */
+export async function runSubjectProposalEngine<TOutput, TInput extends AiGenerationInputBase>(
+  fetch: FetchFn,
+  registry: AiProviderRegistry,
+  target: TargetDefinition<TOutput, TInput>,
+  subject: ProposalSubject<TInput>,
+  params: { providerId: unknown, mediaIds: unknown },
+  reuse?: ProposalReuseHooks<TOutput>,
+  readers?: SourceReaders,
+): Promise<ProposalEngineResult<TOutput>> {
+  const precheckError = await subject.precheck()
+  if (precheckError) {
+    return { ok: false, error: precheckError, fileResults: [] }
   }
 
   if (!isAiProviderId(params.providerId)) {
@@ -376,8 +485,14 @@ export async function runProposalEngine<TOutput>(
     return { ok: false, error: NOT_CONFIGURED_ERROR, fileResults: [] }
   }
 
-  const rows = await resolveProductSourceFiles(fetch, params.productId, mediaIds)
+  const rows = await subject.resolveSources(mediaIds)
   const rowById = new Map(rows.map(r => [r.id, r]))
+
+  // CC-IMP-08 — a subject that requires every selected source (Content AI) refuses a
+  // selection it cannot fully resolve before anything is downloaded or sent.
+  if (subject.missingSourcesError && mediaIds.some(mediaId => !rowById.get(mediaId)?.directus_files_id)) {
+    return { ok: false, error: subject.missingSourcesError, fileResults: [] }
+  }
 
   // AI-IMAGE-OCR-SOURCE-01 — the image limit is the server's, whatever the browser
   // allowed. It is counted from the files' own stored types before anything is
@@ -397,10 +512,6 @@ export async function runProposalEngine<TOutput>(
   let promptSourceCounter = 0
   // AI-SOURCE-CONTRACT-01 — one clock for the whole reading stage; see MAX_TOTAL_EXTRACTION_MS.
   const budget = createExtractionBudget()
-  // AI-XLSX-SOURCE-01 — read once, when first needed: a workbook asks for the
-  // code while it is being read, and the prompt needs the identity afterwards.
-  let identity: ReturnType<typeof fetchProductIdentity> | null = null
-  const productIdentity = () => (identity ??= fetchProductIdentity(fetch, params.productId))
   // Each selected source's share of the combined cap. There are never more
   // readable sources than selected ones, so text within this share is never cut.
   const perSourceChars = Math.min(MAX_PER_FILE_CHARS, Math.floor(MAX_TOTAL_EXTRACTED_CHARS / mediaIds.length))
@@ -471,7 +582,7 @@ export async function runProposalEngine<TOutput>(
     const extraction = await extractTextFromFile(bytes, mime, promptLabel, {
       readers,
       timeoutMs: budget.remainingMs(),
-      productCode: async () => (await productIdentity()).productCode,
+      productCode: subject.extractionProductCode,
       maxChars: perSourceChars,
     })
     // A read that ran into the end of the stage used up the analysis's time,
@@ -516,36 +627,22 @@ export async function runProposalEngine<TOutput>(
   }
 
   const cappedSources = capTotalCharacters(readableSources, MAX_TOTAL_EXTRACTED_CHARS)
-  const { productName, productCode } = await productIdentity()
+  const input = await subject.buildInput(cappedSources)
 
-  const input: AiGenerationInput = {
-    productName,
-    productCode,
-    sourceFileSummaries: cappedSources.map(s => ({ displayName: s.displayName, fileType: s.fileType })),
-    extractedSourceTexts: cappedSources.map(s => ({ displayName: s.displayName, text: s.text })),
-  }
-
-  /**
-   * The identity of this analysis, computed from what will actually be sent:
-   * the product, the Target, the provider, the product name and code, the
-   * version of the shared prompt contract, and the content digests of the
-   * unique sources. It carries no filename, no Directus id, no sourceRef and no
-   * source text.
-   *
-   * PRODUCT-MODEL-RELEVANCE-GUARD-01 — the code and the contract version are
-   * both part of it: a product whose code changes is a different analysis, and
-   * an analysis made before the relevance guard existed can never be served as
-   * though it had been made with it.
-   */
-  const fingerprint = buildAnalysisFingerprint({
-    productId: params.productId,
+  // Never derived from a filename or a Directus id supplied by the caller; see each subject's fingerprint.
+  const fingerprint = await subject.fingerprint({
     targetId: target.id,
     providerId,
-    productName,
-    productCode,
-    promptContractVersion: PROMPT_CONTRACT_VERSION,
     sourceDigests: [...seenDigests],
+    rows: mediaIds.map(mediaId => rowById.get(mediaId)).filter((row): row is AiSourceFileRow => Boolean(row)),
   })
+
+  // CC-IMP-08 — the subject and its selected sources are checked again after the
+  // reading stage: a content item archived, a Draft saved, or a source unlinked,
+  // disabled or archived while the files were being read fails closed here, before
+  // any provider call.
+  const changedBefore = subject.verifyUnchanged ? await subject.verifyUnchanged() : null
+  if (changedBefore) return { ok: false, error: changedBefore, fileResults }
 
   // A validated result for exactly these sources is still good. Nothing is
   // sent to the provider, and no bill is incurred.
@@ -556,6 +653,11 @@ export async function runProposalEngine<TOutput>(
 
   const result = await registry.generateStructured(providerId, target, input)
   if (!result.ok) return { ok: false, error: result.error, fileResults }
+
+  // CC-IMP-08 — and once more before a result is returned: a proposal is never
+  // bound to a subject or a source set that changed during the provider call.
+  const changedAfter = subject.verifyUnchanged ? await subject.verifyUnchanged() : null
+  if (changedAfter) return { ok: false, error: changedAfter, fileResults }
 
   // Only a result that passed the Target's own validation is ever cached; a
   // failure must never be replayed as though it had succeeded.

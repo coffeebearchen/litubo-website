@@ -1,4 +1,5 @@
 import { randomBytes, createHash } from 'node:crypto'
+import { subjectKeyOf, type AiSubjectBinding } from './aiSubject'
 
 /**
  * PWS-AI-DUP-GUARD-01 — stops the same analysis being paid for twice, and the
@@ -100,7 +101,10 @@ interface ProposalRecord {
   proposalRef: string
   scopeKey: string
   adminUserId: string
-  productId: number
+  /** CC-IMP-08 — `product:<id>` or `content:<id>:<locale>`; a reference only ever works for this subject. */
+  subjectKey: string
+  /** CC-IMP-08 — server-held binding stored with the proposal (content: subject, locale, draft revision, items, fingerprint, prompt version). */
+  binding: unknown
   output: unknown
   applyState: ProposalApplyState
   /** The outcome of the write that reached a terminal state, replayed verbatim to a duplicate request. */
@@ -111,10 +115,12 @@ interface ProposalRecord {
   applyExpiresAt: number
 }
 
-/** Everything a reuse lookup is scoped by. Two analyses are the same only if all of it matches. */
-export interface AnalysisScope {
+/**
+ * Everything a reuse lookup is scoped by. Two analyses are the same only if all of it matches.
+ * CC-IMP-08 — the subject is `{ productId }` (Product AI, unchanged) or `{ subjectKey }`.
+ */
+export type AnalysisScope = AiSubjectBinding & {
   adminUserId: string
-  productId: number
   targetId: string
   providerId: string
   fingerprint: string
@@ -126,7 +132,7 @@ const byRef = new Map<string, ProposalRecord>()
 function scopeKeyOf(scope: AnalysisScope): string {
   // Every field is length-prefixed so no combination of values can collide by
   // running into the separator.
-  return [scope.adminUserId, String(scope.productId), scope.targetId, scope.providerId, scope.fingerprint]
+  return [scope.adminUserId, subjectKeyOf(scope), scope.targetId, scope.providerId, scope.fingerprint]
     .map(part => `${part.length}:${part}`)
     .join('|')
 }
@@ -223,6 +229,46 @@ export function buildAnalysisFingerprint(parts: {
   return createHash('sha256').update(canonical).digest('hex')
 }
 
+/**
+ * CC-IMP-08 — the identity of a content analysis (Blueprint §18 proposal binding).
+ *
+ * Built from what the server read, never from the browser: the subject (content
+ * id + locale), the Draft revision the analysis read, the Target and provider,
+ * the prompt contract version, the current-item identity the prompt shows, each
+ * selected association as it is right now (link id, file id, role, enabled,
+ * archived, type, size) and the digests of the extracted texts. A changed link,
+ * file, role, revision or locale is a different analysis. The product
+ * fingerprint above is untouched; the two can never collide because this one is
+ * prefixed with its subject kind.
+ */
+export function buildContentAnalysisFingerprint(parts: {
+  contentItemId: number
+  locale: string
+  draftRevision: number
+  targetId: string
+  providerId: string
+  promptContractVersion: number
+  identity: unknown
+  sources: Array<{ linkId: number, fileId: string, role: string, enabled: boolean, archived: boolean, type: string | null, filesize: number | null }>
+  sourceDigests: string[]
+}): string {
+  const canonical = JSON.stringify({
+    k: 'content',
+    i: parts.contentItemId,
+    l: parts.locale,
+    r: parts.draftRevision,
+    t: parts.targetId,
+    v: parts.providerId,
+    pv: parts.promptContractVersion,
+    id: parts.identity,
+    s: [...parts.sources]
+      .sort((a, b) => a.linkId - b.linkId)
+      .map(s => [s.linkId, s.fileId.toLowerCase(), s.role, s.enabled, s.archived, s.type, s.filesize]),
+    d: [...parts.sourceDigests].sort(),
+  })
+  return createHash('sha256').update(canonical).digest('hex')
+}
+
 /** SHA-256 of one extracted source's text. Used only to compare and to build the fingerprint. */
 export function digestSourceText(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex')
@@ -254,8 +300,11 @@ export function lookupAnalysis<TOutput>(scope: AnalysisScope, now = Date.now()):
   }
 }
 
-/** Records a freshly validated analysis and mints its proposal reference. */
-export function rememberAnalysis(scope: AnalysisScope, output: unknown, now = Date.now()): string {
+/**
+ * Records a freshly validated analysis and mints its proposal reference.
+ * CC-IMP-08 — `binding` is the server-held proposal binding (content proposals); product callers omit it.
+ */
+export function rememberAnalysis(scope: AnalysisScope, output: unknown, now = Date.now(), binding: unknown = null): string {
   dropExpired(now)
   const existing = byScope.get(scopeKeyOf(scope))
   // Should not normally happen (the caller looks first), but never replace a
@@ -268,7 +317,8 @@ export function rememberAnalysis(scope: AnalysisScope, output: unknown, now = Da
     proposalRef: randomBytes(32).toString('base64url'),
     scopeKey: scopeKeyOf(scope),
     adminUserId: scope.adminUserId,
-    productId: scope.productId,
+    subjectKey: subjectKeyOf(scope),
+    binding,
     output,
     applyState: 'ready',
     appliedResult: null,
@@ -297,7 +347,7 @@ export type ApplyClaim =
  */
 export function claimApply(
   proposalRef: unknown,
-  binding: { adminUserId: string, productId: number },
+  binding: AiSubjectBinding & { adminUserId: string },
   now = Date.now(),
 ): ApplyClaim {
   if (typeof proposalRef !== 'string' || proposalRef.length === 0) return { ok: false, reason: 'unknown' }
@@ -306,7 +356,7 @@ export function claimApply(
   const record = byRef.get(proposalRef)
   if (!record || !isApplicable(record, now)) return { ok: false, reason: 'unknown' }
   if (record.adminUserId !== binding.adminUserId) return { ok: false, reason: 'unknown' }
-  if (record.productId !== binding.productId) return { ok: false, reason: 'unknown' }
+  if (record.subjectKey !== subjectKeyOf(binding)) return { ok: false, reason: 'unknown' }
 
   if (record.applyState === 'applying') return { ok: false, reason: 'in-progress' }
   if (record.applyState === 'applied' || record.applyState === 'partial') {
@@ -350,6 +400,38 @@ export function releaseApply(proposalRef: string, now = Date.now()): void {
   const record = byRef.get(proposalRef)
   if (!record || !isApplicable(record, now)) return
   if (record.applyState === 'applying') record.applyState = 'ready'
+}
+
+export interface StoredProposal<TOutput, TBinding> {
+  output: TOutput
+  binding: TBinding
+  applyState: ProposalApplyState
+  applyExpiresAt: number
+}
+
+/**
+ * CC-IMP-08 — reads a stored proposal for the same administrator and the same
+ * subject only (Blueprint §18: a proposal for Content A / en is never available
+ * to Content B or to another locale). Anything else — unknown, expired, another
+ * admin, another subject — is `null`, with no hint which check failed. Read-only:
+ * it never claims or changes the apply state.
+ */
+export function readProposal<TOutput, TBinding>(
+  proposalRef: unknown,
+  access: AiSubjectBinding & { adminUserId: string },
+  now = Date.now(),
+): StoredProposal<TOutput, TBinding> | null {
+  if (typeof proposalRef !== 'string' || proposalRef.length === 0) return null
+  dropExpired(now)
+  const record = byRef.get(proposalRef)
+  if (!record || !isApplicable(record, now)) return null
+  if (record.adminUserId !== access.adminUserId || record.subjectKey !== subjectKeyOf(access)) return null
+  return {
+    output: record.output as TOutput,
+    binding: record.binding as TBinding,
+    applyState: record.applyState,
+    applyExpiresAt: record.applyExpiresAt,
+  }
 }
 
 /** Test-only reset. Never called by a request handler. */

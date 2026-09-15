@@ -1,4 +1,4 @@
-import type { AiGenerationInput, TargetDefinition, TargetGenerationResult } from './aiTargetContract'
+import type { AiGenerationInput, AiGenerationInputBase, TargetDefinition, TargetGenerationResult } from './aiTargetContract'
 import type { AiStructuredProvider } from './aiProviderRegistry'
 
 /**
@@ -325,15 +325,16 @@ export function createDeepSeekStructuredProvider(
     return Boolean(config.apiKey.trim() && config.model.trim())
   }
 
-  async function generateStructured<TOutput>(
-    target: TargetDefinition<TOutput>,
-    input: AiGenerationInput,
+  async function generateStructured<TOutput, TInput extends AiGenerationInputBase = AiGenerationInput>(
+    target: TargetDefinition<TOutput, TInput>,
+    input: TInput,
   ): Promise<TargetGenerationResult<TOutput>> {
     if (!isConfigured()) return { ok: false, error: NOT_CONFIGURED_ERROR }
 
     let raw: unknown
     try {
-      raw = await withCallDeadline(callModel(target as TargetDefinition<unknown>, input, config))
+      // CC-IMP-08 — the call only uses `target.buildUserInput(input)`, so the subject's input shape passes through unchanged.
+      raw = await withCallDeadline(callModel(target as unknown as TargetDefinition<unknown>, input as unknown as AiGenerationInput, config))
     } catch (error) {
       // An uncategorised throw can only come from an injected caller (tests) or
       // an unforeseen runtime fault; it is reported as a transport failure

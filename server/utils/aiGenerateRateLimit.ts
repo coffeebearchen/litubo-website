@@ -28,6 +28,8 @@
  * administrator id already established by the auth middleware.
  */
 
+import { productSubjectKey } from './aiSubject'
+
 /** One generation at a time per administrator per product. */
 export const COOLDOWN_MS = 10_000
 
@@ -43,8 +45,14 @@ interface GenerateSlot {
 
 const slots = new Map<string, GenerateSlot>()
 
-function key(adminUserId: string, productId: number): string {
-  return `${adminUserId}:${productId}`
+/**
+ * CC-IMP-08 — one slot per administrator per subject. A number is the existing
+ * Product AI call shape (`product:<id>`); a string is a subject key such as
+ * `content:6:en`, so a product and a content item with the same id, or two
+ * locales of one content item, never share a slot or a cooldown.
+ */
+function key(adminUserId: string, subject: number | string): string {
+  return `${adminUserId}|${typeof subject === 'number' ? productSubjectKey(subject) : subject}`
 }
 
 export type GenerateSlotDecision =
@@ -56,8 +64,8 @@ export type GenerateSlotDecision =
  * `releaseGenerateSlot()` must be called in a `finally` when this returns
  * `{ allowed: true }`, or the slot stays claimed until `MAX_INFLIGHT_MS`.
  */
-export function claimGenerateSlot(adminUserId: string, productId: number, now = Date.now()): GenerateSlotDecision {
-  const slotKey = key(adminUserId, productId)
+export function claimGenerateSlot(adminUserId: string, subject: number | string, now = Date.now()): GenerateSlotDecision {
+  const slotKey = key(adminUserId, subject)
   const slot = slots.get(slotKey)
 
   if (slot?.startedAt !== null && slot?.startedAt !== undefined) {
@@ -88,8 +96,8 @@ export function claimGenerateSlot(adminUserId: string, productId: number, now = 
 }
 
 /** Releases the slot and starts this administrator's cooldown for this product. */
-export function releaseGenerateSlot(adminUserId: string, productId: number, now = Date.now()): void {
-  slots.set(key(adminUserId, productId), { startedAt: null, finishedAt: now })
+export function releaseGenerateSlot(adminUserId: string, subject: number | string, now = Date.now()): void {
+  slots.set(key(adminUserId, subject), { startedAt: null, finishedAt: now })
 }
 
 /** Test-only: forget all slots, so one test's cooldown cannot affect the next. */

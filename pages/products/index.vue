@@ -6,7 +6,7 @@ const localePath = useLocalePath()
 
 const { data: categories } = await useAsyncData<ProductCategory[]>(
   'product-categories',
-  () => $fetch('/api/cms/products/categories')
+  () => $fetch<ProductCategory[]>('/api/cms/products/categories')
 )
 
 useSeoHead({

@@ -14,7 +14,21 @@
  * validation, text extraction, or provider dispatch code.
  */
 
-export interface AiGenerationInput {
+/**
+ * CC-IMP-08 — what every analysis sends, whichever subject it is about: the
+ * neutral source summaries and the extracted source texts. A subject adds its
+ * own identity on top (`AiGenerationInput` for a product, `ContentGenerationInput`
+ * for a content item); the provider adapters only hand the value to the Target.
+ */
+export interface AiGenerationInputBase {
+  sourceFileSummaries: Array<{ displayName: string, fileType: string }>
+  extractedSourceTexts: Array<{ displayName: string, text: string }>
+  /** Optional, human-approved free text the admin typed in — never raw file content. */
+  contextNote?: string
+}
+
+/** The product subject's input — unchanged for the Product AI path. */
+export interface AiGenerationInput extends AiGenerationInputBase {
   productName: string
   /**
    * PRODUCT-MODEL-RELEVANCE-GUARD-01 — the current product's own
@@ -22,10 +36,30 @@ export interface AiGenerationInput {
    * Nothing on the AI path ever creates, fills in or guesses a product code.
    */
   productCode?: string | null
-  sourceFileSummaries: Array<{ displayName: string, fileType: string }>
-  extractedSourceTexts: Array<{ displayName: string, text: string }>
-  /** Optional, human-approved free text the admin typed in — never raw file content. */
-  contextNote?: string
+}
+
+/**
+ * CC-IMP-08 — the current content item as the prompt sees it. Every value is read
+ * by the server from the working copy (never the published snapshot) and the
+ * explicit product relations of that item; nothing comes from the browser.
+ */
+export interface ContentGenerationIdentity {
+  contentTypeLabel: string
+  locale: string
+  localeLabel: string
+  title: string
+  slug: string
+  summary: string | null
+  seoTitle: string | null
+  seoDescription: string | null
+  /** Existing working-copy sections: id, type and a bounded plain-text preview. */
+  blocks: Array<{ id: string, type: string, preview: string }>
+  /** Only products a human explicitly related to this content item. */
+  linkedProducts: Array<{ name: string, code: string | null }>
+}
+
+export interface ContentGenerationInput extends AiGenerationInputBase {
+  content: ContentGenerationIdentity
 }
 
 export type TargetGenerationResult<TOutput> =
@@ -52,17 +86,21 @@ export interface TargetValidationContext {
  * constructing one of these and handing it to `runProposalEngine()`, never
  * by editing the Engine or the registry.
  */
-export interface TargetDefinition<TOutput> {
+export interface TargetDefinition<TOutput, TInput extends AiGenerationInputBase = AiGenerationInput> {
   /** Stable identifier, e.g. `'specifications'`. Never shown to the model or the browser as free text. */
   id: string
   /** Name passed to the provider's `json_schema` structured-output field. */
   schemaName: string
   /** The JSON Schema the provider is constrained to. Must never include a model-authored "note"/"source"/"locator" field. */
   jsonSchema: Record<string, unknown>
-  /** Full system-level instructions sent to the provider — must incorporate `UNTRUSTED_SOURCE_MATERIAL_PREAMBLE`, followed by `PRODUCT_MODEL_RELEVANCE_GUARD`. */
+  /**
+   * Full system-level instructions sent to the provider — must incorporate `UNTRUSTED_SOURCE_MATERIAL_PREAMBLE`,
+   * followed by the subject's attribution guard: `PRODUCT_MODEL_RELEVANCE_GUARD` for a product Target,
+   * `CONTENT_ATTRIBUTION_GUARD` for a content Target.
+   */
   systemInstructions: string
-  /** Builds the user-turn / input text from the generation input — opens with `buildCurrentProductContext(input)`; source material only, no execution of file content as instructions. */
-  buildUserInput(input: AiGenerationInput): string
+  /** Builds the user-turn / input text — opens with the subject's current-item context; source material only, no execution of file content as instructions. */
+  buildUserInput(input: TInput): string
   /** The ONLY place an untrusted, already-JSON-parsed provider response is validated and safety-scanned before anything else touches it. Never throws. */
   parseAndValidate(raw: unknown, context: TargetValidationContext): TargetGenerationResult<TOutput>
 }
@@ -120,8 +158,11 @@ export const PRODUCT_MODEL_RELEVANCE_GUARD =
  *
  *   1 — before the relevance guard: product name only, no guard
  *   2 — current product name, product code when present, relevance guard
+ *   3 — CC-IMP-08: the shared Content Attribution Guard and the current content
+ *       item context join the contract (Blueprint §18, D-025 (10)). The product
+ *       prompt text is unchanged; only cached analyses are invalidated.
  */
-export const PROMPT_CONTRACT_VERSION = 2
+export const PROMPT_CONTRACT_VERSION = 3
 
 /**
  * PWS-AI-ENGINE-01R2-SAFETY-02 — every non-source string that reaches a model
@@ -162,6 +203,58 @@ export function buildCurrentProductContext(input: Pick<AiGenerationInput, 'produ
     'Current product:\n'
     + `Product: ${sanitizeModelInputText(input.productName)}\n`
     + (code ? `Product code: ${code}\n` : '')
+  )
+}
+
+/**
+ * CC-IMP-08 — the shared rule for Content AI (Blueprint §18 "Content Attribution
+ * Guard"; D-008, D-025). Every content Target's `systemInstructions` includes it
+ * right after the preamble; a test fails if a content Target omits it.
+ *
+ * It names the current content item as the only subject, allows product facts
+ * only for products a human explicitly related to the item (with the D-025
+ * attribution rules), forbids invented claims, and keeps the `[?]` rule.
+ */
+export const CONTENT_ATTRIBUTION_GUARD =
+  'Use the source material only for the current content item, the one named under "Current content item" in the input. '
+  + 'A source that describes another article, case study, customer or product family does not become the current content item. '
+  + 'State a product fact only for a product listed under "Explicitly linked products" in the input, and only when the source material clearly attributes that fact to that product by its product code or name, or is clearly and exclusively about it. '
+  + 'A model name or code that is merely similar to a linked product is not that product. Never copy a value that belongs to another product model. '
+  + 'A value stated for a whole series may be used only when the source material itself says that it applies to all models in that series. '
+  + 'If attribution is ambiguous, omit the fact. Never infer a product, a relationship or a fact from a file name, a folder name or a name that only looks alike. '
+  + 'Never invent customers, results, figures, certifications, dates or quotes; omit anything the source material does not state. '
+  + 'Text marked [?] could not be read reliably. Never use text marked [?] as the basis for any value.'
+
+/**
+ * CC-IMP-08 — how a content Target presents the current content item: type,
+ * locale, title and slug, the working-copy fields a proposal may change, the
+ * existing sections by id and type, and only the explicitly linked products.
+ * Every value passes through `sanitizeModelInputText()`; an item without linked
+ * products says so rather than leaving the model to guess.
+ */
+export function buildCurrentContentContext(content: ContentGenerationIdentity): string {
+  const line = (label: string, value: string | null, max = 200) => `${label}: ${value ? sanitizeModelInputText(value, max) : '(empty)'}\n`
+  const products = content.linkedProducts.length > 0
+    ? content.linkedProducts
+      .map(p => `- ${sanitizeModelInputText(p.name, 200)}${p.code ? ` (product code: ${sanitizeModelInputText(p.code, 100)})` : ''}`)
+      .join('\n')
+    : '- None'
+  const sections = content.blocks.length > 0
+    ? content.blocks
+      .map(b => `- ${sanitizeModelInputText(b.id, 40)} (${sanitizeModelInputText(b.type, 20)}): ${sanitizeModelInputText(b.preview, 300) || '(empty)'}`)
+      .join('\n')
+    : '- None'
+  return (
+    'Current content item:\n'
+    + line('Content type', content.contentTypeLabel, 60)
+    + `Locale: ${sanitizeModelInputText(content.locale, 10)} (${sanitizeModelInputText(content.localeLabel, 40)})\n`
+    + line('Title', content.title)
+    + line('Slug', content.slug, 100)
+    + line('Summary', content.summary, 400)
+    + line('SEO title', content.seoTitle, 120)
+    + line('SEO description', content.seoDescription, 320)
+    + `Existing sections:\n${sections}\n`
+    + `Explicitly linked products:\n${products}\n`
   )
 }
 

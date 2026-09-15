@@ -114,6 +114,8 @@ describe('route surface', () => {
     const files = listFiles(adminDir).map(f => relative(adminDir, f).split('\\').join('/')).sort()
     expect(files).toEqual([
       '[id].get.ts',
+      '[id]/ai-source-intake.get.ts',
+      '[id]/ai-source-intake.post.ts',
       '[id]/archive.post.ts',
       '[id]/history.get.ts',
       '[id]/locales/[locale].patch.ts',

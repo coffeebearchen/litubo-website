@@ -45,7 +45,7 @@ export const CONTENT_WORKSPACE_MODULES: readonly ContentWorkspaceModule[] = [
   { key: 'editor', label: 'Content editor', icon: 'page-content', enabled: true },
   { key: 'media-relations', label: 'Media & relations', icon: 'media-resources', enabled: true },
   { key: 'seo-locales', label: 'SEO & locales', icon: 'seo-locales', enabled: true },
-  { key: 'ai-source-intake', label: 'AI Source Intake', icon: 'ai-source-intake', enabled: false, disabledReason: 'Not built yet' },
+  { key: 'ai-source-intake', label: 'AI Source Intake', icon: 'ai-source-intake', enabled: true },
   { key: 'ai-proposal-review', label: 'AI Proposal Review', icon: 'sources-evidence', enabled: false, disabledReason: 'Not built yet' },
   { key: 'preview-publish', label: 'Preview & publish readiness', icon: 'share-distribution', enabled: true },
   { key: 'history', label: 'Change history', icon: 'change-history', enabled: true },
@@ -79,12 +79,19 @@ export function contentPreviewPublishRoute(id: number | string, locale?: string)
   return locale && locale !== DEFAULT_CONTENT_LOCALE ? `${base}?locale=${encodeURIComponent(locale)}` : base
 }
 
+/** CC-IMP-08 — CC-AI-01 AI Source Intake, optionally opened on one language. */
+export function contentAiSourceIntakeRoute(id: number | string, locale?: string): string {
+  const base = `/admin/content-center/${encodeURIComponent(String(id))}/ai-source-intake`
+  return locale && locale !== DEFAULT_CONTENT_LOCALE ? `${base}?locale=${encodeURIComponent(locale)}` : base
+}
+
 /** Routes exist only for enabled modules. */
 export function contentWorkspaceModuleRoute(key: string, id: number | string): string | null {
   if (key === 'overview') return contentOverviewRoute(id)
   if (key === 'editor') return contentEditorRoute(id)
   if (key === 'media-relations') return contentMediaRelationsRoute(id)
   if (key === 'seo-locales') return contentSeoLocalesRoute(id)
+  if (key === 'ai-source-intake') return contentAiSourceIntakeRoute(id)
   if (key === 'preview-publish') return contentPreviewPublishRoute(id)
   if (key === 'history') return contentHistoryRoute(id)
   return null

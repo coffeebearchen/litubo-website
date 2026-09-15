@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             CC-IMP-06 — Preview, Readiness & Publish（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · core 97bf4d8 + Review Fix 01 404ed94 · not pushed）
-Latest completed module:            CC-IMP-04-R3 — Source Document Association（A2 · LOCAL COMPLETE · CC-IMP-08 前置窄修复；CC-IMP-07 含 Review Fix 02/03 已由 Controller 签收）
-Active authorized module:           NONE（CC-IMP-04-R3 已收口，等待 Controller 审查）
+Latest accepted module:             CC-IMP-07 — Archive, Restore & Change History（ACCEPTED LOCALLY / VISUALLY VERIFIED，Controller 签收 · core 76e77af + Review Fix 02 ae337e0 + Review Fix 03 f5d020b · not pushed）
+Latest completed module:            CC-IMP-08 — Content AI Target & Source Intake（A2 · LOCAL COMPLETE · 等待 Controller 审查；前置窄修复 CC-IMP-04-R3 c491774）
+Active authorized module:           NONE（CC-IMP-08 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     CC-IMP-08 — Content AI Target & Source Intake（高风险模块：RSG-04 / RSG-06，须按 RELEASE-SAFETY-GATES.md 取证；Controller 审查 CC-IMP-04-R3 前不授权）
+Next candidate:                     CC-IMP-09 — AI Proposal Review & Apply（高风险模块：RSG-04 / RSG-05，须按 RELEASE-SAFETY-GATES.md 取证；Controller 审查 CC-IMP-08 前不授权）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：f5d020b）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：c491774）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -9702,3 +9702,55 @@ P0 Violations:                  NONE
 **最终本地数据：** 内容 1 / 2 / 4 / 5 / 6 全部 draft；内容 4 链接 0 / 关系 0；全库 `source_document` 关联 0（测试关联已移除）；负 id 夹具 0；非空快照 0；trigger 7；provider calls 0。CC-IMP-07 的 Controller 签收（ACCEPTED LOCALLY / VISUALLY VERIFIED）与 Register CC-HIST Acceptance 同步留待下一份授权模块执行。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
 
 *最后更新：2026-09-15，由 Claude Code 在"CC-IMP-04-R3"任务中写入。*
+
+---
+
+## CC-IMP-08 — Content AI Target & Source Intake（2026-09-15）
+
+```text
+Module:                         CC-IMP-08 — Content AI Target & Source Intake（CC-AI-01 AI Source Intake）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（CC-IMP-08 Resume After Prerequisite Fix）
+Status:                         COMPLETED（LOCAL COMPLETE · 等待 Controller 审查）
+Branch:                         review/cc-imp-08-content-ai-source-intake
+Baseline:                       c491774b56601c5ebcc9abd18a962fa2cca8f93e
+Commit:                         feat(content): add ai source intake（本节所在 commit）
+Primary visual:                 05-CC-AI-01-SOURCE-INTAKE-D1440.png（已关联文件列表；无 Add source / Upload）
+Source association owner:       CC-03 Media & Relations
+AI intake association writes:   0
+Eligible content source roles:  source_document / download / inline
+Hero / OG image as AI source:   NO / NO
+Draft / relation / publication writes: 0 / 0 / 0（无 Apply、无 Proposal Review、无 Publish）
+Real provider calls / API fees: 0 / 0（全部测试使用 fake Provider；浏览器未点击 Analyze）
+Schema / dependency / service:  0 / 0 / 0
+DG-07:                          OPEN（不阻塞；数据出境未授权）
+Register:                       CC-HIST Acceptance → VISUALLY_VERIFIED（规则 17）；CC-AI-01 Implementation AUTOMATED_CHECKED · Acceptance NOT_STARTED（规则 18）
+MASTER-ROADMAP:                 CC-IMP-08 ✅；CC-IMP-09 NEXT — NOT AUTHORIZED
+P0 Violations:                  NONE
+```
+
+**同步：** Controller 已签收 CC-IMP-07（core 76e77af + Review Fix 02 ae337e0 + Review Fix 03 f5d020b，ACCEPTED LOCALLY / VISUALLY VERIFIED）；Register CC-HIST Acceptance 同步为 VISUALLY_VERIFIED；CC-03 Acceptance 不变。开工前干净基线全量 vitest 通过。
+
+**实现（单一 Proposal Engine，泛化 subject）：**
+
+- `server/utils/aiSubject.ts`（新）：subject key `product:<id>` / `content:<id>:<locale>`。`aiSourceRef`（payload 绑定 subject key + admin）、`aiGenerateRateLimit`（key = admin + subject）、`aiProposalReplayGuard`（scope / claimApply / 新增只读 `readProposal` 与 `buildContentAnalysisFingerprint`）按 subject 泛化；Product 调用形状（`{ productId }`）与行为不变。
+- `server/utils/aiProposalEngine.ts`：抽出 `ProposalSubject` 与 `runSubjectProposalEngine`；`runProposalEngine` 保持原签名，内部使用 `createProductProposalSubject`（Product 身份、指纹、D-025 行为不变）。仍是同一读取 / 上限 / 去重 / 一次 Provider 调用路径，无第二引擎或提取器。
+- `server/utils/aiTargetContract.ts`：`PROMPT_CONTRACT_VERSION = 3`；共享 `CONTENT_ATTRIBUTION_GUARD` 与 `buildCurrentContentContext`（条目类型 / 语言 / 标题 / slug / 摘要 / SEO / 现有 section / 显式关联产品）；Target 与 Provider 输入泛型化（adapter 行为不变）。
+- `server/utils/aiTargets/contentDraftTarget.ts`（新）：`content-draft` Target。只允许 `field:title|summary|seo_title|seo_description`、`block:<现有 id>`（同类型替换）、`block:new`（允许类型、非 image）；其他路径（slug / canonical / noindex / status / type / media / relation / publication）使整个响应结构校验失败；block 数据走既有 `validateBlocks`；泄漏 / 回显 / 长度 / 总量检查；冲突候选值；证据仅 `Source N`。
+- `server/utils/aiContentIntake.ts`（新）：只读。来源 = 当前条目 `content_items_files` 中 role ∈ {source_document, download, inline}、enabled、文件存在、未在 Media Library 归档、共享格式合同可读；不可用原因（缺失 / 归档 / 格式 / 禁用）。精确语言、不自动创建、不回退；只读工作副本（不读 `published_snapshot`）。Analyze：body allowlist {locale, providerId, sourceRefs}、archived 409、未开始语言 409、sourceRef 按 admin + subject 解析、按 subject 限流（429）、单一引擎一次 Provider 调用、分析前后重查（条目状态 / draft revision / 关联角色 / enabled / 文件 / 归档）→ 变化则 fail closed；一个内存 Proposal（item id、服务端取得的现有值、证据）+ binding（subject / locale / draftRevision / targetId / items / sourceFingerprint / promptContractVersion），相同输入复用、revision 变化重新分析。
+- 路由：`GET` / `POST /api/admin/content-center/:id/ai-source-intake`（全局 admin-auth：Administrator + CSRF Origin；POST 字节上限 4 KB）。无 Apply 路由。
+- UI：`pages/admin/content-center/[id]/ai-source-intake.vue` + `components/admin/content/ContentAiSourceIntake.vue` + `utils/contentAiIntake.ts`：当前 Draft 卡（语言切换、Not started）、已关联来源列表（真实角色 Source document / Download / Inline media、Readable / Unavailable + 原因）、浏览器本地选择（5 来源 / 3 图片上限）、数据披露、Provider 单选、"Analyze selected sources"、"Proposal prepared"（无 Accept / Edit / Reject / Apply）、空态 "No AI-readable linked sources." + "Manage files in Media & Relations"；archived 只读；Workspace 导航启用 AI Source Intake（AI Proposal Review 仍 disabled）。
+- 类型检查附带（仅类型，无运行时变化）：Nitro 路由类型在本分支累积后触发 TS2321（移除两个新路由后依旧），为 6 处未注明类型的 `$fetch` 加泛型：`pages/index.vue`、`pages/products/index.vue`、`pages/products/[category]/index.vue`、`pages/products/[category]/[slug].vue`（2 处）、`server/api/cms/media/[id].get.ts`。
+
+**测试：** 新增 `tests/aiContentIntake.test.ts` 50 / 50——subject 隔离（sourceRef / 限流 / proposal 读取与 claim / 指纹随 locale·revision·关联·角色·enabled·归档·digest·prompt 版本变化）；intake 只列三种角色、hero / og 不出现、原因、无 id / Directus 元数据、未开始语言不回退、422 / 404；A source_document、B 可读 download、C 可读 inline 可用；D hero、E og_image、F 他条目关联、G disabled、H 归档文件、I 不支持格式、文件缺失 → 服务端拒绝且 0 下载 0 Provider；他条目 / 他语言 / 他 admin / product ref 无效；TXT / CSV / TSV / DOCX / XLSX 与 PDF / JPG / PNG / WebP（fake reader）；0 / 6 来源与 4 图片在下载前拒绝；无可读 → 0 Provider，Provider 错误只调用 1 次不重试；proposal 与 binding、现有值来自工作副本；复用与 revision 变化；并发 429；archived 409、未开始语言 409、多余字段 422；分析期间归档 / revision 变化 / 解除关联 / 禁用 / 文件归档 → fail closed；Target 禁止路径整体拒绝、无效 block 丢弃；prompt 含 Attribution Guard、工作副本、关联产品、Source N，不含文件名 / 快照 / uuid；prompt injection（要求改 slug / 发布）被拒；J 列表与 ref 铸造 0 写 0 Provider；K AI Intake 无 content_items_files 变更端点 / 动作；无 Apply / 发布 / 生命周期导入、单一引擎；GET / POST 401、403、POST 无 Origin 403。新增 `tests/components/ContentAiSourceIntake.component.test.ts` 9 / 9（角色 / 披露、无 Add / Upload / Accept / Apply、本地选择 0 请求、5 / 3 上限、空态链接、未开始语言、archived、语言切换、Analyze 一次 POST 与 prepared、拒绝显示）。同步 `contentCenterUi` / `ContentWorkspace` 组件 / `contentFoundationRegistries` / `aiImageSource`（prompt 版本 3）。L：`tests/contentMediaRelations.test.ts`（CC-03 source_document）在全量中通过。全量 vitest（含真实 PostgreSQL，串行、无并行负载）：72 files passed / 2 skipped，2632 passed / 45 skipped（含 Product AI：aiProposalEngine、productModelRelevanceGuard、aiDuplicateGuard、aiSourceRef、aiEndpointBoundaries、aiSpecificationApply、PDF / DOCX / XLSX / 图片来源、aiStructuredProvider）。typecheck 0；lint 0；`nuxt build` Build complete；`git diff --check` 通过。
+
+**浏览器验收（本地 dev，重启后新标签页，dev@litubo.com 已登录）：**
+
+- 1440（DOM 实测；面板缩放下截图不作证据）：主列 575 + 右栏 300，scrollWidth 1425 ≤ 1440；内容 6 列出 TEST ONLY JPG（Image · Inline media · Readable）与 PDF（PDF · Download · Readable），hero / og_image 不出现；选择 0 → 2 → 0，Analyze disabled → enabled → disabled，披露出现；期间 /api 请求 0；无 Add / Upload / Accept / Reject / Apply、无文件输入；导航 AI Source Intake 为当前、AI Proposal Review disabled。
+- 375（375×480，真实坐标点击，截图可辨认）：scrollWidth 375，来源卡 343 宽，Analyze 按钮 309 宽；真实点击 JPG → "1 / 5 selected"、Analyze 启用、披露 "Original files are not sent to the AI provider. Nothing will be written or published."；PDF → "2 / 5 selected"；再取消两项 → "0 / 5 selected"、Analyze disabled、无 "Proposal prepared"；全程 /api 请求 0（仅页面加载时的 auth refresh / me）。内容 4：空态 "No AI-readable linked sources." + 链接 `/admin/content-center/4/media-relations`、Analyze disabled。`?locale=es`：Spanish 当前、revision 6、来源 2。`?locale=pt`：未开始提示 + SEO & locales 链接、无 Analyze、来源 0、不回退英文。console error 0；server error 0（首次启动的已知 `#app-manifest` P2 经重启消除）。
+- 0 写入证明（SQL 前后一致）：`directus_activity` max 1111、`directus_revisions` max 865、内容 4 en revision 2、内容 6 en / es revision 6 / 6、`content_items_files` 4、pt 语言行 0、非空快照 0。未创建临时关联或测试数据。
+
+**Release Safety Gates：** RSG-04（AI 仅建议；无 Draft / 快照 / status / 发布写入与导入：静态边界 + 0 写测试 → PASS；Apply 部分 N-21～N-23、G-06～G-09 属 CC-IMP-09，OPEN）；RSG-05（精确语言、不自动创建、不回退：PASS）；RSG-06（未新增公开输出；source_document 永不公开、不改 is_public：PASS）；RSG-07（401 / 403 / CSRF：PASS）；RSG-01（Proposal / Sources 不进入任何公开出口，无公开路由：PASS）。P0 Violations：NONE。
+
+**已知 / 记录（不修复）：** Product AI Apply 未按存储 proposal 校验提交内容、Product generate 无 Draft gate（Blueprint §18 / §35 既有债务）；Product 来源未检查 Media Library 归档状态（Product archived-source gap）。P2：未开始语言页头显示 "Untitled content #6"（该语言无标题，如实显示，无回退）。Proposal 仅存内存，2 小时或服务重启后失效。未 push、未 deploy、未 merge；6 个历史 untracked 路径原样保留。
+
+*最后更新：2026-09-15，由 Claude Code 在"CC-IMP-08"任务中写入。*
