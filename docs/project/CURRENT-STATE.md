@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             TEST-INFRA-CONTENT-DB-STABILITY-01 — Real PostgreSQL Integration Test Stability（Controller 接受为基线 · 4c66687 · not pushed）；其后 FINAL-RELEASE-AUDIT-01（A0 只读审计，未落盘）结论 RELEASE BLOCKED：P0-01 公开表单写本地文件 · P0-02 已发布 TEST 数据
-Latest completed module:            FINAL-RELEASE-FIX-A — Public Form Safety（A2 · LOCAL COMPLETE · P0-01 FIXED · 等待 Controller 审查）
-Active authorized module:           NONE（FINAL-RELEASE-FIX-A 已收口，等待 Controller 审查）
+Latest accepted module:             FINAL-RELEASE-FIX-A — Public Form Safety（Controller 接受 · 926be4d · not pushed · P0-01 CLOSED）
+Latest completed module:            FINAL-RELEASE-FIX-B — Published TEST Data Cleanup + Release Guard（A2 · LOCAL COMPLETE · P0-02 CLOSED · 等待 Controller 审查）
+Active authorized module:           NONE（FINAL-RELEASE-FIX-B 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     NONE — 等待 Controller（P0-02 Published TEST data 仍 OPEN；后续修复模块未授权）
+Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 的 P1 项仍 OPEN；后续模块未授权）
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（RELEASE BLOCKED：P0-02 仍 OPEN）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：4c66687）
+Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：926be4d）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10036,3 +10036,51 @@ Next candidate:                 NONE — 等待 Controller（P0-02 Published TES
 - `docs/ADMIN-CMS-SPEC.md` 仍把"三个 API 写本地 JSON"描述为待迁移计划（文档滞后，P2）。
 
 *最后更新：2026-09-15，由 Claude Code 在"FINAL-RELEASE-FIX-A"任务中写入。*
+
+---
+
+## FINAL-RELEASE-FIX-B — Published TEST Data Cleanup + Release Guard（2026-09-16）
+
+```text
+Module:                         FINAL-RELEASE-FIX-B — Published TEST Data Cleanup + Release Guard（仅修复 FINAL-RELEASE-AUDIT-01 P0-02）
+Authorization:                  A2 LOCAL_IMPLEMENTATION + LOCAL TEST DATA REMEDIATION（Controller 施工单）
+Branch:                         review/final-release-fix-b-test-data-01（基线 926be4d，FIX-A 已由 Controller 接受）
+Status:                         LOCAL COMPLETE · P0-02 CLOSED · 等待 Controller 审查
+Published TEST data:            BEFORE 7（legacy posts 1 / 2 / 3 / 4 / 6 / 7 / 8）→ AFTER 0
+Deleted / real records changed: 0 / 0（TEST 标记全部保留）
+Release guard:                  npm run release:check-test-data（只读、fail closed；清理前 exit 1，清理后 exit 0）
+Decision:                       无新增（"TEST 数据不得进入公开输出"已是 RSG-08 / N-17 与协议 §12 的既有原则）
+Schema / permissions:           未修改
+Safety gates touched:           RSG-01 / RSG-08（N-17 TEST ONLY 数据）· RSG-09
+MASTER-ROADMAP:                 未修改（无 Final Fix 跟踪小节，里程碑未变）
+Push / merge / deploy:          NONE
+Remaining P0:                   NONE（FINAL-RELEASE-AUDIT-01 登记的 2 项 P0 均已关闭；本模块未发现新的 P0）；P1 仍 OPEN
+Next candidate:                 NONE — 等待 Controller
+```
+
+**库存（写入前，只读 SELECT）：** legacy posts 共 8 条，全部在 `title_en` 带 `[TEST]`（1–4 的 `seo_title_en` 也带），slug 均为 `test-*`，没有任何非 TEST post；published 7 条（1 insight、2 technical_guide、3 case_study、4 news、6 / 7 / 8 faq），draft 1 条（5）。其中 2（Technical Guide 详情与 Resources hub）和 6 / 7 / 8（`/support/faq`）被公开页面读取，1 / 3 / 4 的公开路由按 D-035 已是 404。Products 4 条全部 draft（3 / 5 / 6 带 TEST ONLY 标记）；product_categories 5 条 published，无标记；Content Center 7 个条目全部 draft，9 个语言行都带 TEST ONLY 标题，published_snapshot 0；site_content / site_settings / site_social_links 无标记；带标记的 34 个媒体文件全部 `is_public = false`（全库唯一的公开文件无标记）；负数 id 夹具 0。
+
+**数据修复：** legacy posts 没有 Nuxt 管理 API（只在 Directus Admin 管理），不读取凭证无法走 Directus 路径，因此按施工单 §7 使用本地开发库精确 UPDATE：一个事务内先锁定行并复核前置条件（published 且带 `[TEST]` 的 post 必须恰好是 [1,2,3,4,6,7,8]），执行 `UPDATE posts SET status = 'draft' WHERE id = ANY([1,2,3,4,6,7,8]) AND status = 'published' AND strpos(title_en, '[TEST]') > 0`，断言影响行数 = 7、再无 published `[TEST]` post、`[TEST]` post 总数仍为 8，然后 COMMIT。结果：7 行 published → draft（draft 为施工单优先状态，也是 posts 集合的 unarchive 值）。前后指纹比对只有这 7 行的 status 变化：posts 除 status 外全部列 md5、`[TEST]` 计数 8 / 8、products 与 6 张产品子表、分类、content_items / content_item_locales / content_items_files / content_relations、快照 0、site_*、inquiries、directus_files / directus_folders、directus_permissions / directus_policies、负数 id 夹具 0 全部不变。此写入不经 Directus，因此没有 revisions / activity，posts.updated_at 保持原值。
+
+**公开验证（真实 GET）：** 清理前 FAQ API 3 条 `[TEST]`、technical_guide API 1 条、详情 API 200，`/support/faq`、`/resources`、Technical Guide 详情页都含 `[TEST]`。清理后 FAQ 与 technical_guide API 均为 `{"posts": []}`，详情 API 404，`/support/faq` 显示 "No FAQ items available yet."，`/resources`、sitemap 与 insights / case-studies / news 的 test slug（404）均无 `[TEST]`（含 HTML 与 payload）。Technical Guide 详情页仍为 HTTP 200 空模板（既有 soft-404，P1-01 OPEN，未修），客户端随后显示 404，console 出现 1 条 "Hydration completed but contains mismatches."（同一 P1-01 表现），无 TEST 内容泄漏。1440 / 375 新标签页：Resources hub、FAQ、Technical Guide 的 `[TEST]` 均为 0，无横向溢出。
+
+**Release guard：** `scripts/release-check-test-data.sql`（已跟踪只读查询）+ `scripts/release-check-test-data.mjs`（0 依赖 Node runner），命令 `npm run release:check-test-data`。runner 经 `docker compose exec -T postgres`（或 `RELEASE_CHECK_DB_CONTAINER`）在容器内以容器自身环境运行 psql，不读取凭证；查询包在 `BEGIN TRANSACTION READ ONLY` 中，由数据库拒绝任何写入。覆盖 posts（published，全部 content_type）、products（published）、product_categories（published）、content_item_locales（条目 published 且有快照）；只在身份字段（各语言名称 / 标题与 SEO 标题；内容另含快照标题）中大小写敏感、精确匹配 `[TEST]`、`TEST ONLY`、`NOT FOR PUBLICATION`，单独的 "test" 不匹配。exit 0 = PASS；exit 1 = BLOCKED，只输出 collection / id / status / marker / slug；exit 2 = CHECK FAILED，数据库无法查询、非零退出或输出不完整时一律如此，不回显数据库或 docker 输出。真实数据红绿：清理前 exit 1（恰好 7 条 posts），清理后 exit 0。
+
+**测试：** 新增 `tests/releaseTestDataCheck.test.ts`（12 项）。决策层（替换查询边界）：PASS / BLOCKED、product / category / content findings、16 种 fail-closed 情况（异常、非零退出、无完成行、计数不符、多列、未知集合或标记、完成行后有输出等）、缺失查询文件、失败报告不泄漏数据库输出、READ ONLY 包装、查询静态检查（无写入 / DDL / 事务控制，无大小写不敏感匹配）、真实 docker 调用不存在的容器 → exit 2。真实 PostgreSQL（`CONTENT_DB_TEST_CONTAINER`，事务回滚，负数 id TEST ONLY 夹具）：published `[TEST]` post、published TEST ONLY post / product、NOT FOR PUBLICATION product、`[TEST]` category、TEST ONLY 快照内容被报告；draft post / product / content、归档内容，以及标题含 "Test" / "Testing" 的真实内容不报告；READ ONLY 包装令数据库拒绝写入；runner 经自身 psql 调用在真实 schema 上完成；回滚后负数 id 夹具 0。
+
+**验证：**
+- 全量（`CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run --no-file-parallelism`）：79 files passed / 2 skipped，2791 passed / 45 skipped，0 failed，148.93 s（FIX-A 基线 78 files / 2779 passed，新增 1 个文件 12 项）；新测试文件单独运行 12/12。
+- 串行门禁（全量之后）：`npm run release:check-test-data` PASS（exit 0）；typecheck 0 error；lint 0 error；`npm run build` Build complete；`git diff --check` 通过（暂存后 `git diff --cached --check` 另行复核）。
+- 最终数据库状态：legacy posts 8 条（`[TEST]` 8、published `[TEST]` 0、published 0）；products 4 条（TEST 标记 3、published 0）；content 条目 7 个（published 0）、公开 TEST 语言行 0、快照 0；五张表负数 id 夹具均为 0。
+- 本机 Node v24.14.0（`.nvmrc` 为 22.22.2，Node 22 合同仍 OPEN）。
+
+**Release Safety Gates：** RSG-01 / RSG-08（N-17）本地 Published TEST data = 0，由可重复执行的只读 guard 证明（已更新 `RELEASE-SAFETY-GATES.md` §4.3 RSG-08 行，只补事实）；RSG-09 无 push / merge / deploy。P0 Violations：NONE。
+
+**已知 / 记录（不修复）：**
+- 产品 4（名称 "test sample"、slug `test`、product_code `D`）为 draft，但身份字段没有明确 TEST 标记，guard 无法识别；不公开、未修改，建议另行授权补标或归档。
+- Technical Guide 详情页 soft-404（P1-01）在清理后产生客户端 hydration mismatch console error。
+- guard 不检查产品子记录（sections / FAQ / specs）与媒体公开性，只检查可公开寻址记录的身份字段。
+- 数据修复不经 Directus：无 revisions / activity 记录，posts.updated_at 未更新。
+- 生产须在同一数据状态下执行 `npm run release:check-test-data`；本地 PASS 不等于生产 PASS。
+
+*最后更新：2026-09-16，由 Claude Code 在"FINAL-RELEASE-FIX-B"任务中写入。*

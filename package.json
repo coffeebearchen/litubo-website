@@ -13,7 +13,8 @@
     "typecheck": "nuxt typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "vitest run"
+    "test": "vitest run",
+    "release:check-test-data": "node scripts/release-check-test-data.mjs"
   },
   "dependencies": {
     "@nuxtjs/i18n": "^9.5.6",
