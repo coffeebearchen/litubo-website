@@ -165,6 +165,10 @@
     "404": {
       "title": "Page Not Found — LITUBO",
       "description": "The page you are looking for could not be found."
+    },
+    "503": {
+      "title": "Temporarily Unavailable — LITUBO",
+      "description": "This page is temporarily unavailable."
     }
   },
   "pages": {
@@ -194,7 +198,8 @@
     },
     "products": {
       "heroTitle": "Inspection Systems",
-      "heroSubtitle": "Five proven technology lines, configurable for your production environment."
+      "heroSubtitle": "Five proven technology lines, configurable for your production environment.",
+      "empty": "Product information is being prepared."
     },
     "applications": {
       "heroTitle": "Applications",
@@ -312,6 +317,10 @@
       "title": "Page not found",
       "body": "The page you are looking for may have moved or no longer exists.",
       "cta": "Return to home"
+    },
+    "503": {
+      "title": "Temporarily unavailable",
+      "body": "This information cannot be loaded right now. Please try again in a few minutes."
     }
   }
 }

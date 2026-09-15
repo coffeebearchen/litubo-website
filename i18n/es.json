@@ -123,7 +123,8 @@
     "quality": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
     "globalService": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
     "partner": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "404": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" }
+    "404": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
+    "503": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" }
   },
   "pages": {
     "home": {
@@ -150,7 +151,7 @@
       "ctaCta": "TODO_TRANSLATION",
       "demoNotice": "TODO_TRANSLATION"
     },
-    "products": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION" },
+    "products": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION", "empty": "TODO_TRANSLATION" },
     "applications": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION" },
     "resources": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION" },
     "contact": {
@@ -245,6 +246,10 @@
       "title": "TODO_TRANSLATION",
       "body": "TODO_TRANSLATION",
       "cta": "TODO_TRANSLATION"
+    },
+    "503": {
+      "title": "TODO_TRANSLATION",
+      "body": "TODO_TRANSLATION"
     }
   }
 }

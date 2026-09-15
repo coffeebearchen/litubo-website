@@ -1,20 +1,27 @@
 <script setup lang="ts">
 import type { PostsResult, FaqGroup } from '~/types/content'
 
-const { t } = useI18n()
+type Lang = 'en' | 'es' | 'pt'
+
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
-const { locale } = useI18n()
+
+// FINAL-RELEASE-FIX-C (RSG-05): FAQ items are legacy posts. An unpublished locale is a 404, and an item is
+// listed only with text in the current locale; another locale's text is never shown instead.
+assertPublishedLocale()
 
 useSeoHead({ title: t('seo.faq.title'), description: t('seo.faq.description'), canonicalPath: '/support/faq' })
 
-const { data: faqData } = await useAsyncData<PostsResult>(
+const { data: faqData, error: faqError } = await useAsyncData<PostsResult>(
   'cms-faq-list',
   () => $fetch<PostsResult>('/api/cms/posts?content_type=faq&sort=publish_date'),
   { default: () => ({ posts: [], cmsError: false }) },
 )
 
-const faqs = computed(() => faqData.value?.posts ?? [])
-const cmsError = computed(() => faqData.value?.cmsError ?? false)
+const faqs = computed(() => (faqData.value?.posts ?? []).filter(f => Boolean(f.title[locale.value as Lang])))
+// A refused or failed FAQ request (for example a production server not configured for Directus, which answers
+// 503) shows the unavailable state, never an empty FAQ list.
+const cmsError = computed(() => Boolean(faqError.value) || (faqData.value?.cmsError ?? false))
 
 const GROUP_ORDER: FaqGroup[] = [
   'xray', 'metal-detection', 'checkweighing', 'applications', 'service-support', 'general',
@@ -52,11 +59,11 @@ const groupedFaqs = computed(() => {
 })
 
 function faqQuestion(f: (typeof faqs.value)[number]): string {
-  return f.title[locale.value as 'en' | 'es' | 'pt'] || f.title.en
+  return f.title[locale.value as Lang] ?? ''
 }
 function faqAnswer(f: (typeof faqs.value)[number]): string {
   if (!f.bodyHtml) return ''
-  return f.bodyHtml[locale.value as 'en' | 'es' | 'pt'] || f.bodyHtml.en
+  return f.bodyHtml[locale.value as Lang] ?? ''
 }
 </script>
 

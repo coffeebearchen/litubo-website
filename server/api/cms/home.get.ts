@@ -1,6 +1,6 @@
 import { defineEventHandler } from 'h3'
-import { useRuntimeConfig } from '#imports'
 import { directusFetch } from '~/server/utils/directus'
+import { requireCmsSource } from '~/server/utils/cmsSource'
 import type { HomeContent } from '~/types/content'
 
 interface DirectusSiteContent {
@@ -28,10 +28,8 @@ interface DirectusSiteContent {
 }
 
 export default defineEventHandler(async (): Promise<HomeContent> => {
-  const config = useRuntimeConfig()
-
-  if (config.cmsMode !== 'directus') {
-    // fixtures 模式：返回 null，前台使用 i18n 回退
+  // fixtures 模式（仅限非生产）：返回 null，前台使用 i18n 回退；生产环境未配置 Directus 时返回 503
+  if (requireCmsSource('cmsMode') === 'fixtures') {
     return { hero: null }
   }
 

@@ -1,6 +1,6 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
-import { useRuntimeConfig } from '#imports'
 import { directusFetch } from '~/server/utils/directus'
+import { requireCmsSource } from '~/server/utils/cmsSource'
 import { DEMO_PRODUCT_CATEGORIES, DEMO_PRODUCTS } from '~/content/fixtures/products'
 import type { ProductCategory, Product } from '~/types/content'
 
@@ -103,13 +103,12 @@ export default defineEventHandler(async (event) => {
   const categorySlug = getRouterParam(event, 'category')
   if (!categorySlug) throw createError({ statusCode: 400 })
 
-  const config = useRuntimeConfig()
-
-  if (config.productsCmsMode !== 'directus') {
+  // DEMO fixtures outside production only; a production server not configured for Directus answers 503.
+  if (requireCmsSource('productsCmsMode') === 'fixtures') {
     const category = DEMO_PRODUCT_CATEGORIES.find(c => c.slug === categorySlug)
     if (!category) throw createError({ statusCode: 404 })
     const products = DEMO_PRODUCTS.filter(p => p.categoryId === category.id && p.status === 'published')
-    return { category, products, cmsError: false as const }
+    return { category, products }
   }
 
   // Resolve category — failure here is a hard 503 (not a 404 that would de-index the page).
@@ -127,17 +126,17 @@ export default defineEventHandler(async (event) => {
   if (!catRes.data.length) throw createError({ statusCode: 404 })
   const category = mapCategory(catRes.data[0])
 
-  // Product list failure is non-fatal: return cmsError flag so the page can show the
-  // appropriate "unavailable" message rather than silently appearing as an empty category.
+  // Product list failure is a 503 too (FINAL-RELEASE-FIX-C): answering the category with an empty
+  // product list would hide the outage behind a 200.
   try {
     const prodRes = await directusFetch<{ data: DirectusProduct[] }>(
       `/items/products?filter[category_id][_eq]=${catRes.data[0].id}&filter[status][_eq]=published&sort=sort,name_en&limit=200`
     )
     const products = prodRes.data.map(p => mapProduct(p, categorySlug))
-    return { category, products, cmsError: false as const }
+    return { category, products }
   }
   catch (err) {
     console.error('[cms/products/category] Directus product fetch failed:', err instanceof Error ? err.message : err)
-    return { category, products: [] as ReturnType<typeof mapProduct>[], cmsError: true as const }
+    throw createError({ statusCode: 503, message: 'Product catalogue temporarily unavailable' })
   }
 })

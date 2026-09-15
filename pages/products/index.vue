@@ -1,13 +1,24 @@
 <script setup lang="ts">
-import type { ProductCategory } from '~/types/content'
+import type { ProductCategory, LocalizedString } from '~/types/content'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 
-const { data: categories } = await useAsyncData<ProductCategory[]>(
+// FINAL-RELEASE-FIX-C: an unpublished locale is a 404; an unavailable catalogue is a 503, never an empty 200.
+assertPublishedLocale()
+const { data: categories, error } = await useAsyncData<ProductCategory[]>(
   'product-categories',
   () => $fetch<ProductCategory[]>('/api/cms/products/categories')
 )
+const status = publicPageStatus(error.value, Array.isArray(categories.value))
+if (status) {
+  throw createError({ statusCode: status, fatal: true })
+}
+
+/** The current locale's text only; there is no fallback to another locale (RSG-05). */
+function loc(s: LocalizedString): string {
+  return s[locale.value as keyof LocalizedString] ?? ''
+}
 
 useSeoHead({
   title: t('seo.products.title'),
@@ -28,7 +39,11 @@ useSeoHead({
 
     <section class="section-gap">
       <div class="container">
-        <div class="product-category-grid">
+        <p v-if="!categories?.length" class="empty-state">
+          {{ t('pages.products.empty') }}
+          <NuxtLink :to="localePath('/contact')">{{ t('nav.contact') }}</NuxtLink>
+        </p>
+        <div v-else class="product-category-grid">
           <NuxtLink
             v-for="cat in categories"
             :key="cat.slug"
@@ -39,7 +54,7 @@ useSeoHead({
               <img
                 v-if="cat.heroMedia.url"
                 :src="cat.heroMedia.url"
-                :alt="cat.heroMedia.alt.en"
+                :alt="loc(cat.heroMedia.alt)"
                 class="category-card__image"
                 loading="lazy"
                 @error="($event.target as HTMLImageElement).style.display = 'none'"
@@ -47,8 +62,8 @@ useSeoHead({
               <div class="category-card__image-placeholder" aria-hidden="true" />
             </div>
             <div class="category-card__body">
-              <h2 class="category-card__title">{{ cat.title.en }}</h2>
-              <p class="category-card__intro">{{ cat.intro.en }}</p>
+              <h2 class="category-card__title">{{ loc(cat.title) }}</h2>
+              <p class="category-card__intro">{{ loc(cat.intro) }}</p>
               <span class="category-card__arrow" aria-hidden="true">
                 <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
                   <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -91,6 +106,17 @@ useSeoHead({
 }
 
 .section-gap { padding: var(--space-16) 0; }
+
+.empty-state {
+  padding: var(--space-12) 0;
+  font-size: var(--text-base);
+  color: var(--color-ink-muted);
+}
+
+.empty-state a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
 
 .product-category-grid {
   display: grid;

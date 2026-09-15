@@ -1,6 +1,6 @@
 import { defineEventHandler, createError } from 'h3'
-import { useRuntimeConfig } from '#imports'
 import { directusFetch } from '~/server/utils/directus'
+import { requireCmsSource } from '~/server/utils/cmsSource'
 import { DEMO_PRODUCT_CATEGORIES } from '~/content/fixtures/products'
 import type { ProductCategory } from '~/types/content'
 
@@ -46,9 +46,8 @@ function toProductCategory(c: DirectusCategory): ProductCategory {
 }
 
 export default defineEventHandler(async () => {
-  const config = useRuntimeConfig()
-
-  if (config.productsCmsMode !== 'directus') {
+  // DEMO fixtures outside production only; a production server not configured for Directus answers 503.
+  if (requireCmsSource('productsCmsMode') === 'fixtures') {
     return DEMO_PRODUCT_CATEGORIES
   }
 

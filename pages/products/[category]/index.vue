@@ -1,31 +1,32 @@
 <script setup lang="ts">
-import type { ProductCategory, Product } from '~/types/content'
+import type { ProductCategory, Product, LocalizedString } from '~/types/content'
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
 const categorySlug = route.params.category as string
 
-const { data, error } = await useAsyncData<{ category: ProductCategory; products: Product[]; cmsError?: boolean }>(
+// FINAL-RELEASE-FIX-C: an unpublished locale is a 404, and the page answers with the API's own 404 / 503.
+assertPublishedLocale()
+const { data, error } = await useAsyncData<{ category: ProductCategory; products: Product[] }>(
   `product-category-${categorySlug}`,
-  () => $fetch<{ category: ProductCategory; products: Product[]; cmsError?: boolean }>(`/api/cms/products/${categorySlug}`)
+  () => $fetch<{ category: ProductCategory; products: Product[] }>(`/api/cms/products/${categorySlug}`)
 )
-
-if (error.value || !data.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Category not found' })
+const status = publicPageStatus(error.value, Boolean(data.value))
+if (status) {
+  throw createError({ statusCode: status, fatal: true })
 }
 
-const category = computed(() => data.value!.category)
-const products = computed(() => data.value!.products)
-const cmsError = computed(() => data.value?.cmsError === true)
+const category = computed(() => data.value?.category)
+const products = computed(() => data.value?.products ?? [])
 
-const catLocale = computed(() => locale.value as 'en' | 'es' | 'pt')
-const catSeoTitle = computed(() =>
-  category.value?.seo.title[catLocale.value] || category.value?.seo.title.en || t('seo.products.title')
-)
-const catSeoDesc = computed(() =>
-  category.value?.seo.description[catLocale.value] || category.value?.seo.description.en || ''
-)
+/** The current locale's text only; there is no fallback to another locale (RSG-05). */
+function loc(s: LocalizedString): string {
+  return s[locale.value as keyof LocalizedString] ?? ''
+}
+
+const catSeoTitle = computed(() => (category.value ? loc(category.value.seo.title) : '') || t('seo.products.title'))
+const catSeoDesc = computed(() => (category.value ? loc(category.value.seo.description) : ''))
 useSeoHead({
   title: catSeoTitle,
   description: catSeoDesc,
@@ -41,11 +42,11 @@ useSeoHead({
           :items="[
             { label: 'Home', to: localePath('/') },
             { label: t('nav.products'), to: localePath('/products') },
-            { label: category.title.en },
+            { label: loc(category.title) },
           ]"
         />
-        <h1 class="page-hero__title">{{ category.title.en }}</h1>
-        <p class="page-hero__sub">{{ category.intro.en }}</p>
+        <h1 class="page-hero__title">{{ loc(category.title) }}</h1>
+        <p class="page-hero__sub">{{ loc(category.intro) }}</p>
       </div>
     </section>
 
@@ -55,15 +56,12 @@ useSeoHead({
           <MediaCard
             v-for="p in products"
             :key="p.slug"
-            :title="p.name.en"
-            :subtitle="p.summary.en"
+            :title="loc(p.name)"
+            :subtitle="loc(p.summary)"
             :to="localePath(`/products/${categorySlug}/${p.slug}`)"
             :image-src="p.heroMedia.url"
-            :image-alt="p.heroMedia.alt.en"
+            :image-alt="loc(p.heroMedia.alt)"
           />
-        </div>
-        <div v-else-if="cmsError" class="unavailable-state">
-          <p>Product information is temporarily unavailable. Please try again later or <NuxtLink :to="localePath('/contact')">contact us</NuxtLink>.</p>
         </div>
         <div v-else class="empty-state">
           <p>Product information is being prepared. <NuxtLink :to="localePath('/contact')">Contact us</NuxtLink> for details.</p>
@@ -109,15 +107,13 @@ useSeoHead({
   gap: var(--space-6);
 }
 
-.empty-state,
-.unavailable-state {
+.empty-state {
   padding: var(--space-12) 0;
   font-size: var(--text-base);
   color: var(--color-ink-muted);
 }
 
-.empty-state a,
-.unavailable-state a {
+.empty-state a {
   color: var(--color-primary);
   text-decoration: underline;
 }

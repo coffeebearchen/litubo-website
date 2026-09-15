@@ -1,6 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3'
-import { useRuntimeConfig } from '#imports'
 import { directusFetch } from '~/server/utils/directus'
+import { requireCmsSource } from '~/server/utils/cmsSource'
 import { isLegacyPublicPostType, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
 import { DEMO_POSTS_LIST } from '~/content/fixtures/posts'
 import type { PostListItem, PostsResult } from '~/types/content'
@@ -46,7 +46,6 @@ function toListItem(r: DirectusPost, isFaq: boolean): PostListItem {
 }
 
 export default defineEventHandler(async (event): Promise<PostsResult> => {
-  const config = useRuntimeConfig()
   const query = getQuery(event)
   const type = query.content_type as string | undefined
   const excludeType = query.exclude_type as string | undefined
@@ -55,7 +54,8 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
   // Case Studies are Content Center only; News is not public in Phase 1.
   if (type && !isLegacyPublicPostType(type)) return { posts: [] }
 
-  if (config.cmsMode !== 'directus') {
+  // DEMO fixtures outside production only; a production server not configured for Directus answers 503.
+  if (requireCmsSource('cmsMode') === 'fixtures') {
     // For fixtures mode: include full Post data (which has faqGroup + bodyHtml) when FAQ type
     const { DEMO_POSTS } = await import('~/content/fixtures/posts')
     let list: PostListItem[] = type === 'faq'

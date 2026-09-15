@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-FIX-A — Public Form Safety（Controller 接受 · 926be4d · not pushed · P0-01 CLOSED）
-Latest completed module:            FINAL-RELEASE-FIX-B — Published TEST Data Cleanup + Release Guard（A2 · LOCAL COMPLETE · P0-02 CLOSED · 等待 Controller 审查）
-Active authorized module:           NONE（FINAL-RELEASE-FIX-B 已收口，等待 Controller 审查）
+Latest accepted module:             FINAL-RELEASE-FIX-B — Published TEST Data Cleanup + Release Guard（Controller 接受 · 12a45b6 · not pushed · P0-02 CLOSED）；FINAL-RELEASE-FIX-A 已接受（926be4d · P0-01 CLOSED）
+Latest completed module:            FINAL-RELEASE-FIX-C — Public Route Correctness + Locale Isolation + Fixture Fail-closed（A2 · LOCAL COMPLETE · P1-01 / P1-02 / P1-03 / P1-04 FIXED · 等待 Controller 审查）
+Active authorized module:           NONE（FINAL-RELEASE-FIX-C 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 的 P1 项仍 OPEN；后续模块未授权）
+Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；FINAL-RELEASE-FIX-D NOT AUTHORIZED）
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：926be4d）
+Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-04 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：12a45b6）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10084,3 +10084,64 @@ Next candidate:                 NONE — 等待 Controller
 - 生产须在同一数据状态下执行 `npm run release:check-test-data`；本地 PASS 不等于生产 PASS。
 
 *最后更新：2026-09-16，由 Claude Code 在"FINAL-RELEASE-FIX-B"任务中写入。*
+
+---
+
+## FINAL-RELEASE-FIX-C — Public Route Correctness + Locale Isolation + Fixture Fail-closed（2026-09-16）
+
+```text
+Module:                         FINAL-RELEASE-FIX-C — Public Route Correctness + Locale Isolation + Fixture Fail-closed（仅修复 FINAL-RELEASE-AUDIT-01 P1-01～P1-04）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller 施工单）
+Branch:                         review/final-release-fix-c-public-route-correctness-01（基线 12a45b6；FIX-A 926be4d、FIX-B 12a45b6 均已由 Controller 接受）
+Status:                         LOCAL COMPLETE · P1-01 / P1-02 / P1-03 / P1-04 FIXED · 等待 Controller 审查
+Error contract:                 有效 EN → 200；缺失 / 未发布 / 语言未发布 → 404；Directus 不可用或必需上游失败 → 503；生产 CMS 模式缺失或不是 directus → 503（fail closed）
+Decision:                       无新增（RSG-05 无回退、D-020 生产不用 DEMO fixtures、D-035 公开页错误语义均为既有规则；下一个空闲 ID 仍为 D-036）
+Schema / permissions / data:    未修改（未写数据库；未重新 Publish TEST 数据）
+Safety gates touched:           RSG-02（公开错误语义）· RSG-05 · RSG-08 · RSG-09
+MASTER-ROADMAP:                 未修改（无 Final Fix 跟踪小节，里程碑未变）
+Push / merge / deploy:          NONE
+Remaining P1:                   P1-05～P1-17（本模块未处理）
+Next candidate:                 NONE — 等待 Controller（FINAL-RELEASE-FIX-D NOT AUTHORIZED）
+```
+
+**修复前复现（真实 HTTP，dev server + 本地生产构建）：**
+- P1-01：`/api/cms/posts/<不存在>` 为 404，Technical Guide 详情页却是 HTTP 200（空模板，客户端随后显示 404 并报 hydration mismatch）；Directus 停机时 API 503，页面仍为 200。原因：`composables/usePostDetail.ts` 没有 await `useAsyncData`，SSR 在数据返回前就完成了。
+- P1-02：Directus 停机时 `/products` 为 200 且 0 张卡片（空 200）；分类页与详情页把 API 的 503 改写成 404；详情 API 的媒体 / 规格 / FAQ / 区块查询失败只记日志、以空数组返回 200；分类 API 的产品列表失败返回 200 + `cmsError`。
+- P1-03：`/es/products` 为 200 且显示英文分类名；`/es`、`/pt` 分类页与详情页为 200、h1 为英文；`/es`、`/pt` Technical Guide 与 `/es/support/faq` 为 200。原因：`field[locale] || field.en` 回退，以及分类页写死的 `.en`。
+- P1-04：本地生产构建在 `CMS_MODE` / `CMS_MODE_PRODUCTS` 为空时，产品分类 API 返回 200（DEMO，TODO_CONTENT × 10），posts API 返回 200（DEMO post），`/products` 为 200 并显示 DEMO 分类。
+
+**实现：**
+- `server/utils/cmsSource.ts`（新增，唯一的 fixtures 判定）：`resolveCmsSource(mode, NODE_ENV)`——模式为 `directus` 时读 Directus；非生产环境且模式不是 `directus` 时允许 DEMO fixtures（开发中显式使用 fixtures 仍可用）；生产环境中缺失、空值、`fixtures` 或其他任何值一律无来源。`requireCmsSource(key)` 在无来源时记录 `[cms] CMS_MODE(_PRODUCTS) must be "directus" in production; refusing to serve demo fixtures` 并抛出 503，不回退、不自动纠正。6 个公开 CMS API（产品分类、分类、详情，遗留 posts 列表、详情，首页）全部改为调用它，不再各自比较 `config.cmsMode`。
+- 产品 API：分类 API 的产品列表失败由 200 + `cmsError` 改为 503（移除 `cmsError` 字段）；详情 API 的媒体、规格组 / 规格项、FAQ、区块 / 区块项查询失败由"记日志 + 空数组"改为 503。分类或产品不存在、未发布仍为 404。
+- `utils/publicRoute.ts`（新增）：`isPublishedLocale(locale, publishedLocales)`；`publicPageStatus(error, hasData)`——API 404 及其他 4xx → 404，API 5xx 或无状态码（上游不可达）→ 503，无错误但无数据 → 404，否则正常渲染。
+- `composables/assertPublishedLocale.ts`（新增）：当前语言不在 `runtimeConfig.public.publishedLocales` 中时抛出 fatal 404。
+- 页面：`/products`、分类页、详情页、Technical Guide 详情页、FAQ 在取数前调用 `assertPublishedLocale()`；产品三页与 Technical Guide 详情页 await `useAsyncData` 后按 `publicPageStatus` 抛出 fatal 404 / 503（SSR 状态码与错误页一致，无 hydration mismatch）；详情页缺当前语言的名称 / 标题时为 404。公开展示只取当前语言文本（`loc()` / `localized()` 返回 `field[locale] ?? ''`），移除 `|| field.en` 与写死的 `.en`；FAQ 只列出有当前语言标题的条目，列表请求失败时显示既有的"暂不可用"状态而不是空列表；Resources hub 的遗留 Technical Guide 卡片只在发布语言中、且有该语言标题时列出。`/products` 无分类时显示 `pages.products.empty`（i18n）。
+- `error.vue`：5xx 显示 `pages.503` / `seo.503` 文案（"Temporarily unavailable"），其余仍为 404 文案；es / pt 新增键为 `TODO_TRANSLATION`。
+- `.env.example`：列出 `CMS_MODE` 与 `CMS_MODE_PRODUCTS`，并说明生产必须设为 `directus`，否则公开 CMS API 返回 503。
+
+**测试：** 新增 `tests/publicRouteCorrectness.test.ts`（21 项）：6 个真实 API 路由挂在 h3 + 真实 HTTP 上，Directus 为按 `_eq` / `_in` 过滤的内存替身。覆盖：`resolveCmsSource` / `requireCmsSource` 矩阵（生产环境缺失 / 空值 / fixtures / 大小写或空格变体 → 503 + 日志，directus 通过；开发环境 fixtures 允许）；生产误配时 6 个 API 均 503、响应不含 DEMO 内容、Directus 调用 0 次；产品分类 / 分类 / 详情的 200 / 404 / 503（详情涉及的 8 张表逐一失败均为 503，不输出部分数据）；遗留 Technical Guide API 的 200 / 404（缺失、draft）/ 503；`isPublishedLocale` 与 `publicPageStatus` 映射；静态检查（5 个页面在取数前调用 `assertPublishedLocale()`；产品页与 Technical Guide 页使用 `publicPageStatus` 与 fatal；`usePostDetail` 已 await；7 个公开展示文件中无 `.en`；API 只经 `requireCmsSource` 判定且不读 `useRuntimeConfig`；详情 API 的 6 个 catch 全部抛错；FAQ 失败状态；error.vue 的 5xx 分支；`.env.example` 两个变量）。
+
+**验证：**
+- 全量（`CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run --no-file-parallelism`）：80 files passed / 2 skipped，2812 passed / 45 skipped，0 failed，183.15 s（FIX-B 基线 79 files / 2791 passed，新增 1 个文件 21 项）。
+- 串行门禁（全量之后）：`npm run release:check-test-data` PASS（exit 0）；typecheck 0 error；lint 0 error；`npm run build` Build complete；`git diff --check` 通过（暂存后 `git diff --cached --check` 另行复核）。
+- 本机 Node v24.14.0（`.nvmrc` 为 22.22.2，Node 22 合同仍 OPEN，P1-10）。
+
+**真实 HTTP（dev server，Directus 正常）：** EN：`/products` 200（5 张分类卡片）；5 个分类页 200（当前 0 个 published 产品，显示空状态）；`/`、`/contact`、`/support/faq`、`/resources` 200。不存在的分类 / 产品、draft 产品（product 3 `conveyors-reject-systems/test-only-lt-180c-free-fall-metal-detector`、product 4 `x-ray-inspection/test`）、不存在的 Technical Guide 均为 404（不再 soft-200）；Content Center 不存在的 insight / case study 为 404（未回归）。ES / PT：`/es`、`/pt` 下的产品根、分类、详情、Technical Guide、FAQ 均为 404（noindex、无英文分类名）；`/es/resources`、`/pt/resources` hub 为 200（D-035 hub 行为，无英文回退卡片）。本地目前没有 published 产品、Technical Guide 或 FAQ（FIX-B 之后），有效详情页的 200 由 API 测试证明，没有为验证而发布任何数据。
+
+**一次 Directus 停机周期：** `docker compose stop directus` 后 ping 为 000：产品分类 / 分类 / 详情 API 与遗留 Technical Guide 详情 API 均为 503；`/products`、分类页、详情页（含 draft 产品 URL）、Technical Guide 详情页均为 HTTP 503，错误页显示 "Temporarily unavailable"、noindex、无 TEST / DEMO 内容；`/es/products` 与 ES Technical Guide 仍为 404（语言判定先于取数）；Content Center 不存在的条目为 503（D-035 合同，未回归）。`docker compose start directus` 后 ping 为 pong、`directus_permissions_verify: OK`，上述健康路由恢复（`/products` 5 张卡片，404 路由仍为 404）。
+
+**生产构建误配置实测：** 使用本地 `npm run build` 产物（`.output`，NODE_ENV=production），经临时 launch 配置与 scratch 启动器，把 `NUXT_CMS_MODE` / `NUXT_PRODUCTS_CMS_MODE` 分别设为空值、`fixtures`、`directus` 各运行一次（结束后 `.claude/launch.json` 已恢复，无 tracked diff）。空值与 `fixtures`：产品分类 / 分类 / 详情、遗留 posts 列表 / 详情、首页共 7 个 API 均为 503（"Content temporarily unavailable"），服务端日志记录 `[cms] CMS_MODE(_PRODUCTS) must be "directus" in production; refusing to serve demo fixtures`；`/products`、分类页、DEMO 产品 URL（`xr-demo-series`）、DEMO Technical Guide URL（`weight-legislation-eu-prepacked-food`）均为 HTTP 503 错误页；`/support/faq` 与 `/resources` 为 200 并显示"暂不可用"状态（P2-06 语义）；上述响应中 DEMO fixtures 数据为 0（TODO_CONTENT 0，DEMO slug 只出现在错误响应回显的请求 URL 中；修复前同样方式下产品分类 API 为 200 且含 TODO_CONTENT × 10）；`/es/products` 404；Content Center 列表 API 为 200 空列表（未改）。`directus`：API 200，`/products` 200（5 张卡片），分类页 200，缺失 / draft 产品与不存在的 Technical Guide 404，ES / PT 404。生产 HTML 不含 `nuxt-error-overlay`。首页模板写死的 "DEMO — NOT FOR PUBLIC" 提示在三种模式下都存在（既有，与 CMS 模式无关，未改）。
+
+**浏览器验收：** dev server 稳定后新开标签页，1440 与 375：`/products`（200，5 张卡片；375 下卡片宽 327）、`/products/x-ray-inspection`（200，空状态）、不存在的 Technical Guide（404）、`/es/products`（404，无英文分类名）、`/support/faq`（200）；Directus 停机期间的 `/products`、`/products/x-ray-inspection`、不存在的 Technical Guide（503，"Temporarily unavailable" + Return to home）。全部 `scrollWidth ≤ innerWidth`（1440：1425 / 1440；375：375 / 375），无 TEST ONLY / TODO_CONTENT；console 中 hydration 相关消息 0 条；正常路由 console error 0，404 / 503 页只有文档自身状态码产生的资源错误。375 截图可辨认；1440 截图在面板中缩放后不可辨认，以 DOM 几何取证。dev 模式下 Nuxt 会在错误页注入 `nuxt-error-overlay`（开发调试浮层，未改动的 Content Center 404 页同样出现）。
+
+**Release Safety Gates：** RSG-05：Products 与遗留 posts 公开页无语言回退 PROVEN（本地范围）；RSG-02：产品与遗留 Technical Guide 的公开错误语义（404 / 503）按事实补记，Products 共享资格判定仍 OPEN；RSG-08：生产 CMS 模式误配 fail closed（503，不服务 DEMO fixtures）PROVEN（本地生产构建范围）；已更新 `RELEASE-SAFETY-GATES.md` §4.3 的 RSG-02 / RSG-05 / RSG-08 行，只补事实；RSG-09：无 push / merge / deploy。P0 Violations：NONE。
+
+**已知 / 记录（不修复，超出 P1-01～P1-04）：**
+- P2-06 仍 OPEN：遗留 posts 列表 API 在 Directus 失败时返回 200 + `cmsError`（FAQ 页、Resources hub 显示"暂不可用"状态，HTTP 200）；首页 `site_content` 失败时静默回退 i18n（`/api/cms/home` 200，`hero: null`）。
+- Applications 页面（`pages/applications/*`）经 `useContentAdapter` 无条件读取 DEMO fixtures 并写死 `.en`（D-035 保持现状；不受 CMS 模式控制，生产切换前须处理）。
+- Content Center 公开读取（`server/utils/contentPublic.ts`）与 sitemap 在 `CMS_MODE` 不是 `directus` 时不读 fixtures，但返回空列表 / 404 而不是 503（Content Center 发布语义不在本模块范围）。
+- 首页 `cmsText()` 仍有 `obj[locale] || obj.en` 回退（RSG-05 首页遗留回退 OPEN，首页不在 P1-03 范围）。
+- 分类页空状态 "Product information is being prepared. Contact us for details." 为模板内写死的英文（既有）；ES / PT 错误页标题为 `TODO_TRANSLATION`（语言未发布、noindex）。
+- 本地没有 published 产品 / Technical Guide / FAQ，有效详情页的 200 未能用真实数据演示。
+
+*最后更新：2026-09-16，由 Claude Code 在"FINAL-RELEASE-FIX-C"任务中写入。*

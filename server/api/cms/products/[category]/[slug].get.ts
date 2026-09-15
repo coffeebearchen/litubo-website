@@ -1,6 +1,6 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
-import { useRuntimeConfig } from '#imports'
 import { directusFetch } from '~/server/utils/directus'
+import { requireCmsSource } from '~/server/utils/cmsSource'
 import { DEMO_PRODUCT_CATEGORIES, DEMO_PRODUCTS } from '~/content/fixtures/products'
 import type {
   Product,
@@ -153,10 +153,8 @@ export default defineEventHandler(async (event) => {
   const productSlug = getRouterParam(event, 'slug')
   if (!categorySlug || !productSlug) throw createError({ statusCode: 400 })
 
-  const config = useRuntimeConfig()
-
-  // ── Fixtures mode ──────────────────────────────────────────────────────
-  if (config.productsCmsMode !== 'directus') {
+  // ── Fixtures mode (DEMO fixtures outside production only; production without Directus → 503) ──
+  if (requireCmsSource('productsCmsMode') === 'fixtures') {
     const category = DEMO_PRODUCT_CATEGORIES.find(c => c.slug === categorySlug)
     if (!category) throw createError({ statusCode: 404 })
     const product = DEMO_PRODUCTS.find(
@@ -211,7 +209,7 @@ export default defineEventHandler(async (event) => {
 
   const productId = p.id
 
-  // 3. Fetch all related data — failures here are non-fatal; log and use empty arrays.
+  // 3. Fetch all related data. Every query is required: a failure is 503, never a partial product page.
 
   // 3a. Media (gallery, hero override, downloads)
   let rawMedia: DirectusMedia[] = []
@@ -225,6 +223,7 @@ export default defineEventHandler(async (event) => {
   }
   catch (err) {
     console.error('[cms/products/slug] media fetch failed:', err instanceof Error ? err.message : err)
+    throw createError({ statusCode: 503, message: 'Product information temporarily unavailable' })
   }
 
   // 3b. Spec groups
@@ -262,6 +261,7 @@ export default defineEventHandler(async (event) => {
   }
   catch (err) {
     console.error('[cms/products/slug] spec groups fetch failed:', err instanceof Error ? err.message : err)
+    throw createError({ statusCode: 503, message: 'Product information temporarily unavailable' })
   }
 
   // 3c. FAQs (all text fields are plain-text input-multiline, not HTML)
@@ -279,6 +279,7 @@ export default defineEventHandler(async (event) => {
   }
   catch (err) {
     console.error('[cms/products/slug] faq fetch failed:', err instanceof Error ? err.message : err)
+    throw createError({ statusCode: 503, message: 'Product information temporarily unavailable' })
   }
 
   // 3d. Content sections + their items
@@ -336,6 +337,7 @@ export default defineEventHandler(async (event) => {
   }
   catch (err) {
     console.error('[cms/products/slug] sections fetch failed:', err instanceof Error ? err.message : err)
+    throw createError({ statusCode: 503, message: 'Product information temporarily unavailable' })
   }
 
   // ── Assemble product from raw data ─────────────────────────────────────

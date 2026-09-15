@@ -1,7 +1,7 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
-import { useRuntimeConfig } from '#imports'
 import sanitizeHtml from 'sanitize-html'
 import { directusFetch } from '~/server/utils/directus'
+import { requireCmsSource } from '~/server/utils/cmsSource'
 import { isLegacyPublicPostType, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
 import { DEMO_POSTS } from '~/content/fixtures/posts'
 import type { Post } from '~/types/content'
@@ -138,10 +138,9 @@ export default defineEventHandler(async (event): Promise<Post> => {
   const slug = getRouterParam(event, 'slug') ?? ''
   if (!slug) throw createError({ statusCode: 404, message: 'Not found' })
 
-  const config = useRuntimeConfig()
-
   // CC-IMP-10 (D-035): only Technical Guide and FAQ posts are still public here.
-  if (config.cmsMode !== 'directus') {
+  // DEMO fixtures outside production only; a production server not configured for Directus answers 503.
+  if (requireCmsSource('cmsMode') === 'fixtures') {
     const post = DEMO_POSTS.find(p => p.slug === slug && isLegacyPublicPostType(p.contentType))
     if (!post) throw createError({ statusCode: 404, message: 'Not found' })
     return post

@@ -2,11 +2,19 @@
 const { t } = useI18n()
 const localePath = useLocalePath()
 
-defineProps<{
+const props = defineProps<{
   error: { statusCode: number; message?: string }
 }>()
 
-useSeoHead({ title: t('seo.404.title'), description: '', canonicalPath: '', noIndex: true })
+// FINAL-RELEASE-FIX-C: a 5xx is "temporarily unavailable", never "page not found".
+const unavailable = computed(() => props.error.statusCode >= 500)
+
+useSeoHead({
+  title: computed(() => t(unavailable.value ? 'seo.503.title' : 'seo.404.title')),
+  description: '',
+  canonicalPath: '',
+  noIndex: true,
+})
 </script>
 
 <template>
@@ -14,8 +22,8 @@ useSeoHead({ title: t('seo.404.title'), description: '', canonicalPath: '', noIn
     <section class="error-page">
       <div class="container error-page__inner">
         <p class="error-page__code">{{ error.statusCode }}</p>
-        <h1 class="error-page__title">{{ t('pages.404.title') }}</h1>
-        <p class="error-page__body">{{ t('pages.404.body') }}</p>
+        <h1 class="error-page__title">{{ unavailable ? t('pages.503.title') : t('pages.404.title') }}</h1>
+        <p class="error-page__body">{{ unavailable ? t('pages.503.body') : t('pages.404.body') }}</p>
         <NuxtLink :to="localePath('/')" class="btn btn--primary btn--lg">
           {{ t('pages.404.cta') }}
         </NuxtLink>

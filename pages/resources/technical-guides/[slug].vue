@@ -4,13 +4,20 @@ const localePath = useLocalePath()
 const { t } = useI18n()
 const slug = String(route.params.slug)
 
-const { post, error, localized } = usePostDetail(slug)
+// FINAL-RELEASE-FIX-C: an unpublished locale is a 404, and the page answers with the API's own 404 / 503.
+assertPublishedLocale()
+const { post, error, localized } = await usePostDetail(slug)
 
-if (error.value) {
-  throw createError({ statusCode: error.value.statusCode ?? 404, fatal: true })
+const status = publicPageStatus(error.value, Boolean(post.value))
+if (status) {
+  throw createError({ statusCode: status, fatal: true })
+}
+// A guide with no title in this locale is not public in it; no other locale's text is shown instead.
+if (!localized(post.value?.title)) {
+  throw createError({ statusCode: 404, fatal: true })
 }
 
-const title = computed(() => localized(post.value?.title) || 'Technical Guide')
+const title = computed(() => localized(post.value?.title))
 const excerpt = computed(() => localized(post.value?.excerpt))
 const bodyHtml = computed(() => localized(post.value?.bodyHtml))
 const seoTitle = computed(() => localized(post.value?.seo?.title) || `${title.value} | LITUBO`)

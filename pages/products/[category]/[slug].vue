@@ -7,34 +7,39 @@ const route = useRoute()
 const categorySlug = route.params.category as string
 const slug = route.params.slug as string
 
+/** The current locale's text only; there is no fallback to another locale (RSG-05). */
 function loc(s: LocalizedString): string {
-  const key = locale.value as keyof LocalizedString
-  return s[key] || s.en
+  return s[locale.value as keyof LocalizedString] ?? ''
 }
 
+// FINAL-RELEASE-FIX-C: an unpublished locale is a 404, and the page answers with the API's own 404 / 503
+// for the product and for its category; neither is ever turned into the other.
+assertPublishedLocale()
 const { data: product, error: productError } = await useAsyncData<Product>(
   `product-${categorySlug}-${slug}`,
   () => $fetch<Product>(`/api/cms/products/${categorySlug}/${slug}`)
 )
-
-if (productError.value || !product.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Product not found' })
+const productStatus = publicPageStatus(productError.value, Boolean(product.value))
+if (productStatus) {
+  throw createError({ statusCode: productStatus, fatal: true })
+}
+// A product with no name in this locale is not public in it.
+if (!loc(product.value!.name)) {
+  throw createError({ statusCode: 404, fatal: true })
 }
 
-const { data: categoryData } = await useAsyncData<{ category: ProductCategory; products: Product[] }>(
+const { data: categoryData, error: categoryError } = await useAsyncData<{ category: ProductCategory; products: Product[] }>(
   `product-category-${categorySlug}`,
   () => $fetch<{ category: ProductCategory; products: Product[] }>(`/api/cms/products/${categorySlug}`)
 )
+const categoryStatus = publicPageStatus(categoryError.value, Boolean(categoryData.value))
+if (categoryStatus) {
+  throw createError({ statusCode: categoryStatus, fatal: true })
+}
 const category = computed(() => categoryData.value?.category)
 
-const prodSeoTitle = computed(() => {
-  const key = locale.value as keyof LocalizedString
-  return (product.value?.seo.title[key] || product.value?.seo.title.en) ?? t('seo.products.title')
-})
-const prodSeoDesc = computed(() => {
-  const key = locale.value as keyof LocalizedString
-  return product.value?.seo.description[key] || product.value?.seo.description.en || ''
-})
+const prodSeoTitle = computed(() => (product.value ? loc(product.value.seo.title) : '') || t('seo.products.title'))
+const prodSeoDesc = computed(() => (product.value ? loc(product.value.seo.description) : ''))
 useSeoHead({
   title: prodSeoTitle,
   description: prodSeoDesc,
@@ -175,7 +180,7 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
           </p>
           <table class="spec-table">
             <tbody>
-              <tr v-for="row in group.items" :key="row.label.en">
+              <tr v-for="(row, ri) in group.items" :key="ri">
                 <th>{{ loc(row.label) }}</th>
                 <td>
                   {{ loc(row.value) }}<span v-if="row.unit" class="spec-unit"> {{ row.unit }}</span>
@@ -194,7 +199,7 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
         <SectionHeading>Technical Specifications</SectionHeading>
         <table class="spec-table">
           <tbody>
-            <tr v-for="row in product.specifications" :key="row.label.en">
+            <tr v-for="(row, ri) in product.specifications" :key="ri">
               <th>{{ loc(row.label) }}</th>
               <td>{{ loc(row.value) }}</td>
             </tr>

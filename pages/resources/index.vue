@@ -4,6 +4,7 @@ import type { PublicContentList } from '~/types/content-public'
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
+const publishedLocales = useRuntimeConfig().public.publishedLocales
 
 useSeoHead({
   title: t('seo.resources.title'),
@@ -71,16 +72,18 @@ const { data: hub } = await useAsyncData(
     }
     if (guides.status !== 'fulfilled' || guides.value.cmsError) {
       unavailable = true
-    } else {
+    } else if (isPublishedLocale(locale.value, publishedLocales)) {
+      // FINAL-RELEASE-FIX-C (RSG-05): a legacy guide is listed only in a published locale, with its own
+      // text in that locale; another locale's text is never shown instead.
       const lang = locale.value as 'en' | 'es' | 'pt'
-      for (const post of guides.value.posts.filter(p => p.contentType === 'technical_guide')) {
-        const title = post.title[lang] || post.title.en
+      for (const post of guides.value.posts.filter(p => p.contentType === 'technical_guide' && p.title[lang])) {
+        const title = post.title[lang]
         cards.push({
           key: `technical_guide:${post.slug}`,
           kind: 'technical_guide',
           typeLabel: TYPE_LABELS.technical_guide,
           title,
-          summary: post.excerpt[lang] || post.excerpt.en,
+          summary: post.excerpt[lang] ?? '',
           date: post.publishDate,
           href: localePath(`/resources/technical-guides/${post.slug}`),
           imageUrl: post.coverImageUrl,
