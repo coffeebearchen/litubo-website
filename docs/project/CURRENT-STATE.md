@@ -8,8 +8,8 @@
 
 ```text
 Latest accepted module:             FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-01B — 统一 Directus service token 合同（A2 · **PASS**：唯一 secret 名 `DIRECTUS_TOKEN` 同时用于 provisioning 与 Nuxt · fresh scratch 13/13、零手工 SQL、同一 secret 运行时鉴权与反向对照已实证 · **新实测**：预构建 server 运行时不读 `DIRECTUS_TOKEN`，构建会把值序列化进 server bundle，生产注入路径待 Controller 决定 · 等待 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-01 / 01A — Node 22 固定 + Directus 不可变 pin + 可复现 provisioning（A2 · **PASS**：空 scratch 库 13/13 步全过、**零手工 SQL**、复跑逐字段一致、运行时鉴权与拒绝面已实证、dev 库逐值未变 · D-038 已登记 · 等待 Controller 审查）；前一模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
-Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-01B 已按施工单完成并本地 commit，等待 Controller 审查）
+Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-01C — Directus token 仅运行时注入（A2 · **PASS**：构建产物不含 `DIRECTUS_TOKEN`（构建环境含 TEST 值时 `.output` 全量扫描 0 次）· 运行中的 server 从进程环境读取同一个 `DIRECTUS_TOKEN` · none / wrong / right = fail / fail / pass，构建期的值即使有效也不被使用 · canonical secret 名仍只有 `DIRECTUS_TOKEN` · 等待 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-01B — 统一 Directus service token 合同（A2 · **PASS**：唯一 secret 名 `DIRECTUS_TOKEN` 同时用于 provisioning 与 Nuxt · fresh scratch 13/13、零手工 SQL · 其实测发现"构建会把值序列化进 server bundle、预构建 server 运行时不读 `DIRECTUS_TOKEN`"已由 01C 按 Controller 裁定解决）；此前 FINAL-RELEASE-PRODUCTION-READY-01 / 01A — Node 22 固定 + Directus 不可变 pin + 可复现 provisioning（A2 · **PASS**：空 scratch 库 13/13 步全过、**零手工 SQL**、复跑逐字段一致、运行时鉴权与拒绝面已实证、dev 库逐值未变 · D-038 已登记 · 等待 Controller 审查）；前一模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
+Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-01C 已按施工单完成并本地 commit，等待 Controller 审查）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（下一模块 NOT AUTHORIZED；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN）
 Next candidate authorized:          NO
@@ -10711,3 +10711,33 @@ Next candidate:                 NONE — 下一模块 NOT AUTHORIZED
 **仍 OPEN：** 生产向 Nuxt 注入 `DIRECTUS_TOKEN` 的路径（构建时注入 vs `NUXT_DIRECTUS_TOKEN` 运行时覆盖，以及构建产物作为 secret 材料的保管）· Backup / Restore · 容量 · 依赖许可证 / CVE · Final Release Verification · 生产部署 NOT AUTHORIZED · `postgres:16-alpine` 浮动 tag（已登记）· PATH 默认 Node 仍为 24.14.0 · 观察（P2）：scratch 演练的一次性 Directus 挂载了 dev 的 uploads 目录，虽只有健康探针文件被重写，今后演练可改挂独立空目录以彻底隔离。
 
 *最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-01B 任务中写入。*
+
+---
+
+## FINAL-RELEASE-PRODUCTION-READY-01C — Directus token 仅运行时注入（构建产物 secret-free）
+
+**授权：** A2 LOCAL_IMPLEMENTATION（Production Ready 01 的最后一个生产 secret 收口，不是 02）。**结果：PASS。** 起点 HEAD `6158b19`，以新的 follow-up commit 收口；未 amend，未 push / merge / deploy。
+
+**Controller 裁定：** 01B 实测发现 `DIRECTUS_TOKEN` 在 `nuxt build` 时被读取并序列化进 `.output`。Controller 裁定：生产构建产物必须 secret-free；canonical secret 名仍只有 `DIRECTUS_TOKEN`；`NUXT_DIRECTUS_TOKEN` 不得成为项目的第二个 secret；生产模式为 deployment secret manager → 运行中进程的环境变量 `DIRECTUS_TOKEN` → 服务端 Directus client。
+
+**改动前先实测（未改代码的 HEAD `6158b19`；随机 TEST 值 A / B / C，未读取、未使用任何真实 token）：** 构建环境设 `DIRECTUS_TOKEN`=A 后，A 出现在 `.output/server/chunks/_/nitro.mjs`（1 次），浏览器侧 0 次——构建期捕获成立。一次性 Directus 持有 A 时，该产物：不设 token → 已认证（用构建期的值）；运行时设错误的 `DIRECTUS_TOKEN` → **仍已认证**（运行时不读该名）；运行时设错误的 `NUXT_DIRECTUS_TOKEN` → 401（框架覆盖变量是改动前唯一的运行时入口）。
+
+**消费方盘点：** 读取 `runtimeConfig.directusToken` 的不止 `server/utils/directus.ts`——还有公开媒体代理 `server/api/cms/media/[id].get.ts` 的前置检查，以及 **AI sourceRef 的 AES 密钥**（`server/utils/aiSourceRef.ts` 以 HKDF-SHA256 从同一 token 派生）。三者必须一起迁移，否则 sourceRef 在生产会因取不到密钥而 503。
+
+**改动：** 新增 `server/utils/directusServiceToken.ts`，其 `readDirectusToken()` 是服务端**唯一**读取 `process.env.DIRECTUS_TOKEN` 的位置，使用时读取，不在 import 或构建期捕获；`directusFetch`、媒体代理与 sourceRef 密钥派生都改为调用它。`nuxt.config.ts` 的 `runtimeConfig` 删除 `directusToken` 键（以注释说明原因），构建因此无值可序列化，`NUXT_DIRECTUS_TOKEN` 也无键可覆盖。fail closed 语义不变：缺失时 `directusFetch` 仍抛出 `Directus not configured`、不发任何请求，各端点沿用既有 CMS 错误合同（遗留 posts 列表 `cmsError`、产品分类与 Content Center 列表 503、sourceRef 端点 503），**未改 UI**。Nitro 不内联任意 `process.env.X`（其 replace 插件只替换 `NODE_ENV` 等固定构建标志）已经实测确认：改后构建的服务端 bundle 保留 1 处 `process.env.DIRECTUS_TOKEN` 运行时读取（`chunks/_/directusServiceToken.mjs`）。该模块起初命名为 `directusToken.ts`，因其路径会命中本模块自己的 `\bdirectusToken\b` 合同断言而在提交前改名。
+
+**测试：** 新增 `tests/directusRuntimeToken.test.ts`（9 项）：调用时读取当下的值；缺失 / 为空一律视为未配置；`NUXT_DIRECTUS_TOKEN` 不是第二入口；缺 token 时不发任何请求；`runtimeConfig` 中残留的过期 token（模拟构建期副本）不会被使用；媒体代理缺 token → 503 且不触达 Directus，有 token → 以该值鉴权。**证伪：** 把 `server/utils/directus.ts` 临时换回 HEAD 版本，其中 3 项失败；恢复后 9/9。单一 secret 合同组（`tests/directusAccessBootstrapDbIntegration.test.ts`）改为锁定：服务端只有 `directusServiceToken.ts` 读取 `process.env.DIRECTUS_TOKEN`；`nuxt.config.ts` 与服务端代码不再出现 `directusToken`；服务端代码、`nuxt.config.ts`、provisioning 脚本 / manifest、`.env.example` 均不含 `NUXT_DIRECTUS_TOKEN`；provisioning 仍只读 `DIRECTUS_TOKEN`（原断言保留）。四个 AI 测试文件从 stub `useRuntimeConfig().directusToken` 改为 `vi.stubEnv('DIRECTUS_TOKEN', …)`，断言语义不变，并补"拒绝文案不含 `DIRECTUS_TOKEN`"。
+
+**构建泄漏实验：** 改后代码、构建环境 `DIRECTUS_TOKEN`=A：`.output` 共 1580 个文件逐一扫描（286 个 `.gz` / `.br` 解压后再扫，含 394 个 sourcemap），A / B / C 在浏览器侧、服务端、其他目录**均为 0**；`.nuxt` 亦为 0；服务端 bundle 中 `directusToken` 为 0。
+
+**运行时对照（一次性 Directus @127.0.0.1:8056；始终是同一个以 A 构建的产物）：** ① Directus 持有 **A（即构建期的值）**：不设 token → **被拒，0 个请求到达 Directus**（服务端日志 `Directus not configured`）——构建期的值即使有效也不被使用；运行时 A → 通过（200×3）；错误值 C → 401×3。② 经 orchestrator `--allow-existing` 重跑 13/13 把 token 轮换为 **B** 并重启 Directus（库内比对 B MATCH、A NO MATCH，不打印值）：不设 token → 被拒、0 请求；错误值 C → 401；**构建期的旧值 A → 401**；**运行时 B → 通过（200×3），未重新构建**；仅设 `NUXT_DIRECTUS_TOKEN`=B → 被拒、0 请求；仅在工作目录放含 B 的 `.env` 文件 → 被拒、0 请求（构建产物不读 `.env`）。探针覆盖遗留 posts、产品分类、Content Center 列表三个公开读取端点。结论：**BUILD_VALUE_USED = NO · RUNTIME_VALUE_USED = YES**。所有 HTTP 响应体、服务端日志、Directus 日志中 TEST 值出现 0 次。**开发模式回归：** `nuxt dev --dotenv=<TEST 文件>`（不加载真实 `.env`，`DIRECTUS_URL` 固定指向 scratch）含 B → 通过；不含 token → 被拒、0 请求。
+
+**Provisioning 回归：** 全新 scratch 库 `litubo_provisioning_test_runtime_20260916`（起始 public tables 0），TEST 值经 `DIRECTUS_TOKEN` 提供，13/13、零手工 SQL；轮换重跑 13/13；两次 orchestrator 原始输出中 TEST 值 0 次；结构 49 表 · 7 触发器 · 身份对象各 1 · 19 权限行 · 业务行 0。
+
+**隔离与清理（01B 的 P2 观察已处理）：** 一次性 Directus 以命令环境中的 `DIRECTUS_UPLOADS_DIR` 挂载**独立的临时空目录**（compose 变量插值中 shell 环境优先于 `.env`，未改任何 compose 文件；`docker inspect` 核实挂载源）；orchestrator 的 Directus CLI 容器在同一环境变量下运行（未逐个 inspect）。临时目录事后只含 Directus 自己的 `directus-health-file`，已删除。dev uploads 129 个文件的路径 / 大小 / 修改时间清单前后**完全一致**；dev 库 20 项计数（含 `directus_activity` count 1107 / max 1141、`directus_revisions` count 859 / max 891）前后**完全一致**。DROP 前名称守卫 PASS；一次性容器、scratch 库、临时目录均已移除，端口 3190 / 3191 / 8056 已释放；质量闸最终构建后 TEST 值在 `.output` 中 0 次，TEST secret 文件已删除。
+
+**质量闸（Node v22.22.2 / npm 10.9.7）：** 定向 11 files / 400 passed · full suite **87 files（2 skipped）/ 2987 passed / 45 skipped / 0 failed（较 01B +1 file、+11 tests）** · release guard PASS · typecheck 0 · lint 0 · build PASS · `git diff --check` exit 0。**AI：DeepSeek 0 · OpenAI 0 · Product AI 0 · Content AI 0。** 生产未触碰。
+
+**仍 OPEN：** 其余 `runtimeConfig` 服务端 secret（SMTP 密码、提交 IP secret、HubSpot token、OpenAI / DeepSeek API key）仍以 `process.env.X ?? ''` 在 `nuxt.config.ts` 声明——构建环境含其值即会被序列化、预构建 server 运行时只能经 `NUXT_*` 覆盖（**INFERRED**，未实测），尚无 secret-free 的生产路径，须另行决定 · Backup / Restore · 容量 · 依赖许可证 / CVE · Final Release Verification · 生产部署 NOT AUTHORIZED · `postgres:16-alpine` 浮动 tag（已登记）· PATH 默认 Node 仍为 24.14.0 · 观察（P2）：`docs/ADMIN-CMS-SPEC.md` / `docs/ADMIN-CMS-SETUP.md` 仍描述早期"在 Directus Admin 生成 token、写入服务器 `.env`"的手工流程，未在本模块修改。
+
+*最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-01C 任务中写入。*

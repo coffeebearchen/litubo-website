@@ -20,7 +20,7 @@ import type { AiStructuredProvider } from './aiProviderRegistry'
  * `server/api/**` endpoints. `OPENAI_API_KEY` and `OPENAI_MODEL` are read
  * from `useRuntimeConfig()` (server-only fields, never `runtimeConfig.public`)
  * by the caller and passed in as plain config, exactly like the existing
- * `directusToken`/`directusUrl` pattern in `adminDirectusClient.ts`.
+ * `directusUrl` pattern in `adminDirectusClient.ts`.
  */
 
 export interface StructuredProviderConfig {

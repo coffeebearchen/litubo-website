@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto'
 import { subjectKeyOf, type AiSubjectBinding } from './aiSubject'
+import { readDirectusToken } from './directusServiceToken'
 
 /**
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-02 — opaque references to a product's source
@@ -32,18 +33,23 @@ import { subjectKeyOf, type AiSubjectBinding } from './aiSubject'
  * useless behaviour that would surface as spurious "this selection is no
  * longer valid" errors the moment the app ran as more than one process.
  *
- * It is derived with HKDF-SHA256 from `directusToken` — an existing,
+ * It is derived with HKDF-SHA256 from `DIRECTUS_TOKEN` — an existing,
  * server-only secret — under a fixed salt and info string, so the derived key
  * is specific to this purpose and cannot be used to recover the secret or
  * interchanged with any other derived key. The secret itself is never logged,
  * returned, or exposed; only the derived key exists in memory. No new
  * environment variable is introduced.
  *
- * PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01 — `directusToken` is not assumed to
+ * PWS-AI-ENGINE-01R2-REVIEW-FIX-03-MIN-01 — `DIRECTUS_TOKEN` is not assumed to
  * be present. When it is not configured, this module mints and resolves
  * nothing and raises `SourceRefUnavailableError`, which the endpoints answer
  * with 503. That is a deliberate fail-closed path, not a fallback: no raw
  * Directus id is ever accepted in a ref's place.
+ *
+ * FINAL-RELEASE-PRODUCTION-READY-01C — the secret is read through
+ * `readDirectusToken()`, from the environment of the running server, and no
+ * longer through `runtimeConfig`, which `nuxt build` serializes into the build
+ * artifact.
  */
 
 /** How long a minted ref stays valid. Long enough to browse and analyze, short enough that a captured ref dies quickly. */
@@ -69,8 +75,7 @@ let derivedKey: Buffer | null = null
  */
 function refKey(): Buffer {
   if (derivedKey) return derivedKey
-  const config = useRuntimeConfig() as { directusToken?: string }
-  const secret = String(config?.directusToken ?? '')
+  const secret = readDirectusToken()
   if (!secret) throw new SourceRefUnavailableError()
   derivedKey = Buffer.from(hkdfSync('sha256', secret, KEY_SALT, KEY_INFO, 32))
   return derivedKey

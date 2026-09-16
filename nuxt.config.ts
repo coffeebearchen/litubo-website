@@ -73,10 +73,15 @@ export default defineNuxtConfig({
     // CMS adapter — server-side only, not exposed to the browser.
     // Populated when CMS_MODE=directus; ignored when CMS_MODE=fixtures (default).
     directusUrl: process.env.DIRECTUS_URL ?? '',
-    directusToken: process.env.DIRECTUS_TOKEN ?? '',
+    // The Directus service token is deliberately NOT declared here (FINAL-RELEASE-PRODUCTION-READY-01C).
+    // runtimeConfig is evaluated whenever this file is loaded — `nuxt build` included — and
+    // serialized into .output, so a token declared here is baked into the build artifact. The
+    // running server reads DIRECTUS_TOKEN from its own process environment instead:
+    // server/utils/directusServiceToken.ts.
     cmsMode: process.env.CMS_MODE ?? 'fixtures',
     // Products-only CMS switch — independent of cmsMode so Home/Posts stay on fixtures.
-    // Set CMS_MODE_PRODUCTS=directus (plus DIRECTUS_URL and DIRECTUS_TOKEN) to enable.
+    // Set CMS_MODE_PRODUCTS=directus (plus DIRECTUS_URL, and DIRECTUS_TOKEN in the running
+    // server's environment) to enable.
     productsCmsMode: process.env.CMS_MODE_PRODUCTS ?? 'fixtures',
     // HubSpot Contact sync (Phase 7A framework — Phase 7B configures token)
     hubspotAccessToken: process.env.HUBSPOT_ACCESS_TOKEN ?? '',

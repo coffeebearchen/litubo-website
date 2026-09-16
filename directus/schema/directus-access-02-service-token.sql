@@ -11,9 +11,10 @@
 -- `directus_users.token` of the single user holding the role `nuxt-server`. Splitting them is what
 -- lets the structure live in Git while the secret stays in the deployment environment.
 --
--- WHAT THE TOKEN IS. `.env.example` documents `DIRECTUS_TOKEN` as the nuxt-server static token,
--- `nuxt.config.ts` maps it to `runtimeConfig.directusToken`, and `server/utils/directus.ts` sends it
--- as `Authorization: Bearer …` on every public CMS read. In Directus 11 a static token is stored in
+-- WHAT THE TOKEN IS. `.env.example` documents `DIRECTUS_TOKEN` as the nuxt-server static token; the
+-- running Nuxt server reads it from its process environment (`server/utils/directusServiceToken.ts`,
+-- FINAL-RELEASE-PRODUCTION-READY-01C) and sends it as `Authorization: Bearer …` on every public CMS
+-- read. In Directus 11 a static token is stored in
 -- plain text in `directus_users.token` and is matched directly, so there is no hash to provision
 -- and no way to derive it — it must be supplied.
 --

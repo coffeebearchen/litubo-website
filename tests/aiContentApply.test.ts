@@ -599,7 +599,7 @@ describe('global admin-auth middleware — /api/admin/content-center/:id/ai-prop
 
   function install(role: string | null) {
     vi.stubGlobal('defineEventHandler', (handler: unknown) => handler)
-    vi.stubGlobal('useRuntimeConfig', () => ({ directusUrl: 'http://directus.test', directusToken: 'server-token' }))
+    vi.stubGlobal('useRuntimeConfig', () => ({ directusUrl: 'http://directus.test' }))
     vi.stubGlobal('$fetch', vi.fn(async (url: string) => {
       if (url.includes('/users/me') && role) return { data: { id: 'u1', role: { name: role } } }
       throw Object.assign(new Error('unauthorized'), { statusCode: 401 })

@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam, getQuery, createError, setResponseHeader } from 'h3'
 import { useRuntimeConfig } from '#imports'
 import { directusFetch } from '~/server/utils/directus'
+import { readDirectusToken } from '~/server/utils/directusServiceToken'
 import { isAssetGone, lookupPublicMedia, MEDIA_ID_RE, type PublicMediaLookup } from '~/server/utils/publicMedia'
 
 /**
@@ -17,7 +18,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig()
-  if (!config.directusUrl || !config.directusToken) {
+  // The token comes from the running process, never runtimeConfig (FINAL-RELEASE-PRODUCTION-READY-01C).
+  if (!config.directusUrl || !readDirectusToken()) {
     throw createError({ statusCode: 503, message: 'Media service unavailable' })
   }
 

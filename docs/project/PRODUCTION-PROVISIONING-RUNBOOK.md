@@ -78,9 +78,9 @@ Required by `docker-compose.yml`: `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `POST
 **`DIRECTUS_TOKEN` — the one secret.** `DIRECTUS_TOKEN` is supplied once by deployment secret
 management and is used both to provision the nuxt-server service user's static token and by Nuxt at
 runtime. It is the same variable `.env.example` lists for the application: step `32` installs its
-value on the service user, and `nuxt.config.ts` maps it to `runtimeConfig.directusToken`, which
-`server/utils/directus.ts` sends as the Bearer token on every public CMS read. There is no second
-variable to keep equal to it by hand.
+value on the service user, and the running Nuxt server reads it from its own process environment and
+sends it as the Bearer token on every public CMS read. There is no second variable to keep equal to it
+by hand.
 
 - Provisioning reads it from its own process environment — never from `.env` — passes it to the
   container on stdin, and redacts it from everything it prints. It never appears in a command line,
@@ -90,37 +90,54 @@ variable to keep equal to it by hand.
 - `--without-service-token` builds the structure without it and says loudly that the environment
   cannot serve. Use it only to inspect a structure, never as a way past a missing secret.
 
-**When Nuxt reads it — measured, and it matters for deployment.** `nuxt.config.ts` evaluates
-`process.env.DIRECTUS_TOKEN` when Nuxt loads its configuration: when `nuxt dev` starts and when
-`nuxt build` runs. A prebuilt server does **not** read it again when it starts.
-FINAL-RELEASE-PRODUCTION-READY-01B measured this with random TEST tokens against a disposable
-Directus, using one server built with the correct token as `DIRECTUS_TOKEN`:
+**Build, provisioning, runtime — one secret, and the build is not one of the places it goes.**
 
-| That prebuilt server, started with… | Public CMS read through `directusFetch` |
-|---|---|
-| no token variable at all | authenticated — the build-time value is used |
-| a wrong `DIRECTUS_TOKEN` | **still authenticated** — a prebuilt server ignores this name at run time |
-| a wrong `NUXT_DIRECTUS_TOKEN` | refused — Nuxt's own run-time override for `runtimeConfig.directusToken` |
+| Phase | Needs `DIRECTUS_TOKEN`? | Where the value comes from |
+|---|---|---|
+| Build — `nuxt build` | **No.** A production build artifact must be secret-free; it is not secret material. | Nowhere. `nuxt.config.ts` does not declare it, so a build has nothing to serialize. Do not supply the production value to a build. |
+| Provisioning — step `32` | Yes | The secret manager, into the environment of `scripts/provision-directus.mjs` (§3). |
+| Runtime — the running Nuxt server | Yes, the same value | The secret manager, into the environment of the server process when it starts. The server reads it when it uses it (`server/utils/directusServiceToken.ts`). |
 
-The build also **serializes the value into the server bundle** (`.output/server/chunks/_/nitro.mjs`);
-it was found in no browser-side file. Two consequences follow, and neither is decided here:
+FINAL-RELEASE-PRODUCTION-READY-01C measured this with random TEST values against a disposable
+Directus. A server was built with value **A** as `DIRECTUS_TOKEN` in the build environment. Every file
+of `.output` was then scanned — each `.gz` / `.br` asset decompressed, source maps included — and **A**
+was found **0** times. The same build was then started with different run-time environments:
 
-- A server built with `DIRECTUS_TOKEN` in its environment carries the secret inside the build
-  artifact. That artifact is then secret material wherever it is stored, cached or copied.
-- A prebuilt artifact deployed elsewhere cannot be given the token as `DIRECTUS_TOKEN` at run time.
-  Its only run-time path is Nuxt's framework override `NUXT_DIRECTUS_TOKEN`, carrying **the same
-  value**. That is Nuxt's way of delivering the one project secret to a built server, not a second
-  project secret: no project code reads it, and `.env.example` does not list it.
+| Directus holds | Server started with | Result |
+|---|---|---|
+| **A**, the build-time value | no `DIRECTUS_TOKEN` | refused before any request reached Directus — the build-time value is not used even where it would be valid |
+| **A** | `DIRECTUS_TOKEN` = A | authenticated |
+| **A** | a wrong `DIRECTUS_TOKEN` | refused (401) |
+| **B**, rotated through step `32` | `DIRECTUS_TOKEN` = B | authenticated — no rebuild |
+| **B** | no token · a wrong value · the old build-time value A | refused (0 requests · 401 · 401) |
+| **B** | only `NUXT_DIRECTUS_TOKEN` = B | refused before any request |
+| **B** | only a `.env` file containing B in the server's working directory | refused before any request — a built server does not read `.env` files |
 
-Which route production takes belongs to the still-undecided production runtime method (§4) and must
-be settled before any deployment. Every other server secret in `runtimeConfig` is declared the same
-way (`process.env.X ?? ''`), so the same applies to each of them — **inferred** from the identical
-declaration, not measured separately.
+Consequences for deployment:
 
-**Rotation.** One change in the secret manager, then two actions: re-run step `32` with the new
-value, and give the Nuxt server the new value by the route it received the old one — restart
-`nuxt dev`, rebuild, or restart a prebuilt server with the override. Until both are done, reads
-through `directusFetch` fail (observed for `/api/cms/posts`: no content, `cmsError`).
+- Put `DIRECTUS_TOKEN` into the environment of the Nuxt server process when it starts. The mechanism
+  (process manager, container environment, secret-manager integration) belongs to the still-undecided
+  production runtime method (§4); the contract does not depend on it.
+- A missing value fails closed and no anonymous request is made. Public CMS reads answer as they do
+  for any Directus failure (measured: the legacy posts list returns `cmsError`, product categories and
+  the Content Center list answer 503), and the AI source-reference endpoints answer 503.
+- `nuxt dev` loads `.env` into its own environment, so a local `.env` keeps working in development
+  (verified with a TEST dotenv file).
+- `NUXT_DIRECTUS_TOKEN` is Nuxt's generic run-time override for a `runtimeConfig` key. There is no such
+  key any more, so it has no effect, and it is **not** part of the LITUBO secret contract.
+
+**Not covered by this measurement.** The other server secrets in `runtimeConfig` — SMTP password,
+submission IP secret, HubSpot token, OpenAI and DeepSeek API keys — are still declared as
+`process.env.X ?? ''` in `nuxt.config.ts`. A build run with them in its environment would serialize
+them the same way, and a built server would take them at run time only through Nuxt's `NUXT_*`
+overrides — **inferred** from the identical declaration, not measured. They have no secret-free
+production path yet; that is an open item, outside the contract this section describes.
+
+**Rotation.** One change in the secret manager, then two actions: re-run step `32` with the new value
+and restart Directus, and restart the Nuxt server with the new value in its environment. No rebuild is
+needed — the build never held the old value. Until both are done, reads through `directusFetch` are
+refused. Rotation also invalidates outstanding AI source references, whose key is derived from the
+token; they live 30 minutes and are simply minted again.
 
 Two production values are load-bearing and fail closed if wrong:
 
@@ -178,10 +195,11 @@ npm ci                                  # must not modify package-lock.json
 npx nuxt build
 ```
 
-Start the built server (`.output/server/index.mjs`) the way the target environment runs Node. How
-production runs Nuxt — host process or container — **is still undecided**, and the document-extractor
-topology (gateway vs. internal network) depends on that decision. So does how the server receives
-`DIRECTUS_TOKEN`: a prebuilt server does not read that name at run time (§2, *When Nuxt reads it*).
+The build needs no secret (§2). Start the built server (`.output/server/index.mjs`) the way the target
+environment runs Node, with `DIRECTUS_TOKEN` in its process environment. How production runs Nuxt —
+host process or container — **is still undecided**, and the document-extractor topology (gateway vs.
+internal network) depends on that decision, as does the mechanism that places `DIRECTUS_TOKEN` in the
+server's environment.
 
 ---
 
@@ -218,8 +236,9 @@ Stop and report rather than improvise if any of these hold:
 - Any step would need a manual `INSERT`, `UPDATE` or `DELETE` to get past it.
 - The service token is unavailable, and the answer being considered is to generate one locally,
   commit one, reuse another environment's, or pass `--without-service-token` and carry on.
-- A deployment plan relies on setting `DIRECTUS_TOKEN` at run time for a prebuilt server — it is
-  ignored there (§2) — or on adding a second project variable to carry the same secret.
+- A deployment plan supplies the production `DIRECTUS_TOKEN` to the build, expects the built server
+  to read it from a `.env` file, or adds a second project variable — Nuxt's `NUXT_DIRECTUS_TOKEN`
+  override included — to carry the same secret.
 - Provisioning would need a credential value to be read out of a file or a container.
 - The target database already contains business data.
 - A public policy holds any business permission.

@@ -78,13 +78,14 @@ function installNitroGlobals(fetchImpl: (url: string, options?: Record<string, u
   vi.stubGlobal('defineEventHandler', (handler: unknown) => handler)
   vi.stubGlobal('useRuntimeConfig', () => ({
     directusUrl: 'http://directus.test',
-    directusToken: 'server-token',
     aiDefaultProvider: 'deepseek',
     openaiApiKey: '',
     openaiModel: '',
     deepseekApiKey: '',
     deepseekModel: '',
   }))
+  // FINAL-RELEASE-PRODUCTION-READY-01C — the server secret lives in the process environment, not runtimeConfig.
+  vi.stubEnv('DIRECTUS_TOKEN', 'server-token')
   vi.stubGlobal('$fetch', vi.fn(async (url: string, options?: Record<string, unknown>) => {
     fetchCalls.push({ url, options })
     return fetchImpl(url, options)
@@ -106,6 +107,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 // ── 1. Auth on the deep AI paths ──
@@ -952,8 +954,6 @@ describe('generate.post.ts — oversized request bodies are refused on real byte
 describe('sourceRef secret missing — 503, not a silent "invalid ref"', () => {
   const NO_SECRET_CONFIG = {
     directusUrl: 'http://directus.test',
-    // directusToken deliberately absent — this is the whole point of the suite.
-    directusToken: '',
     aiDefaultProvider: 'deepseek',
     openaiApiKey: '',
     openaiModel: '',
@@ -975,10 +975,12 @@ describe('sourceRef secret missing — 503, not a silent "invalid ref"', () => {
     return { data: null }
   }
 
-  /** Installs the Nitro globals with a runtime config that has no server secret. */
+  /** Installs the Nitro globals with no server secret in the process environment. */
   function installWithoutSecret() {
     installNitroGlobals(async (url: string) => secretFetch(url))
     vi.stubGlobal('useRuntimeConfig', () => NO_SECRET_CONFIG)
+    // DIRECTUS_TOKEN deliberately absent — this is the whole point of the suite.
+    vi.stubEnv('DIRECTUS_TOKEN', undefined)
   }
 
   it('ai/sources returns 503 rather than a list with unusable refs', async () => {
@@ -1094,6 +1096,7 @@ describe('sourceRef secret missing — 503, not a silent "invalid ref"', () => {
     expect(text).not.toContain('no longer valid')
     // And the refusal never names the secret, the config key, or its value.
     expect(text).not.toContain('directusToken')
+    expect(text).not.toContain('DIRECTUS_TOKEN')
     expect(text).not.toContain('server-token')
   })
 

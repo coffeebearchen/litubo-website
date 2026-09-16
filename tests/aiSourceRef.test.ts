@@ -8,7 +8,7 @@
  * the shipped implementation.
  */
 
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import { createSourceRef, resolveSourceRef, resolveSourceRefs, SOURCE_REF_TTL_MS } from '../server/utils/aiSourceRef'
 
 const OWNER = { productId: 3, adminUserId: 'admin-1' }
@@ -16,10 +16,16 @@ const OWNER = { productId: 3, adminUserId: 'admin-1' }
 /**
  * The key is derived from the configured server secret (HKDF), so these tests
  * supply a fixed one. Using a stable secret is also what lets the
- * "derivation is deterministic" test below mean anything.
+ * "derivation is deterministic" test below mean anything. Since
+ * FINAL-RELEASE-PRODUCTION-READY-01C the secret is `DIRECTUS_TOKEN` in the process
+ * environment, not a runtimeConfig value.
  */
 beforeAll(() => {
-  vi.stubGlobal('useRuntimeConfig', () => ({ directusToken: 'test-directus-token-for-key-derivation' }))
+  vi.stubEnv('DIRECTUS_TOKEN', 'test-directus-token-for-key-derivation')
+})
+
+afterAll(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('createSourceRef — the ref reveals nothing', () => {
@@ -171,13 +177,13 @@ describe('resolveSourceRefs — all or nothing', () => {
 describe('no server secret — the error propagates instead of becoming a null ref', () => {
   async function freshModuleWithoutSecret() {
     vi.resetModules()
-    vi.stubGlobal('useRuntimeConfig', () => ({ directusToken: '' }))
+    vi.stubEnv('DIRECTUS_TOKEN', undefined)
     return import('../server/utils/aiSourceRef')
   }
 
   async function restoreSecretStub() {
     vi.resetModules()
-    vi.stubGlobal('useRuntimeConfig', () => ({ directusToken: 'test-directus-token-for-key-derivation' }))
+    vi.stubEnv('DIRECTUS_TOKEN', 'test-directus-token-for-key-derivation')
   }
 
   it('createSourceRef throws SourceRefUnavailableError', async () => {
@@ -207,6 +213,7 @@ describe('no server secret — the error propagates instead of becoming a null r
     } catch (err) {
       const message = String((err as Error).message)
       expect(message).not.toContain('directusToken')
+      expect(message).not.toContain('DIRECTUS_TOKEN')
       expect(message).not.toContain('test-directus-token')
     }
     await restoreSecretStub()

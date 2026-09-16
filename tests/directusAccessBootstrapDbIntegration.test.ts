@@ -19,12 +19,16 @@
  * name, DIRECTUS_TOKEN, read both by provisioning and by the Nuxt server. Those checks read files
  * and run the orchestrator only as far as its secret check, so they need no database and run
  * everywhere, CI included. Every token used anywhere in this file is generated at random per run.
+ *
+ * FINAL-RELEASE-PRODUCTION-READY-01C pins where the server reads it: from its own process
+ * environment at call time, never from `runtimeConfig`, which `nuxt build` serializes into the
+ * build artifact. The behaviour itself is covered in tests/directusRuntimeToken.test.ts.
  */
 
 import { execFile, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { relative, resolve, sep } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 const CONTAINER = process.env.CONTENT_DB_TEST_CONTAINER ?? ''
@@ -133,8 +137,40 @@ describe('Directus service token contract — one secret, one name', () => {
   const RETIRED_NAME = ['DIRECTUS', 'SERVICE', 'TOKEN'].join('_')
   const repoFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-  it('the Nuxt server reads the service token from DIRECTUS_TOKEN', () => {
-    expect(repoFile('nuxt.config.ts')).toMatch(/directusToken:\s*process\.env\.DIRECTUS_TOKEN\b/)
+  /** Every TypeScript source under server/, as repo-relative forward-slash paths. */
+  const serverSources = (dir = resolve(process.cwd(), 'server')): Array<{ path: string, text: string }> =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = resolve(dir, entry.name)
+      if (entry.isDirectory()) return serverSources(full)
+      if (!entry.name.endsWith('.ts')) return []
+      return [{ path: relative(process.cwd(), full).split(sep).join('/'), text: readFileSync(full, 'utf8') }]
+    })
+
+  it('the running Nuxt server reads DIRECTUS_TOKEN from its process environment, in exactly one place', () => {
+    // FINAL-RELEASE-PRODUCTION-READY-01C — read at call time, never through runtimeConfig.
+    const readers = serverSources().filter(({ text }) => /process\.env\.DIRECTUS_TOKEN\b/.test(text)).map(({ path }) => path)
+    expect(readers).toEqual(['server/utils/directusServiceToken.ts'])
+    for (const consumer of ['server/utils/directus.ts', 'server/utils/aiSourceRef.ts', 'server/api/cms/media/[id].get.ts']) {
+      expect(repoFile(consumer), consumer).toContain('readDirectusToken()')
+    }
+  })
+
+  it('the build configuration does not declare the token, so no build can serialize it', () => {
+    // `nuxt build` evaluates runtimeConfig and writes it into .output (measured in 01B, removed in 01C).
+    const config = repoFile('nuxt.config.ts')
+    expect(config).not.toMatch(/process\.env\.DIRECTUS_TOKEN\b/)
+    expect(config).not.toMatch(/\bdirectusToken\b/)
+    // Nor does any server code still look for it in runtimeConfig.
+    expect(serverSources().filter(({ text }) => /\bdirectusToken\b/.test(text)).map(({ path }) => path)).toEqual([])
+  })
+
+  it('the framework override name is not a second way to supply the secret', () => {
+    // Assembled from parts, like RETIRED_NAME, so this file carries no literal of it.
+    const OVERRIDE_NAME = ['NUXT', 'DIRECTUS', 'TOKEN'].join('_')
+    for (const { path, text } of serverSources()) expect(text, path).not.toContain(OVERRIDE_NAME)
+    for (const path of ['nuxt.config.ts', 'scripts/provision-directus.mjs', 'scripts/provisioning-manifest.json', '.env.example']) {
+      expect(repoFile(path), path).not.toContain(OVERRIDE_NAME)
+    }
   })
 
   it('provisioning installs the token from that same variable, and declares no other secret', () => {

@@ -1,4 +1,5 @@
 import { useRuntimeConfig } from '#imports'
+import { readDirectusToken } from './directusServiceToken'
 
 export async function directusFetch<T = unknown>(
   path: string,
@@ -6,7 +7,9 @@ export async function directusFetch<T = unknown>(
 ): Promise<T> {
   const config = useRuntimeConfig()
   const base = config.directusUrl
-  const token = config.directusToken
+  // Read from the running process on every call, never from runtimeConfig: a build can neither
+  // carry the token nor leave a stale copy behind (FINAL-RELEASE-PRODUCTION-READY-01C).
+  const token = readDirectusToken()
 
   if (!base || !token) {
     throw new Error('Directus not configured')

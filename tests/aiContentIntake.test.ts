@@ -216,13 +216,16 @@ async function statusOf(run: () => Promise<unknown>): Promise<{ status: number |
 }
 
 beforeEach(() => {
-  vi.stubGlobal('useRuntimeConfig', () => ({ directusToken: 'test-directus-token-for-key-derivation' }))
+  vi.stubGlobal('useRuntimeConfig', () => ({}))
+  // FINAL-RELEASE-PRODUCTION-READY-01C — the source-ref secret is DIRECTUS_TOKEN in the process environment.
+  vi.stubEnv('DIRECTUS_TOKEN', 'test-directus-token-for-key-derivation')
   resetGenerateSlots()
   resetProposalGuard()
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 // ── Subject identity ────────────────────────────────────────────────────────
@@ -705,7 +708,7 @@ describe('global admin-auth middleware — /api/admin/content-center/:id/ai-sour
 
   function install(role: string | null) {
     vi.stubGlobal('defineEventHandler', (handler: unknown) => handler)
-    vi.stubGlobal('useRuntimeConfig', () => ({ directusUrl: 'http://directus.test', directusToken: 'server-token' }))
+    vi.stubGlobal('useRuntimeConfig', () => ({ directusUrl: 'http://directus.test' }))
     vi.stubGlobal('$fetch', vi.fn(async (url: string) => {
       if (url.includes('/users/me') && role) return { data: { id: 'u1', role: { name: role } } }
       throw Object.assign(new Error('unauthorized'), { statusCode: 401 })
