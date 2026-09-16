@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-FIX-E — Legacy Directus Permissions: Tracked + Least Privilege（Controller 接受 · e77849d · not pushed · P1-09 本地 CLOSED）；PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（A2 · LOCAL COMPLETE · D-037 已登记 · 等待 Controller 审查）
-Active authorized module:           NONE（FINAL-RELEASE-FIX-F 已收口，等待 Controller 审查）
+Latest accepted module:             FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
+Latest completed module:            FINAL-RELEASE-LIVE-SOURCE-PREP-01 — Content AI Live Test Source Preparation（A2 · LOCAL COMPLETE · 无新增 Decision · 等待 Controller 审查）
+Active authorized module:           NONE（FINAL-RELEASE-LIVE-SOURCE-PREP-01 已收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
+Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-LIVE-VALIDATION-01-R2 NOT AUTHORIZED；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05、P1-09、P1-15、P1-17 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：e77849d）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：314b005）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10490,3 +10490,49 @@ Next candidate:                 NONE — 等待 Controller（下一模块 NOT AU
 - 旧编辑器与 Workspace 共用同一批服务端路由，本模块未改变这一并存架构，只是让两者受同一条 Draft-only 规则约束。
 
 *最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-FIX-F 任务中写入。*
+
+---
+
+## FINAL-RELEASE-LIVE-SOURCE-PREP-01 — Content AI Live Test Source Preparation（2026-09-16）
+
+```text
+Module:                         FINAL-RELEASE-LIVE-SOURCE-PREP-01 — 为 Content AI Live Validation 准备一个真实可读的 TEST ONLY source
+Authorization:                  A2 LOCAL_IMPLEMENTATION / TEST DATA PREPARATION（Controller 施工单）
+Branch:                         review/final-release-fix-f-product-v1-safety-01（基线 314b005；FINAL-RELEASE-FIX-F 已由 Controller 接受）
+Status:                         LOCAL COMPLETE · 等待 Controller 审查
+Decision:                       无新增（沿用 CC-IMP-04-R3 裁定：所有 Content ↔ Media 关联含 source_document 归 CC-03）
+Schema / permissions / data:    schema 0；Directus 权限 0；production code 0；业务数据写入 = 1 条 content_items_files
+Safety gates touched:           RSG-01 · RSG-03 · RSG-04 · RSG-06 · RSG-07 · RSG-08（· RSG-09 无 push / merge / deploy）
+MASTER-ROADMAP:                 未修改
+Push / merge / deploy:          NONE
+Next candidate:                 NONE — FINAL-RELEASE-LIVE-VALIDATION-01-R2 NOT AUTHORIZED；下一模块 NOT AUTHORIZED
+```
+
+**背景（FINAL-RELEASE-LIVE-VALIDATION-01 Round 1 = STOP）：** Round 1 授权了**恰好一次**真实 AI Provider 调用，但在点击 Analyze 之前的来源核验中发现：content item 6 当时仅有的两个可选来源（link 2 `.jpg`、link 3 `.pdf`）**不是文档**——两者首字节完全相同，均为 `{"data":[{"id":"c40b4548-…` 的 Directus JSON 响应体被截成 8192 字节后分别存成 `.pdf` / `.jpg`。对照 `server/utils/aiTextExtraction.ts`：PDF 分支先查 `hasPdfHeader()`、图片分支先查 `imageMatchesDeclaredType()`，两者都会返回 `malformed` 且**根本不会调用 document-extractor**；`server/utils/aiProposalEngine.ts` 随后在 `readableSources.length === 0` 时返回 `NO_READABLE_SOURCES_ERROR`，该判断位于 `registry.generateStructured()` **之前**。因此点击 Analyze 必然失败且产出 0 个 Proposal，而施工单 §12「NO SECOND ANALYZE」会使 Golden Path 在该模块内永久不可证明。Round 1 据此 STOP，**真实 Provider 调用消耗 = 0，授权未被使用**。
+
+**本模块范围：** 只做一件事——通过正常业务路径为 content item 6 关联一个**真实可读**的 TEST ONLY `source_document`。**不点击 Analyze、不生成 Proposal、不执行 Apply、不发布任何内容。**
+
+**来源选择（§4–§7）：** 候选全部为库中已存在、未归档、明确 TEST ONLY 的文件。选定 `LT180C-test-general.txt`（`text/plain`，160 B），理由：`text/plain` 由 `aiTextExtraction.ts` 在进程内直接 UTF-8 解码，不经 document-extractor、不做文件头校验，成功率最高；正文为自洽的事实清单（Aperture 180 mm / IP54 / SUS304 / AC 220 V, 50 Hz / Net weight: **UNKNOWN**），其中 UNKNOWN 可在后续验证「AI 不得为未知值编造事实」。**排除 `README-TEST-ONLY.txt`**：其正文是写给模型的测试说明书（"Expected AI behavior: Produce one combined proposal…"、"Do not invent values…"），且声明用于 Product Draft，用作素材会让提案受说明书摆布，属坏的测试设计。**排除 `LT180C-test-electrical.txt`**（设计目的是与 general 制造 220V/380V 冲突，单源场景不需要）与 `unknown-traps.txt`（全是 UNKNOWN / NOT VERIFIED 陷阱、无可用事实，易导致 `NO_SAFE_ITEMS_ERROR`）。
+
+**副本消歧：** `LT180C-test-general.txt` 在库中有 3 份字节完全相同的副本（md5 `a2b55bf5…`），选择器只显示文件名与标题、肉眼无法区分。以数据库基准真值消歧：`cf9cdd74…` 已被 1 个 product 引用（排除，§7 歧义）；`6056b261…` 位于 `ZZ-UICLEANUP-RENAMED TEST ONLY` 文件夹；**`11c2b457-3d95-41ea-b06f-2239dcffb43d` 的 `folder` 为 NULL**、`content_links = 0`、`products_files = 0`、`media_file_lifecycle` 行 0。因此改走**文件夹导航而非搜索**：进入 picker 的 "Unclassified files"，其显示 "13 file(s)" 与基准真值（未归类 22 个 − 已归档 9 个 = 13）精确吻合，该视图内的同名文件必然唯一。保存前 UI 的「Selected asset details」直接显示 `Media UUID 11c2b457-3d95-41ea-b06f-2239dcffb43d`，身份由界面直接确认而非推断。
+
+**写入路径（§9 / §13）：** 严格走正常后台 Content Center → Media & relations → Source documents → Add source document → 选文件 → Save changes，**未使用任何直接 SQL INSERT**。`PUT /api/admin/content-center/6/media-relations` → **200 OK**，只提交一次。此处的关键风险是该端点收的是**完整期望清单**（`server/utils/contentMediaRelations.ts`：任何缺席的 managed 行会被 DELETE，managed = hero / inline / download / source_document），保存前已核对摘要为 Hero 1 / Inline 1 / Downloads 1 / Source documents 1 且 og_image 单独保留，确认本次为「只新增一行」。
+
+**写入结果（§12 / §14）：** 新增 `content_items_files` **id = 1042**（`content_items_id=6`、`directus_files_id=11c2b457-3d95-41ea-b06f-2239dcffb43d`、`file_role=source_document`、`enabled=true`、`sort=0`、alt/caption/language/version/file_date 全空）。**既有 4 条链接（id 1 hero / 2 inline / 3 download / 4 og_image）逐字段原样保留**。`directus_activity` 1140 → **1141**（唯一新增行：`create content_items_files 1042`）、`directus_revisions` 890 → **891**。item 6 仍 `draft`、`archived_at` NULL；en locale `draft_revision` 仍为 **9**、`last_change_kind` 仍为 `manual_edit`、`published_snapshot` 仍为 NULL（locale 行完全未被触碰）；es 仍 rev 6。全库 `source_document` 关联由 **0 → 1**（此前 CC-IMP-04-R3 的测试关联已删除，本条是库中第一条持久化的 source_document 关联）。
+
+**AI Source Intake 只读确认（§15）：** 新来源以 `LT180C-test-general.txt` / `Text` / `Source document` / `Readable` 出现，Intake summary = Selected 0 / Readable 3 / Unavailable 0，Draft revision 9，AI provider 仍为 `DeepSeek (default)`，`Analyze selected sources` 按钮可见但因未选来源而 `disabled`。**Analyze 全程未点击。**
+
+**公开安全（§18）：** 该文件 `is_public = false`、未归档；`content_items_files` 对 `nuxt-server` 与 public policy 零权限（D-034 工件 `directus-permissions-01-nuxt-server-content-read.sql` 的 `forbidden_collections` / `public_denied_collections` 同时列入）。写入后实测：`/resources/insights/cc-imp-02-ui-create-2sxq57` → 404、`/resources/insights` → 404、`sitemap.xml` 200 且不含该 slug 与该文件；全表 `published_snapshot` 非空行 0、非 draft 内容项 0。
+
+**Provider 调用（§3 / §16）：** DeepSeek 0、OpenAI 0、**TOTAL REAL PROVIDER CALLS = 0**。两个标签页对 `/api/admin/content-center/6/ai-source-intake` 的网络记录**只有 GET、无任何 POST**（POST 才是 Analyze 的调用路径）；如实标注局限：两个缓冲区均发生过轮转，缓冲区本身不构成穷尽证明，决定性事实是 Analyze 从未被点击且按钮处于 disabled。**Round 1 授权的那唯一一次真实调用至今未被消耗。**
+
+**门禁（§7 / §20）：** `npm run release:check-test-data` **PASS**；`git diff --check` exit 0；tracked 变更中**无任何 production code**（仅本文件与 RELEASE-SAFETY-GATES 两份治理文档）。按施工单本模块无 production code change，未跑全量测试。
+
+**浏览器验收（§19）：** 375 —— 可辨认截图已取得（750×1624 全分辨率）：文件名、`Source document`、`Readable`、`DeepSeek (default)`、灰显的 Analyze 按钮均清晰；`horizontalOverflowPx = 0`、`criticalOverlaps = []`、console 0 error（干净标签页单次加载）。1440 —— `horizontalOverflowPx = 0`、`elementsWiderThanViewport = 0`、三项关键元素 `allThreeFullyInViewport = true`、console 0 error（干净标签页单次加载）；**但 1440 的可辨认截图未能取得**：Browser 面板返回「zoom: region crop not yet supported」，且 1440 模拟视口被压进窄面板后整页截图恒为 800×500 糊图，因此 1440 判据以 DOM 实测值为准，如实登记为取证工具限制而非产品缺陷。
+
+**已知 / 记录：**
+- **P2 / source-readability UX accuracy（本模块不修）：** item 6 上两个 malformed 的旧 JPG / PDF 在 AI Source Intake 仍显示 `Readable`。原因是该徽章仅由 MIME 推导（`server/utils/aiContentIntake.ts` 的 `unavailableReason` 只检查 `aiSourceFormatRefusal(file.type)`），不检查文件是否真的可抽取。用户要到花掉一次分析后才会知道读不了。按施工单 §6 只记录、不在本模块修复。
+- 本模块**未验证** AI Golden Path：Analyze 未执行、Proposal 未生成、Apply 未执行、revision / activity / History 的 AI 链路未验证。本节只说明「已准备好一个真实可读的 TEST ONLY source」。
+- `FINAL-RELEASE-LIVE-VALIDATION-01-R2` **NOT AUTHORIZED**；下一模块 NOT AUTHORIZED。
+
+*最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-LIVE-SOURCE-PREP-01 任务中写入。*
