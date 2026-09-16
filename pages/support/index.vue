@@ -27,7 +27,7 @@ useSeoHead({ title: t('seo.support.title'), description: t('seo.support.descript
           </NuxtLink>
           <NuxtLink :to="localePath('/support/send-product-test')" class="support-card">
             <h2 class="support-card__title">{{ t('nav_support.productTest') }}</h2>
-            <p class="support-card__body">Send a product sample to our application lab for testing.</p>
+            <p class="support-card__body">Submit a product testing enquiry for technical review.</p>
           </NuxtLink>
           <NuxtLink :to="localePath('/support/technical-support')" class="support-card">
             <h2 class="support-card__title">{{ t('nav_support.techSupport') }}</h2>
