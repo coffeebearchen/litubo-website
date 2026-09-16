@@ -7,15 +7,15 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             PUBLIC-CLAIMS-HOTFIX-01 — Send Product Test One-Route Business Claim Cleanup（Controller 接受 · 02b0281 · not pushed）；PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            PUBLIC-CLAIMS-HOTFIX-02 — Support Hub Application Lab Claim Cleanup（A2 · LOCAL COMPLETE · 等待 Controller 审查）
-Active authorized module:           NONE（PUBLIC-CLAIMS-HOTFIX-02 已收口，等待 Controller 审查）
+Latest accepted module:             PUBLIC-CLAIMS-HOTFIX-02 — Support Hub Application Lab Claim Cleanup（Controller 接受 · e0d6ff6 · not pushed）；PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
+Latest completed module:            FINAL-RELEASE-FIX-E — Legacy Directus Permissions: Tracked + Least Privilege（A2 · LOCAL COMPLETE · P1-09 本地 CLOSED · 等待 Controller 审查）
+Active authorized module:           NONE（FINAL-RELEASE-FIX-E 已收口，等待 Controller 审查）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：02b0281）
-Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
+Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05 与 P1-09 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：e0d6ff6）
+Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
 
@@ -10378,3 +10378,63 @@ Next candidate:                 NONE — 等待 Controller（下一模块 NOT AU
 - `es.json` / `pt.json` 未涉及：该卡片文案不是 i18n 键。
 
 *最后更新：2026-09-16，由 Claude Code 在 PUBLIC-CLAIMS-HOTFIX-02 任务中写入。*
+
+---
+
+## FINAL-RELEASE-FIX-E — Legacy Directus Permissions: Tracked + Least Privilege（2026-09-16）
+
+```text
+Module:                         FINAL-RELEASE-FIX-E — Legacy Directus Permissions: Tracked + Least Privilege（P1-09）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller 施工单）
+Branch:                         review/final-release-fix-e-legacy-permissions-01（基线 e0d6ff6；PUBLIC-CLAIMS-HOTFIX-02 已由 Controller 接受）
+Status:                         LOCAL COMPLETE · 等待 Controller 审查
+Decision:                       无新增（沿用 D-034 已跟踪权限工件机制；按施工单 §41 不机械占用 D-037）
+Schema / permissions / data:    schema 0；业务数据写入 0；唯一真实写入是本地开发库的 directus_permissions 行（授权范围内）
+Safety gates touched:           RSG-07（权限 fail closed）· RSG-08（环境分离 / provisioning）· RSG-09（无 push / merge / deploy）
+MASTER-ROADMAP:                 未修改
+Push / merge / deploy:          NONE
+Next candidate:                 NONE — 等待 Controller（下一模块 NOT AUTHORIZED）
+```
+
+**清点（变更前，SELECT-only）：** `site-readonly-policy`（角色 `nuxt-server`）共 20 行 = D-034 的 3 行 + legacy 17 行；role / policy / access link 各唯一，policy 无 admin/app access，无重复 (collection, action)，public policy 业务权限 0 —— 与施工单预期完全一致，**无 drift**。17 行中有 8 处 `fields=*`（6 张 Product 子表 + `site_settings` + `site_social_links`，`product_page_presets` 亦为 `*`），6 张子表 `filter={}`。实测暴露：draft 产品名下的 9 条 FAQ、3 条 section、6 条 section item、15 条 spec group、50 条 spec item、19 条 file link，当时均可被公开只读身份读取。
+
+**调用矩阵依据：** 以 `server/utils/directus.ts` 的 `directusFetch`（唯一使用 `nuxt-server` 静态 token 的通道）全部 14 个引用文件为准；`server/api/admin/**` 走 `adminFetch`（管理员会话），不属本策略。字段白名单取各 caller 字面 `fields=` 的并集；三处没有 `fields=` 的查询（products 列表、product_categories ×2、site_content）按其 TS interface 消费的字段取并集，确保收紧后不会静默降级为空串。
+
+**权限变更（16 条 canonical + 1 条撤销）：**
+- **products / product_categories：** 字段与行过滤均未变（25 / 18 个字段都有真实调用者；`status` 用于过滤、`sort` 用于排序）。已发布分类的条件仍留在 BFF，产品公开行为不变。
+- **products_files：** 去掉 `caption_es` / `caption_pt` / `language`；`filter={}` → 父产品 `status=published` 且 `enabled=true`。
+- **product_faqs：** `*` → 显式字段（去掉内部 `source_note`）；`{}` → 父产品 published 且 enabled。
+- **product_sections：** `*` → 显式字段（去掉 `external_url`）；`{}` → 父产品 published 且 enabled。
+- **product_section_items：** `*` → 显式字段；`{}` → 父 section 的产品 published、该 section enabled、自身 enabled。
+- **product_spec_groups：** `*` → 显式字段；`{}` → 父产品 published 且 enabled。
+- **product_spec_items：** `*` → 显式字段（去掉 `note_es` / `note_pt`）；`{}` → 父 group 的产品 published、该 group enabled、自身 enabled。
+- **posts：** 去掉 `created_at` / `updated_at`；行过滤加上 `content_type IN (technical_guide, faq)`，insight / case_study / news 不再可读（D-035 (3)）。
+- **site_content：** 去掉 `page_key` / `section_key` / `updated_at`；保持 `status=published`。
+- **site_settings：** `*` → 公开 API 实际请求的 7 个字段；该集合无发布生命周期，未发明 status 过滤。
+- **site_social_links：** `*` → `platform,url,sort,enabled`；行过滤 `enabled=true`。
+- **directus_files：** 去掉 `filename_disk` / `filesize` / `width` / `height`（无公开调用者）；保持 `is_public=true`。
+- **inquiries create / read / update：** 字段未变（30 / `id` / 4 个 `hubspot_*`，与 `publicInquiry.ts`、`writeInquiry.ts`、`syncHubspot.ts` 逐字对应），本次只是纳入跟踪。
+- **product_page_presets：** 权限**撤销** —— 公开侧零调用，全仓库唯一读取点 `server/api/admin/presets.get.ts` 走管理员 token。
+
+**P2 residual（登记，不阻塞签收）：** `inquiries` 三行仍无行过滤。该集合没有 `user_created` / `created_by` 之类归属列，不改 schema 无法可靠限定到"本服务账户创建的行"；基于 `status` 的过滤会很脆弱，按施工单 §21 不予发明。字段面已最小，残留仅为行范围。
+
+**工件：** `directus/schema/directus-permissions-02-nuxt-server-legacy-site.sql`（apply）、`.verify.sql`、`.rollback.sql`。按名称解析角色 / 策略 / access link（各须恰一条），无硬编码 UUID、无硬编码 permission id；`LOCK TABLE … SHARE ROW EXCLUSIVE`；缺失则插入、漂移则原位规范化（同 id）、一致则不动；未声明的 owned 动作、重复行、公开策略持有业务权限、D-034 三行缺失，均 fail closed。rollback 仅在当前恰为 FIX-E canonical 状态时执行，逐行还原 pre-FIX-E 定义并重建被撤销的 presets 行，因此它同时是 pre-FIX-E legacy 权限状态的已跟踪记录。
+
+**测试：** 新增 `tests/directusLegacyPermissionsProvisioningDbIntegration.test.ts`（真实 PostgreSQL，35 项）：三份工件不含 secrets / users / roles / access 写入，也不含任何 UUID 字面量；两次 apply 后整表（含 id 与序列）逐字一致；恰 16 行 legacy + presets 0 行 + D-034 三行未变；策略上无 `*` 字段、子表无空行过滤；6 张子表的过滤 JSON 从库中读回后与期望结构逐项相等；以真实数据证明 draft 产品的子行落在过滤之外；posts 仅 technical_guide / faq；`directus_files` 字段精确；site_* 字段精确；inquiries 30 / `id` / 4 字段且不含 `note`、`assigned_to`、`ai_*`；fresh environment 下 apply 插入全部 16 行；漂移原位规范化；8 类 apply fail closed 与 6 类 verify fail closed（均在回滚事务中执行，整表不变）；rollback 拒绝漂移行；rollback 还原 17 行 pre-FIX-E 定义后重新 apply 回到 canonical。
+
+**本地真实执行（§31 / §32）：** 变更前 legacy 快照存入会话 scratchpad（未入 Git）。apply #1 → `inserted 0, normalized 0, unchanged 16, revoked 0`（定向测试已先行落地）→ FIX-E verify OK、D-034 verify OK；apply #2 输出完全相同，三次状态哈希均为 `total=19 legacy=16 hash=5b10d44c…`，幂等成立。受控 rollback 演练：`restored 16, recreated 1`，还原后的 17 行与变更前快照逐字一致（比对结果 YES）；该窗口内未发出任何公开请求；随即重新 apply（`normalized 11, unchanged 5, revoked 1`）回到 canonical，FIX-E verify 与 D-034 verify 均 OK。最终库状态停留在 canonical 最小权限。
+
+**Directus 重启与公开 smoke（§33 / §34）：** `docker compose restart directus` → `/server/ping` = `pong`。公开 GET smoke 全部 200：`/api/cms/products/categories`、`/api/cms/posts?content_type=technical_guide`、`/api/cms/posts?content_type=faq`、`/api/cms/home`、`/api/cms/site-settings`、`/sitemap.xml`、`/products`、`/support/faq`；媒体代理 `/api/cms/media/<public file>` 仍为 200 `image/png` 1,376,987 字节（证明去除 `filename_disk` 未影响 `/assets/` 二进制投递）。site-settings、home、categories、posts-faq、sitemap 五份响应体与变更前基线**逐字节一致**；无意外 401 / 403 / 503。未创建、未发布、未修改任何业务数据。
+
+**环境限制（如实记录）：** 本地 `cmsMode` 与 `productsCmsMode` 默认为 `fixtures`，且库中 0 条 published 产品、0 条 published posts，因此 products / Product 子表 / posts 三组权限**无法取得正向的真实 HTTP 执行证据**；其证据由 `.verify.sql`（精确行 / 字段 / 过滤）与针对真实数据的谓词断言承担。`site_settings`、`site_social_links`、`site_content`、`directus_files` 走的是真实 Directus 读取，已由上述 smoke 正向覆盖。
+
+**Release Safety Gates：**
+- RSG-07：17 行 legacy 权限已工件化并按真实调用面收紧，verify fail closed，重启后公开 smoke 与基线一致；Product 子表过滤的 Directus 运行时正向执行与 `inquiries` 行范围仍 `OPEN`（已写入 §4.3）。
+- RSG-08：权限不在 YAML 快照中；新环境 provisioning 须在工件 01 之后显式 apply 工件 02 并分别 verify。本次仅本地开发库，生产未触碰。
+- RSG-09：无 push / merge / deploy。P0 Violations：NONE。
+
+**门禁：** 定向 35/35；全量（`CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run --no-file-parallelism`）83 files passed / 2 skipped，2870 passed / 45 skipped，0 failed，131.83 s（基线 82 files / 2833 passed，新增 1 个文件 35 项）；`npm run release:check-test-data` PASS（exit 0）；typecheck 0 error；lint 0 error；`npm run build` Build complete；`git diff --check` 通过。
+
+**P1-09：** 本地 CLOSED（已工件化、已按真实调用面最小化、可 verify / rollback / 幂等复用）。生产仍须按 RSG §3A.8 作为独立 release 步骤显式 apply 并留证；本地通过不等于生产已具备。
+
+*最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-FIX-E 任务中写入。*
