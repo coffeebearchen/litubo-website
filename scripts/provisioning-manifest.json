@@ -22,11 +22,12 @@
     "  · 40  permissions-01       — the three D-034 Content read rows",
     "  · 50  permissions-02       — the sixteen FINAL-RELEASE-FIX-E legacy site rows",
     "",
-    "Step 32 is the one step whose input is a secret. It reads the environment variable named in",
-    "`secretEnv` and installs its value; no value is stored here, in the SQL artifact, or anywhere",
-    "else in this repository. A deployment environment or secret manager owns the value. Missing",
-    "secret fails the run closed — the environment is reported as not provisioned rather than",
-    "provisioned without a working runtime credential.",
+    "Step 32 is the one step whose input is a secret. It reads DIRECTUS_TOKEN, the same variable",
+    "nuxt.config.ts reads for the Nuxt server, and installs its value: one secret under one name,",
+    "supplied once (FINAL-RELEASE-PRODUCTION-READY-01B). No value is stored here, in the SQL",
+    "artifact, or anywhere else in this repository; a deployment environment or secret manager owns",
+    "it. Missing secret fails the run closed — the environment is reported as not provisioned rather",
+    "than provisioned without a working runtime credential.",
     "",
     "Business data is deliberately absent: provisioning builds an empty, correctly-shaped environment.",
     "Seeding real content is a separate, human activity."
@@ -85,10 +86,10 @@
       "id": "32-service-token",
       "kind": "psql-secret",
       "file": "directus/schema/directus-access-02-service-token.sql",
-      "secretEnv": "DIRECTUS_SERVICE_TOKEN",
+      "secretEnv": "DIRECTUS_TOKEN",
       "skipFlag": "--without-service-token",
       "expect": "directus_service_token: OK",
-      "description": "SECRET STEP, NOT GIT DATA. Installs the static token the Nuxt server authenticates with (consumed by the application as DIRECTUS_TOKEN) onto the service user created by step 31. The value comes from the environment variable named above and is never written to, read from or logged by this repository. Absent secret fails the run closed; --without-service-token provisions the structure only and says so, leaving the environment unable to serve."
+      "description": "SECRET STEP, NOT GIT DATA. Installs DIRECTUS_TOKEN — the one secret, which nuxt.config.ts also reads for the Nuxt server — as the static token of the service user created by step 31. The value comes from the environment and is never written to, read from or logged by this repository. Absent secret fails the run closed; --without-service-token provisions the structure only and says so, leaving the environment unable to serve."
     },
     {
       "id": "33-access-verify",
@@ -127,7 +128,7 @@
   "postSteps": [
     "Restart Directus: it caches schema, policies and permissions in process memory, so a freshly provisioned environment serves the old shape until it restarts.",
     "Run npm run release:check-test-data against the target database; only exit 0 passes.",
-    "Give the application the same token value as DIRECTUS_TOKEN. The provisioning variable (DIRECTUS_SERVICE_TOKEN) and the runtime variable (DIRECTUS_TOKEN) are separate names for the same secret; a deployment normally sources both from one entry in its secret manager.",
+    "The Nuxt server authenticates with this same DIRECTUS_TOKEN: one secret, one name, supplied once from the deployment's secret manager. The runbook (§2) records when Nuxt reads it.",
     "Production additionally requires a verified restorable backup before any mutation, and a written rollback plan (§3A.8 steps 7 and 8). Neither is implemented by this script."
   ]
 }

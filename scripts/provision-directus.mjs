@@ -31,7 +31,8 @@
  *                                       [--without-service-token]
  *
  * Environment:
- *   DIRECTUS_SERVICE_TOKEN      the static token to install on the service user.
+ *   DIRECTUS_TOKEN              the nuxt-server service user's static token: the one secret,
+ *                               which the Nuxt server also reads, so it is supplied once.
  *                               Required unless --without-service-token is given.
  *   PROVISION_PG_SERVICE        compose service for Postgres   (default: postgres)
  *   PROVISION_DIRECTUS_SERVICE  compose service for Directus   (default: directus)
@@ -182,7 +183,8 @@ for (const step of steps) {
     }
     fail(
       `${step.id} needs the environment variable ${name}, which is not set.\n`
-      + `  It is the static token the application will present to Directus as DIRECTUS_TOKEN.\n`
+      + '  It is the nuxt-server static token, and the Nuxt server reads this same variable:\n'
+      + '  one secret, one name, supplied once.\n'
       + '  Set it from your secret manager and run again. This script never stores, prints or\n'
       + '  generates the value.\n'
       + (step.skipFlag

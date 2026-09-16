@@ -11,17 +11,18 @@
 -- `directus_users.token` of the single user holding the role `nuxt-server`. Splitting them is what
 -- lets the structure live in Git while the secret stays in the deployment environment.
 --
--- WHAT THE TOKEN IS. `.env.example` documents `DIRECTUS_TOKEN` as the site-readonly token, and
--- `server/utils/directus.ts` sends it as `Authorization: Bearer …` on every public CMS read. In
--- Directus 11 a static token is stored in plain text in `directus_users.token` and is matched
--- directly, so there is no hash to provision and no way to derive it — it must be supplied.
+-- WHAT THE TOKEN IS. `.env.example` documents `DIRECTUS_TOKEN` as the nuxt-server static token,
+-- `nuxt.config.ts` maps it to `runtimeConfig.directusToken`, and `server/utils/directus.ts` sends it
+-- as `Authorization: Bearer …` on every public CMS read. In Directus 11 a static token is stored in
+-- plain text in `directus_users.token` and is matched directly, so there is no hash to provision
+-- and no way to derive it — it must be supplied.
 --
--- ENVIRONMENT VARIABLE (name only): DIRECTUS_SERVICE_TOKEN
---   It is read from the environment of the psql process, which scripts/provision-directus.mjs
---   populates by passing the value on stdin so it never appears in a command line, a process
---   listing or a log. The same value is what the application then receives as DIRECTUS_TOKEN.
---   The two names differ on purpose: one provisions, the other is consumed at run time, and a
---   deployment may well source them from the same secret in its own secret manager.
+-- ENVIRONMENT VARIABLE (name only): DIRECTUS_TOKEN — one secret, under one name.
+--   This step and the Nuxt server read the same variable, so a deployment supplies the value once,
+--   from its secret manager, instead of keeping two variables that would have to be kept equal by
+--   hand (FINAL-RELEASE-PRODUCTION-READY-01B). It is read from the environment of the psql process,
+--   which scripts/provision-directus.mjs populates by passing the value on stdin, so it never
+--   appears in a command line, a process listing or a log.
 --
 -- FAIL CLOSED. An absent, empty or shorter-than-32-character value raises and writes nothing; the
 -- environment is then not provisioned, rather than provisioned with a weak or missing credential.
@@ -37,7 +38,7 @@
 --
 -- Restart Directus afterwards; static tokens are read per request, but policies are cached.
 
-\getenv service_token DIRECTUS_SERVICE_TOKEN
+\getenv service_token DIRECTUS_TOKEN
 \if :{?service_token}
 \else
 \set service_token ''
@@ -67,7 +68,7 @@ DECLARE
   service_user record;
 BEGIN
   IF supplied IS NULL OR length(supplied) < minimum THEN
-    RAISE EXCEPTION 'directus_service_token: DIRECTUS_SERVICE_TOKEN is absent, empty or shorter than % characters; refusing to install a missing or weak static token (the value is not shown)', minimum;
+    RAISE EXCEPTION 'directus_service_token: DIRECTUS_TOKEN is absent, empty or shorter than % characters; refusing to install a missing or weak static token (the value is not shown)', minimum;
   END IF;
 
   SELECT count(*) INTO found_count FROM directus_roles WHERE name = owned_role;

@@ -14,9 +14,15 @@
  * artifact, assert it rebuilt everything) without the development database ever changing. The only
  * statement that commits is the artifact applied to an environment that already matches it, which
  * is a no-op by construction and is asserted to be one, id by id.
+ *
+ * FINAL-RELEASE-PRODUCTION-READY-01B adds the single-secret contract: the service token has one
+ * name, DIRECTUS_TOKEN, read both by provisioning and by the Nuxt server. Those checks read files
+ * and run the orchestrator only as far as its secret check, so they need no database and run
+ * everywhere, CI included. Every token used anywhere in this file is generated at random per run.
  */
 
-import { execFile } from 'node:child_process'
+import { execFile, spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -30,8 +36,9 @@ const TOKEN = readFileSync(resolve(DIR, 'directus-access-02-service-token.sql'),
 
 const ROLE = 'nuxt-server'
 const POLICY = 'site-readonly-policy'
-/** Long enough to satisfy the artifact's minimum; never a real credential. */
-const SYNTHETIC_TOKEN = 'synthetic-test-token-0000000000000000'
+/** A random TEST secret, fresh every run and long enough for the artifact's minimum. Never a real credential. */
+const SYNTHETIC_TOKEN = `test-${randomBytes(24).toString('hex')}`
+const ORCHESTRATOR = 'scripts/provision-directus.mjs'
 
 function body(sql: string, name: 'apply' | 'verify' | 'rollback' | 'token'): string {
   const start = sql.indexOf(`-- ${name}:begin`)
@@ -66,6 +73,16 @@ async function sqlOk(sql: string): Promise<string> {
 /** Runs `setup` then `script` in one transaction that is never committed. */
 async function inRolledBackTransaction(setup: string, script: string): Promise<PsqlResult> {
   return psql(`BEGIN;\n${setup}\n${script}\nROLLBACK;\n`)
+}
+
+/** Runs the provisioning orchestrator the way an operator would, with the given DIRECTUS_TOKEN. */
+function runOrchestrator(database: string, token: string) {
+  return spawnSync(process.execPath, [ORCHESTRATOR, '--database', database], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    timeout: 60_000,
+    env: { ...process.env, DIRECTUS_TOKEN: token },
+  })
 }
 
 /**
@@ -110,6 +127,56 @@ const PERMISSION_SNAPSHOT = `SELECT coalesce(json_agg(json_build_object('id', id
   'fields', fields, 'permissions', permissions::jsonb, 'validation', validation::jsonb, 'presets', presets::jsonb) ORDER BY id)::text, '[]')
   FROM directus_permissions;`
 
+describe('Directus service token contract — one secret, one name', () => {
+  const RUNTIME_NAME = 'DIRECTUS_TOKEN'
+  // Assembled from parts so that this file never carries the retired name as a literal of its own.
+  const RETIRED_NAME = ['DIRECTUS', 'SERVICE', 'TOKEN'].join('_')
+  const repoFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
+
+  it('the Nuxt server reads the service token from DIRECTUS_TOKEN', () => {
+    expect(repoFile('nuxt.config.ts')).toMatch(/directusToken:\s*process\.env\.DIRECTUS_TOKEN\b/)
+  })
+
+  it('provisioning installs the token from that same variable, and declares no other secret', () => {
+    const manifest = JSON.parse(repoFile('scripts/provisioning-manifest.json')) as { steps: Array<{ kind: string, secretEnv?: string }> }
+    expect(manifest.steps.filter(step => step.kind === 'psql-secret').map(step => step.secretEnv)).toEqual([RUNTIME_NAME])
+    expect(manifest.steps.filter(step => step.kind !== 'psql-secret' && step.secretEnv !== undefined)).toEqual([])
+    expect(TOKEN).toMatch(/^\\getenv service_token DIRECTUS_TOKEN$/m)
+  })
+
+  it('no current provisioning artifact, runbook or env template names a second secret variable', () => {
+    for (const path of [
+      'scripts/provisioning-manifest.json',
+      'scripts/provision-directus.mjs',
+      'directus/schema/directus-access-01-nuxt-server-site-readonly.sql',
+      'directus/schema/directus-access-01-nuxt-server-site-readonly.verify.sql',
+      'directus/schema/directus-access-01-nuxt-server-site-readonly.rollback.sql',
+      'directus/schema/directus-access-02-service-token.sql',
+      'docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md',
+      '.env.example',
+    ]) {
+      expect(repoFile(path), path).not.toContain(RETIRED_NAME)
+    }
+    // The template declares the secret exactly once.
+    expect(repoFile('.env.example').match(/^DIRECTUS_TOKEN=/gm)).toHaveLength(1)
+  })
+
+  it('the secret step holds a reference to the variable and never a value', () => {
+    const code = TOKEN.split(/\r?\n/).filter(line => !line.trim().startsWith('--')).join('\n')
+    expect(code).toContain(":'service_token'")
+    // No quoted literal long enough to be a credential.
+    expect(code).not.toMatch(/'[A-Za-z0-9_-]{32,}'/)
+  })
+
+  it('provisioning refuses to start without DIRECTUS_TOKEN, before it touches any database', () => {
+    const run = runOrchestrator('litubo_provisioning_test_contract', '')
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain('needs the environment variable DIRECTUS_TOKEN')
+    // It stopped at the secret check: the provisioning header was never printed.
+    expect(run.stdout).not.toContain('Provisioning "')
+  })
+})
+
 describe.skipIf(!CONTAINER)('Directus access bootstrap artifacts — real PostgreSQL', () => {
   let identityBefore = ''
   let permissionsBefore = ''
@@ -135,7 +202,7 @@ describe.skipIf(!CONTAINER)('Directus access bootstrap artifacts — real Postgr
     // And the secret artifact must never contain a literal token.
     const tokenCode = body(TOKEN, 'token')
     expect(tokenCode).toContain(":'service_token'")
-    expect(TOKEN).toContain('DIRECTUS_SERVICE_TOKEN')
+    expect(TOKEN).toContain('\\getenv service_token DIRECTUS_TOKEN')
     expect(tokenCode).not.toMatch(/(INSERT INTO|DELETE FROM)\s+directus_users/i)
   })
 
@@ -286,15 +353,18 @@ describe.skipIf(!CONTAINER)('Directus access bootstrap artifacts — real Postgr
     expect(await sqlOk(IDENTITY_SNAPSHOT)).toBe(identityBefore)
   }, 60_000)
 
-  it('the token artifact installs a token on the service user and is idempotent', async () => {
+  it('the token artifact installs the supplied token on the service user, idempotently, without echoing it', async () => {
     const result = await inRolledBackTransaction(
       EMPTY_DATABASE + body(APPLY, 'apply'),
       `${tokenBodyWith(SYNTHETIC_TOKEN)}\n${tokenBodyWith(SYNTHETIC_TOKEN)}\n`
       + `SELECT (SELECT count(*) FROM directus_users WHERE token = '${SYNTHETIC_TOKEN}')::text || '|'
-            || (SELECT count(*) FROM directus_users u JOIN directus_roles r ON r.id = u.role WHERE r.name = '${ROLE}')::text;`,
+            || (SELECT count(*) FROM directus_users u JOIN directus_roles r ON r.id = u.role WHERE r.name = '${ROLE}' AND u.token = '${SYNTHETIC_TOKEN}')::text;`,
     )
     expect(result.ok, result.stderr).toBe(true)
+    // Exactly one row holds it, and that row is the nuxt-server service user.
     expect(result.stdout.trim().split('\n').at(-1)).toBe('1|1')
+    // psql reported only whether a value arrived, never the value itself.
+    expect(`${result.stdout}${result.stderr}`).not.toContain(SYNTHETIC_TOKEN)
   }, 120_000)
 
   it.each([
@@ -306,7 +376,14 @@ describe.skipIf(!CONTAINER)('Directus access bootstrap artifacts — real Postgr
     expect(result.stderr).toContain(message)
   }, 120_000)
 
-  it('the token artifact refuses a value another user already holds', async () => {
+  it('a refused token is never echoed back, even in the error', async () => {
+    const refused = `short-${randomBytes(6).toString('hex')}`
+    const result = await inRolledBackTransaction(EMPTY_DATABASE + body(APPLY, 'apply'), tokenBodyWith(refused))
+    expect(result.ok).toBe(false)
+    expect(`${result.stdout}${result.stderr}`).not.toContain(refused)
+  }, 120_000)
+
+  it('the token artifact refuses a value another user already holds, without echoing it', async () => {
     const result = await inRolledBackTransaction(
       `${EMPTY_DATABASE}${body(APPLY, 'apply')}
        UPDATE directus_users SET token = '${SYNTHETIC_TOKEN}' WHERE role = (SELECT id FROM directus_roles WHERE name = 'Administrator');`,
@@ -314,12 +391,28 @@ describe.skipIf(!CONTAINER)('Directus access bootstrap artifacts — real Postgr
     )
     expect(result.ok).toBe(false)
     expect(result.stderr).toContain('already held by a different user')
+    // A unique-constraint violation would print the key in its DETAIL; the artifact refuses first.
+    expect(`${result.stdout}${result.stderr}`).not.toContain(SYNTHETIC_TOKEN)
   }, 120_000)
 
   it('the token artifact refuses to run before the identity structure exists', async () => {
     const result = await inRolledBackTransaction(EMPTY_DATABASE, tokenBodyWith(SYNTHETIC_TOKEN))
     expect(result.ok).toBe(false)
     expect(result.stderr).toContain(`expected exactly one role ${ROLE}`)
+  }, 60_000)
+
+  it('the orchestrator redacts DIRECTUS_TOKEN from everything it prints, including a failure', () => {
+    // The secret is deliberately made part of the database name, which the orchestrator prints in
+    // its header and again in the error when that database does not exist. That forces the value
+    // into printed text, so the test proves masking happened rather than that the value simply
+    // never came up. The run stops at the existence check; nothing is created.
+    const secret = randomBytes(24).toString('hex')
+    const run = runOrchestrator(`litubo_provisioning_test_${secret}`, secret)
+    const printed = `${run.stdout}${run.stderr}`
+    expect(run.status).toBe(1)
+    expect(printed).toContain('does not exist')
+    expect(printed).toContain('«DIRECTUS_TOKEN»')
+    expect(printed).not.toContain(secret)
   }, 60_000)
 
   it('the development database is byte-identical to how this file found it', async () => {
