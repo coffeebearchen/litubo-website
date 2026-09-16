@@ -23,7 +23,20 @@ services:
       retries: 5
 
   directus:
-    image: directus/directus:11
+    # FINAL-RELEASE-PRODUCTION-READY-01 — exact version + immutable digest.
+    #
+    # The floating `:11` tag silently follows upstream releases, so a redeploy
+    # could move Directus to a version whose system-table shape the tracked
+    # permission artifacts were never validated against — and those artifacts
+    # fail closed, so the failure would surface as a broken provision, not a
+    # warning. The schema snapshot, the guard SQL and both permission artifacts
+    # were all verified against 11.17.4.
+    #
+    # The digest is the OCI image *index* (multi-architecture) digest, verified
+    # against the registry with `docker buildx imagetools inspect`, not a single
+    # platform manifest: linux/amd64 and linux/arm64 both remain pullable, so
+    # pinning does not decide the deployment architecture.
+    image: directus/directus:11.17.4@sha256:eb326f679ae847c0a776f93b972761dc2ebe84980e0b9d274a6bc31cd62809f7
     restart: unless-stopped
     depends_on:
       postgres:

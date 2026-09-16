@@ -1,0 +1,133 @@
+{
+  "_comment": [
+    "FINAL-RELEASE-PRODUCTION-READY-01 / 01A — canonical provisioning order for a Directus environment.",
+    "",
+    "This file is the single source of ORDER. docs/project/RELEASE-SAFETY-GATES.md §3A.8 is the",
+    "normative contract that requires these steps; this manifest is its executable expression, and",
+    "scripts/provision-directus.mjs is the only thing that executes it. A runbook must reference this",
+    "file rather than restate the order, so the order can never drift between three places.",
+    "",
+    "Why the steps exist at all: a Directus YAML schema snapshot captures collections, fields and",
+    "relations only. Triggers, functions, database constraints, and every role / policy / access link",
+    "and permission row are NOT in it, so a fresh environment built from the snapshot alone is",
+    "silently incomplete. Each SQL artifact below is the canonical rebuild source for one of those",
+    "missing pieces.",
+    "",
+    "Ownership is deliberately not shared. Each artifact declares what it owns and writes nothing",
+    "else, so two steps can never fight over the same row:",
+    "  · 10  schema baseline      — collections, fields, relations",
+    "  · 31  access bootstrap     — role nuxt-server, policy site-readonly-policy, their access link,",
+    "                               and the service user structure (no credential)",
+    "  · 32  service token        — one column of one row: directus_users.token. SECRET, NOT GIT DATA",
+    "  · 40  permissions-01       — the three D-034 Content read rows",
+    "  · 50  permissions-02       — the sixteen FINAL-RELEASE-FIX-E legacy site rows",
+    "",
+    "Step 32 is the one step whose input is a secret. It reads the environment variable named in",
+    "`secretEnv` and installs its value; no value is stored here, in the SQL artifact, or anywhere",
+    "else in this repository. A deployment environment or secret manager owns the value. Missing",
+    "secret fails the run closed — the environment is reported as not provisioned rather than",
+    "provisioned without a working runtime credential.",
+    "",
+    "Business data is deliberately absent: provisioning builds an empty, correctly-shaped environment.",
+    "Seeding real content is a separate, human activity."
+  ],
+  "contract": "docs/project/RELEASE-SAFETY-GATES.md §3A.8",
+  "runtime": {
+    "node": "22.22.2",
+    "directusVersion": "11.17.4",
+    "directusImage": "directus/directus:11.17.4@sha256:eb326f679ae847c0a776f93b972761dc2ebe84980e0b9d274a6bc31cd62809f7"
+  },
+  "steps": [
+    {
+      "id": "00-directus-bootstrap",
+      "kind": "directus-cli",
+      "args": ["bootstrap"],
+      "description": "Create the Directus system tables and the first administrator on an empty database."
+    },
+    {
+      "id": "10-schema-baseline",
+      "kind": "directus-cli",
+      "args": ["schema", "apply", "--yes", "/schema/cc-imp-01-after.yaml"],
+      "description": "Apply the tracked collection / field / relation baseline. cc-imp-01-after.yaml is the canonical baseline because it is byte-identical to a snapshot of the verified environment; cc-imp-01-apply.yaml is the CC-IMP-01 transition input, not a current-state baseline."
+    },
+    {
+      "id": "20-constraints",
+      "kind": "psql",
+      "file": "directus/schema/cc-imp-01-constraints.sql",
+      "description": "Composite, partial and CHECK constraints a Directus snapshot cannot express."
+    },
+    {
+      "id": "21-revision-guard",
+      "kind": "psql",
+      "file": "directus/schema/cc-imp-01-fix-01-revision-guard.sql",
+      "description": "Atomic draft-revision trigger and function. Must follow the constraints."
+    },
+    {
+      "id": "22-lifecycle-guard",
+      "kind": "psql",
+      "file": "directus/schema/cc-imp-07-fix-02-lifecycle-guard.sql",
+      "description": "Archive / restore concurrency triggers. Order fixed by §3A.8: constraints then revision guard then lifecycle guard."
+    },
+    {
+      "id": "30-verify-schema-objects",
+      "kind": "psql-expect",
+      "inline": "SELECT CASE WHEN (SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid WHERE NOT t.tgisinternal AND c.relname IN ('content_items','content_item_locales','content_items_files','content_relations')) = 7 THEN 'schema_objects_verify: OK' ELSE 'schema_objects_verify: FAIL' END;",
+      "expect": "schema_objects_verify: OK",
+      "description": "Seven user triggers must exist: one revision guard plus six lifecycle guards."
+    },
+    {
+      "id": "31-access-bootstrap",
+      "kind": "psql",
+      "file": "directus/schema/directus-access-01-nuxt-server-site-readonly.sql",
+      "description": "DIRECTUS-ACCESS-BOOTSTRAP-01 — role nuxt-server, policy site-readonly-policy, the access link between them, and the credential-free service user. Must precede both permission artifacts: they own rows on a policy that has to exist already, and fail closed when it does not. Owns no permission row and no secret."
+    },
+    {
+      "id": "32-service-token",
+      "kind": "psql-secret",
+      "file": "directus/schema/directus-access-02-service-token.sql",
+      "secretEnv": "DIRECTUS_SERVICE_TOKEN",
+      "skipFlag": "--without-service-token",
+      "expect": "directus_service_token: OK",
+      "description": "SECRET STEP, NOT GIT DATA. Installs the static token the Nuxt server authenticates with (consumed by the application as DIRECTUS_TOKEN) onto the service user created by step 31. The value comes from the environment variable named above and is never written to, read from or logged by this repository. Absent secret fails the run closed; --without-service-token provisions the structure only and says so, leaving the environment unable to serve."
+    },
+    {
+      "id": "33-access-verify",
+      "kind": "psql-expect",
+      "file": "directus/schema/directus-access-01-nuxt-server-site-readonly.verify.sql",
+      "expect": "directus_access_verify: OK",
+      "description": "Mandatory verification of the identity structure before any permission row is written: one role, one least-privilege policy, one role-scoped access link, one active password-free service user, and that policy reachable from nothing else. Structure only — it never reads the token."
+    },
+    {
+      "id": "40-permissions-01-apply",
+      "kind": "psql",
+      "file": "directus/schema/directus-permissions-01-nuxt-server-content-read.sql",
+      "description": "D-034 — the three nuxt-server Content read rows. Owns only those rows."
+    },
+    {
+      "id": "41-permissions-01-verify",
+      "kind": "psql-expect",
+      "file": "directus/schema/directus-permissions-01-nuxt-server-content-read.verify.sql",
+      "expect": "directus_permissions_verify: OK",
+      "description": "Mandatory verification immediately after the stage that wrote those rows."
+    },
+    {
+      "id": "50-permissions-02-apply",
+      "kind": "psql",
+      "file": "directus/schema/directus-permissions-02-nuxt-server-legacy-site.sql",
+      "description": "FINAL-RELEASE-FIX-E — the sixteen legacy site rows, least privilege. Must run after artifact 01 and never touches its rows."
+    },
+    {
+      "id": "51-permissions-02-verify",
+      "kind": "psql-expect",
+      "file": "directus/schema/directus-permissions-02-nuxt-server-legacy-site.verify.sql",
+      "expect": "directus_permissions_legacy_verify: OK",
+      "description": "Mandatory verification. Also re-checks that the three D-034 rows are untouched."
+    }
+  ],
+  "postSteps": [
+    "Restart Directus: it caches schema, policies and permissions in process memory, so a freshly provisioned environment serves the old shape until it restarts.",
+    "Run npm run release:check-test-data against the target database; only exit 0 passes.",
+    "Give the application the same token value as DIRECTUS_TOKEN. The provisioning variable (DIRECTUS_SERVICE_TOKEN) and the runtime variable (DIRECTUS_TOKEN) are separate names for the same secret; a deployment normally sources both from one entry in its secret manager.",
+    "Production additionally requires a verified restorable backup before any mutation, and a written rollback plan (§3A.8 steps 7 and 8). Neither is implemented by this script."
+  ]
+}

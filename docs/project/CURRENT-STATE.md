@@ -8,14 +8,14 @@
 
 ```text
 Latest accepted module:             FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
-Active authorized module:           NONE（FINAL-RELEASE-LIVE-VALIDATION-01-R3 已按 STOP 收口，等待 Controller 审查）
+Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-01 / 01A — Node 22 固定 + Directus 不可变 pin + 可复现 provisioning（A2 · **PASS**：空 scratch 库 13/13 步全过、**零手工 SQL**、复跑逐字段一致、运行时鉴权与拒绝面已实证、dev 库逐值未变 · D-038 已登记 · 等待 Controller 审查）；前一模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
+Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-01A 已按施工单完成并本地 commit，等待 Controller 审查）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（下一模块 NOT AUTHORIZED；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05、P1-09、P1-15、P1-17 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
 Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：801af4f）
-Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
+Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
 
@@ -8258,7 +8258,7 @@ the one paid Beta request body itself was not independently captured.
 
 | Gate | 状态 | 说明 |
 |---|---|---|
-| Persistent Node 22.22.2 environment | OPEN | PATH 上为 Node 24.14.0，fnm 为 18.20.8；验证所用 22.22.2 为旧会话 Temp 便携版（`.nvmrc` 与 `engines` 已固定 22.22.2） |
+| Persistent Node 22.22.2 environment | OPEN | 已由 fnm **持久安装** 22.22.2（不再是会话 Temp 便携版），FINAL-RELEASE-PRODUCTION-READY-01 / 01A 的 full suite / release guard / typecheck / lint / build / provisioning 全部在其上完成（进程实测 v22.22.2、npm 10.9.7）；`scripts/verify-node-runtime.mjs` 以 `.nvmrc` 为唯一真源、版本不符即非零退出，CI 亦读同一文件。**仍 OPEN 的原因：** PATH 默认仍是 Node 24.14.0，未显式切换的开发者与 `npm run dev` 仍会落在 24 |
 | Production RAM / CPU capacity | OPEN | extractor 镜像 633 MB，容器 512 MB / 1 CPU；生产服务器容量未核实 |
 | Native dependency license review | OPEN | Poppler、util-linux、libvips、Tesseract 及 eng / chi_sim 模型仅记录包内声明 |
 | Container / native package CVE review | OPEN | 未做正式扫描；npm audit 在当前镜像源不可用 |
@@ -10655,3 +10655,31 @@ Next candidate:                 NONE — 下一模块 NOT AUTHORIZED
 - 下一模块 **NOT AUTHORIZED**。
 
 *最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-LIVE-VALIDATION-01-R3 任务中写入。*
+
+---
+
+## FINAL-RELEASE-PRODUCTION-READY-01 / 01A — Node 22 固定 · Directus 不可变 pin · 可复现 Directus Provisioning
+
+**授权：** A2 LOCAL_IMPLEMENTATION（两份施工单：PRODUCTION-READY-01 建立 runtime pin 与 provisioning 骨架；01A 补齐 access bootstrap 并完成无手工补丁的 fresh rehearsal）。**结果：PASS。** 未 push / merge / deploy。
+
+**为什么会有 01A：** 01 的 scratch 演练在 `40-permissions-01-apply` 失败于 `expected exactly one role nuxt-server, found 0`。穷尽检索证明 Git 中**没有任何工件**创建 `directus_roles` / `directus_policies` / `directus_access`，schema 快照对三者引用为 0。01 据此判为 STOP（§47 第 10 条）而非就地修补，理由是 D-034 声明拥有的是 **permission rows**，角色 / 策略 / access 属于新的所有权类别，须由 Controller 裁定。Controller 裁定后由 01A 施工。
+
+**01A 首先做的是身份盘点，而不是直接补三个对象**——结果证明缺口比 01 报告的更深：`nuxt-server` 角色下存在 **1 个 service user，且持有 static token**（`with_static_token=1`、`with_password=0`）。`.env.example` 与 `server/utils/directus.ts` 相互印证：`DIRECTUS_TOKEN` 就是该用户的 static token，以 `Authorization: Bearer` 用于全部公开 CMS 读取。因此真实依赖是 **5 层而非 3 层**。全程只用 NULL / NOT NULL 判断 token 存在性，**未读取、未输出任何凭证值**。
+
+**所有权分层（D-038）：** schema 快照拥有 collections / fields / relations；**Directus Access Bootstrap**（新类别）拥有 role + policy + access link + 无凭证的 service user；**Secret Provisioning** 拥有 token 物料且**永不进 Git**；D-034 与 FINAL-RELEASE-FIX-E 的权限行所有权**逐字未改**。没有任何两个工件管同一行。
+
+**新增工件：** `directus-access-01-nuxt-server-site-readonly.sql`（apply / `.verify.sql` / `.rollback.sql`）与 `directus-access-02-service-token.sql`。按名称解析、**无任何硬编码 UUID**、幂等、fail closed；安全相关漂移（policy 取得 admin / app access、role 取得 parent 或第二个 policy、service user 取得 password 或自带 policy）一律 RAISE 而不静默"修复"——静默撤销他人已取得的权限与静默授予同样危险。rollback 在 policy 上仍有任何权限行时**拒绝执行**：`directus_permissions.policy` 是 `ON DELETE CASCADE`，删 policy 会无声摧毁 D-034 与 FIX-E 拥有的 19 行。
+
+**Secret 分层的实现：** token 值经 stdin 首行传入容器，由容器内 shell 读入环境变量、psql 以 `getenv` 取用，**不进入宿主或容器的 argv / 进程表 / 日志**；orchestrator 对自身全部输出做脱敏；Postgres `log_statement=none` 已实测。此前一处设计缺陷已修正并记录：psql **不在 dollar-quoted 块内做变量替换**，故改为在块外经 `set_config(..., is_local := true)` 交接，事务结束即失效。
+
+**Fresh rehearsal（`litubo_provisioning_test_access_20260916`，起始 public tables = 0）：** 13/13 步全过、`PROVISION_EXIT=0`、**全程零手工 INSERT / UPDATE**。结果：49 表 · 7 触发器 · 19 权限行（D-034 3 + FIX-E 16）· public business permissions **0** · `products / content_items / content_item_locales / posts / inquiries / directus_files` 全为 **0**。复跑（`--allow-existing`）后逐字段 **identical**，role / policy / access / user 均无重复。
+
+**运行时鉴权（一次性 Directus，端口 8056）：** 允许字段 `fields=id` 200、`site_settings` / `posts` 读 200；未授权字段 `draft_revision` / `blocks` **403**（报文为 `You don't have permission to access field`，即权限拒绝而非不存在）；无权限集合 `content_relations` / `content_items_files` **403**；`POST posts` / `POST product_categories` / `PATCH site_settings` **403** 且三张表实际写入 **0 行**；无 token 读取 **403**。凭证未打印。**如实说明两处判据更正：** 最初把 `fields=*` 返回 200 记为异常，实为 Directus 对受限字段做**投影而非拒绝**，是我的判据错误；`/users/me` 只回 `{id}` 而无 `role.name`，恰恰说明该身份无权读 `directus_users`，不能据此宣称"证明了角色名"。
+
+**清理与 dev 完整性：** DROP 前强制复核名称含 `test` 方才执行；scratch 库与一次性容器均已移除，临时 token 文件已从会话暂存区删除。dev 库复核 `tables=49 policyrows=19 allperms=19 products=4 products_nondraft=0 item6=draft rev=9 act_count=1107 act_max=1141 rev_max=891 roles=2 policies=3 access=3 users=2`，与演练前逐值一致。**另更正一处我此前的记数口径：** 模块 01 报告中的 `act=1141` 实为 `max(id)` 而非 `count(*)`（真实 count 为 1107，1141 的 id 跨度中有 34 个空号，属事务回滚消耗序列号的正常现象）；`directus_activity` 无任何外键指向它、`rev_max` 未变，可排除数据被删。今后同时列出 count 与 max。
+
+**质量闸（全部在 Node v22.22.2 / npm 10.9.7）：** full suite **86 files（2 skipped）/ 2969 passed / 45 skipped / 0 failed**（较基线 +31，即新增的 access bootstrap DB 集成测试）· release guard PASS · typecheck 0 · lint 0 · build PASS · `git diff --check` exit 0。本模块 **0 行 runtime application code 改动**，故未重复整套 1440 / 375 视觉验收（施工单 §28）。**AI 调用：DeepSeek 0 · OpenAI 0 · Product AI 0 · Content AI 0。**
+
+**仍 OPEN：** Backup / Restore · 生产容量 · 依赖许可证 / CVE · Final Release Verification · 生产部署 NOT AUTHORIZED · `postgres:16-alpine` 浮动 tag（已登记，超出本模块范围）· 持久 Node 22.22.2 已安装但 PATH 默认仍是 24。
+
+*最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-01A 任务中写入。*
