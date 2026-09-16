@@ -77,11 +77,12 @@ vi.mock('../server/utils/sendInquiryEmail', () => ({ sendInquiryEmail: notify.em
 vi.mock('../server/utils/syncHubspot', () => ({ syncHubspot: notify.hubspot }))
 
 const config = {
-  submissionIpSecret: 'test-ip-hash-secret',
   privacyPolicyVersion: '1.0',
-  hubspotAccessToken: '',
   public: { siteUrl: 'http://localhost:3000' },
 }
+
+/** FINAL-RELEASE-PRODUCTION-READY-01D — server secrets live in the process environment, not runtimeConfig. */
+const IP_HASH_SECRET = 'test-ip-hash-secret'
 
 const MARK = 'TEST ONLY — NOT FOR PUBLICATION'
 const SITE = 'http://localhost:3000'
@@ -183,6 +184,7 @@ function storedInquiries(): Array<Record<string, unknown>> {
 
 beforeAll(async () => {
   vi.stubGlobal('useRuntimeConfig', () => config)
+  vi.stubEnv('SUBMISSION_IP_SECRET', IP_HASH_SECRET)
   const router = createRouter()
     .post('/api/inquiries', inquiriesHandler)
     .post('/api/contact', contactHandler)
@@ -205,6 +207,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await new Promise<void>(done => server.close(() => done()))
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 beforeEach(() => {
@@ -212,7 +215,7 @@ beforeEach(() => {
   directus.failure = null
   notify.email.mockClear()
   notify.hubspot.mockClear()
-  config.hubspotAccessToken = ''
+  vi.stubEnv('HUBSPOT_ACCESS_TOKEN', undefined)
 })
 
 describe('FINAL-RELEASE-FIX-A — public inquiry submissions over real HTTP', () => {
@@ -387,6 +390,38 @@ describe('FINAL-RELEASE-FIX-A — public inquiry submissions over real HTTP', ()
       expect((await post('/api/spare-parts', sparePartsBody(), { client })).status).toBe(429)
       expect(directus.calls).toHaveLength(0)
     })
+
+    it('derives the bucket from SUBMISSION_IP_SECRET as it is at request time (FINAL-RELEASE-PRODUCTION-READY-01D)', async () => {
+      const client = newClient()
+      try {
+        for (let i = 0; i < 3; i++) {
+          expect((await post('/api/contact', partnerBody(), { client })).status).toBe(200)
+        }
+        expect((await post('/api/contact', partnerBody(), { client })).status).toBe(429)
+        // The same client under a rotated secret is hashed with a different key, so it lands in a fresh
+        // bucket. A secret captured when the server was built could never do that.
+        vi.stubEnv('SUBMISSION_IP_SECRET', 'rotated-test-ip-hash-secret')
+        expect((await post('/api/contact', partnerBody(), { client })).status).toBe(200)
+        // Back to the first secret: this client's bucket under it is still full.
+        vi.stubEnv('SUBMISSION_IP_SECRET', IP_HASH_SECRET)
+        expect((await post('/api/contact', partnerBody(), { client })).status).toBe(429)
+      } finally {
+        vi.stubEnv('SUBMISSION_IP_SECRET', IP_HASH_SECRET)
+      }
+    })
+
+    it('with no SUBMISSION_IP_SECRET the limiter still applies, exactly as before the secret left runtimeConfig', async () => {
+      const client = newClient()
+      vi.stubEnv('SUBMISSION_IP_SECRET', undefined)
+      try {
+        for (let i = 0; i < 3; i++) {
+          expect((await post('/api/contact', partnerBody(), { client })).status).toBe(200)
+        }
+        expect((await post('/api/contact', partnerBody(), { client })).status).toBe(429)
+      } finally {
+        vi.stubEnv('SUBMISSION_IP_SECRET', IP_HASH_SECRET)
+      }
+    })
   })
 
   describe('validation', () => {
@@ -557,7 +592,7 @@ describe('FINAL-RELEASE-FIX-A — public inquiry submissions over real HTTP', ()
       expect(notify.email).toHaveBeenCalledWith(701, 'contact')
       expect(notify.hubspot).not.toHaveBeenCalled()
 
-      config.hubspotAccessToken = 'test-token-not-a-real-credential'
+      vi.stubEnv('HUBSPOT_ACCESS_TOKEN', 'test-token-not-a-real-credential')
       expect((await post('/api/contact', partnerBody())).status).toBe(200)
       const [, second] = storedInquiries()
       expect(second!.hubspot_sync_status).toBe('pending')

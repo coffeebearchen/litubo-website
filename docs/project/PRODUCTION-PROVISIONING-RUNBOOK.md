@@ -126,18 +126,53 @@ Consequences for deployment:
 - `NUXT_DIRECTUS_TOKEN` is Nuxt's generic run-time override for a `runtimeConfig` key. There is no such
   key any more, so it has no effect, and it is **not** part of the LITUBO secret contract.
 
-**Not covered by this measurement.** The other server secrets in `runtimeConfig` — SMTP password,
-submission IP secret, HubSpot token, OpenAI and DeepSeek API keys — are still declared as
-`process.env.X ?? ''` in `nuxt.config.ts`. A build run with them in its environment would serialize
-them the same way, and a built server would take them at run time only through Nuxt's `NUXT_*`
-overrides — **inferred** from the identical declaration, not measured. They have no secret-free
-production path yet; that is an open item, outside the contract this section describes.
+**Every server secret — runtime only (D-039).** The rule `DIRECTUS_TOKEN` follows is the rule for every
+secret the Nuxt server uses:
+
+- **Build phase** — `nuxt build` does not require production server secrets. `nuxt.config.ts` declares
+  none of them, so a build has nothing to serialize. Do not supply their production values to a build.
+- **Runtime phase** — the server process receives each secret it needs in its environment, from the
+  deployment environment / secret manager, when it starts. The server reads it when it uses it
+  (`server/utils/directusServiceToken.ts`, `server/utils/serverSecrets.ts`), so a rotation takes a
+  restart, not a rebuild.
+
+| Variable (name only) | Used for | Without it (existing behaviour, unchanged) |
+|---|---|---|
+| `DIRECTUS_TOKEN` | Public CMS reads, inquiry storage, the AI source-reference key | CMS reads refused, inquiry submissions answer 503, AI source selection answers 503 |
+| `SMTP_PASS` | Authenticating inquiry notification emails | the best-effort notification fails; the inquiry itself is still stored |
+| `SUBMISSION_IP_SECRET` | Keying the hash of client addresses in the in-process rate limiter | the limiter still applies, keyed with a built-in fallback (an open decision, CURRENT-STATE) |
+| `HUBSPOT_ACCESS_TOKEN` | HubSpot Contact sync | inquiries are stored as `not_configured`; no HubSpot request |
+| `OPENAI_API_KEY` | The OpenAI provider | the provider reports "not configured"; no request |
+| `DEEPSEEK_API_KEY` | The DeepSeek provider | the provider reports "not configured"; no request |
+
+FINAL-RELEASE-PRODUCTION-READY-01D measured the whole set with synthetic canaries — three distinct values
+per secret — and no real credential, no real email and no external call:
+
+- **Before the change**, a build with a canary for each secret in its environment serialized
+  `SMTP_PASS`, `SUBMISSION_IP_SECRET`, `HUBSPOT_ACCESS_TOKEN`, `OPENAI_API_KEY` and `DEEPSEEK_API_KEY`
+  once each into `.output/server/chunks/_/nitro.mjs`.
+- **After it**, the same kind of build contained each of the eighteen canaries **0** times — browser
+  assets, server bundle, source maps, decompressed `.gz` / `.br` assets and `.nuxt` included — and each
+  secret kept exactly one run-time read in the server bundle.
+- That build, started with other values at run time, authenticated to a local fake SMTP server with the
+  **run-time** `SMTP_PASS` (a wrong run-time value was used as given; with none, no credentials were
+  sent), and the fake refused every message, so nothing was delivered anywhere. With the HubSpot canary
+  in the build environment and none at run time, inquiries were stored as `not_configured` and no
+  HubSpot request was made. No canary appeared in any HTTP response (SSR HTML and payload included),
+  server log or Directus log.
+- `SUBMISSION_IP_SECRET` and the AI keys cannot be observed from outside a built server without a real
+  provider call, so they rest on the build-time value being absent (0 occurrences) and on unit tests
+  showing that each consumer uses the value present when it is called.
+
+This is a local proof. No production secret manager or production injection mechanism has been
+exercised.
 
 **Rotation.** One change in the secret manager, then two actions: re-run step `32` with the new value
 and restart Directus, and restart the Nuxt server with the new value in its environment. No rebuild is
 needed — the build never held the old value. Until both are done, reads through `directusFetch` are
 refused. Rotation also invalidates outstanding AI source references, whose key is derived from the
-token; they live 30 minutes and are simply minted again.
+token; they live 30 minutes and are simply minted again. Every other server secret rotates with a
+restart alone: change it in the secret manager and restart the Nuxt server — no rebuild.
 
 Two production values are load-bearing and fail closed if wrong:
 
@@ -196,10 +231,10 @@ npx nuxt build
 ```
 
 The build needs no secret (§2). Start the built server (`.output/server/index.mjs`) the way the target
-environment runs Node, with `DIRECTUS_TOKEN` in its process environment. How production runs Nuxt —
-host process or container — **is still undecided**, and the document-extractor topology (gateway vs.
-internal network) depends on that decision, as does the mechanism that places `DIRECTUS_TOKEN` in the
-server's environment.
+environment runs Node, with the server secrets it needs in its process environment. How production runs
+Nuxt — host process or container — **is still undecided**, and the document-extractor topology (gateway
+vs. internal network) depends on that decision, as does the mechanism that places the server secrets in
+the server's environment.
 
 ---
 
@@ -236,9 +271,9 @@ Stop and report rather than improvise if any of these hold:
 - Any step would need a manual `INSERT`, `UPDATE` or `DELETE` to get past it.
 - The service token is unavailable, and the answer being considered is to generate one locally,
   commit one, reuse another environment's, or pass `--without-service-token` and carry on.
-- A deployment plan supplies the production `DIRECTUS_TOKEN` to the build, expects the built server
-  to read it from a `.env` file, or adds a second project variable — Nuxt's `NUXT_DIRECTUS_TOKEN`
-  override included — to carry the same secret.
+- A deployment plan supplies a production server secret (§2) to the build, expects the built server to
+  read one from a `.env` file, or adds a second project variable for one — a Nuxt `NUXT_*` override
+  included.
 - Provisioning would need a credential value to be read out of a file or a container.
 - The target database already contains business data.
 - A public policy holds any business permission.

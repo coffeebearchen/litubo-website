@@ -1,5 +1,6 @@
 import { useRuntimeConfig } from '#imports'
 import { directusFetch } from '~/server/utils/directus'
+import { readHubspotAccessToken } from '~/server/utils/serverSecrets'
 import type { HubspotSyncStatus } from '~/types/content'
 
 export interface HubspotSyncInput {
@@ -135,7 +136,8 @@ export async function syncHubspot(
   input: HubspotSyncInput,
 ): Promise<void> {
   const config = useRuntimeConfig()
-  const accessToken = config.hubspotAccessToken as string | undefined
+  // Read from the running process, never runtimeConfig (FINAL-RELEASE-PRODUCTION-READY-01D).
+  const accessToken = readHubspotAccessToken()
 
   // Defensive: should not be called without a token, but handle gracefully
   if (!accessToken) {

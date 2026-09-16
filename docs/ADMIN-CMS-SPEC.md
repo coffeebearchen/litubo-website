@@ -107,7 +107,7 @@ Directus API          http://directus:8055/       ← 仅容器内网可达，�
 | 以上变量名（不含值） | `.env.example` | **是** |
 
 - 禁止将真实密码或 token 写入任何 `.ts`、`.vue`、`docker-compose.yml` 或文档文件；
-- 静态 token 仅在 Directus 数据库中生成，Nuxt server 从 `process.env.DIRECTUS_TOKEN` 读取；
+- `DIRECTUS_TOKEN` 是 `nuxt-server` 最小权限服务用户的 static token：值由部署 secret manager 提供、由 provisioning 安装（D-038）；Nuxt server 在运行时从自身进程环境读取 `process.env.DIRECTUS_TOKEN`，构建不需要它、构建产物也不包含它（D-039，其余服务端 secret 同理，见 `docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md` §2）；
 - 禁止在管理界面开启公开注册（`PUBLIC_REGISTRATION=false`）。
 
 ### 2.3 媒体文件持久化方案
@@ -280,7 +280,7 @@ Directus 通过图形界面配置 Collections（对应数据库表）。以下�
 **.env 关键变量（不提交 Git，通过 `.env.example` 记录）：**
 ```
 DIRECTUS_URL=http://directus:8055
-DIRECTUS_TOKEN=<static-admin-token>
+DIRECTUS_TOKEN=<nuxt-server service user static token — runtime only, from the secret manager>
 CMS_MODE=directus
 ```
 

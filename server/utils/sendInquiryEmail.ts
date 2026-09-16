@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { useRuntimeConfig } from '#imports'
+import { readSmtpPassword } from '~/server/utils/serverSecrets'
 import type { InquiryType } from '~/types/content'
 
 const CONTACT_TYPES: InquiryType[] = ['contact', 'technical_matching', 'distributor']
@@ -17,8 +18,9 @@ export async function sendInquiryEmail(
     host: config.smtpHost,
     port: Number(config.smtpPort) || 587,
     secure: false,
+    // SMTP_PASS is read from the running process, never runtimeConfig (FINAL-RELEASE-PRODUCTION-READY-01D).
     auth: config.smtpUser
-      ? { user: config.smtpUser, pass: config.smtpPass }
+      ? { user: config.smtpUser, pass: readSmtpPassword() }
       : undefined,
   })
 

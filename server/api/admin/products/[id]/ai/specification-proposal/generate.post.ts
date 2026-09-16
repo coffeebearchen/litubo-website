@@ -3,6 +3,7 @@ import { adminFetch } from '~/server/utils/adminDirectusClient'
 import { readProductLifecycle } from '~/server/utils/productLifecycle'
 import { runProposalEngine } from '~/server/utils/aiProposalEngine'
 import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegistryDefault'
+import { readDeepseekApiKey, readOpenaiApiKey } from '~/server/utils/serverSecrets'
 import { specificationsTarget } from '~/server/utils/aiTargets/specificationsTarget'
 import { readJsonBodyWithByteLimit } from '~/server/utils/requestBodyLimit'
 import { resolveSourceRefs, SourceRefUnavailableError } from '~/server/utils/aiSourceRef'
@@ -131,8 +132,9 @@ export default defineEventHandler(async (event) => {
   const fetch = <T>(path: string, opts?: Record<string, unknown>) => adminFetch<T>(event, path, opts)
   const registry = createDefaultAiProviderRegistry({
     defaultProvider: config.aiDefaultProvider,
-    openai: { apiKey: config.openaiApiKey, model: config.openaiModel },
-    deepseek: { apiKey: config.deepseekApiKey, model: config.deepseekModel },
+    // API keys come from the running process, never runtimeConfig (FINAL-RELEASE-PRODUCTION-READY-01D).
+    openai: { apiKey: readOpenaiApiKey(), model: config.openaiModel },
+    deepseek: { apiKey: readDeepseekApiKey(), model: config.deepseekModel },
   })
 
   // AI-PDF-SOURCE-01 — PDFs are read by the isolated document-extractor sidecar,

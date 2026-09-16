@@ -79,13 +79,14 @@ function installNitroGlobals(fetchImpl: (url: string, options?: Record<string, u
   vi.stubGlobal('useRuntimeConfig', () => ({
     directusUrl: 'http://directus.test',
     aiDefaultProvider: 'deepseek',
-    openaiApiKey: '',
     openaiModel: '',
-    deepseekApiKey: '',
     deepseekModel: '',
   }))
-  // FINAL-RELEASE-PRODUCTION-READY-01C — the server secret lives in the process environment, not runtimeConfig.
+  // FINAL-RELEASE-PRODUCTION-READY-01C / 01D — server secrets live in the process environment, not
+  // runtimeConfig. No provider key is supplied unless a test sets one.
   vi.stubEnv('DIRECTUS_TOKEN', 'server-token')
+  vi.stubEnv('OPENAI_API_KEY', undefined)
+  vi.stubEnv('DEEPSEEK_API_KEY', undefined)
   vi.stubGlobal('$fetch', vi.fn(async (url: string, options?: Record<string, unknown>) => {
     fetchCalls.push({ url, options })
     return fetchImpl(url, options)
@@ -323,11 +324,11 @@ describe('/api/admin/ai/providers — auth, safe fields only, and no caching', (
     installNitroGlobals(async () => ({}))
     vi.stubGlobal('useRuntimeConfig', () => ({
       aiDefaultProvider: 'deepseek',
-      openaiApiKey: 'sk-SUPER-SECRET-OPENAI-KEY',
       openaiModel: 'gpt-secret-model-name',
-      deepseekApiKey: 'ds-SUPER-SECRET-DEEPSEEK-KEY',
       deepseekModel: 'deepseek-secret-model-name',
     }))
+    vi.stubEnv('OPENAI_API_KEY', 'sk-SUPER-SECRET-OPENAI-KEY')
+    vi.stubEnv('DEEPSEEK_API_KEY', 'ds-SUPER-SECRET-DEEPSEEK-KEY')
     const handler = (await import('../server/api/admin/ai/providers.get')).default as unknown as (e: unknown) => unknown
 
     const event = mockEvent({ url: PROVIDERS_PATH })
@@ -955,9 +956,7 @@ describe('sourceRef secret missing — 503, not a silent "invalid ref"', () => {
   const NO_SECRET_CONFIG = {
     directusUrl: 'http://directus.test',
     aiDefaultProvider: 'deepseek',
-    openaiApiKey: '',
     openaiModel: '',
-    deepseekApiKey: '',
     deepseekModel: '',
   }
 

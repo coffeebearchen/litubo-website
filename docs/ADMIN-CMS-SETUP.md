@@ -102,6 +102,8 @@ curl http://localhost:8055/server/health
 
 ### 3.2 创建 API Token（前台 adapter 阶段使用）
 
+> **已被取代（FINAL-RELEASE-PRODUCTION-READY-01A / 01C / 01D）：不要按本节创建 token。** `DIRECTUS_TOKEN` 是 `nuxt-server` 最小权限服务用户的 static token，不是 Administrator token；值由部署 secret manager 提供、由 provisioning 第 32 步安装（D-038），并在运行时注入 Nuxt 服务进程环境（D-039）。见 `docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md` §2。以下步骤仅作历史记录保留。
+
 > **本阶段（阶段 1）不需要创建 Token。** 以下步骤留待前台 adapter 开发阶段执行。
 
 1. **Settings** → **API Tokens** → **Create Token**
@@ -302,6 +304,8 @@ curl --max-time 5 http://<server-public-ip>:8055/server/health
 | `DIRECTUS_ADMIN_EMAIL` | 管理员邮箱 |
 | `DIRECTUS_ADMIN_PASSWORD` | 管理员密码 |
 | `DIRECTUS_TOKEN` | 前台 adapter 使用的 API Token（阶段 3 创建） |
+
+> **运行时注入（D-039）：** Nuxt 服务端 secret——`DIRECTUS_TOKEN`、`SMTP_PASS`、`SUBMISSION_IP_SECRET`、`HUBSPOT_ACCESS_TOKEN`、`OPENAI_API_KEY`、`DEEPSEEK_API_KEY`——只在运行时由部署 secret manager 注入 Nuxt 服务进程环境；构建不需要它们，构建产物也不包含它们。构建好的 server 不会自行读取 `.env` 文件。见 `docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md` §2。
 
 管理方式建议：使用密码管理器（如 1Password、Bitwarden）存储，服务器 `.env` 文件权限设为 `600`：
 

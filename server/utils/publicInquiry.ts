@@ -3,6 +3,7 @@ import type { H3Event } from 'h3'
 import { createHmac } from 'node:crypto'
 import sanitizeHtml from 'sanitize-html'
 import { checkRateLimit } from '~/server/utils/rateLimit'
+import { readHubspotAccessToken, readSubmissionIpSecret } from '~/server/utils/serverSecrets'
 import { readJsonBodyWithByteLimit } from '~/server/utils/requestBodyLimit'
 import { writeInquiry } from '~/server/utils/writeInquiry'
 import { sendInquiryEmail } from '~/server/utils/sendInquiryEmail'
@@ -177,10 +178,11 @@ async function readInquiryBody(event: H3Event): Promise<Record<string, unknown>>
 export async function handlePublicInquiry(event: H3Event, toInquiryFields: InquiryFieldMapper): Promise<{ ok: true }> {
   const body = await readInquiryBody(event)
   const config = useRuntimeConfig()
-  const hasHubspotToken = Boolean(config.hubspotAccessToken)
+  // Server secrets come from the running process, never runtimeConfig (FINAL-RELEASE-PRODUCTION-READY-01D).
+  const hasHubspotToken = Boolean(readHubspotAccessToken())
 
   // Rate limit: reject without writing to Directus
-  if (checkRateLimit(rateLimitKey(event, config.submissionIpSecret))) {
+  if (checkRateLimit(rateLimitKey(event, readSubmissionIpSecret()))) {
     throw createError({ statusCode: 429, message: 'Too many requests. Please wait and try again.' })
   }
 

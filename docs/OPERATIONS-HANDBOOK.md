@@ -478,6 +478,7 @@ Phase 7A 在 `inquiries` 表中新增了以下 4 个字段，运营人员可在 
 
 - `HUBSPOT_ACCESS_TOKEN`：只能放在腾讯云服务器的 `.env` 文件中，不写入代码、文档或 Git
 - `OPENAI_API_KEY` 或其他 AI 服务密钥：同上
+- **运行时注入（D-039）：** 这些服务端 secret（以及 `DIRECTUS_TOKEN`、`SMTP_PASS`、`SUBMISSION_IP_SECRET`、`DEEPSEEK_API_KEY`）只在运行时注入 Nuxt 服务进程的环境——由部署 secret manager / 进程管理器 / 容器环境在服务启动时提供；构建不需要、构建产物也不包含它们。构建好的 server 不会自己读取 `.env` 文件，只有被注入进程环境的值才生效；更换后重启 Nuxt 服务即可，无需重新构建。见 `docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md` §2。
 
 ### Phase 7B 运营人员操作步骤
 

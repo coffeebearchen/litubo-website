@@ -7,9 +7,9 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-01C — Directus token 仅运行时注入（A2 · **PASS**：构建产物不含 `DIRECTUS_TOKEN`（构建环境含 TEST 值时 `.output` 全量扫描 0 次）· 运行中的 server 从进程环境读取同一个 `DIRECTUS_TOKEN` · none / wrong / right = fail / fail / pass，构建期的值即使有效也不被使用 · canonical secret 名仍只有 `DIRECTUS_TOKEN` · 等待 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-01B — 统一 Directus service token 合同（A2 · **PASS**：唯一 secret 名 `DIRECTUS_TOKEN` 同时用于 provisioning 与 Nuxt · fresh scratch 13/13、零手工 SQL · 其实测发现"构建会把值序列化进 server bundle、预构建 server 运行时不读 `DIRECTUS_TOKEN`"已由 01C 按 Controller 裁定解决）；此前 FINAL-RELEASE-PRODUCTION-READY-01 / 01A — Node 22 固定 + Directus 不可变 pin + 可复现 provisioning（A2 · **PASS**：空 scratch 库 13/13 步全过、**零手工 SQL**、复跑逐字段一致、运行时鉴权与拒绝面已实证、dev 库逐值未变 · D-038 已登记 · 等待 Controller 审查）；前一模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
-Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-01C 已按施工单完成并本地 commit，等待 Controller 审查）
+Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · token 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 · not pushed · D-038 已登记）；此前 FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
+Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-01D — 服务端 secret 全部仅运行时注入（A2 · **PASS**：6 个服务端 secret 均不进构建产物（构建环境含全部合成 canary 时 `.output` / `.nuxt` 全量扫描 0 次）· 运行中的 server 在调用时从进程环境读取 · 构建期的值不胜出 · 外部真实调用 0 · D-039 已登记 · **Production Ready 01：COMPLETE（本地范围；Backup / Restore 仍 PENDING）** · 等待 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-01C — Directus token 仅运行时注入（A2 · **PASS** · Controller 已签收 cc0f494）；此前 FINAL-RELEASE-PRODUCTION-READY-01B — 统一 Directus service token 合同（A2 · **PASS**：唯一 secret 名 `DIRECTUS_TOKEN` 同时用于 provisioning 与 Nuxt · fresh scratch 13/13、零手工 SQL · 其实测发现"构建会把值序列化进 server bundle、预构建 server 运行时不读 `DIRECTUS_TOKEN`"已由 01C 按 Controller 裁定解决）；此前 FINAL-RELEASE-PRODUCTION-READY-01 / 01A — Node 22 固定 + Directus 不可变 pin + 可复现 provisioning（A2 · **PASS**：空 scratch 库 13/13 步全过、**零手工 SQL**、复跑逐字段一致、运行时鉴权与拒绝面已实证、dev 库逐值未变 · D-038 已登记 · 等待 Controller 审查）；前一模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
+Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-01D 已按施工单完成并本地 commit，等待 Controller 审查）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（下一模块 NOT AUTHORIZED；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN）
 Next candidate authorized:          NO
@@ -10741,3 +10741,37 @@ Next candidate:                 NONE — 下一模块 NOT AUTHORIZED
 **仍 OPEN：** 其余 `runtimeConfig` 服务端 secret（SMTP 密码、提交 IP secret、HubSpot token、OpenAI / DeepSeek API key）仍以 `process.env.X ?? ''` 在 `nuxt.config.ts` 声明——构建环境含其值即会被序列化、预构建 server 运行时只能经 `NUXT_*` 覆盖（**INFERRED**，未实测），尚无 secret-free 的生产路径，须另行决定 · Backup / Restore · 容量 · 依赖许可证 / CVE · Final Release Verification · 生产部署 NOT AUTHORIZED · `postgres:16-alpine` 浮动 tag（已登记）· PATH 默认 Node 仍为 24.14.0 · 观察（P2）：`docs/ADMIN-CMS-SPEC.md` / `docs/ADMIN-CMS-SETUP.md` 仍描述早期"在 Directus Admin 生成 token、写入服务器 `.env`"的手工流程，未在本模块修改。
 
 *最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-01C 任务中写入。*
+
+---
+
+## FINAL-RELEASE-PRODUCTION-READY-01D — 服务端 secret 全部仅运行时注入
+
+**授权：** A2 LOCAL_IMPLEMENTATION（Production Ready 01 的最后一个 secret 收口，不是 02；不做新功能）。**结果：PASS。** 起点 HEAD `cc0f494`（01C 已由 Controller 签收），以新的 follow-up commit 收口；未 amend，未 push / merge / deploy。
+
+**Controller 裁定：** 生产服务端构建产物不得包含任何服务端 secret；一次性完成全部现行服务端 secret 的运行时收口；每个 secret 保留既有的 canonical 变量名，不引入 `NUXT_*` 第二套名字；非 secret 配置不迁移；`DIRECTUS_TOKEN` 与 01C 路径不重做。
+
+**完整清单（先盘点再改码；只读变量名，未读取任何值）：** Nuxt 服务端共 **6** 个 secret——`DIRECTUS_TOKEN`（01C 已运行时读取）、`SMTP_PASS`（`sendInquiryEmail.ts`）、`SUBMISSION_IP_SECRET`（`publicInquiry.ts`，限流键 HMAC）、`HUBSPOT_ACCESS_TOKEN`（`publicInquiry.ts`、`syncHubspot.ts`）、`OPENAI_API_KEY` 与 `DEEPSEEK_API_KEY`（`ai/providers.get.ts`、Content Center `ai-source-intake.post.ts`、Product `generate.post.ts`）。非 secret、保持原样：`NUXT_PUBLIC_SITE_URL`、`CONTACT_EMAIL`、`SALES_EMAIL`、`SMTP_HOST`、`SMTP_PORT`、`SMTP_USER`（账户名是标识而非凭证）、`SMTP_FROM`、`PRIVACY_POLICY_VERSION`、`DIRECTUS_URL`、`CMS_MODE`、`CMS_MODE_PRODUCTS`、`HUBSPOT_API_BASE_URL`、`AI_DEFAULT_PROVIDER`、`OPENAI_MODEL`、`DEEPSEEK_MODEL`、`PRODUCT_AI_APPLY_ENABLED`、`DOCUMENT_EXTRACTOR_URL`。`DB_PASSWORD`、`DIRECTUS_SECRET`、`DIRECTUS_ADMIN_PASSWORD` 只由 Docker Compose 交给 Postgres / Directus 容器，Nuxt 不读取，不属于 Nuxt 构建产物这一缺陷类别。
+
+**改动前实测（未改代码的 HEAD `cc0f494`；每个 secret 各 3 个合成 canary）：** 构建环境含 6 个 secret 的 canary A 时，`SMTP_PASS`、`SUBMISSION_IP_SECRET`、`HUBSPOT_ACCESS_TOKEN`、`OPENAI_API_KEY`、`DEEPSEEK_API_KEY` **各 1 次**出现在 `.output/server/chunks/_/nitro.mjs`（01C 标为 INFERRED 的判断由此成为实测），`DIRECTUS_TOKEN` 0 次，浏览器侧、sourcemap、压缩资源、`.nuxt` 均 0。该产物带有构建期 HubSpot canary，**未启动**。
+
+**改动：** 新增 `server/utils/serverSecrets.ts`，5 个单行读取函数（`readSmtpPassword()` 等）在调用时读取各自的 canonical 环境变量；`nuxt.config.ts` 的 `runtimeConfig` 删除这 5 个键并在顶部注释说明；6 个消费方只替换读取方式。缺失时各功能行为逐一保持不变：SMTP 无密码、邮件通知按 best-effort 失败；HubSpot 记 `not_configured`；AI provider 报 "not configured"；限流键沿用既有行为。`directusServiceToken.ts` 与 01C 路径未改。prompt / model / provider 选择 / 重试 / 计费 / AI 安全闸 / 表单行为 / UI 均未改。
+
+**测试：** 新增 `tests/serverSecretsRuntime.test.ts`（31 项）：每个读取函数在调用时读取、改值即生效、缺失 / 为空视为未配置、`NUXT_*` 覆盖名无效；SMTP（nodemailer 替身）、HubSpot（`fetch` 替身）与 3 个 AI 端点（引擎替身，捕获交给 provider registry 的 key）逐一证明：缺失时不使用 `runtimeConfig` 中残留的构建期副本、使用调用时的值、轮换后下一次调用即用新值；静态合同：`nuxt.config.ts` 不声明任何 secret、每个 secret 只在一个服务端模块读取 `process.env`、消费方均调用读取函数、`.env.example` 每个 secret 恰一行且无值、无 `NUXT_*` 别名。`tests/publicInquirySafety.test.ts` 新增 2 项：限流桶随请求时的 `SUBMISSION_IP_SECRET` 变化（构建期副本做不到）、缺失时限流仍生效；HubSpot 用例改为 `vi.stubEnv`。`tests/aiEndpointBoundaries.test.ts` 的 provider key 改为环境变量。**证伪：** 6 个消费方逐一换回 HEAD 版本，每个都被行为测试抓到（另加 2 项静态合同），恢复后 diff 摘要一致。
+
+**构建泄漏实验：** 改后代码、构建环境含全部 6 个 secret 的 canary A：`.output` 1582 个文件逐一扫描（286 个 `.gz` / `.br` 解压后再扫，含 395 个 sourcemap），18 个 canary 在浏览器侧、服务端、sourcemap、压缩资源中**全部为 0**，`.nuxt` 为 0；服务端 bundle 中 6 个 secret 各保留 1 处运行时读取（未被内联）。
+
+**运行时实测（全新 scratch 库 `litubo_provisioning_test_secrets_20260916`，orchestrator 13/13；一次性 Directus 挂隔离空 uploads；始终是同一个以 A 构建的产物）：** 运行时只给 `DIRECTUS_TOKEN` / `SMTP_PASS` / `SUBMISSION_IP_SECRET` 的 B 值，**不给** HubSpot token 与 AI key——生产模式下 HubSpot 忽略 base 覆盖、AI base URL 写死，给了就可能产生真实外部请求。提交询盘 200，Directus 写入 200；本地假 SMTP 记录到 AUTH PLAIN 使用的是**运行时 B**，随后拒绝 `MAIL FROM`，接收邮件 0 封；询盘 `hubspot_sync_status` = `not_configured`（构建期 HubSpot canary 未生效，0 次 HubSpot 请求）。对照：运行时无 `SMTP_PASS` → 不发起 AUTH、接收 0 封；错误值 C → 使用 C、接收 0 封、服务端记录通知失败、表单仍 200。所有 HTTP 响应（含 SSR HTML / payload）、服务端日志、Directus 日志中 canary 为 0。`SUBMISSION_IP_SECRET` 与 AI key 在不发真实请求的前提下无法从产物外部观测，由产物中 0 出现与单元测试覆盖。
+
+**HTTP smoke（同一产物，scratch 数据，两轮）：** `/`、`/products`、`/resources`、`/support/faq`、`/company/become-a-partner`、`/contact`、`/api/cms/posts`、`/api/cms/products/categories`、`/api/cms/content/technical_article`、`/api/cms/site-settings`、`/admin/login`、`/admin` 均 200；`/admin/products` 302；`/api/admin/ai/providers` 401；非预期 401 / 403 / 503 均为 0。如实说明：首轮我对 `/resources/insights`、`/resources/case-studies` 预期 200、对 `/admin` 预期 302，均为我的判据错误——前两者只有 `[slug]` 页，裸 URL 按设计落到 `pages/[...slug].vue` 的 404；`/admin` 无 cookie 返回 admin 外壳（200）并在客户端跳转，与此前记录一致，子页面服务端 302。
+
+**清理与 dev 安全：** DROP 前名称守卫 PASS；一次性容器、scratch 库、隔离目录均已移除，端口 2525 / 3190 / 8056 已释放；隔离 uploads 事后只含 `directus-health-file`。dev 库 21 项计数（含 `inquiries` 22 / max 22、`directus_activity` 1107 / max 1141、`directus_revisions` 859 / max 891）前后完全一致；dev uploads 129 个文件清单完全一致。
+
+**质量闸（Node v22.22.2 / npm 10.9.7）：** 定向 14 files / 494 passed · full suite **88 files（2 skipped）/ 3020 passed / 45 skipped / 0 failed（较 01C +1 file、+33 tests）** · release guard PASS · typecheck 0 · lint 0 · build PASS · `git diff --check` exit 0；质量闸最终构建后 18 个 canary 在 `.output` 中 0 次，tracked 文件与暂存区 canary 0，canary 文件已删除。**外部副作用：OpenAI 调用 0 · DeepSeek 调用 0 · SMTP 真实发送 0 · HubSpot 写入 0。** 生产未触碰。
+
+**治理：** 新增 **D-039 — Runtime-Only Server Secret Injection**；RSG-08 补充本地证据（未声称生产 secret manager 已验证）；runbook §2 / §4 / §7；`.env.example` 顶部说明；旧文档最小同步：`docs/ADMIN-CMS-SETUP.md` §3.2（标注已被取代，勿按其创建 Administrator token）与 §8、`docs/ADMIN-CMS-SPEC.md` 两处、`docs/OPERATIONS-HANDBOOK.md` 密钥存放原则一条。最后这份不在施工单点名的两份之内，因其"只放服务器 `.env`"的指引与运行时注入直接冲突而一并做了最小同步。
+
+**Production Ready 01：COMPLETE（本地范围）。** Backup / Restore 仍 PENDING。
+
+**仍 OPEN：** `SUBMISSION_IP_SECRET` 缺失时的既有行为——`publicInquiry.ts` 以内置常量作 HMAC 键，限流照常生效。该 HMAC 结果只作进程内限流 Map 的键、从不存储或记录，能观察到它的一方同样能读到进程内存里的 secret，故判断不构成不安全回退；但生产中会静默使用开发常量，是否改为缺失即拒绝须 Controller 决定（本模块按施工单未改行为）· Backup / Restore · 容量 · 依赖许可证 / CVE · Final Release Verification · 生产部署 NOT AUTHORIZED · `postgres:16-alpine` 浮动 tag（已登记）· PATH 默认 Node 仍为 24.14.0 · 生产 secret manager 与生产注入机制（随生产运行方式决定，未验证）。
+
+*最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-01D 任务中写入。*

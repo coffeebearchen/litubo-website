@@ -3,6 +3,7 @@ import { contentAdminFetch } from '~/server/utils/contentAdminFetch'
 import { parseContentItemId } from '~/server/utils/contentDraft'
 import { CONTENT_AI_ANALYZE_BODY_MAX_BYTES, analyzeContentAiSources } from '~/server/utils/aiContentIntake'
 import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegistryDefault'
+import { readDeepseekApiKey, readOpenaiApiKey } from '~/server/utils/serverSecrets'
 import { MAX_PER_FILE_CHARS } from '~/server/utils/aiTextExtraction'
 import { createImageTextReader, createPdfTextReader } from '~/server/utils/documentExtractorClient'
 import { readJsonBodyWithByteLimit } from '~/server/utils/requestBodyLimit'
@@ -24,8 +25,9 @@ export default defineEventHandler(async (event): Promise<AdminContentAiAnalyzeRe
   const config = useRuntimeConfig()
   const registry = createDefaultAiProviderRegistry({
     defaultProvider: config.aiDefaultProvider,
-    openai: { apiKey: config.openaiApiKey, model: config.openaiModel },
-    deepseek: { apiKey: config.deepseekApiKey, model: config.deepseekModel },
+    // API keys come from the running process, never runtimeConfig (FINAL-RELEASE-PRODUCTION-READY-01D).
+    openai: { apiKey: readOpenaiApiKey(), model: config.openaiModel },
+    deepseek: { apiKey: readDeepseekApiKey(), model: config.deepseekModel },
   })
   // The same isolated document-extractor readers the Product AI path uses (PDF text, image OCR).
   const readers = {

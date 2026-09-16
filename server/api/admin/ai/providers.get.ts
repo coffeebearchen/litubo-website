@@ -1,5 +1,6 @@
 import { setResponseHeader } from 'h3'
 import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegistryDefault'
+import { readDeepseekApiKey, readOpenaiApiKey } from '~/server/utils/serverSecrets'
 
 /**
  * PWS-AI-ENGINE-01 — read-only, admin-only AI provider status. Covered by
@@ -8,8 +9,10 @@ import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegist
  *
  * Returns only `{ id, label, configured, isDefault }` per provider — never
  * an API key, model name, environment variable name, raw error, prompt, or
- * file content. `useRuntimeConfig()` values are read here and nowhere else
- * in this response; only their *presence* (via `configured`) is exposed.
+ * file content. The API keys (read from the running process, never runtimeConfig —
+ * FINAL-RELEASE-PRODUCTION-READY-01D) and the `useRuntimeConfig()` model names are
+ * read here and nowhere else in this response; only their *presence* (via
+ * `configured`) is exposed.
  *
  * PWS-AI-ENGINE-01R2-REVIEW-FIX-01 — `private, no-store`: this describes one
  * administrator's server configuration, so it must never be held by a shared
@@ -21,8 +24,8 @@ export default defineEventHandler((event) => {
 
   const registry = createDefaultAiProviderRegistry({
     defaultProvider: config.aiDefaultProvider,
-    openai: { apiKey: config.openaiApiKey, model: config.openaiModel },
-    deepseek: { apiKey: config.deepseekApiKey, model: config.deepseekModel },
+    openai: { apiKey: readOpenaiApiKey(), model: config.openaiModel },
+    deepseek: { apiKey: readDeepseekApiKey(), model: config.deepseekModel },
   })
 
   const defaultProvider = registry.getDefaultProvider()

@@ -60,15 +60,20 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // Server secrets are deliberately NOT declared anywhere in runtimeConfig (D-039). It is evaluated
+    // whenever this file is loaded — `nuxt build` included — and serialized into .output, so a secret
+    // declared here would be baked into the build artifact. The running server reads DIRECTUS_TOKEN,
+    // SMTP_PASS, SUBMISSION_IP_SECRET, HUBSPOT_ACCESS_TOKEN, OPENAI_API_KEY and DEEPSEEK_API_KEY from its
+    // own process environment instead: server/utils/directusServiceToken.ts and
+    // server/utils/serverSecrets.ts (FINAL-RELEASE-PRODUCTION-READY-01C / 01D). Every value declared
+    // below is non-secret configuration.
     contactEmail: process.env.CONTACT_EMAIL ?? 'info@litubo.com',
     salesEmail: process.env.SALES_EMAIL ?? 'sales@litubo.com',
     smtpHost: process.env.SMTP_HOST ?? '',
     smtpPort: process.env.SMTP_PORT ?? '587',
+    // The SMTP account name identifies the mailbox; it is not a credential. Its password is SMTP_PASS.
     smtpUser: process.env.SMTP_USER ?? '',
-    smtpPass: process.env.SMTP_PASS ?? '',
     smtpFrom: process.env.SMTP_FROM ?? 'noreply@litubo.com',
-    // Inquiry security — server-side only
-    submissionIpSecret: process.env.SUBMISSION_IP_SECRET ?? '',
     privacyPolicyVersion: process.env.PRIVACY_POLICY_VERSION ?? '1.0',
     // CMS adapter — server-side only, not exposed to the browser.
     // Populated when CMS_MODE=directus; ignored when CMS_MODE=fixtures (default).
@@ -83,21 +88,20 @@ export default defineNuxtConfig({
     // Set CMS_MODE_PRODUCTS=directus (plus DIRECTUS_URL, and DIRECTUS_TOKEN in the running
     // server's environment) to enable.
     productsCmsMode: process.env.CMS_MODE_PRODUCTS ?? 'fixtures',
-    // HubSpot Contact sync (Phase 7A framework — Phase 7B configures token)
-    hubspotAccessToken: process.env.HUBSPOT_ACCESS_TOKEN ?? '',
+    // HubSpot Contact sync (Phase 7A framework — Phase 7B configures token). The token itself,
+    // HUBSPOT_ACCESS_TOKEN, is runtime-only (see the note at the top of runtimeConfig).
     // Override API base for local mock testing only; always https://api.hubapi.com in production
     hubspotApiBase: process.env.HUBSPOT_API_BASE_URL ?? '',
     // AI provider registry (PWS-AI-PLATFORM-01 + PWS-AI-PROVIDER-02) — server-side only,
-    // never runtimeConfig.public. *_API_KEY values are secrets (local/deployment .env only);
-    // *_MODEL values are non-secret and configurable — no model name is ever hardcoded in
-    // application code. All empty by default: each provider's isConfigured() fails closed
-    // until an operator sets both of its values in their own .env. AI_DEFAULT_PROVIDER picks
-    // which already-configured provider a future Generate call defaults to — 'deepseek' unless
-    // explicitly set to 'openai' (validated server-side by parseAiProviderId(), never trusted raw).
+    // never runtimeConfig.public. The API keys, OPENAI_API_KEY and DEEPSEEK_API_KEY, are secrets and
+    // runtime-only (see the note at the top of runtimeConfig); *_MODEL values are non-secret and
+    // configurable — no model name is ever hardcoded in application code. All empty by default:
+    // each provider's isConfigured() fails closed until both its key and its model are set.
+    // AI_DEFAULT_PROVIDER picks which already-configured provider a future Generate call defaults
+    // to — 'deepseek' unless explicitly set to 'openai' (validated server-side by
+    // parseAiProviderId(), never trusted raw).
     aiDefaultProvider: process.env.AI_DEFAULT_PROVIDER ?? 'deepseek',
-    openaiApiKey: process.env.OPENAI_API_KEY ?? '',
     openaiModel: process.env.OPENAI_MODEL ?? '',
-    deepseekApiKey: process.env.DEEPSEEK_API_KEY ?? '',
     deepseekModel: process.env.DEEPSEEK_MODEL ?? '',
     // AI-PDF-SOURCE-01 — where the server reaches the document-extractor sidecar that
     // reads text-layer PDFs. Server-side only, never runtimeConfig.public: the browser
