@@ -1,5 +1,6 @@
 import { createError, getRouterParam } from 'h3'
-import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
+import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { assertProductDraftForMutation } from '~/server/utils/productLifecycle'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -8,7 +9,7 @@ export default defineEventHandler(async (event) => {
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: 'Invalid product id' })
   if (!sourceId || isNaN(Number(sourceId))) throw createError({ statusCode: 400, message: 'Invalid source record id' })
 
-  await assertProductExists(event, Number(id))
+  await assertProductDraftForMutation(event, Number(id))
 
   // Verify source record belongs to this product
   const existing = await adminFetch<{ data: { id: number; product_id: number; archived: boolean }[] }>(

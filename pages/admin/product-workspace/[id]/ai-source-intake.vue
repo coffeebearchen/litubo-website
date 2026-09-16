@@ -59,6 +59,13 @@ const shellProduct = computed(() => ({
 const mediaResourcesHref = computed(() => workspaceMediaResourcesRoute(id))
 
 /**
+ * FINAL-RELEASE-FIX-F (D-037) — AI analysis is Draft-only. The server refuses
+ * Generate for any other status BEFORE it reaches a provider, so offering the
+ * button here would only spend a click to earn a 409.
+ */
+const isDraft = computed(() => (context.value?.lifecycleStatus ?? 'draft') === 'draft')
+
+/**
  * A failed source request is tracked separately from an empty list. Falling
  * back to `[]` made a server error render as "this product has no associated
  * files yet", which is a different (and false) statement about the product.
@@ -193,7 +200,15 @@ async function analyze() {
       />
     </template>
 
+    <div v-if="!isDraft" class="ws-not-found">
+      <p class="ws-not-found-hint">
+        AI changes are available only while the product is in Draft. Return it to Draft to analyze sources.
+      </p>
+      <NuxtLink to="/admin/products" class="ws-not-found-link">← Back to Product Center</NuxtLink>
+    </div>
+
     <WorkspaceAiSourceIntake
+      v-else
       :sources="sources"
       :selected-refs="selectedRefs"
       :media-resources-href="mediaResourcesHref"

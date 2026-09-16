@@ -1,5 +1,6 @@
 import { createError, getRouterParam, setResponseHeader } from 'h3'
 import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { readProductLifecycle } from '~/server/utils/productLifecycle'
 import { runProposalEngine } from '~/server/utils/aiProposalEngine'
 import { createDefaultAiProviderRegistry } from '~/server/utils/aiProviderRegistryDefault'
 import { specificationsTarget } from '~/server/utils/aiTargets/specificationsTarget'
@@ -7,6 +8,7 @@ import { readJsonBodyWithByteLimit } from '~/server/utils/requestBodyLimit'
 import { resolveSourceRefs, SourceRefUnavailableError } from '~/server/utils/aiSourceRef'
 import { claimGenerateSlot, releaseGenerateSlot } from '~/server/utils/aiGenerateRateLimit'
 import { lookupAnalysis, rememberAnalysis } from '~/server/utils/aiProposalReplayGuard'
+import { createProductProposalBinding } from '~/server/utils/aiProposalBinding'
 import type { SpecificationProposal } from '~/utils/aiProposal'
 import { MAX_FILES_PER_REQUEST, MAX_PER_FILE_CHARS } from '~/server/utils/aiTextExtraction'
 import { createImageTextReader, createPdfTextReader } from '~/server/utils/documentExtractorClient'
@@ -44,6 +46,12 @@ interface GenerateBody {
  * still belongs to this product and is still enabled — the ref is a handle,
  * never a grant.
  *
+ * FINAL-RELEASE-FIX-F — analysing a product that is not a Draft is refused
+ * BEFORE the provider is reached. A proposal for a product under review or
+ * already published could only ever end in confusion: Apply would refuse it,
+ * and the analysis would have been paid for to produce something unusable.
+ * The check costs one read and saves a provider call.
+ *
  * The response never includes a file UUID, path, download URL, locator,
  * internal note, raw extracted text, or the provider's raw response — only
  * the validated structured proposal (or a short, safe error) plus a per-file
@@ -63,6 +71,23 @@ export default defineEventHandler(async (event) => {
 
   const adminUserId = event.context.adminUserId as string | undefined
   if (!adminUserId) throw createError({ statusCode: 401, message: 'Not authenticated' })
+
+  /**
+   * FINAL-RELEASE-FIX-F — the Draft gate.
+   *
+   * It sits after the two checks that cost nothing and must keep their own
+   * contracts — the byte ceiling on the body and authentication — and before
+   * everything that costs something: no source ref is resolved, no rate-limit
+   * slot is claimed, and above all no provider is ever called for a product
+   * whose proposal could not be applied anyway.
+   */
+  const lifecycle = await readProductLifecycle(event, productId)
+  if (lifecycle.status !== 'draft') {
+    throw createError({
+      statusCode: 409,
+      message: 'AI analysis is available only while this product is a Draft.',
+    })
+  }
 
   // A ref that was not minted for this admin AND this product resolves to
   // nothing; one bad ref refuses the whole request rather than silently
@@ -161,9 +186,20 @@ export default defineEventHandler(async (event) => {
       return { ok: false, error: result.error, fileResults: result.fileResults }
     }
 
-    // A cache hit keeps its ORIGINAL reference. Minting a new one would hand
-    // back a clean slate and let a re-analysis walk past the Apply guard.
-    const proposalRef = reusedRef ?? rememberAnalysis(scopeFor(result.fingerprint), result.output)
+    /**
+     * A cache hit keeps its ORIGINAL reference. Minting a new one would hand
+     * back a clean slate and let a re-analysis walk past the Apply guard.
+     *
+     * FINAL-RELEASE-FIX-F — a freshly minted reference now carries the server's
+     * binding: which association rows this analysis read, and under which
+     * fingerprint. Apply re-resolves those rows before it writes.
+     */
+    const proposalRef = reusedRef ?? rememberAnalysis(
+      scopeFor(result.fingerprint),
+      result.output,
+      Date.now(),
+      createProductProposalBinding(productId, mediaIds, result.fingerprint),
+    )
 
     return {
       ok: true,

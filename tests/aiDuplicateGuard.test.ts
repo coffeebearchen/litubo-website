@@ -478,10 +478,14 @@ describe('apply.post.ts — a replayed request performs no additional writes', (
     vi.stubGlobal('$fetch', vi.fn(async (url: string, options?: Record<string, unknown>) => {
       fetchCalls.push({ url, options })
       const method = String(options?.method ?? 'GET').toUpperCase()
-      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
-      if (url.includes('/items/products/3?fields=status')) return { data: { status: 'draft' } }
+      // FINAL-RELEASE-FIX-F — the shared Draft guard reads the lifecycle columns
+      // from this one filter query, so the fixture has to carry a status.
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3, status: 'draft', product_code: null, published_at: null }] }
+      if (url.includes('/items/products_files?')) return { data: [] }
+      if (url.includes('/items/product_spec_items?filter')) {
+        return { data: [{ id: 11, label_en: 'Detection sensitivity (Fe)', spec_group_id: { id: 5, title_en: 'Detection performance' } }] }
+      }
       if (url.includes('/items/product_spec_groups?filter')) return { data: [{ id: 5, title_en: 'Detection performance' }] }
-      if (url.includes('/items/product_spec_items/')) return { data: { id: 11, value_en: 'old', note_en: null, spec_group_id: { id: 5, product_id: 3 } } }
       if (method === 'POST') return { data: { id: 900 } }
       return { data: null }
     }))
@@ -497,12 +501,22 @@ describe('apply.post.ts — a replayed request performs no additional writes', (
   })
 
   it('writes once for the first request and nothing at all for an identical replay', async () => {
+    // FINAL-RELEASE-FIX-F — a product proposal now carries the server's binding:
+    // which association rows it read, under which fingerprint. Apply re-resolves
+    // them before it writes, and an empty set resolves to an empty set.
+    const { createProductProposalBinding } = await import('../server/utils/aiProposalBinding')
+    const { proposalItemKey } = await import('../server/utils/aiSpecificationApply')
     const ref = rememberAnalysis(
       { adminUserId: 'admin-1', productId: 3, targetId: 'specifications', providerId: 'deepseek', fingerprint: 'fp-endpoint' },
       VALID_PROPOSAL,
+      Date.now(),
+      createProductProposalBinding(3, [], 'fp-endpoint'),
     )
     const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/apply.post')).default as (e: unknown) => Promise<unknown>
-    const body = { proposalRef: ref, changes: [{ action: 'update', specItemId: 11, value: '0.9 mm' }] }
+    const body = {
+      proposalRef: ref,
+      changes: [{ itemKey: proposalItemKey('Detection performance', 'Detection sensitivity (Fe)'), value: '0.9 mm' }],
+    }
 
     const first = await handler(mockEvent(body)) as { ok: boolean, appliedCount: number }
     expect(first).toMatchObject({ ok: true, appliedCount: 1 })
@@ -519,7 +533,9 @@ describe('apply.post.ts — a replayed request performs no additional writes', (
 
   it('a reference that was never minted is refused before any write', async () => {
     const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/apply.post')).default as (e: unknown) => Promise<unknown>
-    const body = { proposalRef: 'not-a-real-reference', changes: [{ action: 'update', specItemId: 11, value: 'x' }] }
+    // FINAL-RELEASE-FIX-F — a schema-valid body, so the refusal below is the
+    // reference being unknown rather than the request being malformed.
+    const body = { proposalRef: 'not-a-real-reference', changes: [{ itemKey: 'detection performance detection sensitivity (fe)', value: 'x' }] }
 
     let statusCode: number | undefined
     try {
@@ -541,7 +557,7 @@ describe('apply.post.ts — a replayed request performs no additional writes', (
 
     let statusCode: number | undefined
     try {
-      await handler(mockEvent({ proposalRef: ref, changes: [{ action: 'update', specItemId: 11, value: 'x' }] }))
+      await handler(mockEvent({ proposalRef: ref, changes: [{ itemKey: 'detection performance detection sensitivity (fe)', value: 'x' }] }))
     } catch (err) {
       statusCode = (err as { statusCode?: number }).statusCode
     }
@@ -551,22 +567,31 @@ describe('apply.post.ts — a replayed request performs no additional writes', (
   })
 
   it('a preflight refusal writes nothing and leaves the reference usable', async () => {
+    const { createProductProposalBinding } = await import('../server/utils/aiProposalBinding')
     const ref = rememberAnalysis(
       { adminUserId: 'admin-1', productId: 3, targetId: 'specifications', providerId: 'deepseek', fingerprint: 'fp-preflight' },
       VALID_PROPOSAL,
+      Date.now(),
+      createProductProposalBinding(3, [], 'fp-preflight'),
     )
     const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/apply.post')).default as (e: unknown) => Promise<unknown>
 
-    // An item that belongs to another product: refused during preflight.
+    /**
+     * FINAL-RELEASE-FIX-F — a change can no longer aim at another product's row,
+     * because it cannot aim at a row at all: it names a proposal item and the
+     * server derives the target. The equivalent refusal is therefore a change
+     * naming something the server's proposal does not contain.
+     */
     vi.stubGlobal('$fetch', vi.fn(async (url: string, options?: Record<string, unknown>) => {
       fetchCalls.push({ url, options })
-      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
-      if (url.includes('/items/products/3?fields=status')) return { data: { status: 'draft' } }
-      if (url.includes('/items/product_spec_items/')) return { data: { id: 77, value_en: 'x', note_en: null, spec_group_id: { id: 8, product_id: 4 } } }
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3, status: 'draft', product_code: null, published_at: null }] }
       return { data: null }
     }))
 
-    await expect(handler(mockEvent({ proposalRef: ref, changes: [{ action: 'update', specItemId: 77, value: 'x' }] }))).rejects.toBeDefined()
+    await expect(handler(mockEvent({
+      proposalRef: ref,
+      changes: [{ itemKey: 'somewhere else never proposed', value: 'x' }],
+    }))).rejects.toBeDefined()
     expect(writes()).toEqual([])
 
     // Still claimable: nothing was written, so the reviewer may correct and retry.

@@ -1,5 +1,6 @@
 import { createError, getRouterParam, setResponseHeader } from 'h3'
 import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
+import { archivedAmong } from '~/server/utils/contentMediaRelations'
 import { sanitizeDisplayNameForBrowser } from '~/server/utils/aiTextExtraction'
 import { createSourceRef, SourceRefUnavailableError } from '~/server/utils/aiSourceRef'
 import { aiSourceFormatFor, aiSourceFormatRefusal, aiSourceTypeLabel, sourceFailureMessage } from '~/utils/aiSourceFormats'
@@ -18,6 +19,12 @@ import { aiSourceFormatFor, aiSourceFormatRefusal, aiSourceTypeLabel, sourceFail
  * a sanitized display name, plain labels, whether the file can be analyzed and
  * why not, and an opaque `sourceRef` that stands in for the association id
  * (see `aiSourceRef.ts`). Everything else stays on the server.
+ *
+ * FINAL-RELEASE-FIX-F — a file archived in the Media Library is listed as
+ * unavailable rather than offered. Content AI has always applied that rule;
+ * Product AI did not, so an archived file could still be selected, downloaded
+ * and sent to a paid provider. The engine now refuses it as well, so this list
+ * can never offer a file the engine would drop.
  */
 
 /** Exactly what the browser receives per file. Nothing here is a Directus identifier. */
@@ -38,10 +45,14 @@ interface ProductFileRow {
   enabled: boolean | null
   file_role: string | null
   directus_files_id: {
+    id: string | null
     filename_download: string | null
     type: string | null
   } | null
 }
+
+/** The same wording Content AI uses for an archived source. */
+const ARCHIVED_FILE_REASON = 'This file is archived in the Media Library, so it cannot be analyzed.'
 
 function roleLabel(role: string | null): string {
   if (!role) return 'Role not set'
@@ -55,11 +66,12 @@ function roleLabel(role: string | null): string {
  * shared source contract, the same one the engine reads the file with, so this
  * list can never offer a file the engine would refuse.
  */
-function unavailableReasonFor(row: ProductFileRow): string | null {
+function unavailableReasonFor(row: ProductFileRow, archived: Set<string>): string | null {
   const mime = row.directus_files_id?.type ?? null
   const refusal = aiSourceFormatRefusal(mime)
   if (refusal) return sourceFailureMessage(refusal, mime)
   if (row.enabled !== true) return sourceFailureMessage('disabled')
+  if (archived.has(row.directus_files_id?.id ?? '')) return ARCHIVED_FILE_REASON
   return null
 }
 
@@ -79,13 +91,17 @@ export default defineEventHandler(async (event): Promise<AiIntakeSource[]> => {
   const result = await adminFetch<{ data: ProductFileRow[] }>(
     event,
     `/items/products_files?filter[products_id][_eq]=${productId}`
-    + '&fields=id,enabled,file_role,directus_files_id.filename_download,directus_files_id.type'
+    + '&fields=id,enabled,file_role,directus_files_id.id,directus_files_id.filename_download,directus_files_id.type'
     + '&limit=200&sort=sort,id',
   )
 
+  const rows = result.data ?? []
+  const fetch = <T>(path: string, opts?: Record<string, unknown>) => adminFetch<T>(event, path, opts)
+  const archived = await archivedAmong(fetch, rows.map(row => row.directus_files_id?.id ?? '').filter(Boolean))
+
   try {
-    return (result.data ?? []).map((row) => {
-      const reason = unavailableReasonFor(row)
+    return rows.map((row) => {
+      const reason = unavailableReasonFor(row, archived)
       return {
         sourceRef: createSourceRef(row.id, { productId, adminUserId }),
         displayName: sanitizeDisplayNameForBrowser(row.directus_files_id?.filename_download ?? null),

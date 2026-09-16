@@ -100,6 +100,12 @@ export default defineNuxtConfig({
     // publishes for a host-process Nuxt; a containerized Nuxt would use
     // http://document-extractor:8787.
     documentExtractorUrl: process.env.DOCUMENT_EXTRACTOR_URL ?? 'http://127.0.0.1:8787',
+    // FINAL-RELEASE-FIX-F — Product AI "Apply to Draft" release gate. Not a secret.
+    // Apply writes a batch as separate Directus REST calls and cannot be made
+    // all-or-nothing without a redesign, so production runs it only when this is
+    // exactly "true"; missing, empty or any other value keeps it closed there.
+    // Outside production it is on unless explicitly set to "false".
+    productAiApplyEnabled: process.env.PRODUCT_AI_APPLY_ENABLED ?? '',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://litubo.com',
       publishedLocales: ['en'],

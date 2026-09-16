@@ -700,11 +700,13 @@ describe('PWS-01 issues no write request on load, only on explicit Save (source 
 
   it('Save changes is wired through the shared WorkspaceShell save event, not a local button', () => {
     expect(page).toContain('@save="handleSave"')
-    expect(page).toContain(':save-state="saveState"')
+    // FINAL-RELEASE-FIX-F — Save is offered only while the product is a Draft.
+    expect(page).toContain(':save-state="isDraft ? saveState : \'unavailable\'"')
   })
 
   it('save only runs when there are local changes and not already saving', () => {
-    expect(page).toContain('if (!isDirty.value || saving.value) return')
+    // FINAL-RELEASE-FIX-F — and only while it is a Draft.
+    expect(page).toContain('if (!isDraft.value || !isDirty.value || saving.value) return')
   })
 })
 
@@ -919,11 +921,13 @@ describe('PWS-02 issues no write request on load, only on explicit Save (source 
 
   it('Save changes is wired through the shared WorkspaceShell save event, not a local button', () => {
     expect(page).toContain('@save="handleSave"')
-    expect(page).toContain(':save-state="saveState"')
+    // FINAL-RELEASE-FIX-F — Save is offered only while the product is a Draft.
+    expect(page).toContain(':save-state="isDraft ? saveState : \'unavailable\'"')
   })
 
   it('save only runs when there are local changes and not already saving', () => {
-    expect(page).toContain('if (!isDirty.value || saving.value) return')
+    // FINAL-RELEASE-FIX-F — and only while it is a Draft.
+    expect(page).toContain('if (!isDraft.value || !isDirty.value || saving.value) return')
   })
 
   it('only PATCHes/POSTs rows that actually changed, diffed per group and per item', () => {
@@ -1074,7 +1078,8 @@ describe('PWS-03 page composition (source evidence)', () => {
   })
 
   it('passes a save-state and listens for the shared Save changes event — R1 batches writes like PWS-01/02', () => {
-    expect(page).toContain(':save-state="saveState"')
+    // FINAL-RELEASE-FIX-F — Save is offered only while the product is a Draft.
+    expect(page).toContain(':save-state="isDraft ? saveState : \'unavailable\'"')
     expect(page).toContain('@save="handleSave"')
   })
 })
@@ -1162,7 +1167,8 @@ describe('PWS-03-R1 issues zero write requests on load, tab switching, opening/c
   })
 
   it('save only runs when there are staged changes and not already saving — matching PWS-01/02\'s exact guard', () => {
-    expect(page).toContain('if (!isDirty.value || saving.value) return')
+    // FINAL-RELEASE-FIX-F — and only while it is a Draft.
+    expect(page).toContain('if (!isDraft.value || !isDirty.value || saving.value) return')
   })
 
   it('never mutates props directly in the presentational component — every action is emitted up to the page', () => {
@@ -1522,13 +1528,16 @@ describe('PWS-SOURCES-LITE-POLISH-01 reuses product_source_records, never a new 
 })
 
 describe('PWS-SOURCES-LITE-POLISH-01 cross-product objects are rejected, never leaked (source evidence)', () => {
-  it('every write endpoint calls assertProductExists before touching product_source_records', () => {
+  it('every write endpoint proves the product before touching product_source_records', () => {
+    // FINAL-RELEASE-FIX-F — a read still only has to prove the product exists;
+    // a write must prove it is a Draft, through the one shared guard.
+    expect(repoFile('server/api/admin/products/[id]/evidence/index.get.ts'))
+      .toContain('await assertProductExists(event, Number(id))')
     for (const file of [
-      'server/api/admin/products/[id]/evidence/index.get.ts',
       'server/api/admin/products/[id]/evidence/index.post.ts',
       'server/api/admin/products/[id]/evidence/[linkId].patch.ts',
     ]) {
-      expect(repoFile(file)).toContain('await assertProductExists(event, Number(id))')
+      expect(repoFile(file)).toContain('await assertProductDraftForMutation(event, Number(id))')
     }
   })
 
@@ -1595,7 +1604,9 @@ describe('PWS-SOURCES-LITE-POLISH-01 writes only on an explicit click — never 
     for (const fn of ['linkEvidence', 'updateVerification', 'removeEvidence']) {
       const start = page.indexOf(`async function ${fn}(`)
       const body = page.slice(start, page.indexOf('\n}', start))
-      expect(body).toContain('if (pending.value) return')
+      // FINAL-RELEASE-FIX-F — and, since every one of these is a write, it runs
+      // only while the product is a Draft.
+      expect(body).toContain('if (!isDraft.value || pending.value) return')
     }
   })
 

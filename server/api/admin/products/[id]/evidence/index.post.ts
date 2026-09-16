@@ -1,5 +1,6 @@
 import { createError, getRouterParam, readBody } from 'h3'
-import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
+import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { assertProductDraftForMutation } from '~/server/utils/productLifecycle'
 import {
   buildSpecItemFactKey,
   assertSpecItemBelongsToProduct,
@@ -23,7 +24,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: 'Invalid product id' })
-  await assertProductExists(event, Number(id))
+  await assertProductDraftForMutation(event, Number(id))
 
   const body = await readBody(event)
 

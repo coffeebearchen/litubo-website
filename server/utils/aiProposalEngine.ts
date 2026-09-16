@@ -15,6 +15,7 @@ import { digestSourceText, buildAnalysisFingerprint } from './aiProposalReplayGu
 import { isAiProviderId, type AiProviderId, type AiProviderRegistry } from './aiProviderRegistry'
 import { PROMPT_CONTRACT_VERSION, type AiGenerationInput, type AiGenerationInputBase, type TargetDefinition } from './aiTargetContract'
 import { productSubjectKey } from './aiSubject'
+import { archivedAmong } from './contentMediaRelations'
 import type { FetchFn } from './mediaLifecycle'
 
 /**
@@ -173,19 +174,29 @@ async function assertProductExistsViaFetch(fetch: FetchFn, productId: number): P
  * usable (`enabled = true`). Any id that does not belong to this product,
  * or belongs to it but is disabled, is simply absent from the result —
  * never leaked as "found but wrong owner/disabled".
+ *
+ * FINAL-RELEASE-FIX-F — a file ARCHIVED in the Media Library is excluded too.
+ * Content AI has always applied that rule; Product AI did not, so a file a
+ * person had archived could still be selected, downloaded and sent to a paid
+ * provider. `media_file_lifecycle.archived` is the one archive state there is,
+ * and this reads it through the same helper the Media Library and Content AI
+ * use. Exported because Apply re-runs exactly this resolution before writing.
  */
-async function resolveProductSourceFiles(
+export async function resolveProductSourceFiles(
   fetch: FetchFn,
   productId: number,
   mediaIds: number[],
 ): Promise<AiSourceFileRow[]> {
+  if (mediaIds.length === 0) return []
   const idsParam = mediaIds.join(',')
   const result = await fetch<{ data: AiSourceFileRow[] }>(
     `/items/products_files?filter[products_id][_eq]=${productId}&filter[id][_in]=${idsParam}&filter[enabled][_eq]=true` +
     '&fields=id,directus_files_id.id,directus_files_id.filename_download,directus_files_id.type,directus_files_id.filesize' +
     `&limit=${mediaIds.length}`,
   )
-  return result.data ?? []
+  const rows = result.data ?? []
+  const archived = await archivedAmong(fetch, rows.map(row => row.directus_files_id?.id ?? '').filter(Boolean))
+  return archived.size === 0 ? rows : rows.filter(row => !archived.has(row.directus_files_id?.id ?? ''))
 }
 
 /**

@@ -121,6 +121,27 @@ export interface SpecificationProposal {
   conflicts?: SpecificationConflict[]
 }
 
+/**
+ * FINAL-RELEASE-FIX-F — the identity of one proposed item, derived from the
+ * proposal itself.
+ *
+ * Apply names WHICH proposal item a reviewer accepted; the server then decides
+ * the destination row. Both sides therefore have to derive the same key from
+ * the same proposal text, so it is defined once, here, in the module they both
+ * already read — not twice, once per side, waiting to drift apart.
+ *
+ * Case and internal whitespace are normalized the same way the Specifications
+ * writer compares names, and the two parts are joined with a NUL so no group
+ * and parameter pair can collide with another by running into the separator.
+ */
+export function specKeyPart(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export function proposalItemKey(group: string, parameter: string): string {
+  return [specKeyPart(group), specKeyPart(parameter)].join(String.fromCharCode(0))
+}
+
 export interface SourceFileOutcome {
   displayName: string
   /**

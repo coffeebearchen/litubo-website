@@ -1,5 +1,6 @@
 import { createError, getRouterParam, readBody } from 'h3'
-import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
+import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { assertProductDraftForMutation } from '~/server/utils/productLifecycle'
 import { parseSpecItemFactKey, isValidReviewStatus, ALLOWED_REVIEW_STATUSES } from '~/server/utils/productEvidenceLinks'
 
 /**
@@ -12,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const linkId = getRouterParam(event, 'linkId')
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: 'Invalid product id' })
   if (!linkId || isNaN(Number(linkId))) throw createError({ statusCode: 400, message: 'Invalid evidence link id' })
-  await assertProductExists(event, Number(id))
+  await assertProductDraftForMutation(event, Number(id))
 
   const check = await adminFetch<{ data: { product_id: number; fact_key: string | null; archived: boolean } | null }>(
     event, `/items/product_source_records/${linkId}?fields=product_id,fact_key,archived`,

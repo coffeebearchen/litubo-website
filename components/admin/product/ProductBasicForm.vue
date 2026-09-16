@@ -6,6 +6,13 @@ const props = defineProps<{
   categories: ProductCategory[]
   presets: ProductPreset[]
   loading?: boolean
+  /**
+   * FINAL-RELEASE-FIX-F — true whenever the product is not a Draft. Every field
+   * is disabled and Save is replaced by an explanation, because the server now
+   * refuses the write (D-037). This is the courtesy layer, not the guard: the
+   * refusal happens in `assertProductDraftForMutation`, whatever the browser does.
+   */
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -107,7 +114,10 @@ function update(field: keyof AdminProduct, value: unknown) {
       <textarea class="form-textarea" :value="modelValue.review_notes ?? ''" rows="2" placeholder="Internal notes, not shown on the website" @input="update('review_notes', ($event.target as HTMLTextAreaElement).value)" />
     </div>
 
-    <div class="form-actions">
+    <p v-if="readonly" class="form-locked-note">
+      This product is not a Draft, so its details are read-only. Return it to Draft to edit.
+    </p>
+    <div v-else class="form-actions">
       <button class="btn btn--primary" :disabled="loading" @click="emit('save')">
         {{ loading ? 'Saving…' : 'Save' }}
       </button>

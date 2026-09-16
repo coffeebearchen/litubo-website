@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             PUBLIC-CLAIMS-HOTFIX-02 — Support Hub Application Lab Claim Cleanup（Controller 接受 · e0d6ff6 · not pushed）；PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-FIX-E — Legacy Directus Permissions: Tracked + Least Privilege（A2 · LOCAL COMPLETE · P1-09 本地 CLOSED · 等待 Controller 审查）
-Active authorized module:           NONE（FINAL-RELEASE-FIX-E 已收口，等待 Controller 审查）
+Latest accepted module:             FINAL-RELEASE-FIX-E — Legacy Directus Permissions: Tracked + Least Privilege（Controller 接受 · e77849d · not pushed · P1-09 本地 CLOSED）；PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
+Latest completed module:            FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（A2 · LOCAL COMPLETE · D-037 已登记 · 等待 Controller 审查）
+Active authorized module:           NONE（FINAL-RELEASE-FIX-F 已收口，等待 Controller 审查）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05 与 P1-09 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：e0d6ff6）
+Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05、P1-09、P1-15、P1-17 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：e77849d）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10438,3 +10438,55 @@ Next candidate:                 NONE — 等待 Controller（下一模块 NOT AU
 **P1-09：** 本地 CLOSED（已工件化、已按真实调用面最小化、可 verify / rollback / 幂等复用）。生产仍须按 RSG §3A.8 作为独立 release 步骤显式 apply 并留证；本地通过不等于生产已具备。
 
 *最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-FIX-E 任务中写入。*
+
+---
+
+## FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（2026-09-16）
+
+```text
+Module:                         FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（P1-15 / P1-17）
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller 施工单）
+Branch:                         review/final-release-fix-f-product-v1-safety-01（基线 e77849d；FINAL-RELEASE-FIX-E 已由 Controller 接受）
+Status:                         LOCAL COMPLETE · 等待 Controller 审查
+Decision:                       新增 D-037 — Product V1 Draft-Only Mutation and AI Apply Safety
+Schema / permissions / data:    schema 0；Directus 权限 0（FIX-E canonical 未动）；业务数据写入 0；未发布任何产品
+Safety gates touched:           RSG-01 · RSG-02 · RSG-03 · RSG-04（· RSG-09 无 push / merge / deploy）
+MASTER-ROADMAP:                 未修改
+Push / merge / deploy:          NONE
+Next candidate:                 NONE — 等待 Controller（下一模块 NOT AUTHORIZED）
+```
+
+**写入面盘点（§5 / §6）：** 产品业务数据写入面共 **26** 个，全部位于 `server/api/admin/products/**`：`products` 3（create / base PATCH / seo）、`product_faqs` 3、`products_files` 3、`product_sections` 3、`product_section_items` 3、`product_spec_groups` 3、`product_spec_items` 3、`product_source_records` 4，加 AI apply 1。`product_categories` 与 `product_page_presets` 在运行时无写入面。盘点以全仓 80 处写方法命中、59 个 `*.post/patch/put/delete.ts` 逐一核对为据。**盘点前的事实：26 个里只有 AI apply 一处检查产品状态，其余 25 个只有 `assertProductExists`（`fields=id`，不查 status）**；旧编辑器 `/admin/products/:id/...` 与新 Workspace `/admin/product-workspace/:id/...` 是两套 UI、**共用同一批服务端路由**，因此两者在 published 状态下同样可写。
+
+**V1 生命周期（D-037）：** `draft` 可写业务数据；`review` / `published` / `archived` 只读；已发布产品须先退回 Draft 才能编辑，再经 review 重新发布。状态机未改（draft → review、review → draft | published、published → draft；archived 经 API 既不可达也不可离开），但从 4 份手工同步的副本收敛为单一真相 `server/utils/productLifecycle.ts`。
+
+**服务端守卫：** 新增 `assertProductDraftForMutation`——一次查询同时证明产品存在且为 Draft，非 Draft 一律 409 且零写入。23 个非 AI 写入路由改用它（`index.post.ts` 创建时服务端写死 `status: 'draft'`，无需守卫；`[id].patch.ts` 单独处理），AI apply 改用同一守卫。**未被守卫的产品业务写入路由：0**，由测试逐文件扫描证明。
+
+**状态迁移与内容修改分离（§10）：** `PATCH /api/admin/products/:id` 现在每次只做一件事——带 `status` 即为生命周期请求，只写 `status` 与服务端派生的 `published_at`，同时携带任何业务字段或 `product_code` 一律 400；不带 `status` 即为内容请求，非 Draft 一律 409。此前一个请求可以一边改名改分类、一边把产品推过 review 送上线。
+
+**UI（§13 / §14 / §41）：** 旧编辑器基础信息表单在非 Draft 时全部字段禁用、Save 换成英文说明；Workspace 的 Specifications / Page content / Media & resources 三页在非 Draft 时 `save-state` 置 `unavailable`、`handleSave` 早返回并显示锁定横幅；Sources & evidence 为即时写入形态，三个写入处理器均早返回；AI Source Intake 与 AI Proposal Review 在非 Draft 时不渲染操作界面，改为英文说明。**UI 只是体验层**，真正的门在服务端（§15）。
+
+**Product AI（§19–§27）：** Generate 在任何 provider 调用之前拒绝非 Draft 产品（闸位于 body 字节上限与鉴权之后、来源解析与限流槽位之前，因此既不改变既有 413/401 契约，也保证非 Draft 的 provider 调用为 0）。来源解析与来源列表新增**归档排除**——Product AI 此前从不 join `media_file_lifecycle`，一个已在 Media Library 归档的文件只要 `enabled=true` 仍可被选中、下载并送进 provider，Content AI 一直有这条规则而 Product AI 没有。Apply 改为**服务端提案权威**：请求只能指名"接受了哪一条提案条目"（`itemKey`，由提案的 group + parameter 归一化推导，前后端共用 `utils/aiProposal.ts` 的同一个函数）与接受时的值；`action`、`specItemId`、`group`、`parameter` 已从请求形状中移除，写入目标与 add / update 判定全部由服务端依据自己持有的 proposal 与产品现状推导；提案中不存在的条目、重复条目、歧义目标整批 409 零写入。Generate 现在把 **product binding**（读过的关联行 id 与指纹）存入提案，Apply 写入前重新解析这些来源，被移除 / 禁用 / 已归档者拒绝整批；并在第一笔写入前**再次复查 Draft**。Apply 的状态清理改为 try/catch：写入前失败释放引用，可能已写入则记为终态不可重放——此前 `planSpecificationApply` 抛异常会让引用永久卡在 `applying`，只能等满 2 小时。
+
+**原子性裁定（§28–§32）：PATH B。** 仓库无 knex / pg / 任何数据库驱动，无事务 helper，全部数据访问经 Directus REST，一批 Apply 最多 200 次独立串行写。真正的 all-or-nothing 需要新增数据访问层或 Directus extension（扩展卷挂载此前已记为未授权），属重新设计。V1 **不伪装事务**（try/catch、补偿删除、best-effort rollback 都不算原子性，且前一版正因如此被下线），改为生产 fail-closed：`PRODUCT_AI_APPLY_ENABLED` 为非密钥布尔，生产仅当精确为 `true` 才启用 Apply，缺失 / 空 / 其它值一律 503；非生产除非显式设为 `false` 否则启用。Generate、提案与人工审阅不受影响，AI 代码未删除。
+
+**测试：** 新增 `tests/productV1LifecycleSafety.test.ts`（52 项）与 `tests/productV1AiApplyAuthority.test.ts`（19 项）：每个产品业务写入路由都经 draft guard 且不再以 `assertProductExists` 把关写入；创建仍强制 draft；状态迁移与内容修改分离；状态机单一真相且发布面板与服务端矩阵逐状态一致；四个公开出口（详情 / 分类列表 / sitemap / Content 的 related products）publication 语义等价（§17 选项 B）；生产 Apply 开关 fail-closed 且不在 `runtimeConfig.public`；Generate 的 draft 闸在 provider 之前；归档来源排除；Apply 重新解析来源并在写前复查 Draft；每条退出路径都 settle 或 release 引用；提案身份归一化、冲突条目可解决、未知 / 重复 / 歧义拒绝、schema 拒绝任何指定目标的字段。既有 Product AI 与 Workspace 测试按新契约**忠实更新**（不是削弱断言）：`aiSpecificationApply`、`aiEndpointBoundaries`、`aiDuplicateGuard`、`WorkspaceAiProposalReview.component`、`productWorkspaceOverview` 共 49 条因契约变更而失败的断言逐条按根因修正，其中一条（"preflight 拒绝仍可认领"）此前会因新 schema 先返回 400 而变成**假绿**，已改为测真正的等价语义。
+
+**门禁：** 全量（`CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run --no-file-parallelism`）85 files passed / 2 skipped，2938 passed / 45 skipped，**0 failed**，153.65 s（FIX-E 基线 83 files / 2938 中的 2870）；`npm run release:check-test-data` PASS；typecheck 0；lint 0；`npm run build` Build complete；`git diff --check` 通过。**真实 AI provider 调用：0**（DeepSeek 0 / OpenAI 0）。
+
+**TEST 产品与未取得的证据（如实记录）：** 库中 4 个产品全部为 TEST ONLY 标记且全部保持 `draft`，本模块**未创建、未修改、未发布任何产品**，`release:check-test-data` 仍 PASS、Published TEST = 0。施工单 §37 / §38 允许临时发布一个隔离 TEST 产品以取得 Published-lock 的浏览器证据与 FIX-E 遗留的 Product 子表**正向**权限证据；但 Charter §G.5 第 853 行明写「TEST ONLY 数据（product_code=NULL 或 ID=3）不得进入 published」，第 694 / 988 行进一步禁止 ID=3 被发布，而 RELEASE-SAFETY-GATES §5.1 规定该本地发布机制「不改变 Charter G.5 …… 有冲突时按更严格者执行，必要时 STOP 请求 Controller 裁定」。按更严格者执行，**未发布任何 TEST 产品**；§37 的浏览器 Published-lock 取证与 §38 的 FIX-E 正向权限证据因此**保持 OPEN**，等待 Controller 裁定是否单独授权。Published-lock 的服务端保证由自动化测试与源码扫描证明，不依赖该次发布。
+
+**Release Safety Gates：**
+- RSG-01：已发布产品的直接修改风险在 V1 范围内关闭（Draft-only + 单一守卫 + 状态/内容分离）；V1 仍无 Published Snapshot / Revision Draft，完整快照架构按 D-037 (3) 延后，§4.3 已按事实改写。
+- RSG-02：四个公开出口的 publication 语义以等价性测试证明（§17 选项 B），sitemap 只再收窄不放宽。
+- RSG-03：状态机收敛为单一真相；状态迁移强制单独成请求；发布仍只由已认证管理员显式触发。
+- RSG-04：Apply 完整性债务关闭（服务端提案权威 + 来源复验 + 写前复查 + 状态清理）；原子性属既有架构限制，以生产 fail-closed 处理而非伪装事务。
+- P0 Violations：NONE。
+
+**已知 / 记录：**
+- **P1-15 / P1-17 在仓库中没有任何定义**：FINAL-RELEASE-AUDIT-01 是 A0 只读模块且报告未落盘（本文件 L10006），全 `docs/` 仅有 `P1-05～P1-17` 这类区间表述。本模块对这两项的定义采用施工单的表述，映射来源为施工单而非仓库。仓库此前把 Apply 完整性债务登记为 Blueprint §18 / §35「既有债务」且**未编号**。
+- RSG-01(Products) 在两份文档中分级不一致：CURRENT-STATE 原文写「阻塞产品 CMS 公开切换 / 生产发布」且未标级，RELEASE-SAFETY-GATES §4.3 标为 **P2**。按 RSG §0.1「以更严格者为准」当作阻塞处理，该不一致本身未擅自统一，留待 Controller 裁定。
+- `review_notes` 属 `products` 的业务字段，按 §8 严格执行后成为 Draft-only：产品进入 review 后无法再写审阅备注。这是严格执行冻结契约的连带结果，如与实际审阅流程冲突请 Controller 裁定。
+- 旧编辑器与 Workspace 共用同一批服务端路由，本模块未改变这一并存架构，只是让两者受同一条 Draft-only 规则约束。
+
+*最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-FIX-F 任务中写入。*

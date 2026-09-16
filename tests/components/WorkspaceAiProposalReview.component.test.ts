@@ -155,7 +155,11 @@ describe('WorkspaceAiProposalReview — real mounted component', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const body = fetchMock.mock.calls[0][1]!.body!
     expect(body.changes).toHaveLength(1)
-    expect(body.changes[0]).toMatchObject({ action: 'add', parameter: 'Detection sensitivity (Fe)' })
+    // FINAL-RELEASE-FIX-F — the payload names the accepted proposal item, not a
+    // destination: no action, no row id, no group or parameter of its own.
+    expect(String(body.changes[0].itemKey)).toContain('detection sensitivity (fe)')
+    expect(body.changes[0]).not.toHaveProperty('action')
+    expect(body.changes[0]).not.toHaveProperty('specItemId')
   })
 
   it('a fully successful apply emits the server message as apply-success', async () => {
@@ -782,7 +786,10 @@ describe('source conflicts are decided by a person, never by the model', () => {
 
     const changes = fetchMock.mock.calls[0][1]!.body!.changes
     expect(changes).toHaveLength(1)
-    expect(changes[0]).toMatchObject({ parameter: 'Power supply', value: '380 V' })
+    // FINAL-RELEASE-FIX-F — the payload names the accepted proposal item, so the
+    // parameter travels inside the key rather than as a field of its own.
+    expect(String(changes[0].itemKey)).toContain('power supply')
+    expect(changes[0]).toMatchObject({ value: '380 V' })
     // The value the reviewer did not choose is nowhere in the request.
     expect(JSON.stringify(changes)).not.toContain('220 V')
   })
@@ -1051,19 +1058,26 @@ describe('PWS-AI-MULTI-SOURCE-REAL-BETA-01 — the real run, as it was reviewed'
     const changes = fetchMock.mock.calls[0][1]!.body!.changes
     expect(changes).toHaveLength(5)
 
-    const adds = changes.filter(c => c.action === 'add')
-    expect(adds.map(c => c.parameter).sort()).toEqual(
-      ['Aperture', 'Ingress protection', 'Material', 'Product model'],
-    )
-
     /**
-     * The conflict resolves against the row the product already had, so
-     * accepting 220 V updates spec item 24 rather than adding a SECOND
-     * "Power supply" to the Electrical group.
+     * FINAL-RELEASE-FIX-F — the browser no longer decides add-versus-update or
+     * which row is written; it names the accepted proposal items and the values.
+     * The four new facts and the resolved conflict travel as five item keys, and
+     * the server decides that "Power supply" updates the row the product already
+     * has rather than adding a second one to the Electrical group.
      */
-    const updates = changes.filter(c => c.action === 'update')
-    expect(updates).toHaveLength(1)
-    expect(updates[0]).toMatchObject({ action: 'update', specItemId: 24, value: 'AC 220 V, 50 Hz' })
+    const keys = changes.map(c => String(c.itemKey))
+    expect(keys.some(k => k.includes('aperture'))).toBe(true)
+    expect(keys.some(k => k.includes('ingress protection'))).toBe(true)
+    expect(keys.some(k => k.includes('material'))).toBe(true)
+    expect(keys.some(k => k.includes('product model'))).toBe(true)
+
+    const powerSupply = changes.filter(c => String(c.itemKey).includes('power supply'))
+    expect(powerSupply).toHaveLength(1)
+    expect(powerSupply[0]).toMatchObject({ value: 'AC 220 V, 50 Hz' })
+    for (const change of changes) {
+      expect(change).not.toHaveProperty('action')
+      expect(change).not.toHaveProperty('specItemId')
+    }
 
     // Nothing the sources declined to state is written under any action.
     const written = JSON.stringify(changes)

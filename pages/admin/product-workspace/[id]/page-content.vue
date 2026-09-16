@@ -17,6 +17,12 @@ const [{ data: product, error: productError }, { data: sectionsData, refresh: re
 
 const notFound = computed(() => Boolean(productError.value) || !product.value)
 const previewHref = computed(() => `/admin/products/${id}/preview`)
+/**
+ * FINAL-RELEASE-FIX-F (D-037) — only a Draft is editable. The server refuses a
+ * write to any other status, so the editing affordances are taken away here
+ * rather than offered and then rejected.
+ */
+const isDraft = computed(() => (product.value?.status ?? 'draft') === 'draft')
 
 // ── Editable local copies. Nothing here writes until handleSave() runs. ─────
 
@@ -180,7 +186,7 @@ function toggleFaqEnabled(index: number) {
 // ── Save: the only place that ever issues a write request ───────────────────
 
 async function handleSave() {
-  if (!isDirty.value || saving.value) return
+  if (!isDraft.value || !isDirty.value || saving.value) return
   saving.value = true
   saveError.value = ''
 
@@ -246,7 +252,7 @@ async function handleSave() {
     :product="(product as AdminProduct)"
     title="Page content"
     :preview-href="previewHref"
-    :save-state="saveState"
+    :save-state="isDraft ? saveState : 'unavailable'"
     @save="handleSave"
   >
     <template #nav>
@@ -259,6 +265,10 @@ async function handleSave() {
         active-key="page-content"
       />
     </template>
+
+    <p v-if="!isDraft" class="ws-lock-banner" role="status">
+      This product is not a Draft, so it is read-only. Return it to Draft to edit.
+    </p>
 
     <p v-if="saveError" class="ws-save-error" role="alert">{{ saveError }}</p>
 
@@ -280,6 +290,16 @@ async function handleSave() {
 </template>
 
 <style scoped>
+.ws-lock-banner {
+  font-size: var(--text-sm);
+  color: #8A5A00;
+  background: #FFF8E6;
+  border: 1px solid #F0DFAE;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+
 .ws-not-found {
   max-width: 480px;
   margin: var(--space-8) auto;

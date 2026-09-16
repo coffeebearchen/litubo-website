@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import type { ProductSpecGroup, ProductSpecItem } from '~/types/product-cms'
 import type { SpecificationProposal, SourceFileOutcome } from '~/utils/aiProposal'
+import { proposalItemKey } from '~/utils/aiProposal'
 
 type SpecGroupWithItems = ProductSpecGroup & { items: ProductSpecItem[] }
 
@@ -418,12 +419,23 @@ async function applyAccepted() {
   emit('applying', true)
   emit('apply-error', null)
   try {
+    /**
+     * FINAL-RELEASE-FIX-F — a change names WHICH proposed item the reviewer
+     * accepted, and the value they accepted it at. It no longer names a row id
+     * or chooses between add and update: the server holds the proposal, derives
+     * the target from it and from the product's current specifications, and
+     * refuses anything that is not in its own copy.
+     *
+     * `proposalItemKey` is the one shared derivation, so the browser and the
+     * server build the same key from the same proposal text.
+     */
     const changes = rows.value
       .filter((r: ReviewRow) => r.status === 'accepted')
-      .map((r: ReviewRow) => r.matchedSpecItemId
-        ? { action: 'update' as const, specItemId: r.matchedSpecItemId, value: r.value, note: r.note || undefined }
-        : { action: 'add' as const, group: r.group, parameter: r.parameter, value: r.value, note: r.note || undefined },
-      )
+      .map((r: ReviewRow) => ({
+        itemKey: proposalItemKey(r.group, r.parameter),
+        value: r.value,
+        note: r.note || undefined,
+      }))
     const result = await $fetch<{
       ok: boolean
       appliedCount: number

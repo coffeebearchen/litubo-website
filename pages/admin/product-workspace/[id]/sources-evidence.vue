@@ -32,6 +32,12 @@ const linkedMedia = computed<ProductMedia[]>(() => mediaData.value ?? [])
 const links = computed<EvidenceLinkSummary[]>(() => evidenceData.value ?? [])
 const notFound = computed(() => Boolean(productError.value) || !product.value)
 const previewHref = computed(() => `/admin/products/${id}/preview`)
+/**
+ * FINAL-RELEASE-FIX-F (D-037) — only a Draft is editable. The server refuses a
+ * write to any other status, so the editing affordances are taken away here
+ * rather than offered and then rejected.
+ */
+const isDraft = computed(() => (product.value?.status ?? 'draft') === 'draft')
 
 const actionError = ref('')
 const pending = ref(false)
@@ -44,7 +50,7 @@ const pending = ref(false)
  * verification or a confirmed Remove does.
  */
 async function linkEvidence(payload: { specItemId: number, sourceFileId: string, reviewStatus: SourceReviewStatus }) {
-  if (pending.value) return
+  if (!isDraft.value || pending.value) return
   pending.value = true
   actionError.value = ''
   try {
@@ -62,7 +68,7 @@ async function linkEvidence(payload: { specItemId: number, sourceFileId: string,
 }
 
 async function updateVerification(payload: { linkId: number, reviewStatus: SourceReviewStatus }) {
-  if (pending.value) return
+  if (!isDraft.value || pending.value) return
   pending.value = true
   actionError.value = ''
   try {
@@ -80,7 +86,7 @@ async function updateVerification(payload: { linkId: number, reviewStatus: Sourc
 }
 
 async function removeEvidence(linkId: number) {
-  if (pending.value) return
+  if (!isDraft.value || pending.value) return
   pending.value = true
   actionError.value = ''
   try {
@@ -125,6 +131,10 @@ async function removeEvidence(linkId: number) {
       Internal workspace — Link a product parameter to an already associated source file. This information is never public.
     </p>
 
+    <p v-if="!isDraft" class="ws-lock-banner" role="status">
+      This product is not a Draft, so it is read-only. Return it to Draft to edit.
+    </p>
+
     <p v-if="actionError" class="ws-save-error" role="alert">{{ actionError }}</p>
 
     <WorkspaceSourcesEvidence :sources="sources" />
@@ -142,6 +152,16 @@ async function removeEvidence(linkId: number) {
 </template>
 
 <style scoped>
+.ws-lock-banner {
+  font-size: var(--text-sm);
+  color: #8A5A00;
+  background: #FFF8E6;
+  border: 1px solid #F0DFAE;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+
 .ws-not-found {
   max-width: 480px;
   margin: var(--space-8) auto;

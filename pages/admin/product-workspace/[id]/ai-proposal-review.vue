@@ -33,6 +33,14 @@ const shellProduct = computed(() => ({
   status: (context.value?.lifecycleStatus ?? 'draft') as ProductStatus,
 }))
 const sourceIntakeHref = computed(() => workspaceAiSourceIntakeRoute(id))
+
+/**
+ * FINAL-RELEASE-FIX-F (D-037) — AI writes only to a Draft. Analyze is refused
+ * server-side for any other status, so a non-Draft product cannot even hold a
+ * fresh proposal; Apply would be refused too. The reviewer is told that plainly
+ * instead of being shown a review screen whose only button cannot work.
+ */
+const isDraft = computed(() => (context.value?.lifecycleStatus ?? 'draft') === 'draft')
 const existingSpecGroups = computed<SpecGroupWithItems[]>(() => specsData.value ?? [])
 
 /**
@@ -125,7 +133,14 @@ onBeforeRouteLeave(() => {
     -->
     <p v-if="applySuccessMessage" class="ws-apply-success-banner" role="status">{{ applySuccessMessage }}</p>
 
-    <div v-if="!hasActiveProposal" class="ws-empty-proposal">
+    <div v-if="!isDraft" class="ws-empty-proposal">
+      <p class="ws-empty-proposal-text">
+        AI changes are available only while the product is in Draft. Return it to Draft to analyze sources and apply proposals.
+      </p>
+      <NuxtLink to="/admin/products" class="btn btn-primary">Back to Product Center</NuxtLink>
+    </div>
+
+    <div v-else-if="!hasActiveProposal" class="ws-empty-proposal">
       <p class="ws-empty-proposal-text">No active proposal. Return to AI Source Intake.</p>
       <NuxtLink :to="sourceIntakeHref" class="btn btn-primary">Go to AI Source Intake</NuxtLink>
     </div>

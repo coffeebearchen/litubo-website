@@ -1,5 +1,6 @@
 import { getRouterParam, readBody, createError } from 'h3'
-import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
+import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { assertProductDraftForMutation } from '~/server/utils/productLifecycle'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -8,7 +9,7 @@ export default defineEventHandler(async (event) => {
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: '无效的产品 ID' })
   if (!sid || isNaN(Number(sid))) throw createError({ statusCode: 400, message: '无效的 section ID' })
   if (!iid || isNaN(Number(iid))) throw createError({ statusCode: 400, message: '无效的条目 ID' })
-  await assertProductExists(event, Number(id))
+  await assertProductDraftForMutation(event, Number(id))
 
   // Ownership chain: item → section → product
   const itemCheck = await adminFetch<{ data: { section_id: number } | null }>(

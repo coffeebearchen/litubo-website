@@ -21,6 +21,13 @@ const form = ref<Partial<AdminProduct>>(productData.value ? { ...productData.val
 const categories = computed(() => cats.value ?? [])
 const presetList = computed(() => presets.value ?? [])
 
+/**
+ * FINAL-RELEASE-FIX-F (D-037) — only a Draft is editable. Review, Published and
+ * Archived are read-only here because the server refuses the write; this just
+ * stops an administrator typing into a form that cannot save.
+ */
+const isDraft = computed(() => (form.value.status ?? 'draft') === 'draft')
+
 watch(productData, (val: AdminProduct | null) => {
   if (val) form.value = { ...val }
 })
@@ -93,11 +100,15 @@ async function changeStatus(newStatus: ProductStatus) {
       <div class="main-col">
         <div class="content-card">
           <h2 class="card-title">基础信息</h2>
+          <p v-if="!isDraft" class="lock-banner" role="status">
+            This product is {{ form.status }}. Product details are read-only — return it to Draft to edit.
+          </p>
           <ProductBasicForm
             v-model="form"
             :categories="categories"
             :presets="presetList"
             :loading="saving"
+            :readonly="!isDraft"
             @save="save"
           />
         </div>
@@ -182,6 +193,16 @@ async function changeStatus(newStatus: ProductStatus) {
   .page-title { font-size: var(--text-xl); word-break: break-word; }
   .layout-grid { grid-template-columns: 1fr; }
   /* status card stays in DOM order (after main-col) */
+}
+
+.lock-banner {
+  background: #FFF8E6;
+  border: 1px solid #F0DFAE;
+  border-radius: var(--radius-sm);
+  color: #8A5A00;
+  font-size: var(--text-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-5);
 }
 
 .error-banner {

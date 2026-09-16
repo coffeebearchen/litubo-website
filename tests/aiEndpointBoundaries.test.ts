@@ -14,6 +14,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Readable } from 'node:stream'
 import { runProposalEngine } from '../server/utils/aiProposalEngine'
+import { proposalItemKey } from '../server/utils/aiSpecificationApply'
 import { specificationsTarget } from '../server/utils/aiTargets/specificationsTarget'
 import type { FetchFn } from '../server/utils/mediaLifecycle'
 import type { AiProviderRegistry, AiProviderSummary, AiStructuredProvider } from '../server/utils/aiProviderRegistry'
@@ -591,7 +592,9 @@ describe('the whole chain — list sources, then generate with the refs it minte
   ]
 
   function chainFetch(url: string) {
-    if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+    // FINAL-RELEASE-FIX-F — Generate's Draft guard reads the lifecycle columns
+    // from this query before it resolves a single source ref.
+    if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3, status: 'draft', product_code: null, published_at: null }] }
     if (url.includes('/items/products_files?filter[products_id][_eq]=3')) return { data: CHAIN_ROWS }
     if (url.includes('/items/products/3')) return { data: { name_en: 'Test product' } }
     return { data: null }
@@ -694,7 +697,11 @@ describe('generate.post.ts — cost control before any provider call', () => {
   async function generateOnce(adminUserId: string, productId = '3', sourceRef?: string) {
     const ref = sourceRef ?? await mintRef(adminUserId, Number(productId))
     installNitroGlobals(async (url: string) => {
-      if (url.includes('/items/products?filter[id]')) return { data: [{ id: Number(productId) }] }
+      // FINAL-RELEASE-FIX-F — Generate is Draft-only, and the guard reads the
+      // lifecycle columns from this query before any source or provider work.
+      if (url.includes('/items/products?filter[id]')) {
+        return { data: [{ id: Number(productId), status: 'draft', product_code: null, published_at: null }] }
+      }
       if (url.includes('/items/products_files')) return { data: [] }
       if (url.includes('/items/products/')) return { data: { name_en: 'Test product' } }
       return { data: null }
@@ -779,7 +786,14 @@ describe('generate.post.ts — oversized request bodies are refused on real byte
    * and each must now end in 413 with nothing parsed.
    */
   async function runGenerate(opts: { headers?: Record<string, string>, bodyChunks: Array<string | Buffer> }) {
-    installNitroGlobals(async () => ({}))
+    // FINAL-RELEASE-FIX-F — an oversized body is refused before Directus is
+    // touched at all, but a body that fits goes on to the Draft guard, which
+    // reads the lifecycle columns from this query.
+    installNitroGlobals(async (url: string) => (
+      url.includes('/items/products?filter[id]')
+        ? { data: [{ id: 3, status: 'draft', product_code: null, published_at: null }] }
+        : {}
+    ))
     const handler = (await import('../server/api/admin/products/[id]/ai/specification-proposal/generate.post')).default as (e: unknown) => Promise<unknown>
 
     const stream = Readable.from(opts.bodyChunks)
@@ -866,7 +880,9 @@ describe('generate.post.ts — oversized request bodies are refused on real byte
 
   it('a normal small body is read and acted on as usual', async () => {
     installNitroGlobals(async (url: string) => {
-      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+      // FINAL-RELEASE-FIX-F — the body parses, and the request then reaches the
+      // Draft guard, which reads the lifecycle columns from this query.
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3, status: 'draft', product_code: null, published_at: null }] }
       if (url.includes('/items/products_files')) return { data: [] }
       if (url.includes('/items/products/')) return { data: { name_en: 'Test product' } }
       return { data: null }
@@ -950,7 +966,10 @@ describe('sourceRef secret missing — 503, not a silent "invalid ref"', () => {
   ]
 
   function secretFetch(url: string) {
-    if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
+    // FINAL-RELEASE-FIX-F — Generate's Draft guard reads the lifecycle columns
+    // from this query, so the fixture carries a status; what is missing in this
+    // suite is the source-ref secret, and nothing else.
+    if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3, status: 'draft', product_code: null, published_at: null }] }
     if (url.includes('/items/products_files?filter[products_id][_eq]=3')) return { data: SECRET_ROWS }
     if (url.includes('/items/products/3')) return { data: { name_en: 'Test product' } }
     return { data: null }
@@ -1125,12 +1144,14 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
       for (const [fragment, value] of Object.entries(overrides)) {
         if (url.includes(fragment)) return typeof value === 'function' ? (value as () => unknown)() : value
       }
-      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
-      if (url.includes('/items/products/3?fields=status')) return DRAFT_PRODUCT
-      if (url.includes('/items/product_spec_groups?filter')) return { data: [{ id: 5, title_en: 'Detection performance' }] }
-      if (url.includes('/items/product_spec_items/')) {
-        return { data: { id: 11, value_en: 'old', note_en: null, spec_group_id: { id: 5, product_id: 3 } } }
+      // FINAL-RELEASE-FIX-F — the shared Draft guard reads the lifecycle columns
+      // from this one filter query, so the fixture carries the status here.
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3, ...DRAFT_PRODUCT.data, product_code: null, published_at: null }] }
+      if (url.includes('/items/products_files?')) return { data: [] }
+      if (url.includes('/items/product_spec_items?filter')) {
+        return { data: [{ id: 11, label_en: 'Detection sensitivity (Fe)', spec_group_id: { id: 5, title_en: 'Detection performance' } }] }
       }
+      if (url.includes('/items/product_spec_groups?filter')) return { data: [{ id: 5, title_en: 'Detection performance' }] }
       if (String(options?.method ?? 'GET').toUpperCase() === 'POST') return { data: { id: 900 } }
       return { data: null }
     }
@@ -1144,12 +1165,34 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
    * fail for the right reason at the wrong time.
    */
   let refCounter = 0
+  /**
+   * FINAL-RELEASE-FIX-F — the reference now carries the server's authority: the
+   * proposal Apply is allowed to write, and the binding naming the association
+   * rows the analysis read. A change may only accept an item that is in here.
+   */
+  const SERVER_PROPOSAL = {
+    groups: [{
+      group: 'Detection performance',
+      items: [
+        { parameter: 'Detection sensitivity (Fe)', value: '0.8 mm' },
+        { parameter: 'New param', value: 'V' },
+        { parameter: 'A', value: '1' },
+        { parameter: 'C', value: '3' },
+      ],
+    }, {
+      group: 'Brand new',
+      items: [{ parameter: 'P', value: 'V' }],
+    }],
+  }
   async function mintRef(adminUserId = 'admin-1', productId = 3) {
     const { rememberAnalysis } = await import('../server/utils/aiProposalReplayGuard')
+    const { createProductProposalBinding } = await import('../server/utils/aiProposalBinding')
     refCounter += 1
     return rememberAnalysis(
       { adminUserId, productId, targetId: 'specifications', providerId: 'deepseek', fingerprint: `fp-${refCounter}` },
-      { groups: [] },
+      SERVER_PROPOSAL,
+      Date.now(),
+      createProductProposalBinding(productId, [], `fp-${refCounter}`),
     )
   }
 
@@ -1177,6 +1220,15 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
     ['POST', 'PATCH', 'DELETE'].includes(String((c.options as { method?: string } | undefined)?.method ?? 'GET').toUpperCase()),
   )
 
+  /** The accepted proposal items, named the way the server indexes its own copy. */
+  const ITEM = {
+    sensitivity: proposalItemKey('Detection performance', 'Detection sensitivity (Fe)'),
+    newParam: proposalItemKey('Detection performance', 'New param'),
+    a: proposalItemKey('Detection performance', 'A'),
+    c: proposalItemKey('Detection performance', 'C'),
+    brandNew: proposalItemKey('Brand new', 'P'),
+  }
+
   it('a malformed body is refused with 400 and writes nothing', async () => {
     const { handler, event } = await callApply({ changes: [{ action: 'add', group: 'G' }] })
     expect(await statusCodeOf(() => handler(event))).toBe(400)
@@ -1191,8 +1243,8 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
 
   it.each(['review', 'published', 'archived'])('a %s product is refused with 409 and writes nothing', async (status) => {
     const { handler, event } = await callApply(
-      { changes: [{ action: 'add', group: 'Detection performance', parameter: 'P', value: 'V' }] },
-      { '/items/products/3?fields=status': { data: { status } } },
+      { changes: [{ itemKey: ITEM.sensitivity, value: 'V' }] },
+      { '/items/products?filter[id]': { data: [{ id: 3, status, product_code: null, published_at: null }] } },
     )
     expect(await statusCodeOf(() => handler(event))).toBe(409)
     expect(writeCalls()).toEqual([])
@@ -1201,21 +1253,16 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
   it('the Draft check happens before the body is even parsed — a published product with a bad body is still 409', async () => {
     const { handler, event } = await callApply(
       { nonsense: true },
-      { '/items/products/3?fields=status': { data: { status: 'published' } } },
+      { '/items/products?filter[id]': { data: [{ id: 3, status: 'published', product_code: null, published_at: null }] } },
     )
     expect(await statusCodeOf(() => handler(event))).toBe(409)
     expect(writeCalls()).toEqual([])
   })
 
-  it('an update targeting another product is refused with 409 before any write', async () => {
-    const { handler, event } = await callApply(
-      { changes: [{ action: 'update', specItemId: 99, value: 'x' }] },
-      {
-        '/items/product_spec_items/99': {
-          data: { id: 99, value_en: 'x', note_en: null, spec_group_id: { id: 8, product_id: 4 } },
-        },
-      },
-    )
+  it('a change the server proposal does not contain is refused with 409 before any write', async () => {
+    const { handler, event } = await callApply({
+      changes: [{ itemKey: proposalItemKey('Somewhere else', 'Invented'), value: 'x' }],
+    })
     expect(await statusCodeOf(() => handler(event))).toBe(409)
     expect(writeCalls()).toEqual([])
   })
@@ -1223,8 +1270,8 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
   it('a valid mixed batch applies and reports the real counts', async () => {
     const { handler, event } = await callApply({
       changes: [
-        { action: 'update', specItemId: 11, value: '0.9 mm', note: 'from datasheet' },
-        { action: 'add', group: 'Detection performance', parameter: 'New param', value: 'V' },
+        { itemKey: ITEM.sensitivity, value: '0.9 mm', note: 'from datasheet' },
+        { itemKey: ITEM.newParam, value: 'V' },
       ],
     })
     const result = await handler(event) as { ok: boolean, appliedCount: number, totalCount: number, partial: boolean }
@@ -1240,8 +1287,8 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
   it('never issues a DELETE, and never writes to products, media, sources or SEO', async () => {
     const { handler, event } = await callApply({
       changes: [
-        { action: 'update', specItemId: 11, value: 'x' },
-        { action: 'add', group: 'Brand new', parameter: 'P', value: 'V' },
+        { itemKey: ITEM.sensitivity, value: 'x' },
+        { itemKey: ITEM.brandNew, value: 'V' },
       ],
     })
     await handler(event)
@@ -1258,7 +1305,7 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
       throw new Error('Apply must never call an AI provider')
     })
     vi.stubGlobal('fetch', nativeFetchSpy)
-    const { handler, event } = await callApply({ changes: [{ action: 'update', specItemId: 11, value: 'x' }] })
+    const { handler, event } = await callApply({ changes: [{ itemKey: ITEM.sensitivity, value: 'x' }] })
     await handler(event)
     expect(nativeFetchSpy).not.toHaveBeenCalled()
   })
@@ -1268,9 +1315,9 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
     const { handler, event } = await callApply(
       {
         changes: [
-          { action: 'add', group: 'Detection performance', parameter: 'A', value: '1' },
-          { action: 'update', specItemId: 11, value: 'boom' },
-          { action: 'add', group: 'Detection performance', parameter: 'C', value: '3' },
+          { itemKey: ITEM.a, value: '1' },
+          { itemKey: ITEM.sensitivity, value: 'boom' },
+          { itemKey: ITEM.c, value: '3' },
         ],
       },
       {
@@ -1283,10 +1330,10 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
       fetchCalls.push({ url, options })
       const method = String(options?.method ?? 'GET').toUpperCase()
       if (method === 'PATCH') throw new Error('directus write failed')
-      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3 }] }
-      if (url.includes('/items/products/3?fields=status')) return { data: { status: 'draft' } }
+      if (url.includes('/items/products?filter[id]')) return { data: [{ id: 3, status: 'draft', product_code: null, published_at: null }] }
+      if (url.includes('/items/products_files?')) return { data: [] }
+      if (url.includes('/items/product_spec_items?filter')) return { data: [{ id: 11, label_en: 'Detection sensitivity (Fe)', spec_group_id: { id: 5, title_en: 'Detection performance' } }] }
       if (url.includes('/items/product_spec_groups?filter')) return { data: [{ id: 5, title_en: 'Detection performance' }] }
-      if (url.includes('/items/product_spec_items/')) return { data: { id: 11, value_en: 'old', note_en: null, spec_group_id: { id: 5, product_id: 3 } } }
       if (method === 'POST') { itemPosts++; return { data: { id: 900 + itemPosts } } }
       return { data: null }
     }))
@@ -1310,7 +1357,7 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
    */
   it('an update sent without a note produces a PATCH containing only value_en', async () => {
     const { handler, event } = await callApply({
-      changes: [{ action: 'update', specItemId: 11, value: 'AI proposed value' }],
+      changes: [{ itemKey: ITEM.sensitivity, value: 'AI proposed value' }],
     })
     const result = await handler(event) as { ok: boolean, appliedCount: number }
     expect(result).toMatchObject({ ok: true, appliedCount: 1 })
@@ -1322,7 +1369,7 @@ describe('apply.post.ts — writes only to a Draft, only this product, only what
 
   it('an update sent WITH a note writes both fields', async () => {
     const { handler, event } = await callApply({
-      changes: [{ action: 'update', specItemId: 11, value: 'AI proposed value', note: 'page 7' }],
+      changes: [{ itemKey: ITEM.sensitivity, value: 'AI proposed value', note: 'page 7' }],
     })
     await handler(event)
 

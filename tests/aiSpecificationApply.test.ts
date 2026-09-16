@@ -15,86 +15,77 @@ import { describe, it, expect } from 'vitest'
 import {
   ApplyChangeSchema,
   ApplyRequestSchema,
+  indexProposalItems,
   planSpecificationApply,
+  proposalItemKey,
   executeSpecificationApply,
 } from '../server/utils/aiSpecificationApply'
 import type { ApplyChange } from '../server/utils/aiSpecificationApply'
 import type { FetchFn } from '../server/utils/mediaLifecycle'
 import { normalizeSpecName } from '../server/utils/productSpecWriter'
 
-describe('ApplyChangeSchema — add', () => {
-  it('accepts a well-formed add change', () => {
-    const result = ApplyChangeSchema.safeParse({
-      action: 'add', group: 'Detection performance', parameter: 'Detection sensitivity (Fe)', value: '0.8 mm',
-    })
-    expect(result.success).toBe(true)
+/**
+ * FINAL-RELEASE-FIX-F — a change names WHICH proposal item was accepted and at
+ * what value. It can no longer choose a destination: `action`, `specItemId`,
+ * `group` and `parameter` are gone from the request shape, and the server
+ * derives all of them from its own copy of the proposal.
+ */
+describe('ApplyChangeSchema', () => {
+  const KEY = proposalItemKey('Detection performance', 'Detection sensitivity (Fe)')
+
+  it('accepts a well-formed change', () => {
+    expect(ApplyChangeSchema.safeParse({ itemKey: KEY, value: '0.8 mm' }).success).toBe(true)
   })
 
   it('accepts an optional note', () => {
-    const result = ApplyChangeSchema.safeParse({
-      action: 'add', group: 'Detection performance', parameter: 'X', value: 'Y', note: 'From datasheet page 7',
-    })
-    expect(result.success).toBe(true)
+    expect(ApplyChangeSchema.safeParse({ itemKey: KEY, value: 'Y', note: 'From datasheet page 7' }).success).toBe(true)
   })
 
-  it('rejects an add missing a required field', () => {
-    expect(ApplyChangeSchema.safeParse({ action: 'add', group: 'X', value: 'Y' }).success).toBe(false)
-    expect(ApplyChangeSchema.safeParse({ action: 'add', parameter: 'X', value: 'Y' }).success).toBe(false)
+  it('rejects a change missing a required field', () => {
+    expect(ApplyChangeSchema.safeParse({ itemKey: KEY }).success).toBe(false)
+    expect(ApplyChangeSchema.safeParse({ value: '0.8 mm' }).success).toBe(false)
+    expect(ApplyChangeSchema.safeParse({ itemKey: '', value: '0.8 mm' }).success).toBe(false)
   })
 
-  it('.strict() rejects an add carrying an update-only field like specItemId', () => {
-    const result = ApplyChangeSchema.safeParse({
-      action: 'add', group: 'X', parameter: 'Y', value: 'Z', specItemId: 999,
-    })
-    expect(result.success).toBe(false)
-  })
-})
-
-describe('ApplyChangeSchema — update', () => {
-  it('accepts a well-formed update change', () => {
-    const result = ApplyChangeSchema.safeParse({ action: 'update', specItemId: 42, value: '0.8 mm' })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects a non-positive or non-integer specItemId', () => {
-    expect(ApplyChangeSchema.safeParse({ action: 'update', specItemId: 0, value: 'X' }).success).toBe(false)
-    expect(ApplyChangeSchema.safeParse({ action: 'update', specItemId: -1, value: 'X' }).success).toBe(false)
-    expect(ApplyChangeSchema.safeParse({ action: 'update', specItemId: 1.5, value: 'X' }).success).toBe(false)
-  })
-
-  it('.strict() rejects an update carrying an add-only field like group/parameter', () => {
-    const result = ApplyChangeSchema.safeParse({
-      action: 'update', specItemId: 1, value: 'X', group: 'Should not exist', parameter: 'Should not exist',
-    })
-    expect(result.success).toBe(false)
+  it('.strict() rejects any attempt to name a destination', () => {
+    for (const extra of [
+      { specItemId: 999 },
+      { action: 'update' },
+      { action: 'add' },
+      { group: 'Should not exist' },
+      { parameter: 'Should not exist' },
+    ]) {
+      expect(ApplyChangeSchema.safeParse({ itemKey: KEY, value: 'Z', ...extra }).success, JSON.stringify(extra)).toBe(false)
+    }
   })
 })
 
 describe('ApplyRequestSchema', () => {
   const REF = 'a-server-minted-proposal-ref'
+  const CHANGE = { itemKey: proposalItemKey('G', 'P'), value: 'X' }
 
   it('accepts a request with 1-100 changes', () => {
-    expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes: [{ action: 'update', specItemId: 1, value: 'X' }] }).success).toBe(true)
+    expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes: [CHANGE] }).success).toBe(true)
   })
   it('rejects an empty changes array', () => {
     expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes: [] }).success).toBe(false)
   })
-  it('rejects an unrecognized action value', () => {
-    expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes: [{ action: 'delete', specItemId: 1 }] }).success).toBe(false)
+  it('rejects a change that still carries an action', () => {
+    expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes: [{ ...CHANGE, action: 'delete' }] }).success).toBe(false)
   })
   it('rejects a request with more than 100 changes', () => {
-    const changes = Array.from({ length: 101 }, (_, i) => ({ action: 'update' as const, specItemId: i + 1, value: 'X' }))
+    const changes = Array.from({ length: 101 }, (_, i) => ({ itemKey: proposalItemKey('G', `P${i}`), value: 'X' }))
     expect(ApplyRequestSchema.safeParse({ proposalRef: REF, changes }).success).toBe(false)
   })
 
   /**
    * PWS-AI-DUP-GUARD-01 — without the reference the server cannot tell a
-   * replayed Apply from a first one, so a body that omits it is not a valid
-   * request at all.
+   * replayed Apply from a first one, and since FIX-F it is also how the server
+   * finds the proposal that authorizes the write at all.
    */
   it('rejects a request with no proposalRef', () => {
-    expect(ApplyRequestSchema.safeParse({ changes: [{ action: 'update', specItemId: 1, value: 'X' }] }).success).toBe(false)
-    expect(ApplyRequestSchema.safeParse({ proposalRef: '', changes: [{ action: 'update', specItemId: 1, value: 'X' }] }).success).toBe(false)
+    expect(ApplyRequestSchema.safeParse({ changes: [CHANGE] }).success).toBe(false)
+    expect(ApplyRequestSchema.safeParse({ proposalRef: '', changes: [CHANGE] }).success).toBe(false)
   })
 })
 
@@ -142,37 +133,50 @@ function recordingFetch(routes: Record<string, unknown | ((call: RecordedCall) =
 const writesIn = (calls: RecordedCall[]) => calls.filter(c => c.method !== 'GET')
 
 describe('planSpecificationApply — the whole batch is judged before anything is written', () => {
-  it('refuses the entire request when one update targets another product, with zero writes', async () => {
-    const { fetch, calls } = recordingFetch({
-      '/items/product_spec_items/11': { data: { id: 11, value_en: 'a', note_en: null, spec_group_id: { id: 5, product_id: 3 } } },
-      // Item 99 lives under product 4 — the browser asked to update it on product 3.
-      '/items/product_spec_items/99': { data: { id: 99, value_en: 'b', note_en: null, spec_group_id: { id: 8, product_id: 4 } } },
-    })
+  /** The server's own proposal; only what is in here can ever be applied. */
+  const PROPOSAL = {
+    groups: [{
+      group: 'Detection performance',
+      items: [{ parameter: 'Sensitivity', value: '0.8 mm' }, { parameter: 'Aperture', value: '180 mm' }],
+    }],
+  }
+  const proposalItems = () => {
+    const indexed = indexProposalItems(PROPOSAL)
+    if (!indexed.ok) throw new Error('fixture must index')
+    return indexed.items
+  }
+  const SENSITIVITY = proposalItemKey('Detection performance', 'Sensitivity')
 
+  it('refuses a change the proposal does not contain, with zero writes', async () => {
+    const { fetch, calls } = recordingFetch({})
     const changes: ApplyChange[] = [
-      { action: 'update', specItemId: 11, value: 'legitimate' },
-      { action: 'update', specItemId: 99, value: 'belongs to product 4' },
+      { itemKey: SENSITIVITY, value: 'legitimate' },
+      { itemKey: proposalItemKey('Somewhere else', 'Invented'), value: 'never proposed' },
     ]
-    const plan = await planSpecificationApply(fetch, 3, changes)
+    const plan = await planSpecificationApply(fetch, 3, changes, proposalItems())
 
     expect(plan.ok).toBe(false)
     if (!plan.ok) {
       expect(plan.statusCode).toBe(409)
-      expect(plan.message).toContain('does not belong to this product')
+      expect(plan.message).toContain('not part of this proposal')
     }
     // Critically: not "the first one was fine so we wrote it".
     expect(writesIn(calls)).toEqual([])
   })
 
-  it('refuses an update whose item does not exist at all', async () => {
-    const { fetch, calls } = recordingFetch({ '/items/product_spec_items/404': { data: null } })
-    const plan = await planSpecificationApply(fetch, 3, [{ action: 'update', specItemId: 404, value: 'x' }])
+  it('refuses the same proposal item accepted twice', async () => {
+    const { fetch, calls } = recordingFetch({})
+    const plan = await planSpecificationApply(fetch, 3, [
+      { itemKey: SENSITIVITY, value: 'a' },
+      { itemKey: SENSITIVITY, value: 'b' },
+    ], proposalItems())
     expect(plan.ok).toBe(false)
     expect(writesIn(calls)).toEqual([])
   })
 
-  it('refuses an add when the product already has two groups with the same normalized name', async () => {
+  it('refuses when the product already has two groups with the same normalized name', async () => {
     const { fetch, calls } = recordingFetch({
+      '/items/product_spec_items?filter': { data: [] },
       '/items/product_spec_groups?filter': {
         data: [
           { id: 5, title_en: 'Detection performance' },
@@ -181,9 +185,7 @@ describe('planSpecificationApply — the whole batch is judged before anything i
       },
     })
 
-    const plan = await planSpecificationApply(fetch, 3, [
-      { action: 'add', group: 'Detection performance', parameter: 'Sensitivity', value: '0.8 mm' },
-    ])
+    const plan = await planSpecificationApply(fetch, 3, [{ itemKey: SENSITIVITY, value: '0.8 mm' }], proposalItems())
 
     expect(plan.ok).toBe(false)
     if (!plan.ok) expect(plan.statusCode).toBe(409)
@@ -192,30 +194,34 @@ describe('planSpecificationApply — the whole batch is judged before anything i
 
   it('resolves an add to the one existing group that matches by normalized name', async () => {
     const { fetch } = recordingFetch({
+      '/items/product_spec_items?filter': { data: [] },
       '/items/product_spec_groups?filter': { data: [{ id: 5, title_en: 'Detection  Performance' }] },
     })
-    const plan = await planSpecificationApply(fetch, 3, [
-      { action: 'add', group: 'detection performance', parameter: 'Sensitivity', value: '0.8 mm' },
-    ])
+    const plan = await planSpecificationApply(fetch, 3, [{ itemKey: SENSITIVITY, value: '0.8 mm' }], proposalItems())
     expect(plan.ok).toBe(true)
     if (plan.ok) expect(plan.steps[0]).toMatchObject({ kind: 'add', existingGroupId: 5 })
   })
 
   it('marks an add for a group this product does not have yet as "create during apply"', async () => {
-    const { fetch } = recordingFetch({ '/items/product_spec_groups?filter': { data: [] } })
-    const plan = await planSpecificationApply(fetch, 3, [
-      { action: 'add', group: 'Brand new group', parameter: 'P', value: 'V' },
-    ])
+    const { fetch } = recordingFetch({
+      '/items/product_spec_items?filter': { data: [] },
+      '/items/product_spec_groups?filter': { data: [] },
+    })
+    const plan = await planSpecificationApply(fetch, 3, [{ itemKey: SENSITIVITY, value: '0.8 mm' }], proposalItems())
     expect(plan.ok).toBe(true)
     if (plan.ok) expect(plan.steps[0]).toMatchObject({ kind: 'add', existingGroupId: null })
   })
 
-  it('does not list groups at all when the batch is updates only', async () => {
-    const { fetch, calls } = recordingFetch({
-      '/items/product_spec_items/11': { data: { id: 11, value_en: 'a', note_en: null, spec_group_id: { id: 5, product_id: 3 } } },
+  it('updates the row the product already has, without the request naming it', async () => {
+    const { fetch } = recordingFetch({
+      '/items/product_spec_items?filter': {
+        data: [{ id: 11, label_en: 'Sensitivity', spec_group_id: { id: 5, title_en: 'Detection performance' } }],
+      },
+      '/items/product_spec_groups?filter': { data: [{ id: 5, title_en: 'Detection performance' }] },
     })
-    await planSpecificationApply(fetch, 3, [{ action: 'update', specItemId: 11, value: 'x' }])
-    expect(calls.some(c => c.path.startsWith('/items/product_spec_groups'))).toBe(false)
+    const plan = await planSpecificationApply(fetch, 3, [{ itemKey: SENSITIVITY, value: 'x' }], proposalItems())
+    expect(plan.ok).toBe(true)
+    if (plan.ok) expect(plan.steps[0]).toMatchObject({ kind: 'update', specItemId: 11 })
   })
 })
 
@@ -349,10 +355,25 @@ describe('an omitted note leaves the existing note alone', () => {
    * and only the first one is reachable from this screen.
    */
   it('the planner keeps an absent note as undefined rather than null', async () => {
-    const { fetch } = recordingFetch({
-      '/items/product_spec_items/11': { data: { id: 11, value_en: 'old', note_en: 'HUMAN NOTE', spec_group_id: { id: 5, product_id: 3 } } },
+    const indexed = indexProposalItems({
+      groups: [{ group: 'Detection performance', items: [{ parameter: 'Sensitivity', value: 'new' }] }],
     })
-    const plan = await planSpecificationApply(fetch, 3, [{ action: 'update', specItemId: 11, value: 'new' }])
+    if (!indexed.ok) throw new Error('fixture must index')
+
+    // The product already has this parameter, so the server resolves the change
+    // to an update of that row — the request never names it.
+    const { fetch } = recordingFetch({
+      '/items/product_spec_items?filter': {
+        data: [{ id: 11, label_en: 'Sensitivity', spec_group_id: { id: 5, title_en: 'Detection performance' } }],
+      },
+      '/items/product_spec_groups?filter': { data: [{ id: 5, title_en: 'Detection performance' }] },
+    })
+    const plan = await planSpecificationApply(
+      fetch,
+      3,
+      [{ itemKey: proposalItemKey('Detection performance', 'Sensitivity'), value: 'new' }],
+      indexed.items,
+    )
 
     expect(plan.ok).toBe(true)
     if (plan.ok) {

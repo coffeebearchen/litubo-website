@@ -1,5 +1,6 @@
 import { getRouterParam, readBody, createError } from 'h3'
-import { adminFetch, assertProductExists } from '~/server/utils/adminDirectusClient'
+import { adminFetch } from '~/server/utils/adminDirectusClient'
+import { assertProductDraftForMutation } from '~/server/utils/productLifecycle'
 import { updateSpecItem } from '~/server/utils/productSpecWriter'
 
 /** Delegates to the canonical writer (`productSpecWriter.ts`) — the same function the AI Apply endpoint uses to update an item. */
@@ -10,7 +11,7 @@ export default defineEventHandler(async (event) => {
   if (!id || isNaN(Number(id))) throw createError({ statusCode: 400, message: '无效的产品 ID' })
   if (!gid || isNaN(Number(gid))) throw createError({ statusCode: 400, message: '无效的参数组 ID' })
   if (!iid || isNaN(Number(iid))) throw createError({ statusCode: 400, message: '无效的条目 ID' })
-  await assertProductExists(event, Number(id))
+  await assertProductDraftForMutation(event, Number(id))
 
   const itemCheck = await adminFetch<{ data: { spec_group_id: number } | null }>(
     event, `/items/product_spec_items/${iid}?fields=spec_group_id`,
