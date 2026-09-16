@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · token 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 · not pushed · D-038 已登记）；此前 FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-01D — 服务端 secret 全部仅运行时注入（A2 · **PASS**：6 个服务端 secret 均不进构建产物（构建环境含全部合成 canary 时 `.output` / `.nuxt` 全量扫描 0 次）· 运行中的 server 在调用时从进程环境读取 · 构建期的值不胜出 · 外部真实调用 0 · D-039 已登记 · **Production Ready 01：COMPLETE（本地范围；Backup / Restore 仍 PENDING）** · 等待 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-01C — Directus token 仅运行时注入（A2 · **PASS** · Controller 已签收 cc0f494）；此前 FINAL-RELEASE-PRODUCTION-READY-01B — 统一 Directus service token 合同（A2 · **PASS**：唯一 secret 名 `DIRECTUS_TOKEN` 同时用于 provisioning 与 Nuxt · fresh scratch 13/13、零手工 SQL · 其实测发现"构建会把值序列化进 server bundle、预构建 server 运行时不读 `DIRECTUS_TOKEN`"已由 01C 按 Controller 裁定解决）；此前 FINAL-RELEASE-PRODUCTION-READY-01 / 01A — Node 22 固定 + Directus 不可变 pin + 可复现 provisioning（A2 · **PASS**：空 scratch 库 13/13 步全过、**零手工 SQL**、复跑逐字段一致、运行时鉴权与拒绝面已实证、dev 库逐值未变 · D-038 已登记 · 等待 Controller 审查）；前一模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
-Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-01D 已按施工单完成并本地 commit，等待 Controller 审查）
+Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C / 01D — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · 全部服务端 secret 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 / c8d5ccf · not pushed · D-038 / D-039 已登记）；此前 FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
+Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-02 — 数据库 + Directus 媒体 Backup / Restore（A2 · **PASS** · **Backup / Restore：LOCAL_REHEARSAL_PROVEN**：本地开发数据停写窗口备份 → 全新 TEST 库 + TEST uploads 恢复 → 49 表逐表行数 / 内容哈希、序列、结构与 129 个文件逐字节一致 → 一次性 Directus 11.17.4 启动无迁移、无写库 · 10 项 fail-closed 负向测试 · dev 前后一致 · 生产 / 异地备份存储 OPEN · D-040 已登记 · 等待 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-01D — 服务端 secret 全部仅运行时注入（A2 · **PASS** · Controller 已签收 c8d5ccf · D-039 · Production Ready 01：COMPLETE（本地范围））；此前 FINAL-RELEASE-PRODUCTION-READY-01C — Directus token 仅运行时注入（A2 · **PASS** · Controller 已签收 cc0f494）；此前 FINAL-RELEASE-PRODUCTION-READY-01B — 统一 Directus service token 合同（A2 · **PASS**：唯一 secret 名 `DIRECTUS_TOKEN` 同时用于 provisioning 与 Nuxt · fresh scratch 13/13、零手工 SQL · 其实测发现"构建会把值序列化进 server bundle、预构建 server 运行时不读 `DIRECTUS_TOKEN`"已由 01C 按 Controller 裁定解决）；此前 FINAL-RELEASE-PRODUCTION-READY-01 / 01A — Node 22 固定 + Directus 不可变 pin + 可复现 provisioning（A2 · **PASS**：空 scratch 库 13/13 步全过、**零手工 SQL**、复跑逐字段一致、运行时鉴权与拒绝面已实证、dev 库逐值未变 · D-038 已登记 · 等待 Controller 审查）；前一模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
+Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-02 已按施工单完成并本地 commit，等待 Controller 审查；Production Ready 03 NOT AUTHORIZED）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（下一模块 NOT AUTHORIZED；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05、P1-09、P1-15、P1-17 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：801af4f）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：c8d5ccf）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10775,3 +10775,151 @@ Next candidate:                 NONE — 下一模块 NOT AUTHORIZED
 **仍 OPEN：** `SUBMISSION_IP_SECRET` 缺失时的既有行为——`publicInquiry.ts` 以内置常量作 HMAC 键，限流照常生效。该 HMAC 结果只作进程内限流 Map 的键、从不存储或记录，能观察到它的一方同样能读到进程内存里的 secret，故判断不构成不安全回退；但生产中会静默使用开发常量，是否改为缺失即拒绝须 Controller 决定（本模块按施工单未改行为）· Backup / Restore · 容量 · 依赖许可证 / CVE · Final Release Verification · 生产部署 NOT AUTHORIZED · `postgres:16-alpine` 浮动 tag（已登记）· PATH 默认 Node 仍为 24.14.0 · 生产 secret manager 与生产注入机制（随生产运行方式决定，未验证）。
 
 *最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-01D 任务中写入。*
+
+---
+
+## FINAL-RELEASE-PRODUCTION-READY-02 — 数据库 + Directus 媒体 Backup / Restore（本地演练）
+
+**授权：** A2 LOCAL_IMPLEMENTATION（上线前 Backup / Restore 收口；不是 Production Deploy，不是 Production Ready 03）。**结果：PASS。** 起点 HEAD `c8d5ccf`（01D 已由 Controller 签收），分支 `review/final-release-production-ready-02-backup-restore`，以一个本地 commit 收口；未 push / merge / deploy；AI 调用 0。
+
+**持久化边界（先盘点再施工，只读名称 / 计数 / 大小）：**
+- **Git：** 代码、schema 快照、已跟踪 SQL 工件（约束、guard、access bootstrap、权限）、provisioning 清单、runbook。
+- **PostgreSQL（dev 库 `litubo_cms`，容器 `litubo-cms-postgres-1`，数据目录绑定挂载 `dev-data/postgres`，库 12.5 MB）：**
+  - 49 张表 / 2749 行、27 个序列、75 个索引、132 个约束、7 个 trigger、8 个函数；
+  - 其中包括 `directus_files` 60 行、`media_file_lifecycle` 20 行，以及身份 / 权限 / activity / revisions / sessions。
+- **uploads（Directus 容器 `/directus/uploads` ← 绑定挂载 `dev-data/uploads`，平铺无子目录）：**
+  - 129 个文件 / 7,189,583 B = 60 个原件 + 67 个 Directus 生成的 transform + `directus-health-file` + 未登记的旧文件 `phase4-site-content.yaml`。
+- **Secret：** 由部署环境 / secret manager 持有，工具不收集。
+- **不需要备份：** Nuxt 进程内存状态、无状态的 document-extractor；`private-product-source/` 不是应用状态。
+
+**一致性模型（先查真实写入路径）：** 这是 quiesced consistent backup set，不宣称原子快照。
+- **写入方：**
+  - Directus 是数据库和 uploads 两侧唯一的应用写入方。Nuxt 没有数据库驱动、不写文件，全部写入都经 Directus。
+  - Directus 在 asset 请求时生成 transform，在 `/server/health` 时写探针文件。
+  - Flows 为 0。
+  - 能直接写库的维护工具（provisioning、Directus CLI、DB 集成测试、手工 psql）不得在窗口内运行。
+- **工具强制检查：** 启动前和复制后都要满足：Directus 容器已停、没有运行中的容器挂载 uploads、数据库客户端会话为 0。复制后还要求数据库指纹与 uploads 清单不变，否则判 `QUIESCE_BROKEN` 并留下 `.incomplete`。
+
+**工具（D-040）：**
+- **代码：** `scripts/backup-set.mjs`（共享库），`scripts/backup-create.mjs` / `scripts/backup-restore.mjs`（CLI；`npm run backup:create` / `npm run backup:restore-test`）。
+- **备份集结构：** 备份集 `litubo-backup-YYYYMMDD-HHMMSS` 包含以下四个文件：
+  - `database.dump`：pg_dump custom 格式，经 `pg_restore --list` 校验每张表及其数据都在，容器内外 SHA-256 一致；
+  - `uploads.tar`：纯 Node 写的 POSIX ustar，逐文件边写边算 SHA-256，写完读回核对；
+  - `SHA256SUMS`；
+  - `manifest.json`：最后写入，严格 allowlist，内容有版本、两个 checksum、逐表行数与内容哈希、序列、结构定义哈希、逐文件 SHA-256。
+- **位置保护：** 输出目录位于 Git 可纳入的位置时拒绝；`.gitignore` 已有 `backups/`，未新增规则。
+- **恢复顺序：**
+  1. 先校验目标名：库名须以独立片段含 `test`，不含 prod / live，不能是源库；uploads 目录名须含 TEST 片段，不与 dev / 文档中的生产 uploads 重叠，不在 Git 可纳入处，且为新建或空目录；
+  2. 校验备份集完整性、manifest、SHA256SUMS 与两个 checksum；
+  3. 以上全部通过后才建库，执行 `pg_restore --exit-on-error --single-transaction`，失败即回滚并删除本次新建的库；
+  4. 逐表、序列、结构与 manifest 比对；
+  5. 独占写入方式解包 uploads，逐文件比对 SHA-256。
+
+**备份实测（本地开发数据）：**
+- **停写：** `docker compose stop directus` 2.6 s，之后库上客户端会话 0。
+- **备份：** 工具耗时 7.7 s，得到 `backups/litubo-backup-20260916-154638`。该目录被忽略、未被跟踪。
+  - `database.dump` 256,030 B（361 个 TOC 条目）；
+  - `uploads.tar` 7,290,880 B；
+  - `manifest.json` 35,632 B；
+  - `SHA256SUMS` 158 B；
+  - 合计 7,582,700 B。
+- **一致性：** 停 Directus 之前采集的 dev 指纹与备份时指纹完全一致，uploads 清单一致。
+- **Directus 恢复：** 事后 `docker compose start directus` exit 0，确认 pong。重启耗时未精确测得：演练脚本等待 pong 时静默退出，已修正，未影响结果。
+- **互通性：** Windows `bsdtar` 能列出 129 个条目，解压出的文件 SHA-256 与 manifest 全部一致，标准 tar 即可还原。
+- **secret 扫描：** 从已跟踪测试中提取 22 个合成 canary。在 `uploads.tar`、`manifest.json`、`SHA256SUMS`、dump 原始字节，以及 dump 渲染出的 888,645 B SQL 中均为 0 次。归档中没有 secret 类文件名，归档成员与 uploads 清单完全相同。
+- **数据库内合法的凭证类记录：** nuxt-server service user 的 static token（`token_present=YES`，未读取值）、管理员密码哈希、session 行，均作为数据库状态随备份保存。
+
+**恢复实测：**
+- **恢复目标：** 恢复到新建的 `litubo_restore_test_20260916154605`，以及 scratchpad 下的 `uploads-restore-test-…`；工具耗时 7.6 s。
+- **数据库（独立复核）：**
+  - 关键指标与 dev 完全一致：tables 49、products 4（均 draft）、product_categories 5、content_items 7（均 draft）、Content item 6 为 draft（en rev 9、es rev 6、无快照）、posts 8（published 0）、site_settings 1、permissions 19、roles 2、policies 3、access 3、users 2、nuxt-server 身份存在且 token_present=YES、files 60（公开 1）、`media_file_lifecycle` 20（归档 18）、inquiries 22 / max 22、activity 1107 / max 1141、revisions 859 / max 891、migrations 101、trigger 7；
+  - 重新计算的全库指纹与 manifest 完全一致。
+- **媒体：**
+  - `directus_files` 60 行对应物理文件缺失 0，大小不符 0；
+  - 未被引用的文件 69 个 = 67 个 transform（原件都在）+ `directus-health-file` + `phase4-site-content.yaml`；
+  - `media_file_lifecycle` 悬空行：恢复库与源库均为 0；
+  - 129 个文件与 dev 逐文件 SHA-256 一致。
+- **字节样本（源 / manifest / 恢复三方一致）：** 按文件名取的首个样本恰好都是 8192 B 的旧占位文件（image、PDF、TXT 各一），因此另按体积取最大文件：最大图片为 1,450,642 B 的 PNG，一致；本库 PDF / TXT 最大也只有 8192 B，同样一致。
+
+**一次性 Directus（恢复数据上）：**
+- **启动方式：** `docker compose run --no-deps`，命令环境传入 `DIRECTUS_UPLOADS_DIR` 与 `-e DB_DATABASE`，`TELEMETRY=false`，端口 127.0.0.1:8057，未改 compose 文件，未读取任何 Env。
+- **镜像：** 11.17.4 + pin digest。
+- **挂载与连接：** `/directus/uploads` 挂载的是恢复出的 scratch 目录，不是 dev 目录；容器连到恢复库的会话 2 个，连到 dev 库 0 个。
+- **启动：** 约 9 s 后 pong，`/server/health` 返回 200 / ok。
+- **迁移：** 日志中 bootstrap 执行了 "Running migrations..."，`directus_migrations` 101 → 101，没有迁移失败。
+- **日志：** 唯一的 WARN 是既有的 PostGIS 提示。
+- **写库情况：** 两次启动后，恢复库仍与 manifest 指纹完全一致，启动未写库。
+- **匿名请求对比：** 恢复 Directus 与 dev Directus 的状态码和响应体逐一一致：
+  - `/server/ping`、`/server/info` → 200；
+  - `site_settings`、`product_categories`、`products`、`posts`、`content_items`、`inquiries` 的 items 与 `/files` → 403；
+  - `/users/me` → 401。
+- **匿名 asset：** 恢复 Directus 上 `/assets/<id>` 返回 403。dev 上未请求 `/server/health` 与 `/assets`，以免触碰 dev uploads。
+- **鉴权：** 没有为运行时鉴权去读取 token；运行时鉴权已由 Production Ready 01 证明。
+
+**负向测试（真实 CLI，全部在创建任何库或目录之前 fail closed）：**
+
+| 场景 | 返回 |
+|---|---|
+| Directus 运行中发起备份 | `NOT_QUIESCED`，`backups/` 无新条目 |
+| dump 损坏一字节 | `CHECKSUM_MISMATCH` |
+| tar 损坏一字节 | `CHECKSUM_MISMATCH` |
+| 缺 dump / 缺 tar / 缺 manifest | 均为 `SET_COMPONENT_MISSING` |
+| 目标库 `litubo_cms` | `TARGET_DATABASE_NOT_TEST` |
+| 目标库 `litubo_restore_20260916`（无 TEST 片段） | `TARGET_DATABASE_NOT_TEST` |
+| uploads 目标为 dev uploads 目录 | `TARGET_UPLOADS_NOT_TEST` |
+| 目标库已存在 | `TARGET_DATABASE_EXISTS` |
+
+全部跑完后：数据库清单不变，dev uploads 的路径 / 大小 / mtime 不变。单元测试另外证明：恢复侧任何一项校验失败时 Docker 调用数为 0；备份侧拒绝时不执行 pg_dump，也不创建备份集目录。
+
+**清理与 dev 安全：**
+- **清理：** 一次性容器已删除；DROP 前库名守卫通过，`litubo_restore_test_20260916154605` 已删除，数据库清单回到演练前；恢复 uploads、bsdtar 解压目录、负向副本全部删除；有效备份集保留在被忽略的 `backups/`。
+- **dev 核对（全量测试之前）：**
+  - 关键指标一致；
+  - 全库指纹一致（49 张表逐行哈希）；
+  - uploads 129 个文件逐文件 SHA-256 与 mtime 一致；
+  - postgres healthy，Directus pong，`verify-directus-pin` OK。
+- **全量测试之后的补充核对：**
+  - 关键计数与 uploads 仍一致；
+  - `directus_permissions` 行被权限类 DB 集成测试 apply / rollback / re-apply 重建，仍 19 行，id 更新为 1…456；
+  - 另有 4 个序列前进，是夹具测试消耗所致；
+  - 三个 `.verify.sql` 均 OK。这是测试套件已记录的既有行为，与本演练无关。
+
+**质量闸（Node v22.22.2）：**
+- **定向：** `tests/backupRestore.test.ts` 66 passed。
+- **全量：** **89 files（2 skipped）/ 3086 passed / 45 skipped / 0 failed**，较 01D 多 1 个文件、66 个测试。
+- **其他：** release guard PASS · typecheck 0 · lint 0 · build PASS · `git diff --check` exit 0。
+
+**HTTP smoke（`nuxt dev` 经 preview，dev server 使用系统 PATH 上的 Node 24.14.0）：**
+- **200：** `/`、`/products`、`/support/faq`、`/resources`、`/sitemap.xml`、`/api/cms/products/categories`、`/api/cms/posts`、`/api/cms/site-settings`、`/admin/login`；`/admin` 为外壳页加客户端跳转（与历史一致）。
+- **鉴权：** `/admin/products` 302，`/api/admin/ai/providers` 401。
+- **结论：** 非预期的 401 / 403 / 503 均为 0。
+- **日志：** build 后首次 dev 出现 6 条 `#app-manifest` 报错，为已记录的基线噪声。
+
+**治理：**
+- **新增：** **D-040 — Verified Database and Media Backup / Restore**（10 条原则）；canonical runbook `docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`。
+- **RELEASE-SAFETY-GATES：**
+  - §3A.8 第 7 步指向该 runbook；
+  - RSG-08 补充本地演练证据，写为 `PROVEN`（本地演练范围）；生产 / 异地备份存储、保留期、静态加密、定时调度写为 `OPEN`。
+- **provisioning runbook：** §1 / §6 同步。
+- **旧文档最小修正：**
+  - `docs/OPERATIONS-HANDBOOK.md` §7：原容器名 `litubo-cms-db-1` 不存在，用户 / 库名错误，且数据库与媒体分开备份；
+  - `docs/ADMIN-CMS-SETUP.md` §6.3：升级前只导出数据库；
+  - `docs/ADMIN-CMS-SPEC.md` §2.3：按不同频率分别备份，已标注被 D-040 取代；
+  - `docs/MEDIA-LIBRARY-GUIDE.md`：引用的章节号不存在。
+- **MASTER-ROADMAP：** 没有 Backup / Restore 里程碑，按施工单不强行添加。
+
+**Backup / Restore：LOCAL_REHEARSAL_PROVEN。** 生产 / 异地备份存储：OPEN。
+
+**仍 OPEN：**
+- **生产备份：** 生产 / 异地备份存储、保留期、静态加密、定时调度（运维决定；RPO / RTO 为 TO BE CONFIRMED）；书面生产 rollback / 切换步骤（恢复工具只恢复到 TEST 目标）；Linux 上 uploads 属主（uid 1000）未演练。
+- **其他发布项：**
+  - 容量；
+  - 依赖许可证 / CVE；
+  - Final Release Verification；
+  - 生产部署 NOT AUTHORIZED；
+  - `postgres:16-alpine` 浮动 tag（已登记）；
+  - PATH 默认 Node 仍为 24.14.0；
+  - 生产 secret manager 与注入机制；
+  - `SUBMISSION_IP_SECRET` 缺失行为待 Controller 决定。
+
+*最后更新：2026-09-17，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-02 任务中写入。*

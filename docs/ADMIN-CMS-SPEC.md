@@ -141,6 +141,8 @@ services:
 
 #### 备份策略（一期最低要求）
 
+> **已被 D-040 取代（FINAL-RELEASE-PRODUCTION-READY-02）：** 数据库与 uploads 必须作为同一个备份集，在停写窗口内一起备份、一起恢复（`scripts/backup-create.mjs` / `scripts/backup-restore.mjs`），不能按不同频率分别备份——那样得到的数据库与媒体文件并不对应。保留期、异地存储、加密与定时调度尚待生产运维决定。见 `docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`。以下原文仅作历史记录保留。
+
 1. **数据库**：每日 `pg_dump` 导出，存储到 `/data/litubo/backups/`，保留 14 天；
 2. **上传文件**：每日 rsync 或腾讯云磁盘快照，保留 7 天；
 3. 备份脚本通过 cron 执行，不依赖 Directus 或 Nuxt 服务正常运行。

@@ -145,7 +145,7 @@ File Library
 - `docker compose down --volumes` 与 named volume 有关，LITUBO 使用 bind mount，因此此命令**不影响**上传文件；但为避免误操作，仍然禁止在生产环境使用 `--volumes`；
 - 文件夹结构存储在 PostgreSQL（`directus_folders` 表），与文件同样受 bind mount 持久化保护；
 - 本地 `dev-data/` 目录已在 `.gitignore` 中排除，不进入 Git；
-- **生产环境必须纳入服务器备份**（见 `docs/ADMIN-CMS-SETUP.md` 第 2.3 节）。
+- **生产环境必须纳入备份**：数据库与 uploads 作为同一个备份集备份（见 `docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`，D-040）。
 
 ### 持久化验证记录（阶段 2 验收，2026-09-02）
 

@@ -257,12 +257,16 @@ docker compose -f docker-compose.yml up -d directus
 docker compose -f docker-compose.yml exec directus npx directus database migrate:latest
 ```
 
-升级前建议先备份 PostgreSQL：
+升级前**必须**先创建一个经过校验的完整备份集（数据库 + uploads，D-040），不要只导出数据库：
 
 ```bash
-docker compose -f docker-compose.yml exec postgres \
-  pg_dump -U litubo litubo_cms > /data/litubo/backups/$(date +%Y%m%d).sql
+docker compose -f docker-compose.yml stop directus
+node scripts/backup-create.mjs --postgres-container litubo-cms-postgres-1 --database <数据库名> \
+  --directus-container litubo-cms-directus-1 --uploads-dir /data/litubo/uploads --output-dir /data/litubo/backups
+docker compose -f docker-compose.yml start directus
 ```
+
+完整步骤与恢复验证见 `docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`。
 
 ---
 

@@ -14,7 +14,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
-    "release:check-test-data": "node scripts/release-check-test-data.mjs"
+    "release:check-test-data": "node scripts/release-check-test-data.mjs",
+    "backup:create": "node scripts/backup-create.mjs",
+    "backup:restore-test": "node scripts/backup-restore.mjs"
   },
   "dependencies": {
     "@nuxtjs/i18n": "^9.5.6",

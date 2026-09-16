@@ -1,7 +1,8 @@
 # Production Provisioning Runbook
 
 > Scope: building a **new Directus + PostgreSQL environment** from this repository.
-> This runbook does not deploy, does not change DNS, and does not implement backup or restore.
+> This runbook does not deploy, does not change DNS, and does not itself back up or restore — that is
+> `docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`.
 > Production deployment remains **NOT AUTHORIZED** and requires its own TYPE D authorization
 > (`PROJECT-EXECUTION-PROTOCOL.md` §4, §13.4).
 
@@ -60,9 +61,12 @@ run and verified is `linux/amd64`. Confirm the target server's architecture duri
 preflight; it has not been verified here.
 
 **Backup prerequisite.** `RELEASE-SAFETY-GATES.md` §3A.8 steps 7 and 8 require a verified restorable
-backup before any production mutation, plus a written rollback plan. **Neither is implemented in this
-repository yet**, and nothing in this runbook creates or tests a backup. Production deployment
-requires a verified backup before mutation; treat that as an open prerequisite, not a solved one.
+backup before any production mutation, plus a written rollback plan. Backups are made and restored with
+`docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md` (D-040): the database and the Directus uploads as one
+set, taken in a quiesced window and verified by restoring it into TEST targets. The tooling and a local
+rehearsal are proven; production backup storage is not, and a written production rollback / cut-over
+plan is still not provided. Nothing in this runbook creates a backup: take one before a production
+mutation, and treat the rollback plan as an open prerequisite, not a solved one.
 
 ---
 
@@ -256,7 +260,8 @@ Read-only, after startup:
   owns, and refuses to delete drifted rows.
 - The guard SQL files document their own `DROP TRIGGER` / `DROP FUNCTION` order in their headers.
 - There is **no rollback for the schema baseline**. Undoing a schema apply means restoring a backup —
-  which is why the backup prerequisite above is not optional.
+  which is why the backup prerequisite above is not optional (§1; restore procedure and its limits in
+  `PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`).
 
 ---
 

@@ -411,36 +411,29 @@ GitHub 仓库（代码库）包含：
 
 ### PostgreSQL 与 uploads 的备份方式
 
-**数据库备份**（需有服务器访问权限的人员执行）：
+> **自 FINAL-RELEASE-PRODUCTION-READY-02（D-040）起：** 数据库与 Directus uploads 是**同一个备份集**，必须在停写窗口内一起备份、一起恢复；不要再单独导出数据库或单独打包 uploads。完整步骤、校验项与失败处理以 `docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md` 为准。（本节原先的命令使用了不存在的容器名 `litubo-cms-db-1` 与错误的用户 / 库名，并把数据库与媒体分开备份，已移除。）
+
+**备份**（由有服务器访问权限的开发人员执行；备份期间网站的 CMS 读取与询盘提交返回 503，期间不要登录后台）：
 
 ```bash
-# 导出数据库
-docker exec litubo-cms-db-1 pg_dump -U postgres directus > backup_$(date +%Y%m%d).sql
-
-# 压缩后妥善保管到异地存储（如腾讯云 COS）
-gzip backup_$(date +%Y%m%d).sql
+docker compose stop directus
+node scripts/backup-create.mjs --postgres-container litubo-cms-postgres-1 --database <数据库名> \
+  --directus-container litubo-cms-directus-1 --uploads-dir <uploads 目录> --output-dir <Git 之外的备份目录>
+docker compose start directus
 ```
 
-**媒体文件备份**：
+得到的 `litubo-backup-YYYYMMDD-HHMMSS/` 目录包含 `database.dump`、`uploads.tar`、`SHA256SUMS`、`manifest.json`，四者缺一不可。备份集含业务数据，以及数据库里的凭证类记录（service token、密码哈希），须按敏感资料保管。
 
-```bash
-# 打包 Directus uploads 目录
-tar -czf uploads_backup_$(date +%Y%m%d).tar.gz /path/to/directus/uploads
-```
-
-**备份频率建议**：
-- 数据库：每日自动备份，保留最近 30 天
-- 媒体文件：每周备份，保留最近 3 个月
+**备份频率、保留期、异地存储、加密**：尚待生产运维决定（TO BE CONFIRMED）。上线初期建议保留多个带日期的备份集，且不要只存放在数据所在的同一块磁盘上。
 
 ### 恢复前必须先做什么
 
 在执行任何恢复操作前：
 
-1. **停止前台服务**：防止恢复期间数据不一致导致前台报错
+1. **先恢复到测试目标验证**：`node scripts/backup-restore.mjs` 只接受名称带 TEST 的新数据库和新建或空的 TEST uploads 目录；它先校验 checksum，任何不一致都拒绝恢复
 2. **记录当前状态**：截图或导出当前数据，作为恢复前的参考点
-3. **确认备份文件完整性**：验证备份文件未损坏（解压检查）
-4. **通知相关人员**：告知维护窗口，预计多少分钟不可用
-5. **在测试环境先演练**：如有条件，先在测试服务器演练恢复过程
+3. **通知相关人员**：告知维护窗口，预计多少分钟不可用
+4. **生产切换须单独授权**：把恢复出的数据切换为生产数据不是恢复工具的功能，目前没有经过演练的步骤，需要单独的发布授权
 
 ### 严禁提交到 Git 的文件
 
