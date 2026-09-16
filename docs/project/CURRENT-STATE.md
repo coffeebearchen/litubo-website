@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-FIX-C — Public Route Correctness + Locale Isolation + Fixture Fail-closed（Controller 接受 · 9a30b1b · not pushed · P1-01～P1-04 CLOSED）；FIX-A 926be4d、FIX-B 12a45b6 已接受
-Latest completed module:            FINAL-RELEASE-FIX-D — Public Business Truth + Production Presentation Cleanup（A2 · LOCAL COMPLETE · P1-05 FIXED · 等待 Controller 审查）
-Active authorized module:           NONE（FINAL-RELEASE-FIX-D 已收口，等待 Controller 审查）
+Latest accepted module:             FINAL-RELEASE-FIX-D — Public Business Truth + Production Presentation Cleanup（Controller 接受 · 26cec80 · not pushed · P1-05 CLOSED）；FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b 已接受
+Latest completed module:            PUBLIC-CLAIMS-CLEANUP-01 — V1 Conservative Public Content Cleanup（A2 · LOCAL COMPLETE · D-036 已登记 · 等待 Controller 审查）
+Active authorized module:           NONE（PUBLIC-CLAIMS-CLEANUP-01 已收口，等待 Controller 审查）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：9a30b1b）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：26cec80）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10219,3 +10219,78 @@ Next candidate:                 NONE — 等待 Controller（下一模块 NOT AU
 - 首页 `cmsText()` 的 `|| obj.en` 回退（RSG-05 OPEN）与 P2-06 均未改。
 
 *最后更新：2026-09-16，由 Claude Code 在"FINAL-RELEASE-FIX-D"任务中写入。*
+
+---
+
+## PUBLIC-CLAIMS-REVIEW-01 — 只读公开业务陈述盘点（2026-09-16）
+
+```text
+Module:                         PUBLIC-CLAIMS-REVIEW-01 — Read-only Public Business Claims Inventory
+Authorization:                  A0 READ_ONLY（Controller 施工单）
+Status:                         COMPLETE · 0 修改 · 0 commit
+Scope:                          /company/about · /company/global-service · 首页 FAQ 预告 · 8 个 Applications
+Result:                         仓库内没有任何业务确认支持这四组页面上的公司身份、业务范围、服务网络或产品能力陈述
+```
+
+**依据：** CURRENT-STATE 全文 10,221 行（5 段并行完整读取）、`08-decision-log.md`、协议、RELEASE-SAFETY-GATES、`CLAUDE.md` 与 49 个已跟踪文档、`docs/content` 的联系信息草稿与内容模板表（空白模板，Applications 状态为 Draft）、空的 `docs/content/inbox` 与 `assets/source`、Media Library 只读查询，以及 About / Global Service / 首页 / Applications 的真实渲染输出。
+
+**分类结果：** CONFIRMED 仅限已确认的信息架构与路由（产品线清单、八个行业名称、CTA 与表单入口、D-007 / D-012 / D-013 支撑的请求流程）；其余公司定位、地域覆盖、分销与服务能力、全系列产品与合规能力均为 NEEDS USER CONFIRMATION；首页 FAQ 预告、Applications 详情的 TODO_CONTENT meta 与缺失图片为 PLACEHOLDER。
+
+**FIX-D 记录更正（本次发现）：** FIX-D 报告与本文件当时写的"Applications 页面可见输出没有 TODO_CONTENT 标记"不准确——当时只扫描了正文与 alt 属性，没有覆盖 `<head>`。实际上 8 个 Applications 详情页的 `meta description` 与 `og:description` 输出的都是 `TODO_CONTENT`，且页面可被索引。本次补充审查发现并记录，由 PUBLIC-CLAIMS-CLEANUP-01 修复（详情页改为 404，无任何占位 meta）。
+
+*最后更新：2026-09-16，由 Claude Code 在"PUBLIC-CLAIMS-REVIEW-01"任务中写入。*
+
+---
+
+## PUBLIC-CLAIMS-CLEANUP-01 — V1 Conservative Public Content Cleanup（2026-09-16）
+
+```text
+Module:                         PUBLIC-CLAIMS-CLEANUP-01 — V1 Conservative Public Content Cleanup
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller 施工单，用户业务决定已冻结）
+Branch:                         review/public-claims-cleanup-01（基线 26cec80；FIX-A / B / C / D 均已由 Controller 接受）
+Status:                         LOCAL COMPLETE · 等待 Controller 审查
+Decision:                       新增 D-036 — V1 Conservative Public Business Claims and Application Exposure（用户确认）
+Schema / permissions / data:    未修改（DB 写入 0；Media Library、Directus、权限均未触碰）
+Safety gates touched:           RSG-01（未审核文字不公开）· RSG-02（公开资格 / 索引）· RSG-08（DEMO 不进入生产公开输出）· RSG-09
+MASTER-ROADMAP:                 未修改
+Push / merge / deploy:          NONE
+Next candidate:                 NONE — 等待 Controller（下一模块 NOT AUTHORIZED）
+```
+
+**用户冻结的业务决定（D-036）：** 法定名称 Shanghai NingPin Industrial Dev. Co., Ltd. 与已确认的昆山地址可正式公开，但不得强化为全球或制造总部；V1 采用保守定位，不做未经证实的全球制造、全球 / 授权分销网络、全球安装与售后覆盖、区域备件库存、工厂培训工程师、现场服务保证等承诺，国际业务只以询盘表达；检测、材料、防护与合规能力只在具体型号有真实资料支撑时公开；首页 FAQ 预告只由真实已发布 FAQ 驱动；八个 Applications 行业分类可公开，DEMO fixture 详情页不得作为生产内容。
+
+**修改内容：**
+- **About：** hero 改为"LITUBO provides food and packaging inspection solutions"加已确认的五条产品线；删除 global manufacturer、headquartered、around the world、Asia / Europe / Americas 覆盖；四张卡片改为事实型入口（产品线、Applications、Technical Matching、Support 请求），删除 HACCP 灵敏度、IP 防护 / 不锈钢 / 冗余检测通道、分销网络服务承诺；保留法定名称、昆山地址与 Contact / Distributor / Engineer 入口；删除两个指向不存在图片的 img。
+- **Global Service：** 页面名保留；hero 与 6 张卡片改为真实存在的请求路径（技术支持、备件、手册、服务与培训、分销商询盘、合作申请）；删除全球授权分销网络、工厂培训工程师、皮带校准与灵敏度验证、区域备件库存、视频远程支持、现场服务承诺、覆盖地图区块与团队图片位；"Parts can be ordered" 改为 "Spare parts can be requested"（D-007 仅询价）；"nearest qualified partner" 改为"提交地点与需求，团队审阅每一份分销商询盘"。
+- **首页：** FAQ 预告改为读取 `/api/cms/posts?content_type=faq`，按当前语言精确取标题（RSG-05 无回退）最多 6 条；已发布 FAQ 为 0 时整块不渲染；删除 6 个写死问题与不可用的 "Search the Knowledge Center…" 搜索框及其 i18n 键。
+- **Applications：** hub 保留八个已确认行业，改用导航标签渲染，不再读取 DEMO fixtures，卡片不再是链接，CTA 增加 Technical Matching；8 个详情路由改用既有的"关闭详情"模式（`pages/resources/news/[slug].vue` 同款）：404 + noindex + 无任何占位 meta；fixture 文件保留供开发与测试。
+- **导航：** Header 11 条、Footer 4 条指向 Applications 详情的链接改为指向 hub，标签不变。
+- **相邻文案（施工单 §10）：** Become a Partner 改为分销 / 商务合作询盘；Find a Distributor 改为提交询盘由团队审阅；首页 meta 去掉 worldwide；备件页改为"发送备件请求"，不再承诺库存与交期；Company mega menu 促销语去掉 "global support"。
+
+**测试：** 新增 `tests/publicClaimsCleanup.test.ts`（11 项，窄范围静态检查）：公开页面、组件、布局与英文文案不含 20 个禁用短语（global manufacturer、worldwide、authorised distributor、distributor network、factory-trained、belt alignment、sensitivity validation、nearest qualified、established distribution、supplied with every machine、availability and lead times、HACCP、IP-rated、stainless steel、redundant detection、legal metrology、headquartered、coverage map、Knowledge Center 等）；About 保留法定实体、地址与入口；Global Service 用"备件可请求"且无 ordered directly / 占位句；首页无写死问题与搜索框、按语言读取已发布 FAQ、无条目时不渲染；三个 locale 文件无 faqSearch；hub 用八个导航标签且不读 fixture、无详情链接；详情页 404 + noindex 且不读 fixture；公开页面与组件不再链接 Applications 详情；fixture 文件仍在。FIX-C（21 项）与 FIX-D（10 项）测试同时通过。
+
+**验证：**
+- 定向：`tests/publicClaimsCleanup.test.ts` 11/11，`tests/publicBusinessTruth.test.ts` 10/10，`tests/publicRouteCorrectness.test.ts` 21/21。
+- 全量（`CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run --no-file-parallelism`）：82 files passed / 2 skipped，2833 passed / 45 skipped，0 failed，114.71 s（FIX-D 基线 81 files / 2822 passed，新增 1 个文件 11 项）。
+- 串行门禁（全量之后）：`npm run release:check-test-data` PASS（exit 0）；typecheck 0 error；lint 0 error；`npm run build` Build complete；`git diff --check` 通过（暂存后 `git diff --cached --check` 另行复核）。
+- 本机 Node v24.14.0（`.nvmrc` 为 22.22.2，Node 22 合同仍 OPEN，P1-10）。
+
+**真实 HTTP（dev server）：** `/`、`/company/about`、`/company/global-service`、`/company/become-a-partner`、`/find-a-distributor`、`/support/request-spare-parts`、`/applications` 均 200；8 个 Applications 详情 URL 全部 404，`robots = noindex, follow`，无 description / og:description（修改前为 `TODO_CONTENT` 且可索引）。可见文本扫描（含 alt / title / aria-label 与 head description）覆盖 10 条公开路由：DEMO、TEST ONLY、NOT FOR PUBLICATION、TODO_CONTENT、TODO_TRANSLATION 与 20 个禁用短语命中数为 0。
+
+**浏览器验收：** dev server 稳定后新开标签页，1440 与 375：About（200，新 hero 与四张事实型卡片，图片请求 0）、Global Service（200，6 条请求路径，无覆盖地图）、首页（200，FAQ 区块因 0 条已发布 FAQ 不渲染）、Applications hub（200，8 张已确认行业卡片，详情链接 0）、Applications 详情（404，noindex）。全部 `scrollWidth = clientWidth`（1440：1425 / 1425；375：375 / 375），损坏图片 0，console 仅有 404 文档自身的资源错误，hydration 消息 0。375 截图可辨认；1440 截图在面板中缩放后不可辨认，以 DOM 几何取证。视口已重置。
+
+**Release Safety Gates：**
+- RSG-01：未经业务确认的公司、服务与产品能力陈述已从公开输出移除（本地范围，静态测试 + 实页检查）。
+- RSG-02：Applications 详情路由统一 404 + noindex，不再输出可索引的 `TODO_CONTENT` meta；sitemap 未包含 Applications URL（未改）。
+- RSG-08：Applications 公开页不再读取 DEMO fixtures；FIX-C 的 CMS 模式 fail closed 未改。
+- RSG-09：无 push / merge / deploy。
+- 已按事实更新 `RELEASE-SAFETY-GATES.md` §4.3 的 RSG-01、RSG-08 行（状态列不变）。P0 Violations：NONE。
+
+**已知 / 记录：**
+- Header 与 Footer 中原本指向 8 个行业详情的链接现在都指向 Applications hub，标签未变；是否改为收起这些菜单项由 Controller 决定。
+- `/support/send-product-test` 仍写着 "Ship a sample to our application lab for a free detection evaluation."（"application lab"与"free"未经确认，不在本模块授权范围，已报告未改）。
+- `/es`、`/pt` 静态页面仍渲染 TODO_TRANSLATION（未发布语言、noindex），属 locale 架构，未改。
+- 首页 `cmsText()` 的 `|| obj.en` 回退（RSG-05 OPEN）与 P2-06 错误语义未改。
+- Applications fixture 文件保留在 `content/fixtures/applications.ts`，仅供开发与测试；公开交付不再读取它。
+
+*最后更新：2026-09-16，由 Claude Code 在"PUBLIC-CLAIMS-CLEANUP-01"任务中写入。*

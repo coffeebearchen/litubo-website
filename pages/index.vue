@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HomeContent } from '~/types/content'
+import type { HomeContent, PostsResult } from '~/types/content'
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
@@ -45,14 +45,17 @@ useSeoHead({
 // the section is not rendered. The hard-coded demo cards and their DEMO notice were removed (D-020, FINAL-RELEASE-FIX-D).
 const latestResources: { tag: string; title: string; excerpt: string; to: string }[] = []
 
-const faqQuestions = [
-  'What contaminants can X-ray inspection detect?',
-  'How does metal detection work with wet or conductive products?',
-  'Which inspection technology suits packaged food?',
-  'What integration options are available for LITUBO systems?',
-  'How do I request service or spare parts?',
-  'Can LITUBO help with regulatory compliance documentation?',
-]
+// PUBLIC-CLAIMS-CLEANUP-01 (D-036): the FAQ teaser lists real published FAQ questions in the current locale only
+// (RSG-05, no fallback). With none published the whole section is not rendered; no question is hard-coded.
+const { data: faqTeaser } = await useAsyncData<PostsResult>(
+  'home-faq-teaser',
+  () => $fetch<PostsResult>('/api/cms/posts?content_type=faq&sort=publish_date'),
+  { default: () => ({ posts: [] }) },
+)
+const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
+  .map(post => post.title[locale.value as 'en' | 'es' | 'pt'])
+  .filter(Boolean)
+  .slice(0, 6))
 </script>
 
 <template>
@@ -187,23 +190,10 @@ const faqQuestions = [
     </section>
 
     <!-- ─── FAQ teaser ────────────────────────────────── -->
-    <section class="home-faq section-gap" aria-labelledby="faq-heading">
+    <section v-if="faqQuestions.length" class="home-faq section-gap" aria-labelledby="faq-heading">
       <div class="container">
         <h2 id="faq-heading" class="home-faq__title">{{ t('pages.home.faqTitle') }}</h2>
         <p class="home-faq__subtitle">{{ t('pages.home.faqSubtitle') }}</p>
-        <!-- Non-functional search (Phase 1 — static) -->
-        <div class="home-faq__search" role="search" aria-label="FAQ search (not yet active)">
-          <svg class="home-faq__search-icon" width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path d="M9 17A8 8 0 109 1a8 8 0 000 16zM19 19l-4.35-4.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-          </svg>
-          <input
-            class="home-faq__search-input"
-            type="search"
-            :placeholder="t('pages.home.faqSearch')"
-            disabled
-            aria-disabled="true"
-          >
-        </div>
         <ul class="home-faq__questions" role="list">
           <li v-for="q in faqQuestions" :key="q">
             <NuxtLink :to="localePath('/support/faq')" class="home-faq__question-link">
@@ -640,34 +630,6 @@ const faqQuestions = [
   max-width: 480px;
   margin: 0 auto var(--space-8);
   line-height: var(--leading-normal);
-}
-
-.home-faq__search {
-  position: relative;
-  max-width: 640px;
-  margin: 0 auto var(--space-8);
-}
-
-.home-faq__search-icon {
-  position: absolute;
-  left: var(--space-4);
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--color-ink-muted);
-  pointer-events: none;
-}
-
-.home-faq__search-input {
-  width: 100%;
-  padding: 14px var(--space-4) 14px 44px;
-  font-size: var(--text-base);
-  font-family: var(--font-body);
-  border: 1.5px solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-white);
-  color: var(--color-ink);
-  cursor: not-allowed;
-  opacity: 0.7;
 }
 
 .home-faq__questions {

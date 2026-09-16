@@ -3,9 +3,9 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'), canonicalPath: '/company/about' })
 
-const imgErrors = ref({ hero: false, story: false })
-const heroSrc = '/images/company/company-about-hero.jpg'
-const storySrc = '/images/company/company-about-story.jpg'
+// PUBLIC-CLAIMS-CLEANUP-01 (D-036): this page states only what the project has confirmed — the product lines,
+// the legal entity and address, and the enquiry routes. Unverified positioning, coverage, certification and
+// service-network claims were removed, together with photo slots whose files do not exist.
 </script>
 
 <template>
@@ -13,14 +13,6 @@ const storySrc = '/images/company/company-about-story.jpg'
     <!-- Hero -->
     <section class="about-hero">
       <div class="about-hero__media">
-        <img
-          v-if="!imgErrors.hero"
-          :src="heroSrc"
-          alt="LITUBO manufacturing facility"
-          class="about-hero__img"
-          loading="eager"
-          @error="imgErrors.hero = true"
-        >
         <div class="about-hero__overlay" aria-hidden="true" />
       </div>
       <div class="about-hero__content container">
@@ -33,7 +25,7 @@ const storySrc = '/images/company/company-about-story.jpg'
           class="about-hero__breadcrumb"
         />
         <h1 class="about-hero__title">{{ t('pages.about.heroTitle') }}</h1>
-        <p class="about-hero__sub">LITUBO is a global manufacturer of food and packaging inspection systems, headquartered in Kunshan, Jiangsu Province, China.</p>
+        <p class="about-hero__sub">LITUBO provides food and packaging inspection solutions: X-ray inspection, metal detection, checkweighing, combination inspection, and conveyors & reject systems.</p>
       </div>
     </section>
 
@@ -43,19 +35,11 @@ const storySrc = '/images/company/company-about-story.jpg'
         <div class="two-col">
           <div class="two-col__text">
             <SectionHeading>Our Mission</SectionHeading>
-            <p class="body-text">We help food and packaging manufacturers around the world protect consumers and brands by delivering reliable, technically precise inspection systems. From the detection of physical contaminants to weight compliance and combination inspection, our equipment is built for continuous production environments where accuracy and uptime are non-negotiable.</p>
-            <p class="body-text">Operating under Shanghai NingPin Industrial Dev. Co., Ltd., LITUBO serves distributors and end-users across Asia, Europe, the Americas and beyond.</p>
+            <p class="body-text">We help food and packaging manufacturers protect consumers and brands with inspection systems for physical contaminant detection, weight compliance and combination inspection.</p>
+            <p class="body-text">LITUBO operates under Shanghai NingPin Industrial Dev. Co., Ltd. in Kunshan, Jiangsu Province, China, and welcomes international enquiries from distributors and end users.</p>
           </div>
           <div class="two-col__photo" aria-hidden="true">
-            <img
-              v-if="!imgErrors.story"
-              :src="storySrc"
-              alt="LITUBO facility"
-              class="two-col__img"
-              loading="lazy"
-              @error="imgErrors.story = true"
-            >
-            <div v-else class="two-col__img-placeholder" aria-hidden="true" />
+            <div class="two-col__img-placeholder" aria-hidden="true" />
           </div>
         </div>
       </div>
@@ -64,7 +48,7 @@ const storySrc = '/images/company/company-about-story.jpg'
     <!-- Key pillars -->
     <section class="section-gap section-alt">
       <div class="container">
-        <SectionHeading>What We Stand For</SectionHeading>
+        <SectionHeading>What LITUBO Provides</SectionHeading>
         <div class="pillars">
           <div class="pillar">
             <div class="pillar__icon" aria-hidden="true">
@@ -72,8 +56,8 @@ const storySrc = '/images/company/company-about-story.jpg'
                 <path d="M14 4l2.5 7h7l-5.7 4.1 2.2 6.9L14 18l-6 4 2.2-6.9L4.5 11H12L14 4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
               </svg>
             </div>
-            <h3 class="pillar__title">Technical Precision</h3>
-            <p class="pillar__body">Inspection systems engineered to meet the detection sensitivity required by food retailers, regulators and HACCP programmes.</p>
+            <h3 class="pillar__title">Inspection Technologies</h3>
+            <p class="pillar__body">X-ray inspection, metal detection, checkweighing, combination inspection, and conveyors & reject systems.</p>
           </div>
           <div class="pillar">
             <div class="pillar__icon" aria-hidden="true">
@@ -82,8 +66,8 @@ const storySrc = '/images/company/company-about-story.jpg'
                 <path d="M9 14l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </div>
-            <h3 class="pillar__title">Production Reliability</h3>
-            <p class="pillar__body">Built for continuous operation in demanding environments: IP-rated enclosures, stainless steel construction, and redundant detection channels.</p>
+            <h3 class="pillar__title">Applications</h3>
+            <p class="pillar__body">Eight food and packaging industries are listed in the Applications section.</p>
           </div>
           <div class="pillar">
             <div class="pillar__icon" aria-hidden="true">
@@ -91,8 +75,8 @@ const storySrc = '/images/company/company-about-story.jpg'
                 <path d="M4 20l8-8 4 4 8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </div>
-            <h3 class="pillar__title">Global Service Reach</h3>
-            <p class="pillar__body">A distributor network across multiple regions provides local commissioning, training, spare parts supply and technical support.</p>
+            <h3 class="pillar__title">Technical Consultation</h3>
+            <p class="pillar__body">Send your product, line speed and packaging details through Technical Matching and our team will review them.</p>
           </div>
           <div class="pillar">
             <div class="pillar__icon" aria-hidden="true">
@@ -101,8 +85,8 @@ const storySrc = '/images/company/company-about-story.jpg'
                 <path d="M9 8V6a5 5 0 0110 0v2" stroke="currentColor" stroke-width="1.5" />
               </svg>
             </div>
-            <h3 class="pillar__title">Partnership Model</h3>
-            <p class="pillar__body">We work through regional distribution partners who bring local expertise, language support and on-the-ground service capability.</p>
+            <h3 class="pillar__title">Support Requests</h3>
+            <p class="pillar__body">Technical support, manual, spare-parts, service and product-test requests are handled through the Support section.</p>
           </div>
         </div>
       </div>

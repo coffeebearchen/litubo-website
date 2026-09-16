@@ -3,17 +3,15 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 useSeoHead({ title: t('seo.globalService.title'), description: t('seo.globalService.description'), canonicalPath: '/company/global-service' })
 
-const imgErrors = ref({ map: false, team: false })
-const mapSrc = '/images/company/company-global-service-map.jpg'
-const teamSrc = '/images/company/company-global-service-team.jpg'
-
+// PUBLIC-CLAIMS-CLEANUP-01 (D-036): V1 describes only the enquiry and request routes that exist. This page makes
+// no claim about network size, engineer training, regional stock, on-site service or geographic coverage.
 const serviceItems = [
-  { title: 'Distributor Network', body: 'LITUBO equipment is sold and supported through authorised regional distributors. Each distributor is trained in installation, commissioning, and first-level technical support.' },
-  { title: 'Installation & Commissioning', body: 'Factory-trained engineers or qualified distributor technicians perform machine installation, belt alignment, sensitivity validation and operator training.' },
-  { title: 'Spare Parts Supply', body: 'Critical replacement parts are stocked by regional distributors. Parts can also be ordered directly through our spare-parts inquiry form with model and serial number.' },
-  { title: 'Technical Support', body: 'Remote technical assistance is available via phone, email or video call. For on-site issues, our distributors coordinate field service visits.' },
-  { title: 'Manual & Documentation', body: 'Operation and maintenance manuals are supplied with every machine. Additional copies can be requested through the Support section.' },
-  { title: 'Become a Distributor', body: 'We are always looking for experienced partners in new territories. Submit a partner application and our team will be in touch.' },
+  { title: 'Technical Support', body: 'Describe the machine and the issue in a technical-support request.' },
+  { title: 'Spare Parts', body: 'Spare parts can be requested with the machine model and serial number.' },
+  { title: 'Manuals & Documentation', body: 'Operation and maintenance manuals can be requested through the Support section.' },
+  { title: 'Service & Training', body: 'Service and operator-training requirements can be submitted as a service request.' },
+  { title: 'Distributor Enquiries', body: 'Tell us your location and requirements; our team reviews each distributor enquiry.' },
+  { title: 'Partnership Applications', body: 'Distributor and business partnership applications are reviewed by the LITUBO team.' },
 ]
 </script>
 
@@ -24,34 +22,14 @@ const serviceItems = [
       <div class="container">
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.company') }, { label: t('nav_company.globalService') }]" />
         <h1 class="gs-hero__title">{{ t('pages.globalService.heroTitle') }}</h1>
-        <p class="gs-hero__sub">LITUBO inspection systems are sold and supported through a global network of authorised distributors, with technical expertise in food and packaging manufacturing environments.</p>
-      </div>
-    </section>
-
-    <!-- Map placeholder -->
-    <section class="section-gap">
-      <div class="container">
-        <div class="map-panel">
-          <img
-            v-if="!imgErrors.map"
-            :src="mapSrc"
-            alt="LITUBO global service coverage map"
-            class="map-panel__img"
-            loading="lazy"
-            @error="imgErrors.map = true"
-          >
-          <div v-else class="map-panel__placeholder" aria-hidden="true">
-            <p class="map-panel__placeholder-text">Global coverage map — image coming soon</p>
-          </div>
-        </div>
-        <p class="map-caption">Distribution coverage map being prepared. Contact us to find a distributor in your region.</p>
+        <p class="gs-hero__sub">Technical support, spare-parts, manual, service and distributor enquiries for LITUBO inspection systems are handled through the request routes below.</p>
       </div>
     </section>
 
     <!-- Services -->
     <section class="section-gap section-alt">
       <div class="container">
-        <SectionHeading>What Our Service Network Provides</SectionHeading>
+        <SectionHeading>Support and Enquiry Routes</SectionHeading>
         <div class="service-grid">
           <div
             v-for="item in serviceItems"
@@ -70,23 +48,15 @@ const serviceItems = [
       <div class="container">
         <div class="two-col">
           <div class="two-col__text">
-            <SectionHeading>Find a Distributor in Your Region</SectionHeading>
-            <p class="body-text">If you are outside an established distribution territory, or if you need to locate local support quickly, use our distributor finder or contact us directly — we will connect you with the nearest qualified partner.</p>
+            <SectionHeading>Distributor Enquiries</SectionHeading>
+            <p class="body-text">Send your location and requirements through the distributor enquiry form, or contact us directly. Our team reviews each enquiry.</p>
             <div class="two-col__actions">
               <NuxtLink :to="localePath('/find-a-distributor')" class="btn btn--primary">Find a Distributor</NuxtLink>
               <NuxtLink :to="localePath('/contact')" class="btn btn--outline">Contact Us</NuxtLink>
             </div>
           </div>
           <div class="two-col__photo" aria-hidden="true">
-            <img
-              v-if="!imgErrors.team"
-              :src="teamSrc"
-              alt="LITUBO service team"
-              class="two-col__img"
-              loading="lazy"
-              @error="imgErrors.team = true"
-            >
-            <div v-else class="two-col__img-placeholder" />
+            <div class="two-col__img-placeholder" />
           </div>
         </div>
       </div>
@@ -126,39 +96,6 @@ const serviceItems = [
 
 .section-gap  { padding: var(--space-16) 0; }
 .section-alt  { background: var(--color-canvas); }
-
-/* ── Map ───────────────────────────────────────────────────────── */
-.map-panel {
-  aspect-ratio: 16 / 7;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
-}
-
-.map-panel__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.map-panel__placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.map-panel__placeholder-text {
-  font-size: var(--text-sm);
-  color: rgba(255,255,255,0.6);
-}
-
-.map-caption {
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
-  margin-top: var(--space-3);
-}
 
 /* ── Service grid ──────────────────────────────────────────────── */
 .service-grid {

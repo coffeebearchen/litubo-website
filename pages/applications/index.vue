@@ -1,7 +1,20 @@
 <script setup lang="ts">
 const { t } = useI18n()
 const localePath = useLocalePath()
-const applications = useApplications()
+
+// PUBLIC-CLAIMS-CLEANUP-01 (D-036): the hub lists the eight confirmed industries (D-002) using the site's own
+// navigation labels, so no DEMO fixture is read here. Per-industry pages stay closed until real, confirmed
+// content exists (D-014), which is why the cards are presentation only and link nowhere.
+const industries = computed(() => [
+  t('nav_applications.packaged'),
+  t('nav_applications.bottled'),
+  t('nav_applications.meat'),
+  t('nav_applications.frozen'),
+  t('nav_applications.bakery'),
+  t('nav_applications.nuts'),
+  t('nav_applications.powder'),
+  t('nav_applications.pharma'),
+])
 
 useSeoHead({
   title: t('seo.applications.title'),
@@ -23,32 +36,18 @@ useSeoHead({
     <section class="section-gap">
       <div class="container">
         <div class="applications-grid">
-          <NuxtLink
-            v-for="app in applications"
-            :key="app.slug"
-            :to="localePath(`/applications/${app.slug}`)"
+          <div
+            v-for="industry in industries"
+            :key="industry"
             class="app-card"
           >
             <div class="app-card__image-wrap">
-              <img
-                v-if="app.heroMedia.url"
-                :src="app.heroMedia.url"
-                :alt="app.heroMedia.alt.en"
-                class="app-card__image"
-                loading="lazy"
-                @error="($event.target as HTMLImageElement).style.display = 'none'"
-              >
               <div class="app-card__image-placeholder" aria-hidden="true" />
             </div>
             <div class="app-card__body">
-              <h2 class="app-card__title">{{ app.title.en }}</h2>
-              <span class="app-card__arrow" aria-hidden="true">
-                <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
-                  <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </span>
+              <h2 class="app-card__title">{{ industry }}</h2>
             </div>
-          </NuxtLink>
+          </div>
         </div>
       </div>
     </section>
@@ -57,6 +56,8 @@ useSeoHead({
       :title="t('common.talkToEngineer')"
       :primary-label="t('nav.contact')"
       :primary-to="localePath('/contact')"
+      :secondary-label="t('mobile_bar.matching')"
+      :secondary-to="localePath('/technical-matching')"
     />
   </div>
 </template>
@@ -99,32 +100,13 @@ useSeoHead({
   border-radius: var(--radius-sm);
   overflow: hidden;
   box-shadow: var(--shadow-card);
-  text-decoration: none;
   color: inherit;
-  transition: box-shadow var(--transition-normal);
-}
-
-.app-card:hover {
-  box-shadow: 0 4px 16px rgba(18, 60, 50, 0.12);
 }
 
 .app-card__image-wrap {
   aspect-ratio: 4 / 3;
   position: relative;
   overflow: hidden;
-}
-
-.app-card__image {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform var(--transition-normal);
-}
-
-.app-card:hover .app-card__image {
-  transform: scale(1.03);
 }
 
 .app-card__image-placeholder {
@@ -147,15 +129,5 @@ useSeoHead({
   font-weight: 600;
   color: var(--color-primary);
   line-height: var(--leading-snug);
-}
-
-.app-card__arrow {
-  color: var(--color-accent);
-  flex-shrink: 0;
-  transition: transform var(--transition-fast);
-}
-
-.app-card:hover .app-card__arrow {
-  transform: translateX(4px);
 }
 </style>

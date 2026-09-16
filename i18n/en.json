@@ -68,7 +68,7 @@
     "globalService": "Global Service Capability",
     "partner": "Become a Partner",
     "promoTitle": "Built for reliable inspection",
-    "promoBody": "Discover LITUBO's approach to quality, manufacturing and global support."
+    "promoBody": "Discover LITUBO's approach to quality, manufacturing and support."
   },
   "common": {
     "talkToEngineer": "Talk to an engineer",
@@ -112,7 +112,7 @@
   "seo": {
     "home": {
       "title": "LITUBO — Food & Packaging Inspection Solutions",
-      "description": "Industrial X-Ray, Metal Detection, Checkweighing and Combination Inspection systems for food manufacturers worldwide."
+      "description": "Industrial X-Ray, Metal Detection, Checkweighing and Combination Inspection systems for food and packaging manufacturers."
     },
     "products": {
       "title": "Products — Inspection Systems | LITUBO",
@@ -136,7 +136,7 @@
     },
     "findDistributor": {
       "title": "Find a Distributor — LITUBO",
-      "description": "Locate an authorised LITUBO distributor in your region."
+      "description": "Submit a distributor enquiry to the LITUBO team."
     },
     "support": {
       "title": "Support — LITUBO",
@@ -148,7 +148,7 @@
     },
     "about": {
       "title": "About LITUBO",
-      "description": "LITUBO is a global manufacturer of food and packaging inspection systems."
+      "description": "LITUBO provides food and packaging inspection solutions: X-ray inspection, metal detection, checkweighing and combination inspection."
     },
     "quality": {
       "title": "Quality & Manufacturing — LITUBO",
@@ -156,11 +156,11 @@
     },
     "globalService": {
       "title": "Global Service Capability — LITUBO",
-      "description": "Worldwide sales, installation and after-sales support."
+      "description": "Technical support, spare-parts, manual and distributor enquiries for LITUBO inspection systems."
     },
     "partner": {
       "title": "Become a Partner — LITUBO",
-      "description": "Join the LITUBO distributor network."
+      "description": "Distributor and business partnership enquiries."
     },
     "404": {
       "title": "Page Not Found — LITUBO",
@@ -189,7 +189,6 @@
       "latestCta": "All resources",
       "faqTitle": "Questions about your line?",
       "faqSubtitle": "Find quick answers to common questions about our systems and solutions.",
-      "faqSearch": "Search the Knowledge Center…",
       "faqCta": "View all FAQs",
       "ctaTitle": "Talk to the team who understands your line.",
       "ctaBody": "From product selection to integration and ongoing support, our engineers are ready to help.",
@@ -234,7 +233,7 @@
     },
     "findDistributor": {
       "heroTitle": "Find a Distributor",
-      "heroSubtitle": "Request contact with an authorised LITUBO distributor in your region.",
+      "heroSubtitle": "Tell us your location and requirements and our team will review your distributor enquiry.",
       "nameLabel": "Full name",
       "companyLabel": "Company",
       "emailLabel": "Email address",
@@ -253,7 +252,7 @@
     },
     "spareParts": {
       "heroTitle": "Request Spare Parts",
-      "heroSubtitle": "Submit a spare-parts inquiry. Our team will reply with availability and lead times.",
+      "heroSubtitle": "Send a spare-parts request with your machine model and serial number. Our team will reply.",
       "modelLabel": "Machine model",
       "serialLabel": "Serial number",
       "partsLabel": "Parts required",
@@ -298,7 +297,7 @@
     },
     "partner": {
       "heroTitle": "Become a Partner",
-      "heroSubtitle": "Join the LITUBO global distributor network.",
+      "heroSubtitle": "Submit a distributor or business partnership enquiry.",
       "nameLabel": "Full name",
       "companyLabel": "Company name",
       "emailLabel": "Email address",
