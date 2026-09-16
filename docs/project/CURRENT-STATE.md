@@ -8,7 +8,7 @@
 
 ```text
 Latest accepted module:             FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-LIVE-VALIDATION-01-R2 — Content AI Live Golden Path 验证（A2 · **STOP**：SourceRef 在 provider 调用前过期 · Analyze 点击 1 次 · 真实 provider 调用 0 · Proposal / Apply 均未发生 · 等待 Controller 审查）；FINAL-RELEASE-LIVE-SOURCE-PREP-01 已于 883caad 收口
+Latest completed module:            FINAL-RELEASE-LIVE-VALIDATION-01-R2 — Content AI Live Golden Path 验证（A2 · **STOP**：SourceRef 在 provider 调用前校验失败（过期为 INFERRED，非 PROVEN）· Analyze 点击 1 次 · 真实 provider 调用 0 · Proposal / Apply 均未发生 · 等待 Controller 审查）；FINAL-RELEASE-LIVE-SOURCE-PREP-01 已于 883caad 收口
 Active authorized module:           NONE（FINAL-RELEASE-LIVE-VALIDATION-01-R2 已按 STOP 收口，等待 Controller 审查）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-LIVE-VALIDATION-01-R3 NOT AUTHORIZED；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
@@ -10545,7 +10545,7 @@ Next candidate:                 NONE — FINAL-RELEASE-LIVE-VALIDATION-01-R2 NOT
 Module:                         FINAL-RELEASE-LIVE-VALIDATION-01-R2 — Content AI Live Golden Path 验证
 Authorization:                  A2 LOCAL VALIDATION + 恰好 1 次真实 AI Provider 调用授权（Controller 施工单）
 Branch:                         review/final-release-live-validation-01-r2（基线 883caad）
-Status:                         STOP — SourceRef 在 provider 调用前过期；等待 Controller 审查
+Status:                         STOP — SourceRef 在 provider 调用前校验失败；过期是最可能原因但为 INFERRED，非 PROVEN；等待 Controller 审查
 Failure stage:                  SourceRef validation，位于 provider invocation 之前
 Subject:                        Content item 6 / locale en / content_item_locales 行 15
 Fixed source:                   content_items_files id 1042（LT180C-test-general.txt）
@@ -10575,7 +10575,7 @@ Next candidate:                 NONE — FINAL-RELEASE-LIVE-VALIDATION-01-R3 NOT
 
 **门禁：** `npm run release:check-test-data` **PASS**（exit 0）；`git diff --check` exit 0；本模块 **production code 变更 = 0**，仅改动本文件与 `RELEASE-SAFETY-GATES.md` 两份治理文档。
 
-**流程教训（这是执行时序问题，不是产品缺陷）：** SourceRef 属**短生命周期安全令牌**，其 30 分钟有效期是设计意图而非缺陷。本次失败的原因是我把耗时的只读核对放在了页面加载**之后**，等到点击 Analyze 时令牌已超期。今后真正的 Live Validation 必须把全部前置核对做完再进入令牌窗口，并在窗口内一气呵成：
+**流程教训（这是执行时序问题，不是产品缺陷）：** SourceRef 属**短生命周期安全令牌**，其 30 分钟有效期是设计意图而非缺陷。本次失败最可能的原因（**INFERRED**，理由与局限见上一段）是我把耗时的只读核对放在了页面加载**之后**，等到点击 Analyze 时令牌很可能已超过有效期。今后真正的 Live Validation 必须把全部前置核对做完再进入令牌窗口，并在窗口内一气呵成：
 
 ```text
 完成全部前置只读核对 → reload → 取得 fresh SourceRef → 勾选 source → 立即 Analyze → Review → Apply
