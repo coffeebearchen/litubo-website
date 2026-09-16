@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-LIVE-SOURCE-PREP-01 — Content AI Live Test Source Preparation（A2 · LOCAL COMPLETE · 无新增 Decision · 等待 Controller 审查）
-Active authorized module:           NONE（FINAL-RELEASE-LIVE-SOURCE-PREP-01 已收口，等待 Controller 审查）
+Latest completed module:            FINAL-RELEASE-LIVE-VALIDATION-01-R2 — Content AI Live Golden Path 验证（A2 · **STOP**：SourceRef 在 provider 调用前过期 · Analyze 点击 1 次 · 真实 provider 调用 0 · Proposal / Apply 均未发生 · 等待 Controller 审查）；FINAL-RELEASE-LIVE-SOURCE-PREP-01 已于 883caad 收口
+Active authorized module:           NONE（FINAL-RELEASE-LIVE-VALIDATION-01-R2 已按 STOP 收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-LIVE-VALIDATION-01-R2 NOT AUTHORIZED；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
+Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-LIVE-VALIDATION-01-R3 NOT AUTHORIZED；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05、P1-09、P1-15、P1-17 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：314b005）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：883caad）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10536,3 +10536,57 @@ Next candidate:                 NONE — FINAL-RELEASE-LIVE-VALIDATION-01-R2 NOT
 - `FINAL-RELEASE-LIVE-VALIDATION-01-R2` **NOT AUTHORIZED**；下一模块 NOT AUTHORIZED。
 
 *最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-LIVE-SOURCE-PREP-01 任务中写入。*
+
+---
+
+## FINAL-RELEASE-LIVE-VALIDATION-01-R2 — Content AI Live Golden Path 验证（**STOP**，2026-09-16）
+
+```text
+Module:                         FINAL-RELEASE-LIVE-VALIDATION-01-R2 — Content AI Live Golden Path 验证
+Authorization:                  A2 LOCAL VALIDATION + 恰好 1 次真实 AI Provider 调用授权（Controller 施工单）
+Branch:                         review/final-release-live-validation-01-r2（基线 883caad）
+Status:                         STOP — SourceRef 在 provider 调用前过期；等待 Controller 审查
+Failure stage:                  SourceRef validation，位于 provider invocation 之前
+Subject:                        Content item 6 / locale en / content_item_locales 行 15
+Fixed source:                   content_items_files id 1042（LT180C-test-general.txt）
+Decision:                       无新增
+Schema / permissions / data:    schema 0；Directus 权限 0；production code 0；业务数据写入 0
+Analyze clicks:                 1（本模块唯一尝试已用尽，未重试、未刷新重试、未换来源、未换 provider）
+Real provider calls:            DeepSeek 0 / OpenAI 0 / TOTAL 0（用户授权的 1 次真实调用仍未消耗）
+Proposal / Apply:               Proposal NONE；Apply NONE
+Release guard:                  npm run release:check-test-data PASS；git diff --check exit 0
+Safety gates touched:           RSG-01 · RSG-03 · RSG-04 · RSG-06 · RSG-08（· RSG-09 无 push / merge / deploy）
+MASTER-ROADMAP:                 未修改
+Push / merge / deploy:          NONE
+Next candidate:                 NONE — FINAL-RELEASE-LIVE-VALIDATION-01-R3 NOT AUTHORIZED；下一模块 NOT AUTHORIZED
+```
+
+**发生了什么：** 本模块在完成全部点击前核验（基线、来源、provider、勾选唯一性）后，点击 `Analyze selected sources` **恰好一次**。服务端返回 **HTTP 200**，响应体为 `{"ok": false, "error": "This selection is no longer valid. Reload the page and choose the sources again.", "fileResults": []}`。该错误串即 `server/utils/aiContentIntake.ts:67` 的 `SELECTION_INVALID_ERROR`。
+
+**Provider 未被调用（控制流实证，非推测）：** `aiContentIntake.ts` 的调用顺序为 `resolveSourceRefs`（:452）→ `if (mediaIds === null) return { ok:false, error: SELECTION_INVALID_ERROR, fileResults: [] }`（**:457，本次在此返回**）→ `claimGenerateSlot`（:459）→ `runSubjectProposalEngine`（:477，provider dispatch 位于其内部更深处）。因此 **provider invocation 从未到达**。响应体 `fileResults: []` 为独立佐证：若请求曾进入 proposal engine，该数组会带有逐文件抽取结果；空数组说明连一个来源文件都未被读取。**DeepSeek 0、OpenAI 0、TOTAL REAL PROVIDER CALLS = 0。**
+
+**SourceRef 语义（FACT）：** `server/utils/aiSourceRef.ts:50` —— `export const SOURCE_REF_TTL_MS = 30 * 60 * 1000`（**30 分钟**，代码常量）。ref 为 AES-256-GCM 密文，密钥由 `directusToken` 经 HKDF-SHA256 派生；`createSourceRef`（:139–147）写入 `e = now + TTL` 并绑定 subjectKey 与 adminUserId；`resolveSourceRef`（:159–171）在 malformed / 篡改 / `payload.e <= now` / subject 不符 / admin 不符时一律返回 `null`，并在注释中**明确声明故意不透露是哪一项检查失败**；`resolveSourceRefs`（:178–187）对任一失败返回整体 `null`，随后即触发上述 :457 的返回。
+
+**根因（INFERENCE，须与上段 FACT 区分）：** 本次失败归因于 **ref 过期**，理由为排除法——ref 由页面自身状态原样提交（非 malformed / 非篡改）、同一 admin 会话（admin 相符）、同一 content item 6 / locale en（subject 相符）、选中数量 1 未超上限；且 `PWS-AI-ENGINE-01R2-REVIEW-FIX-03` 已把密钥从"每进程随机"改为"从密钥派生"，注释写明其目的正是**使 dev server 重启不再令已签发的 ref 失效**，故"重启导致失效"亦被排除。**局限如实登记：** 由于 `resolveSourceRef` 故意不区分失败原因，且浏览器网络日志不含墙钟时间戳，无法直接测得签发与点击之间的间隔，因此"过期"为 INFERRED 而非 PROVEN；可佐证的是日志中签发用的 `GET /api/admin/content-center/6/ai-source-intake?locale=en` 与 `POST` 为相邻序号、其间无任何请求，符合"加载后长时间无网络活动再点击"的形态。
+
+**零业务写入（SELECT-only 实证）：** item 6 仍 `status = draft`、`archived_at` NULL、`first_published_at` NULL、**`date_updated` NULL**（自创建以来从未被更新）；locale 行 15 仍 `draft_revision = 9`、`last_change_kind = manual_edit`、`published_snapshot` NULL，`summary` 与 `seo_description` 与点击前基线**逐字一致**；link 1042 完好（`file_role = source_document`、`enabled = true`、`sort = 0`、文件 UUID `11c2b457-3d95-41ea-b06f-2239dcffb43d`），item 6 的 5 条链接（1 hero / 2 inline / 3 download / 4 og_image / 1042 source_document）全部在位、无增删；`directus_activity` 最大 id 仍 **1141**、`directus_revisions` 最大 id 仍 **891**（均与点击前一致，本次 Analyze 新增 0 行）；locale 15 的 activity 9 行 / revision 9 行未变；全表 `published_snapshot` 非空 0、非 draft 内容项 0。**Proposal Review 端点返回 `"proposal": null`**，无 proposal、无 proposal ref、无 pending proposal。
+
+**公开安全（GET-only 实测）：** `/resources/insights/cc-imp-02-ui-create-2sxq57`、`/resources/technical-guides/…`、`/resources/case-studies/…`、`/resources/news/…` **全部 404**；`/resources/insights` 404；`sitemap.xml` 200 且**不含该 slug、亦不含该来源文件 UUID**；Published TEST = 0。
+
+**门禁：** `npm run release:check-test-data` **PASS**（exit 0）；`git diff --check` exit 0；本模块 **production code 变更 = 0**，仅改动本文件与 `RELEASE-SAFETY-GATES.md` 两份治理文档。
+
+**流程教训（这是执行时序问题，不是产品缺陷）：** SourceRef 属**短生命周期安全令牌**，其 30 分钟有效期是设计意图而非缺陷。本次失败的原因是我把耗时的只读核对放在了页面加载**之后**，等到点击 Analyze 时令牌已超期。今后真正的 Live Validation 必须把全部前置核对做完再进入令牌窗口，并在窗口内一气呵成：
+
+```text
+完成全部前置只读核对 → reload → 取得 fresh SourceRef → 勾选 source → 立即 Analyze → Review → Apply
+```
+
+**严禁**以放宽机制的方式"修复"它：不得延长 `SOURCE_REF_TTL_MS`、不得关闭过期检查、不得放行 expired ref、不得增加自动重试、不得自动 refresh ref、不得改动来源令牌的安全机制。
+
+**已知 / 记录：**
+- 本模块**未验证** AI Golden Path：Analyze 未成功、Proposal 未生成、Apply 未执行、revision / activity / History 的 AI 链路仍未验证。RSG-04 的 Content 一栏**保持 `NOT_YET_EXERCISED`**，不得标记为 PROVEN。
+- 用户授权的**那 1 次真实 provider 调用至今未被消耗**；但本模块的 Analyze 尝试额度（1 / 1）已用尽，按施工单 §12 的 ABSOLUTE NO-RETRY RULE 不得在本模块内再次尝试。
+- 上一模块记录的 **P2 / source-readability UX accuracy** 仍未修复（malformed 的旧 JPG / PDF 在 Intake 仍显示 `Readable`，因该徽章仅由 MIME 推导），本模块同样只记录、不修。
+- `FINAL-RELEASE-LIVE-VALIDATION-01-R3` **NOT AUTHORIZED**；下一模块 NOT AUTHORIZED。
+
+*最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-LIVE-VALIDATION-01-R2-CLOSEOUT 任务中写入。*
