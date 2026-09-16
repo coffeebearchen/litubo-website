@@ -10643,9 +10643,12 @@ Next candidate:                 NONE — 下一模块 NOT AUTHORIZED
 **断点验收（§34 / §35，本模块 production code 变更为 0，故属现状核验而非改动验收）：** 1440 —— `horizontalOverflowPx = 0`、`elementsWiderThanViewport = 0`，错误横幅（523×73）与 Analyze 按钮（251×48）均完整在视口内，console error 0。375 —— `horizontalOverflowPx = 0`、`elementsWiderThanViewport = 0`、`criticalOverlaps = []`，横幅与按钮宽 309 且位于 33–342 未越界；**已取得可辨认截图（750×1624）**，其中**只有 `LT180C-test-general.txt` 显示为勾选、两个旧 malformed 文件复选框为空**，`DeepSeek (default)` 为唯一 provider——该截图即 §7 / §8 的直接视觉证据。如实说明：该截图滚动位置未含错误横幅，横幅以 DOM 实测为证。验收后视口已恢复 desktop。
 
 **已知 / 记录：**
-- **RSG-04 的 Content 一栏保持 `NOT_YET_EXERCISED`，不得标记为 PROVEN。** 本模块虽首次真正到达 provider，但 Proposal 未生成、Human Review 未进行、Apply 未执行，`ai_apply` 的 revision / activity / History 链路仍未验证。
+- **RSG-04 的 Content 一栏由 `NOT_YET_EXERCISED` 改为 `OPEN`，且仍不得标记为 `PROVEN`。** 本模块首次真正到达 provider，该能力已被实际行使，因此「对应能力尚不存在」的 `NOT_YET_EXERCISED` 已不再准确；但 Proposal 未生成、Human Review 未进行、Apply 未执行，`ai_apply` 的 revision / activity / History 链路仍未验证，故只能取 `OPEN`（§0.3 定义为「尚未被证明」，owner 为 CC-IMP-08 / CC-IMP-09）。仓库状态词表未定义 `PARTIALLY_EXERCISED` 或 `NOT_PROVEN`，不为此新造枚举。
 - **用户授权的 1 次真实 provider 调用已于本模块消耗完毕，剩余 = 0。** 后续任何真实调用都需要 Controller / 用户重新授权。本次调用的数据出境内容仅为该 160 字节 TEST ONLY 合成规格文本。
-- **Charter DG-07（AI 试点：模型供应商 / 费用预算 / 数据出境范围）仍为 OPEN 且未授权。** CC-IMP-08 收口时登记为「不阻塞（真实调用 0）」，而本模块已实际发生一次数据出境，该登记理由已不再成立，**建议 Controller 重新评估 DG-07 状态**。本模块不自行改动该 Gate。
+- **Charter DG-07（AI 试点：模型供应商 / 费用预算 / 数据出境范围）——须区分两个层次，不可混为一谈：**
+  - **一般性政策层：仍为 `OPEN` / NOT GENERALLY AUTHORIZED。** 生产 AI provider 政策、持续费用政策，以及一般业务 / 客户数据的出境范围均未获授权。本模块不改动该 Gate。
+  - **本次动作层：这一次调用是经用户 / Controller 明确授权的。** 恰好一次 DeepSeek 调用、内容为 160 字节 TEST ONLY 合成规格文本、仅服务于本次本地验证，属 `AUTHORIZED FOR THIS VALIDATION ONLY`。**该一次性授权不构成对持续调用或生产环境数据出境的授权**；后续任何真实调用仍须重新授权（当前剩余授权 = 0）。
+  - CC-IMP-08 收口时记为「不阻塞（真实 Provider 调用 0）」，那是对**当时**状态的准确记述；本模块之后该前提已改变（真实调用 1），建议 Controller 在后续模块中复核 DG-07 的登记口径。这是登记口径问题，**不是合规违规**。
 - **P2 / source-readability UX accuracy 仍未修复**：两个 malformed 的旧 JPG / PDF 在 Intake 仍显示 `Readable`（徽章仅由 MIME 推导）。本模块因按文件名与固定序号精确勾选而未受影响，但该缺陷对人工操作者依然存在。
 - **新观察（P2，只记录不修）：** dev server 日志显示 Vite 监视了 `dev-data/postgres`，Postgres 写入临时文件会触发 Nuxt 页面重载（日志可见 `page reload dev-data/postgres/pg_logical/replorigin_checkpoint.tmp`，以及一次 `.nuxt/dist directory has been removed. Restarting Nuxt...`）。由于 proposal **仅存于 Nuxt 进程内存**，进程重启会使其丢失，这对 Analyze → Apply 之间的窗口是真实隐患。本次失败与之无关（失败点在 Target 校验），按施工单 §37 只记录、不修。
 - 日志缓冲区中另有历史 Directus 503（`/revisions`、`/items/content_item_locales`）。Directus 当前 `Up 6 hours`、本模块前后相邻的 admin API 调用全部 200、数据库完好，故判定为历史噪声，且其错误形态与本次失败不同，不构成本次失败的解释。
