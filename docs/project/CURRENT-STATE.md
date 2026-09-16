@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C / 01D — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · 全部服务端 secret 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 / c8d5ccf · not pushed · D-038 / D-039 已登记）；此前 FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-02 — 数据库 + Directus 媒体 Backup / Restore（A2 · **PASS** · **Backup / Restore：LOCAL_REHEARSAL_PROVEN**：本地开发数据停写窗口备份 → 全新 TEST 库 + TEST uploads 恢复 → 49 表逐表行数 / 内容哈希、序列、结构与 129 个文件逐字节一致 → 一次性 Directus 11.17.4 启动无迁移、无写库 · 10 项 fail-closed 负向测试 · dev 前后一致 · 生产 / 异地备份存储 OPEN · D-040 已登记 · 等待 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-01D — 服务端 secret 全部仅运行时注入（A2 · **PASS** · Controller 已签收 c8d5ccf · D-039 · Production Ready 01：COMPLETE（本地范围））；此前 FINAL-RELEASE-PRODUCTION-READY-01C — Directus token 仅运行时注入（A2 · **PASS** · Controller 已签收 cc0f494）；此前 FINAL-RELEASE-PRODUCTION-READY-01B — 统一 Directus service token 合同（A2 · **PASS**：唯一 secret 名 `DIRECTUS_TOKEN` 同时用于 provisioning 与 Nuxt · fresh scratch 13/13、零手工 SQL · 其实测发现"构建会把值序列化进 server bundle、预构建 server 运行时不读 `DIRECTUS_TOKEN`"已由 01C 按 Controller 裁定解决）；此前 FINAL-RELEASE-PRODUCTION-READY-01 / 01A — Node 22 固定 + Directus 不可变 pin + 可复现 provisioning（A2 · **PASS**：空 scratch 库 13/13 步全过、**零手工 SQL**、复跑逐字段一致、运行时鉴权与拒绝面已实证、dev 库逐值未变 · D-038 已登记 · 等待 Controller 审查）；前一模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
-Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-02 已按施工单完成并本地 commit，等待 Controller 审查；Production Ready 03 NOT AUTHORIZED）
+Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-02 — 数据库 + Directus 媒体 Backup / Restore（Controller 接受：以 26d0238 作为 Production Ready 03 的 accepted 基线 · not pushed · D-040 已登记）；此前 FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C / 01D — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · 全部服务端 secret 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 / c8d5ccf · D-038 / D-039 已登记）；FINAL-RELEASE-FIX-F 314b005（D-037）、FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
+Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B — PostgreSQL 不可变 pin · Node canonical release gate · 本地容量基线 · 依赖 / 许可证 / CVE 审查（A2 · **BASELINE COMPLETE / SECURITY BLOCKER OPEN**，不是单纯 PASS · `postgres:16.15-alpine@sha256:cf78e766…`，重建前后数据指纹一致 · `npm run release:verify`：Node 24 在第一步 fail、Node 22.22.2 全链路通过 · 本地生产构建 720 个 GET 0 超时 / 0 5xx · npm 生产 critical 0 · Trivy 已扫描、Critical 未清零：分诊后 2 项 Directus Critical（admin-gated）与 5 项未认证 Directus 公告（生产网络暴露未证明）仍阻塞 · Directus BUSL-1.1 须业务确认 · D-041 已登记 · 等待 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-02（PASS · Backup / Restore：LOCAL_REHEARSAL_PROVEN · D-040）；前一 STOP 模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3（剩余用户授权的真实 provider 调用 = 0）
+Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-03 已按 03 / 03A / 03B 施工单完成并本地 commit，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     NONE — 等待 Controller（下一模块 NOT AUTHORIZED；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN）
+Next candidate:                     FINAL-RELEASE-SECURITY-REMEDIATION-01（Final Release Verification 之前必须单独完成；NOT AUTHORIZED）；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05、P1-09、P1-15、P1-17 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：c8d5ccf）
+Production release:                 NOT APPROVED（PRE-RELEASE SECURITY BLOCKER OPEN → FINAL-RELEASE-SECURITY-REMEDIATION-01；Directus 11.17.4 BUSL-1.1 商业资格须业务确认；Final Release Verification NOT AUTHORIZED UNTIL SECURITY MODULE CLOSED；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：26d0238）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10772,7 +10772,7 @@ Next candidate:                 NONE — 下一模块 NOT AUTHORIZED
 
 **Production Ready 01：COMPLETE（本地范围）。** Backup / Restore 仍 PENDING。
 
-**仍 OPEN：** `SUBMISSION_IP_SECRET` 缺失时的既有行为——`publicInquiry.ts` 以内置常量作 HMAC 键，限流照常生效。该 HMAC 结果只作进程内限流 Map 的键、从不存储或记录，能观察到它的一方同样能读到进程内存里的 secret，故判断不构成不安全回退；但生产中会静默使用开发常量，是否改为缺失即拒绝须 Controller 决定（本模块按施工单未改行为）· Backup / Restore · 容量 · 依赖许可证 / CVE · Final Release Verification · 生产部署 NOT AUTHORIZED · `postgres:16-alpine` 浮动 tag（已登记）· PATH 默认 Node 仍为 24.14.0 · 生产 secret manager 与生产注入机制（随生产运行方式决定，未验证）。
+**仍 OPEN：** `SUBMISSION_IP_SECRET` 缺失时的既有行为——`publicInquiry.ts` 以内置常量作 HMAC 键，限流照常生效。该 HMAC 结果只作进程内限流 Map 的键、从不存储或记录，能观察到它的一方同样能读到进程内存里的 secret，故判断不构成不安全回退；但生产中会静默使用开发常量，是否改为缺失即拒绝须 Controller 决定（本模块按施工单未改行为）· Backup / Restore · 容量 · 依赖许可证 / CVE · Final Release Verification · 生产部署 NOT AUTHORIZED · `postgres:16-alpine` 浮动 tag（已登记）· PATH 默认 Node 仍为 24.14.0 · 生产 secret manager 与生产注入机制（随生产运行方式决定，未验证）。（→ 后续：Controller 已在 FINAL-RELEASE-PRODUCTION-READY-03 裁定——保留该回退、不是 V1 blocker、Production Preflight 只检查 `SUBMISSION_IP_SECRET` 已配置、永不读取值；见文末该模块节 G。）
 
 *最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-01D 任务中写入。*
 
@@ -10920,6 +10920,283 @@ Next candidate:                 NONE — 下一模块 NOT AUTHORIZED
   - `postgres:16-alpine` 浮动 tag（已登记）；
   - PATH 默认 Node 仍为 24.14.0；
   - 生产 secret manager 与注入机制；
-  - `SUBMISSION_IP_SECRET` 缺失行为待 Controller 决定。
+  - `SUBMISSION_IP_SECRET` 缺失行为待 Controller 决定。（→ 已由 Controller 在 FINAL-RELEASE-PRODUCTION-READY-03 裁定，见文末该模块节 G。）
 
 *最后更新：2026-09-17，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-02 任务中写入。*
+
+---
+
+## FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B — PostgreSQL 不可变 pin · Node canonical release gate · 本地容量基线 · 依赖 / 许可证 / CVE 审查
+
+**Module：** FINAL-RELEASE-PRODUCTION-READY-03（A2 · LOCAL_IMPLEMENTATION），由三份施工单完成：
+- **03：** STOP——`CONTAINER_CVE_SCANNER_UNAVAILABLE`，以及 PostgreSQL 许可证证据问题；
+- **03A：** Controller 授权 Trivy，并裁定 PostgreSQL 许可证；随后 STOP——运行镜像出现 Critical；
+- **03B：** Controller 把 Critical 规则改为可达性分诊，授权继续并允许本地 commit。
+
+**Status：** **BASELINE COMPLETE / SECURITY BLOCKER OPEN**。这不是单纯 PASS；本模块的本地 commit 含义是"记录基线"，不是安全批准。
+
+**Branch / 基线：**
+- 分支 `review/final-release-production-ready-03-capacity-deps`，从 accepted HEAD `26d0238` 创建；
+- 以一个本地 commit 收口；未 push / merge / deploy；origin/master 仍 `8f2e384`。
+
+**Safety gates touched：**
+- RSG-08：事实更新；
+- RSG-09：local commit only。
+
+P0 violations：NONE。Container Security 不写 `PROVEN`。
+
+### 环境事件（03 开工时，非本模块引入）
+- 本机 2026-09-17 02:36 重启后，Docker Desktop 4.55.0 后端崩溃：删不掉重启前遗留的 AF_UNIX socket（`Docker\run\dockerInference`、`docker-secrets-engine\engine.sock`，错误 1920）。
+- 处理方式：
+  - 退出 Docker Desktop；
+  - 把只含这些 socket 的两个目录改名为 `*.stale-20260917`（未删除）；
+  - 未 Reset to factory defaults，未动镜像 / 容器 / 卷 / `dev-data`。
+- 结果：
+  - 重启后 Engine 29.1.3 就绪；
+  - PostgreSQL 做了一次非正常关机后的 WAL 自动恢复（redo 几十字节）；
+  - 四个容器恢复，Directus ping / health 200。
+
+### A. PostgreSQL 不可变 pin（D-041）
+**pin 前事实：**
+- compose 与运行中容器都是 `postgres:16-alpine`；
+- `server_version` 16.15（与二进制一致），Alpine 3.24.1，linux/amd64；
+- 本地 RepoDigest `sha256:cf78e766…`。
+
+**registry 核对（`docker buildx imagetools inspect`）：**
+- `16-alpine`、`16.15-alpine`、`16.15-alpine3.24` 同指向 OCI index `sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685`；
+- 含 linux/amd64、arm64/v8、arm/v6、arm/v7、386、ppc64le、riscv64、s390x；
+- 02 备份 manifest 也记录 16.15，无版本漂移；pin 前轻量复查 digest 未变。
+
+**pin：**
+- `docker-compose.yml` 只改 PostgreSQL 的 image 行（附说明注释），改为 `postgres:16.15-alpine@sha256:cf78e766…`；
+- `docker compose config --quiet` exit 0；
+- 固定的是已在运行的同一构建，没有换镜像。
+
+**verifier `scripts/verify-postgres-pin.mjs`（新增）：**
+- 核对四项：精确 `major.minor` + digest 的声明、运行容器的镜像引用、镜像 repository digest、`SHOW server_version`；
+- 版本查询在容器内以 `psql -U "$POSTGRES_USER"` 执行，脚本不读取任何环境变量；
+- 任一不一致 exit 1：pin 前 FAIL（exit 1），pin 后 OK（exit 0）。
+
+**数据安全：**
+1. 停 Directus（2.1 s）。
+2. 用 D-040 工具新建备份集 `litubo-backup-20260916-225007`：exit 0，7.9 s；49 表 / 2749 行，dump 361 TOC，129 个文件回读；`verifyBackupSet` OK；被 `.gitignore` 忽略。
+3. 只重建 PostgreSQL 服务：容器 `f42b9e7d` → `28a81d51`，镜像 ID 与 bind mount 不变，12.3 s healthy；无 `down -v` / 删卷 / prune。
+4. 29 项业务指标前后完全一致；全库指纹（49 表 / 2749 行 / 索引 75 / 约束 132 / trigger 7 / 函数 8 / 序列 27 / 结构哈希）与备份 manifest 完全一致。
+5. **pin 后备份回归：** `litubo-backup-20260916-225622`。exit 0，7.1 s；pg_dump 16.15、TOC 361（`pg_restore --list` 校验）、`uploads.tar` SHA-256 相同、指纹一致；`verifyBackupSet` OK。
+6. 启动 Directus：12.6 s ping 200，health 200，migrations 101 → 101，日志只有既有 PostGIS WARN；`verify-directus-pin` / `verify-postgres-pin` 均 OK。
+7. Directus 停机约 7 分钟。
+
+**业务指标（pin 前后相同）：**
+- products 4（draft 4）；
+- Content 7（draft 7），item 6 为 draft，en rev 9 / es rev 6，无快照；
+- permissions 19；roles 2 / policies 3 / access 3 / users 2；nuxt-server token_present YES（未读值）；
+- files 60（is_public 1）；
+- inquiries 22 / max 22；activity 1107 / max 1141；revisions 859 / max 891；
+- migrations 101。
+
+### B. Node canonical release gate
+**Controller 裁定：** 不修改 Windows 系统 PATH；工作站 Node 24.14.0 为 informational / non-authoritative；只让 canonical release 入口 fail closed，不给日常 dev / lint / typecheck 套 wrapper。
+
+**新增 `npm run release:verify`：**
+- 依次为 `verify-node-runtime` → `verify-directus-pin` → `verify-postgres-pin` → `release-check-test-data` → `nuxt build`，以 `&&` 串联；
+- `dev` / `build` / `typecheck` / `lint` / `test` 保持不变，由测试锁定。
+
+**正反证据：**
+- **负向：** 系统 PATH 上的 Node 24.14.0 → exit 1，2.6 s。只输出运行时 FAIL，pin 检查、TEST 数据检查与构建均未执行，`.output` 时间戳未变。
+- **正向：** Node 22.22.2 → exit 0，142 s。runtime OK · Directus pin OK · PostgreSQL pin OK · published TEST data PASS · build 8.26 MB（gzip 2.06 MB）。
+
+**分类：**
+- Node canonical release runtime：`PROVEN`（本地范围）；
+- Windows 工作站系统 PATH：informational / non-authoritative，不再作为发布 blocker。
+
+### C. 本地容量基线（本地工程基线，不是生产 SLA）
+**主机：**
+- Windows 11 10.0.26200 x64，Intel Core Ultra 5 125H，18 逻辑核；
+- 内存 15.46 GiB（测量时空闲 2.04 GiB）；
+- Docker Desktop VM：18 CPU / 7.49 GiB；
+- 磁盘剩余：C: 80,870,408,192 B（Docker 数据），D: 71,649,792,000 B（仓库）。
+
+**存储：**
+- Git 跟踪 604 个文件 / 72,796,793 B（`.git` 135,320,951 B）；
+- `.output` 11,531,589 B / 1,582 个文件；
+- `node_modules` 282,083,669 B（参考）；
+- 数据库逻辑大小 12,549,143 B（集群 34 MB），PGDATA 69,671,645 B；
+- uploads 129 个文件 / 7,189,583 B；单个备份集 7,582,700 B；
+- 镜像磁盘占用：Directus 1.21 GB · PostgreSQL 420 MB · extractor 633 MB。
+
+**容器（LITUBO 四个）：**
+
+| 容器 | 空闲 | 持续并发 20 期间 |
+|---|---|---|
+| Directus | 1.19% CPU / 236.6 MiB | 132–168% / 280–316 MiB |
+| PostgreSQL | 0% / 30.3 MiB | 13–14% / 47.8 MiB |
+| extractor | 162.7 / 512 MiB | 不变 |
+| gateway | 13.5 / 96 MiB | 不变 |
+| Nuxt 生产进程 | 75.1 MiB | 138–193 MiB，结束后 66.3 MiB |
+
+**并发测量：** 工具 `scripts/local-capacity-smoke.mjs`（新增），测试对象是**本地生产构建**。
+- **服务器：** `node .output/server/index.mjs`，Node 22.22.2，只监听 127.0.0.1:3310。运行时环境由 Node `--env-file` 从本地 `.env` 注入，值未读取、未打印。
+- **启动方式：** 在 `.claude/launch.json` 里临时加配置、经预览工具启动，结束后逐字节还原，无差异。
+- **工具安全约束：** 只接受回环地址；只发 GET，6 个公开路由白名单；不带 cookie / 认证头；不跟随重定向；并发 ≤ 20、每级 ≤ 500 请求、超时有上限。
+
+| 并发 | 请求 | 200 | p50 ms | p95 ms | max ms | req/s |
+|---|---|---|---|---|---|---|
+| 1 | 60 | 60 | 17.9 | 48.9 | 57.2 | 41.2 |
+| 5 | 60 | 60 | 74.1 | 118.8 | 124.8 | 64.4 |
+| 10 | 60 | 60 | 123.4 | 265.9 | 403.1 | 66.3 |
+| 20 | 60 | 60 | 199.3 | 697.5 | 886.6 | 67.3 |
+
+- **补充测量：**
+  - 第二轮（无预热）p95：37.2 / 116.2 / 256.4 / 656.0 ms；
+  - 持续并发 20、240 个请求：p50 324.7、p95 701.2、max 1,050.6 ms，51.8 req/s。
+- **合计：** 720 个请求，**0 超时 / 0 连接错误 / 0 5xx**；并发 5 以上吞吐约 64–68 req/s。
+- **未证明：** 生产容量、支持用户数、吞吐保证、生产 CPU / 内存规格。本地数据没有已发布产品或文章。
+
+### D. Node 依赖（未升级、未 `npm audit fix`）
+**npm audit：**
+- 配置的镜像源 `registry.npmmirror.com` 返回 `NOT_IMPLEMENTED`；重试改用官方源（仅命令行参数）。
+- 生产依赖（`--omit=dev`）：**critical 0 / high 1 / moderate 2 / low 1**（prod 731 / dev 212 / optional 230 / peer 64）；
+- 全树：critical 1 / high 2 / moderate 5 / low 1。
+
+**逐项分类：**
+- **glob 10.4.5 high（GHSA-5j98-mcp5-4vw2，CLI `-c/--cmd`）：BUILD-TIME / NOT DEPLOYED RUNTIME。**
+  - 唯一依赖链：nuxt → @nuxt/nitro-server → nitropack → archiver → archiver-utils；
+  - `.output` 中没有 glob / archiver / foreground-child / path-scurry 的目录或代码；
+  - 对 V1 运行时非阻塞，保留为后续依赖更新项。
+- **vue-i18n 10.0.7 / @intlify/core-base moderate（GHSA-x8qp-wqqm-57ph）：**
+  - 是客户端运行时依赖；
+  - 项目未设置 `escapeParameterHtml`，6 处 `v-html` 都不渲染翻译文本；
+  - 非阻塞，更新项。
+- **esbuild low、vitest critical、vite high：** DEV / BUILD TOOLING，不是生产运行时漏洞。
+
+### E. 容器镜像 CVE（扫描已执行；安全未证明）
+**扫描器：**
+- 03 时 Docker Scout v1.18.3 需要登录 Docker ID，本机没有 Trivy / Grype → STOP。
+- 03A 授权 Trivy **v0.74.0** 官方 release：`trivy_0.74.0_windows-64bit.zip`，51,656,892 B，SHA-256 `94c40e06…d520842` 与官方 checksums 一致；只放在会话 scratch，未进 PATH / 仓库。
+- 漏洞库 DB v2，UpdatedAt 2026-09-16 13:02:23 UTC，从 `mirror.gcr.io/aquasec/trivy-db:2` 一次下载成功。
+- 扫描时间 2026-09-16 20:38–20:39 UTC；参数 `--image-src docker --scanners vuln`；扫描到的 ImageID 与运行容器一致。
+- 原始 JSON、二进制与 DB 未进 Git。
+
+| 镜像 | OS | Critical | High | Medium | Low | Unknown |
+|---|---|---|---|---|---|---|
+| Directus 11.17.4 | Alpine 3.23.4 | 5（去重 4） | 145（去重 117） | 160 | 52 | 2 |
+| PostgreSQL 16.15 | Alpine 3.24.1 | 1 | 30 | 30 | 12 | 1 |
+| document-extractor | Debian 12.13 | 14 | 176 | 304 | 381 | 14 |
+
+**Critical 分诊（03B 规则）：**
+- 三类：A 可达且未缓解 → BLOCKING；B 有客观证据的功能关闭 / 网络不可达 / 仅构建期 / 仅入口阶段 → NON-BLOCKING FINDING；C 不确定 → BLOCKING。
+- 去重后共 19 项：**BLOCKING 2**，NON-BLOCKING 17（证据见审查文档 §2.2）。
+- **BLOCKING 两项（均为 Directus，admin-gated）：**
+  - **liquidjs 10.25.7 RCE（CVE-2026-45618）：**
+    - 公告要求攻击者控制模板源码；Directus 只从模板文件渲染，系统调用方使用固定模板名；
+    - 公开注册关闭，Flows 0，公开策略权限 0，只有 Administrator 能建文件，所以未认证 / 非管理员输入无法到达模板源码；
+    - 但 Flow 邮件模板名路径穿越（GHSA-5h38）加上传 `.liquid` 文件这条 admin-gated 路径无法排除。
+  - **Directus tar 7.5.13 gzip bomb DoS（CVE-2026-59873）：** 只被扩展安装器使用，接口要求 admin；扩展安装未禁用。
+- **NON-BLOCKING 17 项，要点：**
+  - **Directus npm CLI 自带 tar：** 运行时代码只有 `directus init` 调用 npm。
+  - **Directus esbuild 的 Go stdlib：** 无任何 `@directus` 运行时包引用 esbuild，仅 extensions-sdk / vite / tsx 构建工具带入。
+  - **PostgreSQL gosu：** 二进制里 `crypto/tls` 与 `net/http` 符号引用为 0，只在入口脚本 `exec gosu postgres` 时降权，之后 PID 1 是 postgres。CVE 仍记录，镜像不是 clean。
+  - **extractor 14 项：**
+    - libaom 是编码路径，extractor 只输出 PNG；
+    - glib 的 D-Bus 内省只被被拦截的 svgload 引用，容器内没有 D-Bus；
+    - gnutls 是 DTLS / RSA-PSK 服务端路径，工具只读本地文件、容器在 internal 网络；
+    - OpenEXR / SQLite 所在 loader 被标为 untrusted 并拦截；
+    - libxml2 解析入口只被 libgsf（未使用）与被拦截的 magick / openslide 引用；
+    - perl 从不执行；
+    - zlib 的 MiniZip 符号不存在；
+    - npm CLI 自带的 tar 不在调用白名单里。
+
+**Directus 11.17.4 官方安全公告：** 21 条适用（1 critical / 11 high / 9 medium），修复都只在 12.x。
+- **BLOCKING / TO VERIFY（5 条）：** 未认证、不依赖可选功能，取决于生产网络暴露是否被证明——`deep` 原型污染持久 DoS、`/graphql/system` 别名放大、Argon2 hash 端点 DoS、权限检查前的副作用、`/settings/owner`。
+- **BLOCKING（admin-gated，3 条）：** 文件导入 SSRF（CVE-2026-61835）、图片变换 DoS、邮件模板路径穿越。
+- **功能关闭 / 不适用（13 条）：** public WebSocket（critical）、WebSocket 劫持、WebSocket 上的 GraphQL、缓存键碰撞（CVE-2026-61836）、TUS × 2、AI chat SSRF、PostGIS SQL 注入、手动 Flow、share 更新、settings 可读、`project_color` XSS、MySQL 注册。
+
+**Directus 暴露事实：**
+- **网络：** 只发布 `127.0.0.1:8055`（生产基础 compose 同样如此）；文档中的生产意图是只经 SSH 隧道管理、无公网路由；生产未部署，暴露**未证明**。
+- **功能开关：** `WEBSOCKETS_ENABLED` 显式 false；`CACHE_ENABLED`、`TUS_ENABLED` 未设置，固定镜像 `@directus/env` 5.8.0 默认 false；`AI_ENABLED` 默认 true，但没有配置任何 provider key。
+- **数据状态：** shares 0 / flows 0 / operations 0 / extensions 0；公开注册 false；公开策略权限 0；数据库只有 plpgsql，无 PostGIS；品牌图片未配置。
+- **身份：** `directus_files` 的 create 只有 Administrator；nuxt-server 策略 `app_access=false`。
+- **LITUBO 用法：** 代码里不用 GraphQL，也不用 `/files/import`；公开 Nuxt 路由不转发 `deep` 或图片变换参数。
+
+**extractor 暴露事实：**
+- 非 root、只读根文件系统、CapDrop ALL、no-new-privileges、无挂载；
+- 主容器只在 `internal=true` 网络，gateway 只发布 127.0.0.1:8787；
+- 没有调用方认证，依赖网络隔离；调用方只有两个 `/api/admin/*` 路由；
+- 只接受按签名识别的 PDF / JPEG / PNG / WebP；`VIPS_BLOCK_UNTRUSTED=1`；子进程固定白名单，`shell: false`。
+
+**结论：**
+- Container image scan：performed
+- Zero Critical：NO
+- Security remediation complete：NO
+- **Release security blocker：YES**（owner `FINAL-RELEASE-SECURITY-REMEDIATION-01`）
+
+本模块未升级镜像或依赖，未关闭任何功能，未 patch。
+
+### F. 许可证清单（不作法律结论）
+- **PostgreSQL 16.15：** PostgreSQL License。
+  - 证据：官方 `postgresql.org/about/licence`（HTTP 200）；
+  - `REL_16_15` 的 COPYRIGHT 请求被 git.postgresql.org 限流（HTTP 429）；
+  - 镜像 SBOM 为 `NOASSERTION`，按 Controller 裁定属于元数据缺口，不等于 UNKNOWN。
+- **Directus 11.17.4：** BUSL-1.1。
+  - 证据：固定镜像 `/directus/license`，以及 `@directus/api` 35.2.0 的 package.json；
+  - 分类：**HUMAN COMMERCIAL / LEGAL CONFIRMATION REQUIRED BEFORE PRODUCTION**，owner User / Business；属于 Production Preflight blocker，不是本地技术 blocker；
+  - 许可证可能随 Directus 版本变化，升级前必须重新审查，不得用其他版本的许可证覆盖 11.17.4 的事实。
+- **Poppler（GPL 系）/ libvips（LGPL-2.1）/ util-linux（混合）：** HUMAN REVIEW；Tesseract 为 Apache-2.0；leptonica 为 BSD 式文本。
+- **Node 生产依赖（lockfile 非 dev 977 条）：**
+  - MIT 839 / ISC 47 / BSD 35 / Apache-2.0 33 / BlueOak 14 / CC0 3 / Python-2.0 1 / CC-BY-4.0 1 / 双许可 3 / 无 license 字段 1（tosource，构建期）；
+  - AGPL 0，BUSL 0；
+  - 部署产物 trace 40 个包：MIT 34 / BSD 4 / ISC 2。
+
+### G. SUBMISSION_IP_SECRET（Controller 裁定同步）
+- 保留现有内置回退，不是 V1 launch blocker；
+- Production Preflight 必须确认 `SUBMISSION_IP_SECRET` 已配置，只检查存在 / 缺失，永远不读取值；
+- 已同步 RSG-08、provisioning runbook §2，以及本文件 01D / 02 节的未决项标注；未改代码。
+
+### 改动文件
+- **代码与测试：**
+  - `docker-compose.yml`（只改 PostgreSQL image）、`package.json`（新增 `release:verify`）；
+  - `scripts/verify-postgres-pin.mjs`、`scripts/local-capacity-smoke.mjs`（新增）；
+  - `tests/releaseRuntimePins.test.ts`（24）、`tests/localCapacitySmoke.test.ts`（40）（新增）。
+- **文档：**
+  - `docs/project/PRODUCTION-CAPACITY-DEPENDENCY-REVIEW.md`（新增）；
+  - `docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md`；
+  - `docs/project/RELEASE-SAFETY-GATES.md`（RSG-08 / RSG-09 事实）；
+  - `docs/project/08-decision-log.md`（D-041）；
+  - 本文件。
+- MASTER-ROADMAP 未改：没有容量 / 依赖 / 生产就绪里程碑。
+- 备份集保留在被忽略的 `backups/`：02 的一份，加 pin 前、pin 后各一份。
+
+### 验证（Node 22.22.2，串行）
+- **定向测试：** 64 passed。
+- **全量测试：** `CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1 npx vitest run --no-file-parallelism`，91 files passed | 2 skipped（93）/ **3150 passed** | 45 skipped / **0 failed**（188.53 s）。
+- **其他门禁：**
+  - `npm run release:check-test-data`：PASS（exit 0）；
+  - `npm run typecheck`：exit 0（TS 错误 0）；
+  - `npm run lint`：exit 0；
+  - `npm run build`：PASS（8.26 MB / gzip 2.06 MB）；
+  - `git diff --check`：exit 0。
+- **HTTP GET smoke（本地生产构建）：**
+  - `/`、`/products`、`/support/faq`、`/resources`、3 个 CMS API、`/sitemap.xml`、`/admin/login`、`/admin` 均为 200；
+  - `/admin/products` 302 → 登录页；`/api/admin/ai/providers` 401；
+  - 非预期 401 / 403 / 503 = 0。
+- **全量测试后的开发库核对（参考信息）：**
+  - 29 项业务指标与 pin 前一致；
+  - access / permissions-01 / permissions-02 三个 `.verify.sql` 均 OK；
+  - `directus_permissions` 仍 19 行，但行 id 被数据库集成测试重建（1…486）；4 个序列前进（content_item_locales 2644→2720、content_items_files 1258→1294、content_relations 1186→1220、directus_permissions 456→486）。这是既有测试行为，与 02 记录一致。
+- **AI / 外部：** DeepSeek 0 · OpenAI 0 · email 0 · HubSpot 0。只读访问过 GitHub Release、Trivy DB、npm 官方 audit、Docker Hub 元数据、GitHub Advisory API、postgresql.org。
+
+### Open items
+- **PRE-RELEASE SECURITY BLOCKER：** `FINAL-RELEASE-SECURITY-REMEDIATION-01`（NOT AUTHORIZED）。
+- **Directus BUSL-1.1 商业资格确认：** Production Preflight blocker，owner User / Business。
+- **Poppler / libvips / util-linux：** 生产前人工法律审查。
+- **生产容量：** OPEN。
+- **持续依赖 / CVE 监控：** OPEN，本审查只是时点记录。
+- **Directus 与 extractor 的生产网络暴露：** TO VERIFY。
+- **生产 / 异地备份存储、保留期、静态加密、调度：** OPEN（D-040）。
+- **书面生产回滚 / 切换步骤：** OPEN。
+- **Linux 上 uploads 属主 uid 1000：** 未演练。
+- **生产 secret manager 与注入机制：** 未验证。
+- **Final Release Verification：** NOT AUTHORIZED UNTIL SECURITY MODULE CLOSED。
+- **Production：** NOT AUTHORIZED。
+
+*最后更新：2026-09-17，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-03B 任务中写入。*

@@ -49,10 +49,10 @@ environment appears to need one, that is a gap in an artifact; fix the artifact.
 
 | Item | Required value | How to verify |
 |---|---|---|
-| Node | **22.22.2** exactly (`.nvmrc`, `package.json` engines) | `node scripts/verify-node-runtime.mjs` — non-zero exit on any other version |
+| Node | **22.22.2** exactly (`.nvmrc`, `package.json` engines) | `node scripts/verify-node-runtime.mjs` — non-zero exit on any other version; also the first step of `npm run release:verify` |
 | npm | the npm bundled with that Node (10.9.7) | `npm -v` |
 | Directus image | `directus/directus:11.17.4@sha256:eb326f679ae847c0a776f93b972761dc2ebe84980e0b9d274a6bc31cd62809f7` | `node scripts/verify-directus-pin.mjs` |
-| PostgreSQL | 16 (`postgres:16-alpine`) | `docker compose ps` |
+| PostgreSQL image | **16.15** — `postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685` (D-041; floating tags are not allowed) | `node scripts/verify-postgres-pin.mjs` — declaration, running image, digest and `server_version` |
 | Architecture | validated on **linux/amd64**; the pin is the multi-architecture image index, so `linux/arm64` also resolves | `docker buildx imagetools inspect <image>` lists both platforms |
 
 **Architecture note.** The pinned digest is the OCI image *index*, not a single-platform manifest, so
@@ -67,6 +67,13 @@ set, taken in a quiesced window and verified by restoring it into TEST targets. 
 rehearsal are proven; production backup storage is not, and a written production rollback / cut-over
 plan is still not provided. Nothing in this runbook creates a backup: take one before a production
 mutation, and treat the rollback plan as an open prerequisite, not a solved one.
+
+**Dependency, license, security and capacity review.** `docs/project/PRODUCTION-CAPACITY-DEPENDENCY-REVIEW.md`
+(D-041) records the pinned runtimes, a local capacity baseline, the npm and container vulnerability scans and
+the license inventory. Two of its items block a production release until they are closed: the container
+security findings (owned by `FINAL-RELEASE-SECURITY-REMEDIATION-01`) and the business confirmation of the
+Directus 11.17.4 BUSL-1.1 license terms. Changing the PostgreSQL pin recreates the database container, so
+take and verify a backup set first.
 
 ---
 
@@ -144,7 +151,7 @@ secret the Nuxt server uses:
 |---|---|---|
 | `DIRECTUS_TOKEN` | Public CMS reads, inquiry storage, the AI source-reference key | CMS reads refused, inquiry submissions answer 503, AI source selection answers 503 |
 | `SMTP_PASS` | Authenticating inquiry notification emails | the best-effort notification fails; the inquiry itself is still stored |
-| `SUBMISSION_IP_SECRET` | Keying the hash of client addresses in the in-process rate limiter | the limiter still applies, keyed with a built-in fallback (an open decision, CURRENT-STATE) |
+| `SUBMISSION_IP_SECRET` | Keying the hash of client addresses in the in-process rate limiter | the limiter still applies, keyed with a built-in fallback. Controller decision (FINAL-RELEASE-PRODUCTION-READY-03): the fallback stays and is not a V1 blocker; Production Preflight must confirm the variable is configured — presence only, never its value |
 | `HUBSPOT_ACCESS_TOKEN` | HubSpot Contact sync | inquiries are stored as `not_configured`; no HubSpot request |
 | `OPENAI_API_KEY` | The OpenAI provider | the provider reports "not configured"; no request |
 | `DEEPSEEK_API_KEY` | The DeepSeek provider | the provider reports "not configured"; no request |
@@ -229,10 +236,15 @@ leaves 19 permission rows, 49 tables and 7 triggers unchanged, with both verific
 ## 4. Application build and start
 
 ```bash
-node scripts/verify-node-runtime.mjs    # refuses to continue on the wrong Node
+node scripts/verify-node-runtime.mjs    # refuses to continue on the wrong Node, before npm ci
 npm ci                                  # must not modify package-lock.json
-npx nuxt build
+npm run release:verify                  # Node → Directus pin → PostgreSQL pin → published TEST data → nuxt build
 ```
+
+`npm run release:verify` is the canonical release entry (D-041). Its steps are chained, and the first one
+refuses any Node other than `.nvmrc`, so nothing expensive runs on a wrong runtime. It needs the Directus and
+PostgreSQL containers running, because it compares them with their pins. The everyday `npm run build` is
+deliberately not gated and is not a release path.
 
 The build needs no secret (§2). Start the built server (`.output/server/index.mjs`) the way the target
 environment runs Node, with the server secrets it needs in its process environment. How production runs
@@ -249,6 +261,8 @@ Read-only, after startup:
 - `GET /server/ping` returns `pong`; `GET /server/health` returns 200.
 - `node scripts/verify-directus-pin.mjs` confirms declared image, running image, digest and reported
   version all agree.
+- `node scripts/verify-postgres-pin.mjs` confirms the same for PostgreSQL, using the server's own
+  `server_version`.
 - Public routes return their expected status. A 404 for content that is not published is correct;
   an unexpected 401, 403 or 503 is not.
 
@@ -270,6 +284,7 @@ Read-only, after startup:
 Stop and report rather than improvise if any of these hold:
 
 - The running Directus version or digest does not match the pin.
+- The running PostgreSQL version or digest does not match the pin.
 - A permission artifact's `.verify.sql` does not print its `OK` line.
 - The access bootstrap's `.verify.sql` does not print `directus_access_verify: OK`, or it reports
   that the policy is reachable from an identity other than the `nuxt-server` role.

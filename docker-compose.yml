@@ -6,7 +6,18 @@ name: litubo-cms
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # FINAL-RELEASE-PRODUCTION-READY-03 — exact version + immutable digest.
+    #
+    # The floating `16-alpine` tag is rebuilt for every PostgreSQL 16 minor release and every
+    # base-image update, so a redeploy could run a different server build than the one the backup /
+    # restore tooling, the provisioning artifacts and the capacity baseline were verified against.
+    # 16.15 on Alpine 3.24 is the build that was running when this pin was made: the registry resolved
+    # `16-alpine`, `16.15-alpine` and `16.15-alpine3.24` to this same digest, so pinning it changed
+    # nothing that runs. `node scripts/verify-postgres-pin.mjs` fails on any drift.
+    #
+    # The digest is the OCI image *index* (multi-architecture) digest, verified against the registry
+    # with `docker buildx imagetools inspect`, not a single platform manifest.
+    image: postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_DATABASE}
