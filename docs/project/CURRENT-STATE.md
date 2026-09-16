@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-FIX-D — Public Business Truth + Production Presentation Cleanup（Controller 接受 · 26cec80 · not pushed · P1-05 CLOSED）；FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b 已接受
-Latest completed module:            PUBLIC-CLAIMS-CLEANUP-01 — V1 Conservative Public Content Cleanup（A2 · LOCAL COMPLETE · D-036 已登记 · 等待 Controller 审查）
-Active authorized module:           NONE（PUBLIC-CLAIMS-CLEANUP-01 已收口，等待 Controller 审查）
+Latest accepted module:             PUBLIC-CLAIMS-CLEANUP-01 — V1 Conservative Public Content Cleanup（Controller 接受 · 5c48acc · not pushed · D-036 已登记）；FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
+Latest completed module:            PUBLIC-CLAIMS-HOTFIX-01 — Send Product Test One-Route Business Claim Cleanup（A2 · LOCAL COMPLETE · 等待 Controller 审查）
+Active authorized module:           NONE（PUBLIC-CLAIMS-HOTFIX-01 已收口，等待 Controller 审查）
 Active module authorization level:  —
 Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：26cec80）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：5c48acc）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10294,3 +10294,46 @@ Next candidate:                 NONE — 等待 Controller（下一模块 NOT AU
 - Applications fixture 文件保留在 `content/fixtures/applications.ts`，仅供开发与测试；公开交付不再读取它。
 
 *最后更新：2026-09-16，由 Claude Code 在"PUBLIC-CLAIMS-CLEANUP-01"任务中写入。*
+
+---
+
+## PUBLIC-CLAIMS-HOTFIX-01 — Send Product Test One-Route Business Claim Cleanup（2026-09-16）
+
+```text
+Module:                         PUBLIC-CLAIMS-HOTFIX-01 — Send Product Test One-Route Business Claim Cleanup
+Authorization:                  A2 LOCAL_IMPLEMENTATION（Controller 施工单，用户业务决定已冻结）
+Branch:                         review/public-claims-hotfix-send-product-test-01（基线 5c48acc；PUBLIC-CLAIMS-CLEANUP-01 已由 Controller 接受）
+Status:                         LOCAL COMPLETE · 等待 Controller 审查
+Decision:                       无新增 Decision Log 条目（沿用 D-036 保守公开定位；本次为单点文案收尾，不构成新的长期决定）
+Schema / permissions / data:    未修改（DB 写入 0；表单字段与 /api/inquiries 行为未改；Directus、权限、Media 均未触碰）
+Safety gates touched:           RSG-01（未经业务确认的能力陈述不进入公开输出）· RSG-09（无 push / merge / deploy）
+MASTER-ROADMAP:                 未修改
+Push / merge / deploy:          NONE
+Next candidate:                 NONE — 等待 Controller（下一模块 NOT AUTHORIZED）
+```
+
+**用户冻结的业务决定：** V1 不公开未经验证的 application lab、free detection evaluation 与 guaranteed sample testing；`/support/send-product-test` 采用保守表述 "Submit your product details and testing requirements for technical review."。允许表达的含义限于：用户提交产品资料、用户提交测试需求、LITUBO 做技术审阅、后续联系；不得暗示一定存在实验室、一定免费、一定接受样品、一定进行实际检测、一定出具报告。
+
+**修改内容：**
+- **`/support/send-product-test`：** 英文 hero 副标题由 "Ship a sample to our application lab for a free detection evaluation." 改为 "Submit your product details and testing requirements for technical review."（`i18n/en.json` → `pages.productTest.heroSubtitle`）。这是该路由上唯一一处未经确认的承诺。
+- **未改动：** 页面结构与版式、表单字段、前端校验、`/api/inquiries` 提交行为、路由与导航标签（D-015）、`heroTitle`；`submitLabel` 保留 "Request test"（表达用户发起请求，不构成 LITUBO 必定检测的承诺）；该路由本就没有 description / og:description，无可清理项；`es.json` / `pt.json` 对应键仍为 TODO_TRANSLATION（未发布语言，不在范围内）。
+
+**测试：** `tests/publicClaimsCleanup.test.ts` 新增 PUBLIC-CLAIMS-HOTFIX-01 一组 2 项窄范围静态检查——英文 `heroSubtitle` 等于保守表述且不含 application lab / free detection / free evaluation / guaranteed testing；页面仍绑定 `pages.productTest.heroSubtitle` 且自身不含上述短语。该文件由 11 项增至 13 项，全部通过。断言范围只覆盖本路由，未改写既有 20 个禁用短语断言。
+
+**验证：** 定向 `tests/publicClaimsCleanup.test.ts` 13/13；`npm run release:check-test-data` PASS（exit 0）；typecheck 0 error；lint 0 error；`npm run build` Build complete；`git diff --check` 通过（暂存后 `git diff --cached --check` 另行复核）。按施工单 §9 未重跑全量 2800+ 测试：本次只改一条英文文案与一个测试文件，无共享组件影响；已核对除新增断言外没有其他测试引用该键。
+
+**真实 HTTP（dev server）：** `/support/send-product-test` 200；hero 输出新文案；整页 HTML（含 head 与内联脚本）对 application lab / free detection / free evaluation / guaranteed testing 的命中数为 0（修改前 application lab ×1、free detection ×1）。该路由改前改后均无 description / og:description。
+
+**浏览器验收：** build 之后重启 dev server（`preview_logs` 无错误）并新开标签页取证。1440：`scrollWidth = clientWidth = 1425`，h1 与新 hero 正确，可见文本禁用短语命中 false，表单 8 个字段、consent 默认未勾选，损坏图片 0，console 仅 `[vite] connecting/connected` 与 `<Suspense> is an experimental feature`，error 0、hydration 0；1440 截图在面板内缩放后不可辨认，以 DOM 几何取证（Browser 面板当前不支持区域放大）。375：`scrollWidth = clientWidth = 375`，hero 不溢出，表单宽 327px、输入框 327px、提交按钮在视口内，损坏图片 0，console 同上，error 0、hydration 0，375 截图可辨认。视口已重置为 desktop。
+
+**Release Safety Gates：**
+- RSG-01：未经业务确认的检测能力陈述（application lab / free detection evaluation）已从该公开路由移除，静态测试与实页检查双重取证。
+- RSG-09：无 push / merge / deploy。
+- 未修改 `RELEASE-SAFETY-GATES.md`（本次不改变任何 Gate 的状态或证据要求）。P0 Violations：NONE。
+
+**已知 / 记录：**
+- `/support`（Support hub）仍写着 "Send a product sample to our application lab for testing."（`pages/support/index.vue` 第 30 行）。该句位于另一条公开路由，施工单 §3 限定本模块只处理 `/support/send-product-test`，§11 将"需要扩大到其他 route"列为 STOP 条件，故未改动，交 Controller 决定是否单独授权。
+- `submitLabel` 仍为 "Request test"；若 Controller 要求更保守，可另行改为 "Submit request"。
+- `es.json` / `pt.json` 的 `pages.productTest` 全部为 TODO_TRANSLATION（未发布语言、noindex），未翻译。
+
+*最后更新：2026-09-16，由 Claude Code 在 PUBLIC-CLAIMS-HOTFIX-01 任务中写入。*

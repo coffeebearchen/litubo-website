@@ -4,6 +4,9 @@
  * Narrow source checks over the public surfaces the user's frozen business decisions cover: no unverified
  * positioning, coverage, certification or service-network claim; no hard-coded FAQ teaser; no DEMO Application
  * detail and no indexable TODO_CONTENT. Rendered behaviour is checked over real HTTP during module validation.
+ *
+ * PUBLIC-CLAIMS-HOTFIX-01 extends the same narrow checks to /support/send-product-test, which must not promise
+ * a testing laboratory, a free evaluation or a guaranteed test.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -37,6 +40,7 @@ const GLOBAL_SERVICE = 'pages/company/global-service.vue'
 const HOME = 'pages/index.vue'
 const APPLICATIONS_HUB = 'pages/applications/index.vue'
 const APPLICATIONS_DETAIL = 'pages/applications/[slug].vue'
+const PRODUCT_TEST = 'pages/support/send-product-test.vue'
 
 describe('PUBLIC-CLAIMS-CLEANUP-01 — no unverified company or service claim in public copy (D-036)', () => {
   const BANNED = [
@@ -144,5 +148,21 @@ describe('PUBLIC-CLAIMS-CLEANUP-01 — Applications: confirmed categories only, 
 
   it('the DEMO Application fixtures are still present for development and tests', () => {
     expect(source('content/fixtures/applications.ts')).toContain('DEMO_APPLICATIONS')
+  })
+})
+
+describe('PUBLIC-CLAIMS-HOTFIX-01 — Send Product for Test offers a technical review, not a free lab test', () => {
+  const PROMISES = [/application lab/i, /free detection/i, /free evaluation/i, /guaranteed testing/i]
+
+  it('the English hero subtitle asks for product details and testing requirements only', () => {
+    const text = source('i18n/en.json')
+    const copy = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text).pages.productTest
+    expect(copy.heroSubtitle).toBe('Submit your product details and testing requirements for technical review.')
+    for (const promise of PROMISES) expect(copy.heroSubtitle, String(promise)).not.toMatch(promise)
+  })
+
+  it('the page renders that copy and makes no testing promise of its own', () => {
+    expect(template(PRODUCT_TEST)).toContain("t('pages.productTest.heroSubtitle')")
+    for (const promise of PROMISES) expect(source(PRODUCT_TEST), String(promise)).not.toMatch(promise)
   })
 })
