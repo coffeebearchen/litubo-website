@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             FINAL-RELEASE-FIX-F — Product V1 Publish Workflow + Product AI Release Safety（Controller 接受 · 314b005 · not pushed · D-037 已登记）；FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-LIVE-VALIDATION-01-R2 — Content AI Live Golden Path 验证（A2 · **STOP**：SourceRef 在 provider 调用前校验失败（过期为 INFERRED，非 PROVEN）· Analyze 点击 1 次 · 真实 provider 调用 0 · Proposal / Apply 均未发生 · 等待 Controller 审查）；FINAL-RELEASE-LIVE-SOURCE-PREP-01 已于 883caad 收口
-Active authorized module:           NONE（FINAL-RELEASE-LIVE-VALIDATION-01-R2 已按 STOP 收口，等待 Controller 审查）
+Latest completed module:            FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（A2 · **STOP**：Analyze 点击 1 次 · **真实 DeepSeek 调用 1 次已发生并已消耗用户授权** · provider 响应经 Target 安全校验后零可用项（`NO_SAFE_ITEMS`）· Proposal 未生成 · Apply 未执行 · 业务写入 0 · 等待 Controller 审查）；R2 已于 801af4f 收口
+Active authorized module:           NONE（FINAL-RELEASE-LIVE-VALIDATION-01-R3 已按 STOP 收口，等待 Controller 审查）
 Active module authorization level:  —
-Next candidate:                     NONE — 等待 Controller（FINAL-RELEASE-LIVE-VALIDATION-01-R3 NOT AUTHORIZED；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN；下一模块 NOT AUTHORIZED）
+Next candidate:                     NONE — 等待 Controller（下一模块 NOT AUTHORIZED；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN）
 Next candidate authorized:          NO
 Production release:                 NOT APPROVED（FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭；P1-01～P1-05、P1-09、P1-15、P1-17 本地已修复，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：883caad）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：801af4f）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -10590,3 +10590,65 @@ Next candidate:                 NONE — FINAL-RELEASE-LIVE-VALIDATION-01-R3 NOT
 - `FINAL-RELEASE-LIVE-VALIDATION-01-R3` **NOT AUTHORIZED**；下一模块 NOT AUTHORIZED。
 
 *最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-LIVE-VALIDATION-01-R2-CLOSEOUT 任务中写入。*
+
+---
+
+## FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证（**STOP**，2026-09-16）
+
+```text
+Module:                         FINAL-RELEASE-LIVE-VALIDATION-01-R3 — Content AI Live Golden Path 验证
+Authorization:                  A2 LOCAL VALIDATION + 最多 1 次真实 DeepSeek Provider 调用授权（Controller 施工单）
+Branch:                         review/final-release-live-validation-01-r3（基线 801af4f）
+Status:                         STOP — provider 已响应，但响应经 Target 安全校验后零可用项；等待 Controller 审查
+Failure stage:                  Target response validation（provider 调用之后），contentDraftTarget.ts:263
+Subject:                        Content item 6 / locale en / content_item_locales 行 15
+Fixed source:                   content_items_files id 1042（LT180C-test-general.txt）
+Decision:                       无新增
+Schema / permissions / data:    schema 0；Directus 权限 0；production code 0；业务数据写入 0
+Analyze clicks:                 1（额度用尽，未重试、未刷新重试、未换来源、未换 provider）
+Real provider calls:            DeepSeek 1 / OpenAI 0 / TOTAL 1 —— **用户授权的那 1 次真实调用已被消耗**
+Remaining authorized calls:     **0**（任何后续真实调用须 Controller / 用户重新授权）
+Proposal / Apply:               Proposal NONE；Apply NONE
+Release guard:                  npm run release:check-test-data PASS；git diff --check exit 0
+Safety gates touched:           RSG-01 · RSG-03 · RSG-04 · RSG-06 · RSG-08（· RSG-09 无 push / merge / deploy）
+MASTER-ROADMAP:                 未修改
+Push / merge / deploy:          NONE
+Next candidate:                 NONE — 下一模块 NOT AUTHORIZED
+```
+
+**PHASE A / PHASE B 分段执行（R2 教训的直接兑现）：** 施工单 §1 要求把全部耗时核对放在最后一次 reload **之前**。本模块据此把治理全文阅读（6 个并行只读子任务，覆盖 CURRENT-STATE 全文、协议、Gates、Blueprint、CC-IMP-08/09、History 与公开交付实现）、数据库基线、来源字节核验、provider 确认、Review 契约冻结与**选择器侦察**全部放在 PHASE A 完成；并在 PHASE A 内先行验证「连续两次 intake GET 签发的 `sourceRef` 三项全部不同」，证明 reload 必定签发全新令牌、不存在缓存。PHASE B 随后以**一次 browser_batch** 串起 navigate 与一段带完整前置守卫的脚本，使「签发 → 点击」间隔压到一个往返之内。**R2 的 `SELECTION_INVALID_ERROR` 未再出现，时序修复有效。**
+
+**点击前守卫（全部通过，任一不符即不点击）：** 页面确系全新加载（R2 旧错误横幅消失、三项来源全部未勾选、计数 `0 / 5 selected`）；来源恰好 3 条且顺序为 inline JPG / download PDF / **source_document TXT**；勾选第 3 项后计数变为 `1 / 5 selected`，**仅 TXT 被选中、两个旧 malformed 文件均未勾选**；provider 单选恰好一个且为 `deepseek`、已选中；Draft revision 显示 9。
+
+**Analyze 结果（点击恰好一次，07:59:07.073Z → 07:59:08.691Z，约 1.6 秒）：** HTTP **200**，响应体
+
+```text
+{ "ok": false,
+  "error": "The AI provider's response did not contain any safely usable content suggestions.",
+  "fileResults": [ { "displayName": "LT180C-test-general.txt", "status": "read" } ] }
+```
+
+**真实 DeepSeek 调用确已发生（证据链闭合，非推断）：** ① `fileResults` **恰含一条且 `status: read`**，证明只有 TXT 进入请求且抽取成功，故 `readableSources.length === 1`，`aiProposalEngine.ts:636` 的 `NO_READABLE_SOURCES_ERROR` 分支（其文案明写 "Nothing was sent to the AI provider."）**未被触发**；② `:655` 的 `verifyUnchanged` 通过；③ `:657–662` 的复用缓存查找**未命中**（命中会 `return { ok: true, … reused: true }`，而本次为 `ok: false`）；④ 因此执行到达 **`:665 await registry.generateStructured(...)`**；⑤ 错误字符串来自 `server/utils/aiTargets/contentDraftTarget.ts:152`，其所在的 `parseAndValidate`（:201–264）是**对模型响应**的校验器，先做 `RawOutputSchema.safeParse(raw)`，**不存在 provider 之前到达该错误的代码路径**；⑥ dev server 日志检索 `provider=` **零命中**，而 DeepSeek 适配器仅在 11 类传输失败下打该类日志，故传输层成功。
+
+**失败点可精确定位为 `contentDraftTarget.ts:263`：** 该文件有两处返回 `NO_SAFE_ITEMS_ERROR`——`:226`（回声守卫）与 `:263`（零可用项）。`:226` 位于 `if (normalizedSource.length >= MIN_UNSAFE_ECHO_LENGTH)`（=200）之内，而 `sourceMaterial` 由 `deepseekStructuredProvider.ts:349` 构造为 `input.extractedSourceTexts.map(s => s.text).join('\n\n')`（**仅抽取文本、无包装**），本次唯一来源仅 160 字节，归一化后必短于 200 字符，**整段守卫被跳过**。故失败必为 `:263`：`changes.length === 0 && safeConflicts.length === 0`。含义是 **DeepSeek 返回了结构合法且体量合规的响应（否则会是 `MALFORMED_RESPONSE_ERROR` / `OVERSIZED_RESPONSE_ERROR`），但每一条提案都被 `:232–:257` 的逐项安全过滤器丢弃，且没有任何冲突凑够两个不同候选值。** 更细的成因（模型具体提出了什么、被哪一条过滤器拦下）**无法从现有证据判定**：系统刻意不记录模型输出与 prompt，本模块亦不得为诊断而加日志或改代码。
+
+**Proposal 未生成：** `:666` 的 `if (!result.ok) return` 位于 `rememberAnalysis` **之前**，因此没有任何提案被存入 replay guard。Proposal Review 端点返回 `proposal: null`，`applyState` / `proposalRef` 均不存在，**Apply 在架构上不可能发生**。
+
+**零业务写入（SELECT-only 实证）：** item 6 仍 `status = draft`、`date_updated` NULL；locale 行 15 仍 `draft_revision = 9`、`last_change_kind = manual_edit`、`published_snapshot` NULL；`directus_activity` 最大 id 仍 **1141**、`directus_revisions` 最大 id 仍 **891**；History 总数仍 **24** 且 **无任何 `ai_applied` 事件**、无 Publish 事件，首条仍为 `media_linked`；全库 `published_snapshot` 非空 0、非 draft 内容项 0。
+
+**来源安全（§32）：** link 1042 仍在（`file_role = source_document`、`enabled = true`）、文件 `is_public = false`、`media_file_lifecycle` 引用行 0（未归档）；item 6 仍为 5 条链接，无增删。**AI 全程未触碰 source association。**
+
+**公开安全（§31）：** `/resources/insights/cc-imp-02-ui-create-2sxq57`、`/resources/technical-guides/…` 与 `/resources/insights` 均 **404**；`sitemap.xml` 200 且该 slug 出现 **0** 次；Published TEST = 0；`npm run release:check-test-data` **PASS**。
+
+**断点验收（§34 / §35，本模块 production code 变更为 0，故属现状核验而非改动验收）：** 1440 —— `horizontalOverflowPx = 0`、`elementsWiderThanViewport = 0`，错误横幅（523×73）与 Analyze 按钮（251×48）均完整在视口内，console error 0。375 —— `horizontalOverflowPx = 0`、`elementsWiderThanViewport = 0`、`criticalOverlaps = []`，横幅与按钮宽 309 且位于 33–342 未越界；**已取得可辨认截图（750×1624）**，其中**只有 `LT180C-test-general.txt` 显示为勾选、两个旧 malformed 文件复选框为空**，`DeepSeek (default)` 为唯一 provider——该截图即 §7 / §8 的直接视觉证据。如实说明：该截图滚动位置未含错误横幅，横幅以 DOM 实测为证。验收后视口已恢复 desktop。
+
+**已知 / 记录：**
+- **RSG-04 的 Content 一栏保持 `NOT_YET_EXERCISED`，不得标记为 PROVEN。** 本模块虽首次真正到达 provider，但 Proposal 未生成、Human Review 未进行、Apply 未执行，`ai_apply` 的 revision / activity / History 链路仍未验证。
+- **用户授权的 1 次真实 provider 调用已于本模块消耗完毕，剩余 = 0。** 后续任何真实调用都需要 Controller / 用户重新授权。本次调用的数据出境内容仅为该 160 字节 TEST ONLY 合成规格文本。
+- **Charter DG-07（AI 试点：模型供应商 / 费用预算 / 数据出境范围）仍为 OPEN 且未授权。** CC-IMP-08 收口时登记为「不阻塞（真实调用 0）」，而本模块已实际发生一次数据出境，该登记理由已不再成立，**建议 Controller 重新评估 DG-07 状态**。本模块不自行改动该 Gate。
+- **P2 / source-readability UX accuracy 仍未修复**：两个 malformed 的旧 JPG / PDF 在 Intake 仍显示 `Readable`（徽章仅由 MIME 推导）。本模块因按文件名与固定序号精确勾选而未受影响，但该缺陷对人工操作者依然存在。
+- **新观察（P2，只记录不修）：** dev server 日志显示 Vite 监视了 `dev-data/postgres`，Postgres 写入临时文件会触发 Nuxt 页面重载（日志可见 `page reload dev-data/postgres/pg_logical/replorigin_checkpoint.tmp`，以及一次 `.nuxt/dist directory has been removed. Restarting Nuxt...`）。由于 proposal **仅存于 Nuxt 进程内存**，进程重启会使其丢失，这对 Analyze → Apply 之间的窗口是真实隐患。本次失败与之无关（失败点在 Target 校验），按施工单 §37 只记录、不修。
+- 日志缓冲区中另有历史 Directus 503（`/revisions`、`/items/content_item_locales`）。Directus 当前 `Up 6 hours`、本模块前后相邻的 admin API 调用全部 200、数据库完好，故判定为历史噪声，且其错误形态与本次失败不同，不构成本次失败的解释。
+- 下一模块 **NOT AUTHORIZED**。
+
+*最后更新：2026-09-16，由 Claude Code 在 FINAL-RELEASE-LIVE-VALIDATION-01-R3 任务中写入。*
