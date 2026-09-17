@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B — PostgreSQL 不可变 pin · Node canonical release gate · 本地容量基线 · 依赖 / 许可证 / CVE 审查（Controller 签收，状态 BASELINE COMPLETE — SECURITY REMEDIATION REQUIRED · 39ce564 · not pushed · D-041 已登记）；此前 FINAL-RELEASE-PRODUCTION-READY-02 — 数据库 + Directus 媒体 Backup / Restore（Controller 接受 · 26d0238 · D-040 已登记）；FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C / 01D — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · 全部服务端 secret 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 / c8d5ccf · D-038 / D-039 已登记）；FINAL-RELEASE-FIX-F 314b005（D-037）、FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复 · 攻击面收紧 · 剩余 CVE 分类（**SECURITY REMEDIATION COMPLETE — READY FOR CONTROLLER REVIEW**：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042 · 本地 commit，未 push · Controller 尚未复核）；此前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（BASELINE COMPLETE / SECURITY BLOCKER OPEN · 39ce564 · D-041 · 已签收）
-Active authorized module:           FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus / 容器安全修复（**已完成，等待 Controller 复核**：第一阶段 STOP 于 Directus 12 许可证商业决定并记录为 81f3fd9；用户取得 Directus Open Innovation Grant license key 后授权路径 A，key 接线记录为 4e72a57；第二阶段已执行 12.3.1 升级、官方支持的攻击面收紧、媒体上传字节签名校验、extractor 包管理器移除与全量回归，key 值全程未被读取或记录）
-Active module authorization level:  A2 — LOCAL_IMPLEMENTATION（SAFE AUTOPILOT；push / merge / deploy 与 Final Release Verification 均不在授权内）
-Next candidate:                     无已授权候选（Final Release Verification NOT STARTED；安全模块已交付但须经 Controller 明确 PASS 才算关闭，不得自行进入）；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
+Latest accepted module:             FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136` 的技术实现与安全整改结果：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口：OIG 期限描述订正 + 删除无效的 TELEMETRY 配置）；此前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（BASELINE COMPLETE · 39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
+Latest completed module:            FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS — READY FOR REVIEW-BRANCH PUSH / GITHUB CI**：全量 95 文件 / 3242 测试串行全绿、typecheck 0、lint 0、release:verify exit 0、构建 8.26 MB、三项权限校验 OK、Draft 公开泄漏 0、secret 泄漏 0、security BLOCKING 0 / UNKNOWN 0、备份契约 PASS、数据完整性 PASS、HTTP smoke 无意外 401/403/503/5xx、1440 与 375 均 PASS；本地 commit，未 push；证据见 `docs/project/FINAL-RELEASE-VERIFICATION.md`）
+Active authorized module:           NONE（FINAL-RELEASE-VERIFICATION-01 已收口并 STOP。push review branch / GitHub CI 属 A3，须 Controller 单独授权；Production Preflight 与 deploy 另需授权并须先关闭人工 gate）
+Active module authorization level:  —（无 Active 模块；上一模块为 A2 — LOCAL_IMPLEMENTATION，push / merge / deploy 均不在其授权内）
+Next candidate:                     无已授权候选。技术侧 RC 验收已 PASS，生产发布仍受人工 gate 与 TYPE D 授权链约束；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（安全修复已完成：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0，**但 PRE-RELEASE SECURITY BLOCKER 只能由 Controller 复核后关闭**，本地证据不构成生产事实；人工 gate：OIG 许可证——用户已自行确认组织满足营收 / 人数条件、自行阅读并提交申请，Directus 已发放 key；授予条款为**永久授予、无到期日、无需续期流程**，每个 key 5 次激活（Claude 不作法律资格判断）；OIG 强制遥测无法关闭，当前 OIG 层级不提供 telemetry opt-out；Poppler / libvips / util-linux 人工审查维持；Final Release Verification NOT STARTED；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：81f3fd9；其后 4e72a57 为 license key 接线）
+Production release:                 NOT APPROVED（Final Release Verification 已 PASS 且 security BLOCKING 0 / UNKNOWN 0，**但这只是本地 RC 的技术结论**；未决人工 gate：OIG 许可证资格（用户已自行确认并取得 key；永久授予、无到期日、无需续期、5 次激活）、OIG 强制遥测无法关闭、Poppler / libvips / util-linux 人工审查；未决生产事项：生产容量、生产网络暴露实测、生产 / 异地备份存储、书面回滚步骤、生产 secret manager、持续 CVE 监控。Production Preflight NOT STARTED）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：da8f445 = GOVERNANCE-FIX-01；其前 bb6c136 = 安全修复收口）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
@@ -31,7 +31,7 @@ origin/master:                      8f2e384（本地 review 分支均未 merge /
 | 当前分支 | `master` |
 | 当前 Git 基线 | 以 `git log -1 --oneline` 为准（此文件本身会产生提交，不硬编码 SHA）|
 
-**技术架构：** Nuxt 3 + Vue 3 + TypeScript（SSR/hybrid）/ Directus 11 + PostgreSQL 16 / Docker Compose / 本地开发中，未来部署至腾讯云美国服务器，Cloudflare Free 作为前端边缘（DNS、TLS、缓存）。
+**技术架构：** Nuxt 3 + Vue 3 + TypeScript（SSR/hybrid）/ Directus 12.3.1 + PostgreSQL 16.15（均为不可变 digest pin，D-041 / D-042；2026-09-18 由 FINAL-RELEASE-VERIFICATION-01 核对，此处原写 "Directus 11" 已过时）/ Docker Compose / 本地开发中，未来部署至腾讯云美国服务器，Cloudflare Free 作为前端边缘（DNS、TLS、缓存）。
 
 ---
 
@@ -154,7 +154,7 @@ origin/master:                      8f2e384（本地 review 分支均未 merge /
 | Directus Admin 地址 | 仅内网访问（127.0.0.1:8055），不对公网开放 |
 | 前台访问 CMS 的方式 | 仅通过 Nuxt server API 层（`server/api/`、`server/utils/`），Directus REST API 不暴露给浏览器 |
 | Directus Token | `.env` 中管理，不进 Git，不写入任何文档 |
-| Directus Collection 数量 | 上限 25（Directus 社区版限制）；当前已用：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries`、`product_page_presets`、`product_sections`、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`、`product_source_records`、`site_settings`、`site_social_links`、`media_file_lifecycle` = **16 个**（含 M2M junction 1 个，9C-2 新增 1 个） |
+| Directus Collection 数量 | **上限已随 Directus 12 + OIG 许可证取消**（实测 entitlements：集合 / 席位 / Flow / 历史均不限；下面这句"上限 25（Directus 社区版限制）"是 Directus 11 时代的记录，2026-09-18 订正）；当前已用 **20 个**（下列 16 个 + Content Center 的 `content_items`、`content_item_locales`、`content_items_files`、`content_relations`）：`product_categories`、`products`、`products_files`、`site_content`、`posts`、`inquiries`、`product_page_presets`、`product_sections`、`product_section_items`、`product_spec_groups`、`product_spec_items`、`product_faqs`、`product_source_records`、`site_settings`、`site_social_links`、`media_file_lifecycle` = **16 个**（含 M2M junction 1 个，9C-2 新增 1 个） |
 | 不进 Git 的内容 | `.env`、PostgreSQL 数据文件、`directus/uploads/`、数据库备份 |
 
 ---
@@ -11474,3 +11474,120 @@ P0 violations：NONE。Container Security 仍 `OPEN`，不写 `PROVEN`。
 ---
 
 *最后更新：2026-09-18，由 Claude Code 在 FINAL-RELEASE-SECURITY-REMEDIATION-01 任务中写入（第二阶段完成，等待 Controller 复核）。*
+
+---
+
+## FINAL-RELEASE-VERIFICATION-01 — 最终发布验收（**PASS — READY FOR REVIEW-BRANCH PUSH / GITHUB CI**，2026-09-18）
+
+**Module：** FINAL-RELEASE-VERIFICATION-01（A2 · LOCAL_IMPLEMENTATION · SAFE AUTOPILOT）。完整证据见
+`docs/project/FINAL-RELEASE-VERIFICATION.md`（24 节）。
+
+**Status：** **FINAL RELEASE VERIFICATION PASS — READY FOR REVIEW-BRANCH PUSH / GITHUB CI**。
+- 本模块是验收，不是开发：**0 runtime 变更、0 镜像、0 权限、0 数据库写入、0 业务代码、0 UI**；未发现 blocker，因此也未做最小 FIX。
+- 只写治理文档：本节 + §0 snapshot + 新建 `FINAL-RELEASE-VERIFICATION.md` + `RELEASE-SAFETY-GATES.md` §4.3 事实更新 + 本文件两处过时事实订正。
+- 生产发布仍 **NOT APPROVED**；push / merge / deploy 仍各自需要单独授权。
+
+**RC 基线与分支：**
+- RC BASELINE = **`da8f445`**（GOVERNANCE-FIX-01）。开工核对完全一致：分支 `review/final-release-security-remediation-01`、HEAD `da8f4457b01121b70bf20127df43304ed2d59fb2`、tracked 0 变更、6 个历史 untracked 路径原样。
+- 本模块分支 `review/final-release-verification-01`，自 `da8f445` 创建，仅本地。`origin/master` 仍 `8f2e384`。
+
+**开工前完整阅读：** CLAUDE.md、本文件全文（11,476 行，按协议 §9 第 4 步以 8 个并行只读子任务分段全文读取，未跳读）、MASTER-ROADMAP、PROJECT-EXECUTION-PROTOCOL、RELEASE-SAFETY-GATES、SECURITY-REMEDIATION-REVIEW、PRODUCTION-CAPACITY-DEPENDENCY-REVIEW、两本生产 runbook、Decision Log（D-040 / D-041 / D-042 全文）。
+
+### 一、运行时与 pin（§9）
+- Node 22.22.2 OK；系统 PATH 的 Node 24.14.0 → `verify-node-runtime` exit 1，后续步骤一律不执行（fail closed 实测）。
+- Directus 声明 = 运行 = digest = 自报 **12.3.1 @sha256:8978edf6…**；PostgreSQL 声明 = 运行 = digest = `server_version` **16.15 @sha256:cf78e766…**。
+- extractor 两个容器运行的都是安全修复后重建的镜像 `sha256:8d3d0639…`；read-only rootfs、CapDrop ALL、PIDs 64 / 32、内存 512 MB / 96 MB。
+- `docker compose config --quiet` exit 0（不输出任何插值）。发布端口：Directus 仅 `127.0.0.1:8055`、PostgreSQL 无、extractor 无、gateway 仅 `127.0.0.1:8787`。
+- Directus 与 PostgreSQL 重启次数均为 0，Directus 近 2 小时 0 条 error。**未升级任何版本。**
+
+### 二、Provisioning 合同（§10，未做破坏性复现）
+- `scripts/provisioning-manifest.json`：runtime 为 Node 22.22.2 + Directus 12.3.1（含 digest），**13 步**顺序完整（bootstrap → schema → constraints → revision guard → lifecycle guard → verify → access bootstrap → service token → access verify → 权限 01 apply/verify → 权限 02 apply/verify）。
+- `scripts/provision-directus.mjs` 以 `node cli.js` 启动 CLI（12.1+ 镜像无 npx），仓库中无 `'npx'` 调用。
+- 全部 SQL 工件与配套 `.verify.sql` / `.rollback.sql` 齐备；license 运行时注入与 `PUBLIC_URL` 合同在 runbook 中有文。
+- 按施工单 §10，**未再消耗新的 OIG 激活**、未重跑从零 provisioning，沿用 R1 / R2 / B3 既有证据 + 本次合同核对。
+
+### 三、备份 / 恢复 / 回滚（§11）
+- 对最近两个备份集重跑 `verifyBackupSet`，**均 OK**（四个组件齐全、SHA256SUMS 一致、两个组件校验和匹配、manifest schema 合法）。
+- `litubo-backup-20260917-153808`（升级后）：Directus 12.3.1 + digest、PostgreSQL / pg_dump 16.15、Node 22.22.2；`database.dump` 271,508 B / 392 TOC / sha256 `b3b310c7…`；指纹 53 表 / 27 序列 / schema hash `360c78b6…`；`uploads.tar` 7,290,880 B ustar / 129 文件 / 7,189,583 B / sha256 `89a23195…`。
+- `litubo-backup-20260917-153058`（升级前，即回滚用集合）同样 OK。
+- **未执行恢复、未建库、未删库、未删卷、未覆盖 dev 数据。**
+
+### 四、Release Safety Gates（§12）
+| Gate | 结果 |
+|---|---|
+| RSG-01 Draft never public | **PASS**（库内 0 条 published；全部草稿详情 URL 404；404 页不泄漏草稿名；分类页空态 0 卡片；sitemap 0 条 URL；`/resources` 0 处 TEST 标记） |
+| RSG-02 单一公开资格合同 | **PASS（Content）· OPEN（Products，既有缺口，未变）** |
+| RSG-03 仅人工发布 | **PASS**（本模块 0 次发布；发布前后公开状态一致；全量测试覆盖生命周期守卫） |
+| RSG-04 AI 只写 Draft | **PASS（无绕过）**；Content AI Golden Path 仍未 live 证明，维持 `OPEN`，未升级 |
+| RSG-05 语言独立、无回退 | **PASS**（`/es/products`、`/pt/products` 404；`/es`、`/pt` 静态页 noindex 且无 canonical / hreflang） |
+| RSG-06 公开媒体资格 | **PASS**（public 文件 200；非公开 / 畸形 id / 未知 UUID 均 404） |
+| RSG-07 权限 fail closed | **PASS**（三项 `.verify.sql` 全 OK；19 行权限；public policy 业务权限 0；匿名 Directus 业务面全 403；`/api/admin/*` 401；`/admin/*` 302） |
+| RSG-08 环境分离 | **PASS（本模块范围）**；生产侧各项维持 `OPEN` |
+| RSG-09 Release 分层 | **PASS**（仅本地 commit；push / merge / deploy = 0） |
+
+**P0 Violations：NONE。**
+
+### 五、权限与访问（§13）
+`directus_access_verify: OK` · `directus_permissions_verify: OK` · `directus_permissions_legacy_verify: OK`；19 行权限、2 角色、3 策略、3 access、public policy 业务权限 0；nuxt-server service user 持有 static token（只核对存在性，未读取值）。匿名 Directus：ping / info 200，业务集合 / files / settings / license / server-health 403，`/users/me` 401，`/mcp`、`/ai/chat`、`/utils/hash/generate`、`/websocket` 404。`/server/info` 报 `license.source = env`、`production_enabled true`、`display_powered_by OIG`。**未修改任何权限结构。**
+
+### 六、Product / Content / Media（§14–§16）
+- Product：4 个产品全部 Draft（计数 4 / 0 / 0 / 0）；Workspace 六个分区齐全；Draft-only 写入守卫与 AI Draft-only 边界未变，由全量测试覆盖。
+- Content Center：7 条全部 Draft、9 个语言行、**0 个 published snapshot**；语言隔离、草稿不公开、News 不公开、AI 不能发布，均已实测或由真实 PostgreSQL 集成测试覆盖。
+- Media Library：文件夹树与受保护目录正常；10/10 缩略图经 `/api/admin/media/<id>?width=240&height=180&fit=cover` 加载成功、0 破图；公开媒体规则 4 项全部正确；SR-01 的图片字节签名校验仍在且测试通过；本模块未上传任何文件。
+
+### 七、公开站真实性与 HTTP smoke（§17、§25）
+在**生产构建**（`.output/server/index.mjs`，Node 22.22.2，仅监听 127.0.0.1:3320）上 GET-only 实测：公开页面 9 条 200、不存在页 404、3 条草稿产品 URL 与 3 条草稿内容 URL 全 404、News 404、`/es/products` 与 `/pt/products` 404、`sitemap.xml` 200 且 0 条 URL、`robots.txt` 200、`/admin/login` 200、`/admin/*` 302、`/api/admin/*` 401、`/api/cms/*` 200。**意外 401 / 403 / 503 / 5xx 均为 0**；公开 DTO 只含 allowlist 字段。
+
+### 八、Forms / AI / Secrets（§18–§20）
+- Forms：只做安全与回归核对，**未提交任何表单**；0 封邮件、0 次 HubSpot 请求、0 次外部调用。
+- AI：**DeepSeek 0 · OpenAI 0 · 费用 0**；无自动发布、无覆盖已发布、无绕过人工审核的路径。
+- Secrets：`runtimeConfig` 不声明任何服务端 secret；6 个 secret 在服务端 bundle 中各自只以一次 `process.env.<NAME>` 运行时读取出现；**客户端 bundle 中 0 次出现任何 secret 名，也 0 次出现 Directus 地址**；已跟踪文件的 license key 守卫测试通过。全程按变量名 / 存在性核对，未读取任何值。
+
+### 九、安全基线（§21，未重做整改）
+三个镜像 digest 与 SR-01 扫描并分类时**完全一致**，因此分类原样适用：Directus 0 Critical / 18 High、PostgreSQL 1 / 30、extractor 13 / 167，全部为 FIXED / MITIGATED / NON-REACHABLE。**BLOCKING = 0、UNKNOWN = 0**。未做新扫描（新 DB 只会移动时点记录，且施工单禁止重开整改）；持续 CVE 监控仍为未决生产事项。
+
+### 十、自动化门禁与构建（§23、§24）
+| 项目 | 结果 |
+|---|---|
+| `npm test`（默认，跳过集成） | 87 文件通过 / 8 跳过，3075 通过 / 167 跳过 |
+| `npm test`（集成开启，**文件并行**） | 5 文件 / 10 测试失败 —— 见下方 F-1 |
+| `npm test`（集成开启，**串行** `--fileParallelism=false`） | **95 文件全部通过 / 3242 测试全部通过 / 0 失败 / 0 跳过** |
+| `npm run typecheck` · `npm run lint` | 0 / 0 |
+| `npm run release:verify` | **exit 0**（Node gate → Directus pin → PostgreSQL pin → published TEST data → build） |
+| `npm run release:check-test-data` | **PASS** |
+| `git diff --check` | exit 0 |
+| 构建产物 | 8.26 MB / 2.06 MB gzip；`.output/server` 1,118 文件、`.output/public` 466 文件；无 `.env`、无 dump / tar / SHA256SUMS、无 Trivy JSON、无 backups / scratch、无未跟踪设计资料 |
+
+### 十一、浏览器验收（§26、§27）
+- 1440px：公开端（生产构建）`/`、`/products`、分类页、`/resources`、`/contact`、404 页无横向溢出、0 越界节点、0 破图；管理端（dev server，沿用既有登录会话，本模块未索取也未输入任何凭证）Product Center / Content Center / Settings / Product Workspace / Media Library 均无溢出、0 破图、Settings 不显示任何 secret 值。
+- 375px：公开 4 页与管理端 3 页 `scrollWidth === innerWidth === 375`、0 越界节点、0 破图；已取可辨认截图（公开首页、公开产品列表、管理端 Media Library）。
+- Console：**构建之后新开的标签页在全部管理页与公开页 0 error / 0 warning**（仅 Vite HMR debug 与 Vue `<Suspense>` 提示）；公开侧唯一一条 error 是我故意探测草稿 URL 产生的 404。
+- 1440px 截图在本面板中不可辨认（面板约 334 CSS px），故 1440 证据以页面内 DOM 实测为准——如实记录为取证工具限制。
+
+### 十二、数据完整性（§29）
+全量测试前后各跑一次 40 项只读指标：**逐项完全一致**（53 表、4 产品全 draft、7 内容全 draft、19 行权限、60 文件、1108 activity / 859 revisions…）。测试后核对：负 id 夹具 **0**、遗留 TEST 数据库 **0**、published 产品 / posts / 内容合计 **0**。未删除任何真实数据。
+
+### 十三、两项如实记录的发现（均非产品缺陷、均非本模块引入）
+- **F-1（测试基础设施）：** 开启数据库集成套件且使用 vitest 默认文件并行时，`tests/releaseTestDataCheck.test.ts` 有 10 条断言失败——它的清理断言统计的是五张共享表中**全部**负 id 行，而同时运行的其他集成套件正合法持有自己的负 id 夹具。串行运行全部通过。这与本文件既有的「全量验证须串行」要求一致；属测试基础设施范围，本模块未修。
+- **F-2（开发工具，既有且已记录）：** 在 `nuxt dev` 仍在运行时执行 `nuxt build`（`release:verify` 内）会改写 `.nuxt`，该 dev server 随后报既有的 `#app-manifest` 预转换错误，长期开着的管理端标签页会出现 `/_nuxt/…` 的 503。Directus 与 PostgreSQL 均未参与：重启 0 次、0 条 error，Nuxt 服务端日志无 503；构建之后新开的标签页完全干净。未改任何代码。
+
+### 十四、本模块对本文件的两处事实订正
+- 第 34 行「Directus 11 + PostgreSQL 16」→ 改为 12.3.1 + 16.15（均为 digest pin，D-041 / D-042）；
+- 第 157 行「Directus Collection 上限 25（社区版限制）；当前 16 个」→ 上限已随 Directus 12 + OIG 取消，当前 **20 个**（含 Content Center 4 张）。
+
+### Changed files
+- `docs/project/FINAL-RELEASE-VERIFICATION.md`（新建）
+- `docs/project/CURRENT-STATE.md`（§0 snapshot + 两处事实订正 + 本节）
+- `docs/project/RELEASE-SAFETY-GATES.md`（§4.3 RSG-08 / RSG-09 事实更新）
+
+未新增 Decision Log 条目：本模块只验证既有决定，未形成新的长期决定。未改 MASTER-ROADMAP：里程碑状态未变。
+
+### Open items / 明确未做
+- Controller 复核本模块；push review branch / GitHub CI 属 A3，须单独授权。
+- 未决人工 gate：OIG 许可证资格（用户已自行确认并取得 key；**永久授予、无到期日、无需续期、5 次激活**）、OIG 强制遥测无法关闭、Poppler / libvips / util-linux 人工审查。
+- 未决生产事项：生产容量、生产网络暴露实测、生产 / 异地备份存储与保留 / 加密 / 调度、书面生产回滚与切换步骤、生产 secret manager、持续 CVE 与公告监控。
+- 既有 OPEN：Products 侧 RSG-01 / RSG-02；Content AI Golden Path 未 live 证明；F-1 / F-2。
+- 产品 4（`test sample`，slug `test`）身份字段无明确 TEST 标记，release guard 看不到它；它是 draft、不公开，补标或归档须另行授权。
+- push = 0 · merge = 0 · deploy = 0；未进入 Production Preflight、未部署、未连接生产。
+
+*最后更新：2026-09-18，由 Claude Code 在 FINAL-RELEASE-VERIFICATION-01 任务中写入。*
