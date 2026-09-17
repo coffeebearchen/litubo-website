@@ -156,10 +156,15 @@ function psqlMaintenance(sql, label) {
  * `-e DB_DATABASE` is the only override; every other value — secret, admin
  * credentials, storage paths — comes from the compose service definition as
  * already configured, and is never read by this process.
+ *
+ * The CLI is started as `node cli.js` from the image's working directory
+ * (/directus), the same entry the image's own docker-entrypoint.cjs uses. The
+ * Directus 12.1+ image no longer ships npm or npx, so `npx directus` fails there
+ * (FINAL-RELEASE-SECURITY-REMEDIATION-01).
  */
 function directusCli(args, label) {
   return compose(
-    ['run', '--rm', '--no-deps', '-e', `DB_DATABASE=${database}`, directusService, 'npx', 'directus', ...args],
+    ['run', '--rm', '--no-deps', '-e', `DB_DATABASE=${database}`, directusService, 'node', 'cli.js', ...args],
     { label },
   )
 }

@@ -27,6 +27,8 @@ let LEGACY_XLS_MESSAGE: string
 let LEGACY_DOC_MESSAGE: string
 let uploadFailureMessage: (status: number | undefined) => string
 let uploadRefusalMessage: (filename: string, contentType: string) => string
+let uploadContentMatchesType: (bytes: Uint8Array, contentType: string) => boolean
+let uploadContentMismatchMessage: (contentType: string) => string
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -40,6 +42,8 @@ beforeAll(async () => {
   LEGACY_DOC_MESSAGE = mod.LEGACY_DOC_MESSAGE
   uploadFailureMessage = mod.uploadFailureMessage
   uploadRefusalMessage = mod.uploadRefusalMessage
+  uploadContentMatchesType = mod.uploadContentMatchesType
+  uploadContentMismatchMessage = mod.uploadContentMismatchMessage
 })
 
 describe('Media Library upload — AI text sources are accepted', () => {
@@ -170,6 +174,63 @@ describe('the refusal message names exactly what is accepted', () => {
     expect(uploadRefusalMessage('macro.docm', 'application/vnd.ms-word.document.macroenabled.12'))
       .toBe(`格式不支持（application/vnd.ms-word.document.macroenabled.12）。仅允许 ${ALLOWED_UPLOAD_LABEL}`)
     expect(uploadRefusalMessage('manual.docx', 'application/msword')).not.toBe(LEGACY_DOC_MESSAGE)
+  })
+})
+
+/**
+ * FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus runs sharp on a file because of its stored content type,
+ * but sharp decodes whatever the bytes are. An image upload therefore has to carry the bytes of the image it
+ * claims to be, or a HEIF / AVIF container labelled as JPEG, PNG or WebP would reach the libheif bundled with
+ * Directus 12.3.1's sharp (GHSA-rgj7-g3m4-5g8c).
+ */
+describe('Media Library upload — image bytes must be the image their content type claims', () => {
+  const bytes = (...parts: Array<number[] | string>) =>
+    Uint8Array.from(parts.flatMap(part => typeof part === 'string' ? [...Buffer.from(part, 'latin1')] : part))
+  const JPEG = bytes([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10], 'JFIF')
+  const PNG = bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], [0, 0, 0, 13], 'IHDR')
+  const WEBP = bytes('RIFF', [0x24, 0, 0, 0], 'WEBPVP8 ')
+  const HEIC = bytes([0, 0, 0, 0x18], 'ftypheic', [0, 0, 0, 0], 'mif1heic')
+  const AVIF = bytes([0, 0, 0, 0x1C], 'ftypavif', [0, 0, 0, 0], 'avifmif1miaf')
+
+  it.each([
+    ['JPEG', JPEG, 'image/jpeg'],
+    ['JPEG', JPEG, 'image/jpg'],
+    ['PNG', PNG, 'image/png'],
+    ['WebP', WEBP, 'image/webp'],
+    ['JPEG', JPEG, 'IMAGE/JPEG; charset=binary'],
+  ])('accepts real %s bytes declared %s', (_label, data, type) => {
+    expect(uploadContentMatchesType(data, type)).toBe(true)
+  })
+
+  it.each([
+    ['HEIC', HEIC, 'image/jpeg'],
+    ['HEIC', HEIC, 'image/png'],
+    ['AVIF', AVIF, 'image/webp'],
+    ['AVIF', AVIF, 'image/jpeg'],
+    ['JPEG', JPEG, 'image/png'],
+    ['PNG', PNG, 'image/webp'],
+    ['empty', new Uint8Array(0), 'image/jpeg'],
+    ['text', bytes('not an image'), 'image/png'],
+  ])('refuses %s bytes declared %s', (_label, data, type) => {
+    expect(uploadContentMatchesType(data, type)).toBe(false)
+  })
+
+  it('does not second-guess the types Directus never hands to sharp', () => {
+    expect(uploadContentMatchesType(bytes('%PDF-1.7'), 'application/pdf')).toBe(true)
+    expect(uploadContentMatchesType(bytes('a,b\n1,2\n'), 'text/csv')).toBe(true)
+    expect(uploadContentMatchesType(bytes([0x50, 0x4B, 0x03, 0x04]), XLSX)).toBe(true)
+  })
+
+  it('names the declared type in the refusal', () => {
+    expect(uploadContentMismatchMessage('image/jpeg')).toBe('文件内容与声明的格式不一致（image/jpeg），已拒绝上传')
+  })
+
+  it('the handler refuses a mismatch before anything is sent to Directus', () => {
+    const source = readFileSync(resolve(process.cwd(), 'server/api/admin/media/upload.post.ts'), 'utf8')
+    const check = source.indexOf('if (!uploadContentMatchesType(exactBytes, ct))')
+    expect(check).toBeGreaterThan(-1)
+    expect(check).toBeLessThan(source.indexOf("fd.append('file'"))
+    expect(check).toBeLessThan(source.indexOf('`${config.directusUrl}/files`'))
   })
 })
 

@@ -2,7 +2,8 @@
 
 > Scope: backing up and restoring the **Directus database and the Directus uploads** of a LITUBO
 > environment, as one backup set.
-> Status: **LOCAL_REHEARSAL_PROVEN** (FINAL-RELEASE-PRODUCTION-READY-02, D-040). Production and
+> Status: **LOCAL_REHEARSAL_PROVEN** (FINAL-RELEASE-PRODUCTION-READY-02, D-040; repeated on Directus 12.3.1 by
+> FINAL-RELEASE-SECURITY-REMEDIATION-01, D-042, §9.1). Production and
 > offsite backup storage, retention and encryption at rest are **not proven** and remain open
 > operations decisions. Production deployment remains **NOT AUTHORIZED** and requires its own TYPE D
 > authorization (`PROJECT-EXECUTION-PROTOCOL.md` §4, §13.4).
@@ -178,14 +179,28 @@ loopback port, without touching the running environment:
 ```bash
 DIRECTUS_UPLOADS_DIR=/scratch/uploads-restore-test-YYYYMMDD \
 docker compose run -d --no-deps --name litubo-restore-test-directus \
-  -e DB_DATABASE=litubo_restore_test_YYYYMMDD -e TELEMETRY=false \
+  -e DB_DATABASE=litubo_restore_test_YYYYMMDD -e LICENSE_KEY= \
   -p 127.0.0.1:8057:8055 directus
 ```
 
-Check `GET /server/ping` → `pong`, `GET /server/health` → 200, the container's `/directus/uploads`
-mount is the restored directory (`docker inspect` mounts only), its database sessions go to the restored
-database only, `directus_migrations` is unchanged (no migration ran), and anonymous requests answer the
-same as the source environment. Remove the container, drop the TEST database and delete the TEST
+**License on Directus 12 (D-042).** A set taken from a licensed Directus 12 environment carries that
+environment's license key and token in `directus_settings`.
+- Start the rehearsal with `LICENSE_KEY` empty, as above, so it never activates a new binding.
+- It then runs on the restored license. It revalidates the source environment's binding online, which writes
+  a new token into the restored `directus_settings`, and it sends the telemetry report that license requires.
+- **Never deactivate the license in a restored copy.** INFERRED from the licensing documentation, not tested:
+  when the copy shares the source environment's project and `PUBLIC_URL`, deactivating it would release the
+  live environment's binding. Remove the copy without touching its license.
+
+Check:
+- `GET /server/ping` → `pong`. On Directus 12, `GET /server/health` needs an administrator; anonymously it
+  answers 403.
+- The container's `/directus/uploads` mount is the restored directory (`docker inspect` mounts only).
+- Its database sessions go to the restored database only.
+- `directus_migrations` is unchanged (no migration ran).
+- Anonymous requests answer the same as the source environment.
+- Startup changed nothing, except that on Directus 12 `directus_settings` may change through the license
+  revalidation above. Remove the container, drop the TEST database and delete the TEST
 directory when done — deleting only names that carry the TEST marker.
 
 On a Linux host, Directus runs as uid 1000 (`docs/ADMIN-CMS-SETUP.md` §6.1): a restored uploads
@@ -217,6 +232,8 @@ be restored into a fresh target, verified completely, and served by the pinned D
   re-run provisioning step `32` with the current value (`PRODUCTION-PROVISIONING-RUNBOOK.md` §2).
 - The backup set itself contains the database's own credential-bearing rows (§0). The tools collect
   nothing beyond the database and the uploads.
+- From Directus 12 those rows include the license key and token in `directus_settings` (D-042). A set is
+  secret material in full: the key is never extracted from it or copied into another environment.
 
 ---
 
@@ -241,6 +258,8 @@ be restored into a fresh target, verified completely, and served by the pinned D
 - The restore rehearsal is repeated periodically, and after any change to the tools, the Directus
   version, the PostgreSQL major version or the storage layout. A local rehearsal is not proof that
   production backup storage works.
+- A Directus version upgrade is first rehearsed on a restored copy of the pre-upgrade set. That set is then
+  the upgrade's rollback (`PRODUCTION-PROVISIONING-RUNBOOK.md` §6).
 - **RPO / RTO: V1 operational target — TO BE CONFIRMED.** The measurements below are local measurements,
   not service levels.
 
@@ -263,6 +282,19 @@ On the local development data, with no production system involved:
 | Negative | backup with Directus running → `NOT_QUIESCED`; one-byte-corrupted dump and archive → `CHECKSUM_MISMATCH`; missing dump / archive / manifest → `SET_COMPONENT_MISSING`; target `litubo_cms` and a name without TEST → `TARGET_DATABASE_NOT_TEST`; the development uploads directory as target → `TARGET_UPLOADS_NOT_TEST`; an existing target database → `TARGET_DATABASE_EXISTS` — each before creating any database or directory |
 | Cleanup and integrity | disposable container, TEST database and TEST directories removed; development database fingerprint (every row of 49 tables) and every upload's SHA-256 and mtime identical before and after |
 
+### 9.1 Directus 12.3.1 upgrade (FINAL-RELEASE-SECURITY-REMEDIATION-01, 2026-09-17)
+
+Local development data only. Values of the license key, the tokens and every other secret were never read or printed.
+
+| Step | Result |
+|---|---|
+| Pre-upgrade set | `litubo-backup-20260917-143309` (Directus 11.17.4 quiesced; 49 tables, 2,749 rows, 129 files); `verifyBackupSet` OK |
+| Upgrade rehearsal | restored into a TEST database; disposable 12.3.1 with the license applied six migrations (101 → 107) and answered after about 21 s; 20 business tables and 25 system tables byte-identical; `directus_collections`, `directus_sessions` and `directus_settings` changed only by added columns (the original columns' content equal); four new empty OAuth tables; sequences unchanged; all three permission verifications OK; Nuxt production build served 42 of 42 checked routes identically to 11.17.4; license deactivated before the copy was dropped |
+| Rollback rehearsal | the same set restored into a TEST database, renamed, and served by 11.17.4: pong after about 21 s, migrations 101 → 101, anonymous responses equal to the development instance, whole-database fingerprint equal to the set |
+| Set taken just before the upgrade | `litubo-backup-20260917-153058`; `verifyBackupSet` OK; database fingerprint and uploads inventory equal to the pre-upgrade set |
+| Post-upgrade set | `litubo-backup-20260917-153808` records Directus 12.3.1 by digest; 53 tables, 2,755 rows (+6 migration rows), 392 TOC entries, 129 files; `verifyBackupSet` OK |
+| Restore of the post-upgrade set | 53 tables, 2,755 rows, 27 sequences and schema identical; 129 files match; disposable 12.3.1 started with `LICENSE_KEY` empty: pong after about 21 s, uploads mount = restored directory, sessions only to the restored database, migrations 107 → 107, license source `settings` (the restored one), anonymous responses equal to the upgraded development instance; startup changed `directus_settings` only, schema hash unchanged; container and TEST database removed without deactivating the license, and the development instance still reported its own license afterwards |
+
 ---
 
 ## 10. STOP conditions
@@ -276,5 +308,6 @@ Stop and report rather than improvise if:
 - a restore target is not clearly a disposable TEST target, or would touch development or production data;
 - a restored database or restored media differ from the manifest without an explanation;
 - the pinned Directus fails to start or runs a migration on restored data;
+- a license would be activated or deactivated in a restored copy (§4);
 - a production restore, production backup storage or any production interaction becomes necessary
   before its authorization exists.

@@ -149,7 +149,7 @@ All work logs, progress updates, error explanations, plans, and final reports mu
 ## Directus schema / database change protocol
 
 Before any Directus collection or field change:
-1. Export a schema snapshot: `npx directus schema snapshot ./directus/schema/<phase>-<name>.yaml`
+1. Export a schema snapshot: `docker compose exec directus node cli.js schema snapshot /schema/<phase>-<name>.yaml` (written to `./directus/schema/`; the Directus 12 image has no `npx`)
 2. Create a local database backup
 3. Commit the snapshot file before applying changes
 

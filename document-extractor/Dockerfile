@@ -21,6 +21,13 @@ WORKDIR /app
 # forwarder (same image, run as a separate, network-bridging container).
 COPY extractor.mjs gateway.mjs server.mjs ./
 
+# FINAL-RELEASE-SECURITY-REMEDIATION-01 — the service never runs a package manager, so the npm CLI, npx and
+# corepack that the Node base image ships are removed, as the Directus 12.1+ image does. The npm CLI's bundled
+# dependencies carried all of this image's npm findings (node-tar CVE-2026-59873 and ten High ones). This layer
+# follows the apt and COPY layers, so adding it changes no installed Debian package.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+
 ENV NODE_ENV=production
 
 # Root is used only while installing packages above; the service runs as the

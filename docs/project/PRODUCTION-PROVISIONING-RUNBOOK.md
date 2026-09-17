@@ -51,7 +51,7 @@ environment appears to need one, that is a gap in an artifact; fix the artifact.
 |---|---|---|
 | Node | **22.22.2** exactly (`.nvmrc`, `package.json` engines) | `node scripts/verify-node-runtime.mjs` — non-zero exit on any other version; also the first step of `npm run release:verify` |
 | npm | the npm bundled with that Node (10.9.7) | `npm -v` |
-| Directus image | `directus/directus:11.17.4@sha256:eb326f679ae847c0a776f93b972761dc2ebe84980e0b9d274a6bc31cd62809f7` | `node scripts/verify-directus-pin.mjs` |
+| Directus image | **12.3.1** — `directus/directus:12.3.1@sha256:8978edf633ae28aa31464bb71c55300c94d8bc771ff3727b5fac485173283869` (D-042) | `node scripts/verify-directus-pin.mjs` |
 | PostgreSQL image | **16.15** — `postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685` (D-041; floating tags are not allowed) | `node scripts/verify-postgres-pin.mjs` — declaration, running image, digest and `server_version` |
 | Architecture | validated on **linux/amd64**; the pin is the multi-architecture image index, so `linux/arm64` also resolves | `docker buildx imagetools inspect <image>` lists both platforms |
 
@@ -70,17 +70,20 @@ mutation, and treat the rollback plan as an open prerequisite, not a solved one.
 
 **Dependency, license, security and capacity review.** `docs/project/PRODUCTION-CAPACITY-DEPENDENCY-REVIEW.md`
 (D-041) records the pinned runtimes, a local capacity baseline, the npm and container vulnerability scans and
-the license inventory. Two of its items block a production release until they are closed: the container
-security findings (owned by `FINAL-RELEASE-SECURITY-REMEDIATION-01`) and the business confirmation of the
-Directus 11.17.4 BUSL-1.1 license terms. Changing the PostgreSQL pin recreates the database container, so
-take and verify a backup set first.
+the license inventory. Its container security findings were owned by `FINAL-RELEASE-SECURITY-REMEDIATION-01`,
+whose result is recorded in `docs/project/SECURITY-REMEDIATION-REVIEW.md`. Changing the PostgreSQL or Directus
+pin recreates a container, so take and verify a backup set first.
 
-`FINAL-RELEASE-SECURITY-REMEDIATION-01` stopped without changing anything: every official fix for the open Directus
-advisories is in Directus 12.x, which is relicensed (MSCL-1.0-GPL) and enforces its license in code. Without a
-license key, Directus 12 drops permission rows that carry field lists or item filters — all nineteen rows of the
-`nuxt-server` identity — and locks a newly provisioned instance that has such rows. Moving the Directus pin to 12.x
-before that license decision is made would therefore take down the site's CMS reads and the admin's Directus
-requests. The facts and the open decision are in `docs/project/SECURITY-REMEDIATION-REVIEW.md`.
+**Directus 12.3.1 and its license (D-042).** `FINAL-RELEASE-SECURITY-REMEDIATION-01` moved Directus from 11.17.4
+to 12.3.1, the lowest release that fixes every Directus advisory that applied to 11.17.4. Directus 12 is
+relicensed (MSCL-1.0-GPL) and enforces its license in code. The business owner obtained an Open Innovation Grant
+(OIG) license key; its eligibility terms remain a human confirmation before production. Measured locally on 12.3.1:
+- **With the OIG key** the license is `active`, custom permission rules are entitled, and every public CMS response
+  of the production build matched the 11.17.4 baseline (42 of 42 routes).
+- **Without a key** the instance stays `active` for LITUBO's usage, because only seats, collections, Flows and SSO
+  can lock it; but all nineteen `nuxt-server` permission rows drop out of permission evaluation. Every CMS read
+  of that identity was refused (403), and the public CMS endpoints and the sitemap answered 503.
+- An earlier statement here that such an instance would be locked was inaccurate and is withdrawn.
 
 ---
 
@@ -99,13 +102,32 @@ Required by `docker-compose.yml`: `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `POST
 - **Where it lives.** Locally, in the ignored `.env`; in production, the deployment secret manager supplies
   it to Compose. It is never in Git, never supplied to a Nuxt build, and never read by the Nuxt server or by
   provisioning.
-- **When it is needed.** Directus 11.17.4 ignores it. From Directus 12 it is required: without it the Core
-  tier drops every `nuxt-server` permission row, and a newly provisioned instance is locked
-  (`docs/project/SECURITY-REMEDIATION-REVIEW.md` §3).
-- **Activation.** On first start with the key, Directus activates it against
-  `https://licensing.directus.com` and binds the activation to the project and `DIRECTUS_PUBLIC_URL`, so the
-  Directus container needs outbound HTTPS to that host. An Open Innovation Grant key has five activations.
-  Deactivate the license in an instance that activated it before destroying that instance.
+- **When it is needed.** Always, with the pinned Directus 12.3.1. Without it the Core tier drops every
+  `nuxt-server` permission row and the public CMS reads fail closed (§1;
+  `docs/project/SECURITY-REMEDIATION-REVIEW.md` §3).
+- **Activation.** The first Directus process that starts with the key against a database holding no license
+  activates it against `https://licensing.directus.com`. On a fresh environment that is provisioning step `10`
+  (`schema apply` loads the license). The activation binds to the project and `DIRECTUS_PUBLIC_URL`, which must be
+  an absolute URL. Directus stores the key and the returned token in `directus_settings`, so every later backup
+  set carries them and is secret material. Later starts revalidate the binding online, so the Directus container
+  needs outbound HTTPS to that host.
+- **Activations are limited.** An OIG key has five, meant for one project's environments. They are released only by
+  deactivation, and a stranded one needs Directus support.
+- **Deactivating an environment-managed license** (FINAL-RELEASE-SECURITY-REMEDIATION-01 did this twice on
+  disposable instances):
+  1. Restart that Directus with `LICENSE_KEY` empty; the license source becomes `settings`.
+  2. As an administrator, call `DELETE /license` (204).
+  3. Check that `GET /license` reports `source: null` and that `directus_settings.license_key` is empty.
+
+  Do this before destroying any instance that activated the key.
+- **Never deactivate in a copy of another environment.** A restore of an environment's backup into the same
+  project and `PUBLIC_URL` revalidates that environment's binding without a new activation.
+  INFERRED from the licensing documentation, not tested: deactivating in such a copy would release the live
+  environment's binding.
+- **Telemetry is part of the OIG license.** Its entitlement `telemetry_required` is `true`, so Directus sends its
+  usage report to `https://telemetry.directus.io` and ignores `TELEMETRY: "false"` while that license is active.
+  The report holds aggregate counts, the public URL and the project id, and no content. `PROJECT_OWNER_ENABLED:
+  "false"` still stops the separate owner registration.
 
 **`DIRECTUS_TOKEN` — the one secret.** `DIRECTUS_TOKEN` is supplied once by deployment secret
 management and is used both to provision the nuxt-server service user's static token and by Nuxt at
@@ -243,7 +265,20 @@ policy that has to exist already and fail closed when it does not; and permissio
 refuses to run before artifact 01 has created its three rows.
 
 The artifacts are idempotent: re-running the whole manifest over an already-provisioned database
-leaves 19 permission rows, 49 tables and 7 triggers unchanged, with both verifications still passing.
+leaves 19 permission rows, 49 tables and 7 triggers unchanged, with both verifications still passing (measured on
+Directus 11.17.4).
+
+**Directus 12.3.1 (FINAL-RELEASE-SECURITY-REMEDIATION-01).** The image has no npm / npx, so the orchestrator starts
+the CLI as `node cli.js`. A fresh provision of an empty TEST database with the committed compose file completed
+13 of 13 steps in 35 s, with every verification passing and without changing any artifact. It produced:
+- 53 tables (the 49 above plus Directus 12's four OAuth system tables), 20 collections, 19 permission rows and
+  7 user triggers;
+- `public_registration = false`;
+- an activated OIG license.
+
+With a TEST service token, the `nuxt-server` identity then read what it may (200), was refused forbidden fields,
+collections and writes (403, 0 rows written), was refused without a token (403) and with a wrong one (401). The
+license was deactivated before the database was dropped. The re-run idempotency above was not re-measured on 12.3.1.
 
 ### After provisioning
 
@@ -279,7 +314,9 @@ the server's environment.
 
 Read-only, after startup:
 
-- `GET /server/ping` returns `pong`; `GET /server/health` returns 200.
+- `GET /server/ping` returns `pong`. `GET /server/health` needs an administrator on Directus 12 (anonymous: 403).
+- `GET /server/info` reports `license.source` `env` and `production_enabled` `true`; an administrator's
+  `GET /license` reports status `active` and `custom_permission_rules_enabled` `true`.
 - `node scripts/verify-directus-pin.mjs` confirms declared image, running image, digest and reported
   version all agree.
 - `node scripts/verify-postgres-pin.mjs` confirms the same for PostgreSQL, using the server's own
@@ -297,6 +334,16 @@ Read-only, after startup:
 - There is **no rollback for the schema baseline**. Undoing a schema apply means restoring a backup —
   which is why the backup prerequisite above is not optional (§1; restore procedure and its limits in
   `PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`).
+- **A Directus version upgrade has no down-migration either.** Its rollback is the verified backup set taken in the
+  quiesced window before the upgrade:
+  1. Restore that set into a TEST database.
+  2. Rename the databases so the restored one takes the environment's name.
+  3. Pin the previous image and recreate the Directus service.
+
+  FINAL-RELEASE-SECURITY-REMEDIATION-01 rehearsed this locally for 12.3.1 → 11.17.4. After restore and rename,
+  11.17.4 started (pong after about 21 s) with no migration. Its anonymous responses matched the development
+  instance, and its whole-database fingerprint matched the backup. A license activated by the newer version stays
+  consumed unless it is deactivated first (§2).
 
 ---
 
@@ -316,6 +363,12 @@ Stop and report rather than improvise if any of these hold:
   read one from a `.env` file, or adds a second project variable for one — a Nuxt `NUXT_*` override
   included.
 - Provisioning would need a credential value to be read out of a file or a container.
+- The Directus license key would have to be read, printed, typed inline or copied into a file other than the
+  secret manager's.
+- An instance that activated the license is about to be destroyed without deactivating it first, or a deactivation
+  is about to run in a copy of another environment (§2).
+- `/server/info` reports a license source other than `env`, or `GET /license` reports a status other than `active`
+  or `custom_permission_rules_enabled` `false`, on an environment meant to run the license.
 - The target database already contains business data.
 - A public policy holds any business permission.
 - `npm ci` modifies the tracked lockfile.

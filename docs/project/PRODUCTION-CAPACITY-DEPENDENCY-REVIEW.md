@@ -7,6 +7,16 @@
 > confirmations (§3) and open production operations (§4).
 > Nothing here was measured on a production server. Local capacity numbers are not a production SLA,
 > a scan is not a security approval, and the license inventory is not legal advice.
+>
+> **Partly superseded by FINAL-RELEASE-SECURITY-REMEDIATION-01 (2026-09-18, D-042).** Directus was upgraded
+> 11.17.4 → 12.3.1 (relicensed MSCL-1.0-GPL, running on an Open Innovation Grant key), the npm CLI, npx and
+> corepack were removed from the document-extractor image, the Directus attack surface was narrowed with
+> officially supported environment variables, and every remaining Critical / High finding in the three runtime
+> images was classified with objective evidence (BLOCKING = 0, UNKNOWN SECURITY EXPOSURE = 0).
+> §1.1 (Directus pin), §1.4 (image scan counts), §1.5 (Directus licence), the Directus row of §3 and all of §2
+> are therefore point-in-time PR03 records, not current state — the current security position is
+> `docs/project/SECURITY-REMEDIATION-REVIEW.md`. §1.2, §1.3, §4 and the remaining rows of §3 stand unchanged.
+> This does not approve a production release: Final Release Verification is still NOT STARTED.
 
 ---
 
@@ -17,7 +27,7 @@
 | Component | Pin | Verified by |
 |---|---|---|
 | Node | **22.22.2** (`.nvmrc`, `package.json` engines, CI `node-version-file`) | `node scripts/verify-node-runtime.mjs`; first step of `npm run release:verify` |
-| Directus | `directus/directus:11.17.4@sha256:eb326f679ae847c0a776f93b972761dc2ebe84980e0b9d274a6bc31cd62809f7` (D-038) | `node scripts/verify-directus-pin.mjs` |
+| Directus | `directus/directus:11.17.4@sha256:eb326f679ae847c0a776f93b972761dc2ebe84980e0b9d274a6bc31cd62809f7` (D-038) — **superseded 2026-09-18 by `directus/directus:12.3.1@sha256:8978edf633ae28aa31464bb71c55300c94d8bc771ff3727b5fac485173283869` (D-042)** | `node scripts/verify-directus-pin.mjs` |
 | PostgreSQL | `postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685` (D-041) | `node scripts/verify-postgres-pin.mjs` |
 
 **PostgreSQL pin.** The compose file declared the floating `postgres:16-alpine`. The running server reported
@@ -159,6 +169,11 @@ image IDs are the IDs of the running containers. The binary, the DB and the raw 
 This records that a scan was performed and what it found. **Zero Critical: NO.** Container security is not
 proven — see §2.
 
+> **Superseded (2026-09-18, D-042).** These are the PR03 counts. After the remediation, rescanned with the same
+> pinned Trivy 0.74.0 (DB v2 updated 2026-09-17), the unique (CVE, package, version) Critical / High counts are
+> Directus 12.3.1 **0 / 18**, PostgreSQL 16.15 **1 / 30** (no newer 16.x image exists upstream) and
+> document-extractor **13 / 167**. See `docs/project/SECURITY-REMEDIATION-REVIEW.md` §1 and §5.
+
 High findings, summarised (full lists in the raw scan output):
 
 - **Directus:**
@@ -201,6 +216,14 @@ and distributes the software, which is a human decision.
 Release security blocker: YES.** Remediation is the separate module `FINAL-RELEASE-SECURITY-REMEDIATION-01`;
 Final Release Verification is not authorized until it closes. Nothing was upgraded, disabled or patched
 here.
+
+> **Superseded (2026-09-18, D-042).** This whole section is the PR03 snapshot. `FINAL-RELEASE-SECURITY-REMEDIATION-01`
+> has since carried out the remediation and reports BLOCKING = 0 and UNKNOWN SECURITY EXPOSURE = 0, with every
+> residual Critical / High classified as FIXED, MITIGATED or NON-REACHABLE on evidence. Read
+> `docs/project/SECURITY-REMEDIATION-REVIEW.md` for the current counts, classifications and open human gates;
+> the triage rule in §2.1 below is unchanged and was the rule applied there. Controller review of that module
+> has not happened yet, so the release security blocker is closed **pending Controller confirmation**, not by
+> this document.
 
 ### 2.1 Triage rule
 
@@ -282,6 +305,13 @@ Source: the directus/directus GitHub security advisories and the GitHub Advisory
 **License terms can change between Directus releases; re-review required before future upgrade.** The
 evidence above belongs to the pinned 11.17.4 image only and must not be mixed with the terms of another
 release.
+
+> **Superseded for Directus (2026-09-18, D-042).** That re-review has happened: 12.3.1 is **MSCL-1.0-GPL**, not
+> BUSL-1.1, and the instance runs on an Open Innovation Grant key obtained by the business owner. The BUSL-1.1
+> row in §1.5 and the first row of §3 apply only to the retired 11.17.4 image. The current, still-open human
+> gates for Directus — OIG eligibility (revenue / headcount, grant usage agreement, one year renewable,
+> 5 activations) and the fact that this licence requires telemetry that cannot be switched off — are listed in
+> `docs/project/SECURITY-REMEDIATION-REVIEW.md` §7. The Poppler / libvips / util-linux rows are unchanged.
 
 ---
 

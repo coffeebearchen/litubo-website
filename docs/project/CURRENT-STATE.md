@@ -8,14 +8,15 @@
 
 ```text
 Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B — PostgreSQL 不可变 pin · Node canonical release gate · 本地容量基线 · 依赖 / 许可证 / CVE 审查（Controller 签收，状态 BASELINE COMPLETE — SECURITY REMEDIATION REQUIRED · 39ce564 · not pushed · D-041 已登记）；此前 FINAL-RELEASE-PRODUCTION-READY-02 — 数据库 + Directus 媒体 Backup / Restore（Controller 接受 · 26d0238 · D-040 已登记）；FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C / 01D — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · 全部服务端 secret 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 / c8d5ccf · D-038 / D-039 已登记）；FINAL-RELEASE-FIX-F 314b005（D-037）、FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B — PostgreSQL 不可变 pin · Node canonical release gate · 本地容量基线 · 依赖 / 许可证 / CVE 审查（BASELINE COMPLETE / SECURITY BLOCKER OPEN · 39ce564 · D-041 · 已签收）；前一 STOP 模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3（剩余用户授权的真实 provider 调用 = 0）
-Active authorized module:           FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus / 容器安全修复（进行中 · 暂停等待用户写入本机 secret：首次 STOP 于 Directus 12 许可证商业决定并记录为 81f3fd9；随后用户取得 Directus Open Innovation Grant license key 并授权继续；项目变量 `DIRECTUS_LICENSE_KEY` 已接入 docker-compose.yml（容器内为 `LICENSE_KEY`）/ `.env.example` / runbook，key 值未经 Claude 读取或记录；待用户写入被忽略的本机 `.env` 后继续 12.3.1 升级）
+Latest completed module:            FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复 · 攻击面收紧 · 剩余 CVE 分类（**SECURITY REMEDIATION COMPLETE — READY FOR CONTROLLER REVIEW**：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042 · 本地 commit，未 push · Controller 尚未复核）；此前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（BASELINE COMPLETE / SECURITY BLOCKER OPEN · 39ce564 · D-041 · 已签收）
+Active authorized module:           FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus / 容器安全修复（**已完成，等待 Controller 复核**：第一阶段 STOP 于 Directus 12 许可证商业决定并记录为 81f3fd9；用户取得 Directus Open Innovation Grant license key 后授权路径 A，key 接线记录为 4e72a57；第二阶段已执行 12.3.1 升级、官方支持的攻击面收紧、媒体上传字节签名校验、extractor 包管理器移除与全量回归，key 值全程未被读取或记录）
 Active module authorization level:  A2 — LOCAL_IMPLEMENTATION（SAFE AUTOPILOT；push / merge / deploy 与 Final Release Verification 均不在授权内）
-Next candidate:                     无已授权候选（Final Release Verification NOT STARTED，安全模块关闭并经 Controller 明确 PASS 前不授权）；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
+Next candidate:                     无已授权候选（Final Release Verification NOT STARTED；安全模块已交付但须经 Controller 明确 PASS 才算关闭，不得自行进入）；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（PRE-RELEASE SECURITY BLOCKER 仍 OPEN：FINAL-RELEASE-SECURITY-REMEDIATION-01 进行中，FIXED 0；Directus Open Innovation Grant license key 已由用户取得、尚未写入本机 `.env`，12.3.1 升级未执行；Directus 11.17.4 BUSL-1.1 商业资格须业务确认；Final Release Verification NOT STARTED；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：81f3fd9）
-Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
+Production release:                 NOT APPROVED（安全修复已完成：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0，**但 PRE-RELEASE SECURITY BLOCKER 只能由 Controller 复核后关闭**，本地证据不构成生产事实；未决人工 gate：OIG 许可证资格（营收 / 人数、grant 协议、1 年可续、5 次激活）与 OIG 强制遥测无法关闭；Poppler / libvips / util-linux 人工审查维持；Final Release Verification NOT STARTED；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：81f3fd9；其后 4e72a57 为 license key 接线）
+Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
+Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
 
@@ -11203,11 +11204,16 @@ P0 violations：NONE。Container Security 不写 `PROVEN`。
 
 ---
 
-## FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus / 容器安全修复（**STOP**：Directus 12 许可证商业决定）
+## FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus / 容器安全修复（**COMPLETE — READY FOR CONTROLLER REVIEW**）
 
 **Module：** FINAL-RELEASE-SECURITY-REMEDIATION-01（A2 · LOCAL_IMPLEMENTATION · SAFE AUTOPILOT）。
 
-**Status：** **SECURITY REMEDIATION INCOMPLETE — BLOCKING ITEMS REMAIN**。
+**Status（模块最终）：** **SECURITY REMEDIATION COMPLETE — READY FOR CONTROLLER REVIEW**（2026-09-18，D-042）。
+- **BLOCKING = 0、UNKNOWN SECURITY EXPOSURE = 0**：三个运行时镜像中剩余的每一条 Critical / High 都已判定为 FIXED / MITIGATED / NON-REACHABLE 并附客观证据。
+- 本节 A–F 是**第一阶段（2026-09-17）**的记录，当时停在许可证商业决定、未做任何运行时变更；**第二阶段（2026-09-18）见 §G**。
+- Controller 尚未复核；Final Release Verification 仍 **NOT STARTED**，生产发布仍 **NOT APPROVED**。
+
+**第一阶段 Status（历史，保留）：** SECURITY REMEDIATION INCOMPLETE — BLOCKING ITEMS REMAIN。
 - 停在施工单 STOP 条件 12（需要用户商业 / 法律决定）与 13（当前授权范围无法安全解决）。
 - 未升级、未改配置、未改网络、未改权限、未改数据。
 
@@ -11362,4 +11368,109 @@ P0 violations：NONE。Container Security 仍 `OPEN`，不写 `PROVEN`。
 - **运行时：** Directus 仍为 11.17.4（不读取 `LICENSE_KEY`）；未重建或重启任何容器；没有发生许可证激活。
 - **暂停点：** 需要用户把 key 写入 `D:\LITUBO-website\.env`，变量名 `DIRECTUS_LICENSE_KEY`，然后继续本模块。
 
-*最后更新：2026-09-17，由 Claude Code 在 FINAL-RELEASE-SECURITY-REMEDIATION-01 任务中写入。*
+*第一阶段最后更新：2026-09-17，由 Claude Code 在 FINAL-RELEASE-SECURITY-REMEDIATION-01 任务中写入。*
+
+---
+
+### G. 第二阶段：12.3.1 升级、加固与剩余风险分类（2026-09-18，D-042）
+
+**G.0 授权与路径**
+- 用户已把 OIG license key 写入被忽略的本机 `.env`（变量名 `DIRECTUS_LICENSE_KEY`）。key 值全程未被读取、打印、记录或写入任何文件。
+- 按第一阶段 Open items 的路径 A 执行：取得许可证后升级到 12.3.1。
+- 逐条证据见 `docs/project/SECURITY-REMEDIATION-REVIEW.md`（本节只记结论与位置）。
+
+**G.1 目标版本选择（最低安全版本，不取 latest）**
+- 对 11.17.4 生效的 21 条官方公告（critical 1 / high 11 / medium 9）全部在 12.x 修复；12.2.0 覆盖 19 条。
+- **12.3.1** 是不低于全部首个修复版本的最低 release（恰好也是当前最新版）。
+- 镜像 pin：`directus/directus:12.3.1@sha256:8978edf633ae28aa31464bb71c55300c94d8bc771ff3727b5fac485173283869`（OCI index digest；拉取后 RepoDigest 与 pin 一致）。
+- 镜像内事实：`directus` 12.3.1 · `@directus/api` 39.1.0 · `@directus/license` 0.4.0 · Node 22.23.2 · Alpine 3.24.1；npm / npx / corepack 均不存在（pm2 为镜像自带 supervisor）；`/directus/license` 的 SHA-256 与上游 v12.3.1 tag 一致（MSCL-1.0-GPL）；liquidjs 10.27.2、tar 7.5.22。
+
+**G.2 不可逆实验不在唯一开发库上首发**
+- **R1 — 升级演练（一次性环境）：** 先用备份集 `litubo-backup-20260917-143309` 把开发数据恢复到 TEST 库与 TEST uploads，再在该副本上跑 12.3.1；验证迁移、许可证激活、19 行权限与公开读取。
+- **回滚演练：** 在同一次性环境上把镜像退回 11.17.4 的原 digest 并验证可用，回滚路径在需要之前就已演练。
+- **R2 — 从零 provisioning 演练：** 空库上用 12.3.1 跑完整 provisioning（13 步），期间修正 CLI 调用方式（12.1+ 镜像无 npx），并完成服务令牌轮换、许可证停用（HTTP 204）与 TEST 库清理。
+- **B3 — 升级后备份的恢复演练：** 以空 `LICENSE_KEY` 启动一次性 12.3.1，证明备份集可恢复且不消耗新的激活。
+
+**G.3 开发库升级与数据完整性**
+- 升级前：`docker compose stop directus` 停写，新建备份集 `litubo-backup-20260917-153058`，**独立执行 `verifyBackupSet` 通过**，指纹与 uploads 清单与 R1 用的集合一致。
+- 升级：`docker compose up -d --no-deps directus` 只重建 Directus；约 24 秒后 pong；迁移与演练时相同的 6 条；日志无许可证错误。
+- Pin 校验：`verify-directus-pin` 升级前 FAIL（运行 11.17.4 vs 声明 12.3.1）→ 升级后 OK；`verify-postgres-pin` OK。
+- **数据：20 张业务表与升级前逐字节一致**；仅 4 张系统表发生变化且只是新增列（原有列的投影相等），另新增 4 张 OAuth 表；业务计数、19 行权限、角色 / 策略均未变；序列未变；许可证激活未改变 `project_id`。
+- 权限：三项校验全部 `OK`；public policy 权限 0。
+- 升级后备份集 `litubo-backup-20260917-153808`（记录 12.3.1 的 digest；53 表 / 2,755 行 / 129 个文件），`verifyBackupSet` 通过，并已实际恢复到 TEST 库启动验证。
+- Nuxt 生产构建的 42 条路由在升级前后逐条一致。
+
+**G.4 许可证、权益与激活预算**
+- 12.3.1 为 **MSCL-1.0-GPL**；LITUBO 使用用户取得的 **Open Innovation Grant（OIG）** key，运行时 source 为 `env`。
+- 实测权益：状态 `active`，席位 / 集合 / Flow / 历史均不限，自定义权限规则可用，`production_enabled` 为真，`display_powered_by` 为 OIG，**`telemetry_required` 为真**。
+- 激活绑定项目与绝对 `PUBLIC_URL`；每个 key 5 次激活。本模块用掉的两次（R1、R2）已按官方三步流程停用并释放，B3 以空 key 运行未新增激活，**净占用 1 次（开发实例）**。
+- 经环境变量提供的 key 无法用 API 管理：必须先以空 `LICENSE_KEY` 重启使 source 变为 `settings`，才能 `DELETE /license`。
+- **恢复出来的副本绝不可执行停用**：副本与原实例共享同一条激活记录（此细节为 INFERRED，三步停用流程本身为实测）。
+
+**G.5 攻击面收紧（只用 12.3.1 真实支持的环境变量）**
+- 新增并实测：`WEBSOCKETS_ENABLED=false`（`/websocket` 404）· `CACHE_ENABLED=false` · `TUS_ENABLED=false` · `GRAPHQL_INTROSPECTION=false`（管理员 introspection 查询 400）· `MCP_ENABLED=false`（`/mcp` 404，11.17.4 时是 403）· `AI_ENABLED=false`（`/ai/chat` 404）· `MARKETPLACE_TRUST=sandbox`（最严格值，安装扩展仍仅管理员，已安装 0）· `PROJECT_OWNER_ENABLED=false`（匿名 `POST /settings/owner` 403）。
+- `PUBLIC_REGISTRATION` 已移除：任何 Directus 运行时都不读取它，公开注册由数据库设置 `public_registration = false` 关闭。
+- 上述每一项都由 `tests/directusSecurityRemediationContract.test.ts` 断言且只允许出现一次，并禁止被重新打开。
+- **遥测：** `TELEMETRY: "false"` 已写入，但 OIG 的 `telemetry_required = true` 使其被忽略。Directus 会周期性向 telemetry.directus.io 上报汇总计数、公开 URL 与 project id（不含内容数据）。这是**业务负责人 gate**，不是工程缺陷，compose 中的注释已写明该条件。
+
+**G.6 代码修复：管理端上传不再相信客户端声明的类型**
+- `server/api/admin/media/upload.post.ts` 在任何字节到达 Directus 之前校验图片的字节签名：声明为 `image/*` 的文件若实际是 ISO-BMFF（HEIC / AVIF），直接拒绝并返回中文错误，不再进入 Directus 的图片管线（该管线的 sharp 内置 libheif 有 GHSA-rgj7 系列漏洞）。
+- 已审计库内既有文件：ISO-BMFF 0 个。
+- `tests/mediaUploadTypes.test.ts` 增加 13 项：真实 JPEG / PNG / WebP 通过，HEIC / AVIF / 类型不符 / 空文件被拒，非图片类型不受影响，并断言校验发生在上传处理的正确顺序位置。
+
+**G.7 document-extractor 镜像**
+- Dockerfile 在 apt 与 COPY 之后新增一层，删除 npm CLI、npx 与 corepack（与 Directus 12.1+ 镜像做法一致）。
+- 该层不改变任何 Debian 包：重建前后 **208 个 dpkg 包逐项一致**。
+- extraction 回归 127 项全部通过；镜像重建为 `sha256:8d3d0639…`，旧镜像保留为 `litubo-document-extractor:pre-sr01` 以便回退。
+- `tests/documentExtractorInfra.test.ts` 相应调整：禁用子串由 `'npm '` 改为 `'npm install'` / `'npm ci'`，并新增一项断言该删除层位于 apt + COPY 之后、`USER node` 之前。
+
+**G.8 剩余 Critical / High 分类（Trivy 0.74.0，DB v2 2026-09-17 07:06:17 UTC，按 (CVE, 包, 版本) 去重）**
+
+| 镜像 | 修复前 | 修复后 | 结论 |
+|---|---|---|---|
+| Directus | 4 / 117 | **0 / 18** | 18 条 High 全部分类，无阻塞 |
+| PostgreSQL 16.15 | 1 / 30 | 1 / 30 | 上游无更新的 16.x 镜像；全部 NON-REACHABLE |
+| document-extractor | 14 / 177 | **13 / 167** | npm CLI 相关（1 Critical + 10 High）FIXED，其余按 E1–E6 分组判定不可达 |
+
+- 判定只接受客观证据：符号级可达性（ldd 闭包 + ELF `.dynsym` 导入 / 导出分析）、libvips loader 优先级与 `untrusted` 标志、代码路径不存在，或实测响应。
+- **BLOCKING = 0、UNKNOWN SECURITY EXPOSURE = 0**；逐条见 `SECURITY-REMEDIATION-REVIEW.md` §5。
+
+**G.9 生产网络暴露（第一阶段的 TO VERIFY 已关闭）**
+- 仓库层面证据：Directus 与 extractor gateway 均只发布在 loopback（`127.0.0.1:8055` / `127.0.0.1:8787`，由契约测试守护）；无反向代理到 Directus 的路由；Directus 只被服务端代码访问（端点已逐一列举）；`.output/public` 中不含 Directus 地址。
+- 文档矛盾已修正：`docs/OPERATIONS-HANDBOOK.md` 不再出现 `cms.litubo.com` / `服务器IP:8055` 等公开 CMS 地址；`docs/ADMIN-CMS-SETUP.md` 明确「浏览器从不直接访问 Directus」。
+- 部署时的实际核对写入 provisioning runbook（仓库证据 ≠ 生产事实）。
+
+**G.10 回归与浏览器验收**
+- `npm run typecheck` 0 · `npm run lint` 0 · `npm test` **95 个文件 / 3243 个测试全部通过、0 skipped**（extractor 集成用例已启用）· `npm run release:verify` exit 0（Node gate、Directus pin、PostgreSQL pin、published TEST data PASS、生产构建 8.26 MB）· `git diff --check` 0。
+- 测试套件跑完后再次核对数据库：指标与升级后一致，三项权限校验 OK，19 行权限，ping 200。
+- 公开页验收（1440 / 375）：`/`、`/products`、`/products/x-ray-inspection`（空态）、草稿产品 URL 返回 404 页、`/admin/login`；375 下 `scrollWidth === innerWidth === 375`。
+- 管理端验收（用户登录一次后，只读；1440 / 375）：Product Center（4 个产品全为 Draft、5 个分类）、产品工作区（6 个分区标签齐全，375 下折叠为下拉）、产品图片与资料、Media Library（10/10 缩略图加载成功、0 破图，14 次 `?width=240&height=180&fit=cover` 变换请求全部 200）、Content Center（7 条）、Settings（3 个分区）；两个断点均无横向溢出。
+- 列表搜索实测：`sample` → 2 条、`133` → 1 条、`test` → 4 条、`sample133` → 0 条并显示空态（0 条为正确结果：该记录名称为 `test sample`、型号为 `133`，列表列把两个字段拼在一起显示，Directus 的 `search` 按单字段做包含匹配）。
+- 登录后新开标签页的 console：**0 error / 0 warning**（只有 Vite HMR debug 与 Vue `<Suspense>` 实验特性提示）；`/api/admin/*` 全部 200。
+
+**G.11 Changed files（第二阶段）**
+- `docker-compose.yml`（Directus pin 12.3.1 + 加固变量 + 移除 `PUBLIC_REGISTRATION`）
+- `scripts/provisioning-manifest.json`、`scripts/provision-directus.mjs`（CLI 改为 `node cli.js`）
+- `server/api/admin/media/upload.post.ts`（字节签名校验）
+- `document-extractor/Dockerfile`（移除 npm / npx / corepack）
+- `tests/directusSecurityRemediationContract.test.ts`（新，25 项）、`tests/mediaUploadTypes.test.ts`、`tests/documentExtractorInfra.test.ts`
+- `docs/project/SECURITY-REMEDIATION-REVIEW.md`（重写为完成态）、`docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md`、`docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`、`docs/project/PRODUCTION-CAPACITY-DEPENDENCY-REVIEW.md`（标注被取代的章节）、`docs/project/RELEASE-SAFETY-GATES.md`、`docs/project/08-decision-log.md`（D-042）、`docs/project/CURRENT-STATE.md`
+- `CLAUDE.md`、`docs/ADMIN-CMS-SETUP.md`、`docs/ADMIN-CMS-SPEC.md`、`docs/OPERATIONS-HANDBOOK.md`（`node cli.js`、`/server/ping`、注册设置、无公开 CMS 地址）
+
+**G.12 未决人工 gate（事实，不作法律结论）**
+- **OIG 许可证资格：** owner 业务负责人。年营收低于 500 万美元且员工少于 50 人，按登录 Studio 的法人主体评估；受 grant usage agreement 约束；一年可续；5 次激活。
+- **OIG 强制遥测：** owner 业务负责人。该许可证下无法关闭用量上报。
+- **Poppler（GPL）/ libvips（LGPL-2.1）/ util-linux（混合）：** 人工审查，维持 PR03 结论不变。
+- **PostgreSQL 剩余 1 Critical / 30 High：** 上游无更新的 16.x 镜像，已判定不可达；随上游更新再评估。
+
+**G.13 明确未做**
+- push / merge / deploy = 0；`origin/master` 仍 `8f2e384`。
+- Final Release Verification **NOT STARTED**，未自行进入。
+- 真实外部 AI 调用 0 · 真实邮件 0 · HubSpot 0 · 产生费用的 API 调用 0。
+- 未删除任何备份、未执行 `down -v` / volume 删除 / prune；未修改 Windows PATH 或全局 Node。
+- 未读取任何 secret 值；只按变量名核对 configured / missing。
+- 生产环境未部署、未连接：本节所有证据均来自本地开发环境。
+
+---
+
+*最后更新：2026-09-18，由 Claude Code 在 FINAL-RELEASE-SECURITY-REMEDIATION-01 任务中写入（第二阶段完成，等待 Controller 复核）。*

@@ -83,9 +83,19 @@ describe('document-extractor/Dockerfile', () => {
     expect(dockerfile).toContain('apt-get install -y --no-install-recommends poppler-utils util-linux libvips-tools tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim \\')
     expect(dockerfile.match(/apt-get install/g)).toHaveLength(1)
     expect(dockerfile).toContain('rm -rf /var/lib/apt/lists/*')
-    for (const unwanted of ['imagemagick', 'opencv', 'libreoffice', 'ghostscript', 'python', 'curl', 'wget', 'npm ', 'package.json', 'fonts-']) {
+    for (const unwanted of ['imagemagick', 'opencv', 'libreoffice', 'ghostscript', 'python', 'curl', 'wget', 'npm install', 'npm ci', 'package.json', 'fonts-']) {
       expect(dockerfile.toLowerCase(), unwanted).not.toContain(unwanted)
     }
+  })
+
+  /** FINAL-RELEASE-SECURITY-REMEDIATION-01 — no package manager at run time, and the apt layer stays untouched. */
+  it('removes the npm CLI, npx and corepack the Node base image ships, after the apt and COPY layers', () => {
+    const removal = dockerfile.match(/^RUN rm -rf \/usr\/local\/lib\/node_modules\/npm \/usr\/local\/lib\/node_modules\/corepack \\\n\s+\/usr\/local\/bin\/npm \/usr\/local\/bin\/npx \/usr\/local\/bin\/corepack$/m)
+    expect(removal).not.toBeNull()
+    const at = dockerfile.indexOf(removal![0])
+    expect(at).toBeGreaterThan(dockerfile.indexOf('apt-get install'))
+    expect(at).toBeGreaterThan(dockerfile.indexOf('COPY extractor.mjs gateway.mjs server.mjs ./'))
+    expect(at).toBeLessThan(dockerfile.indexOf('USER node'))
   })
 
   it('copies only the three service files and runs as the unprivileged node user', () => {

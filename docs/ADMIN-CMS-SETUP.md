@@ -74,13 +74,13 @@ docker compose logs -f directus
 Server started at http://0.0.0.0:8055
 ```
 
-健康检查：
+健康检查（存活探测）：
 
 ```
-curl http://localhost:8055/server/health
+curl http://localhost:8055/server/ping
 ```
 
-期望返回：`{"status":"ok"}`
+期望返回：`pong`。Directus 12 起，未认证的 `/server/health` 返回 403，只有管理员身份才能调用。
 
 ### 2.4 访问管理界面
 
@@ -162,20 +162,22 @@ docker compose -f docker-compose.yml up -d directus
 
 Schema 快照记录所有集合定义，确保新环境可以一键恢复，无需手动建表。
 
+Directus 12.1 起官方镜像不再包含 npm / npx，CLI 在容器工作目录 `/directus` 下以 `node cli.js` 运行。
+
 ### 5.1 导出快照（集合设置完成后执行）
 
 **本地：**
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.local.yml exec directus \
-  npx directus schema snapshot /schema/phase1.yaml
+  node cli.js schema snapshot /schema/phase1.yaml
 ```
 
 **生产：**
 
 ```bash
 docker compose -f docker-compose.yml exec directus \
-  npx directus schema snapshot /schema/phase1.yaml
+  node cli.js schema snapshot /schema/phase1.yaml
 ```
 
 导出后文件出现在 `directus/schema/phase1.yaml`，将其提交到 Git。
@@ -185,11 +187,11 @@ docker compose -f docker-compose.yml exec directus \
 ```bash
 # 本地
 docker compose -f docker-compose.yml -f docker-compose.local.yml exec directus \
-  npx directus schema apply --yes /schema/phase1.yaml
+  node cli.js schema apply --yes /schema/phase1.yaml
 
 # 生产
 docker compose -f docker-compose.yml exec directus \
-  npx directus schema apply --yes /schema/phase1.yaml
+  node cli.js schema apply --yes /schema/phase1.yaml
 ```
 
 `--yes` 跳过交互确认。执行前确保 Directus 已完全启动。
@@ -254,10 +256,10 @@ docker compose -f docker-compose.yml pull directus
 # 重建容器（数据不丢失）
 docker compose -f docker-compose.yml up -d directus
 # 运行数据库迁移（Directus 启动时自动执行，也可手动触发）
-docker compose -f docker-compose.yml exec directus npx directus database migrate:latest
+docker compose -f docker-compose.yml exec directus node cli.js database migrate:latest
 ```
 
-升级前**必须**先创建一个经过校验的完整备份集（数据库 + uploads，D-040），不要只导出数据库：
+升级前**必须**先创建一个经过校验的完整备份集（数据库 + uploads，D-040），不要只导出数据库。Directus 12 起还需要许可证 key（`DIRECTUS_LICENSE_KEY`）与绝对 `PUBLIC_URL`；激活、反激活与恢复演练的注意事项见 `docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md` §2 与 `docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`：
 
 ```bash
 docker compose -f docker-compose.yml stop directus
@@ -278,9 +280,9 @@ docker compose -f docker-compose.yml start directus
 | Directus 不对公网暴露 | 无 `0.0.0.0` 绑定；Nginx 无 Directus 路由 |
 | 无 `admin.litubo.com` 子域 | 本期不创建 |
 | 生产访问只通过 SSH 隧道 | 见 6.2 节 |
-| 公开注册关闭 | `PUBLIC_REGISTRATION=false` |
+| 公开注册关闭 | 数据库设置 `directus_settings.public_registration = false`（Directus 没有同名环境变量） |
 | 所有密钥只在 `.env` 中 | `.env` 已在 `.gitignore` 排除 |
-| 前台不直接调用 Directus | 预留 `directusUrl` / `cmsMode` runtimeConfig，adapter 阶段才实现 |
+| 浏览器从不直接访问 Directus | `directusUrl` 只在服务端 runtimeConfig（不在 `public`）；公开媒体经 `/api/cms/media/:id` 服务端代理 |
 
 **验证腾讯云无公网暴露（在服务器上执行）：**
 
@@ -292,7 +294,7 @@ ss -tlnp | grep 8055
 **从外部验证（在本地执行，应超时）：**
 
 ```bash
-curl --max-time 5 http://<server-public-ip>:8055/server/health
+curl --max-time 5 http://<server-public-ip>:8055/server/ping
 ```
 
 ---
@@ -327,7 +329,7 @@ A: PostgreSQL 健康检查通过前 Directus 会等待并重试。如持续失�
 
 **Q: 升级后管理界面显示数据库迁移提示。**
 
-A: 运行 `docker compose exec directus npx directus database migrate:latest`，或重启 Directus（启动时自动迁移）。
+A: 运行 `docker compose exec directus node cli.js database migrate:latest`，或重启 Directus（启动时自动迁移）。
 
 **Q: `directus/schema/phase1.yaml` 不存在，如何初始化集合？**
 

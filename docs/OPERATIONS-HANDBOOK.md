@@ -27,7 +27,7 @@
 
 Directus 是本网站的内容管理系统（CMS）。它运行在腾讯云服务器上，通过 Docker 容器启动。运营团队在 Directus 后台新建和编辑内容，Nuxt 前台网站通过 API 读取并展示这些内容。
 
-Directus 后台的地址形如 `https://cms.litubo.com/admin`（或内网 `http://服务器IP:8055`）。
+Directus 后台不对公网开放，也没有独立的后台域名：它只监听服务器本机的 `127.0.0.1:8055`。生产环境只能在管理员本机建立 SSH 隧道后访问 `http://localhost:8055/admin`（`docs/ADMIN-CMS-SETUP.md` §6.2 / §7）。
 
 ### 本地开发环境登录
 

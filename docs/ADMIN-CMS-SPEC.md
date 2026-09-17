@@ -108,7 +108,7 @@ Directus API          http://directus:8055/       ← 仅容器内网可达，�
 
 - 禁止将真实密码或 token 写入任何 `.ts`、`.vue`、`docker-compose.yml` 或文档文件；
 - `DIRECTUS_TOKEN` 是 `nuxt-server` 最小权限服务用户的 static token：值由部署 secret manager 提供、由 provisioning 安装（D-038）；Nuxt server 在运行时从自身进程环境读取 `process.env.DIRECTUS_TOKEN`，构建不需要它、构建产物也不包含它（D-039，其余服务端 secret 同理，见 `docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md` §2）；
-- 禁止在管理界面开启公开注册（`PUBLIC_REGISTRATION=false`）。
+- 禁止在管理界面开启公开注册（数据库设置 `directus_settings.public_registration` 保持 `false`；Directus 没有同名环境变量）。
 
 ### 2.3 媒体文件持久化方案
 

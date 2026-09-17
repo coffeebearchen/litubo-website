@@ -1,5 +1,6 @@
 import { readMultipartFormData, createError } from 'h3'
 import { getAdminToken } from '~/server/utils/adminDirectusClient'
+import { imageMatchesDeclaredType } from '~/server/utils/documentExtractorClient'
 import { assertFolderAllowsUpload } from '~/server/utils/folderRegistry'
 
 /**
@@ -54,6 +55,27 @@ export function uploadRefusalMessage(filename: string, contentType: string): str
   if (/\.xls$/i.test(filename)) return LEGACY_XLS_MESSAGE
   if (/\.doc$/i.test(filename)) return LEGACY_DOC_MESSAGE
   return `格式不支持（${contentType}）。仅允许 ${ALLOWED_UPLOAD_LABEL}`
+}
+
+/**
+ * FINAL-RELEASE-SECURITY-REMEDIATION-01 — an image's bytes must be the image its content type claims.
+ *
+ * Directus decides from the stored content type whether to run sharp on a file (metadata on upload,
+ * transformations on /assets), but sharp decodes whatever the bytes really are. Without this check a HEIF or
+ * AVIF file labelled image/jpeg would reach the libheif decoder bundled with Directus 12.3.1's sharp 0.35.3,
+ * which has known vulnerabilities (GHSA-rgj7-g3m4-5g8c). The decision is the signature check the document
+ * extractor path already uses, and a mismatch is refused, never re-guessed. Directus never hands a non-image
+ * content type to sharp, so only image types are checked.
+ */
+export function uploadContentMatchesType(bytes: Uint8Array, contentType: string): boolean {
+  const type = contentType.toLowerCase().split(';')[0].trim()
+  if (!type.startsWith('image/')) return true
+  return imageMatchesDeclaredType(bytes, type)
+}
+
+/** Why an image whose bytes are not the declared format was refused. */
+export function uploadContentMismatchMessage(contentType: string): string {
+  return `文件内容与声明的格式不一致（${contentType}），已拒绝上传`
 }
 /**
  * A safe, actionable reason for a storage failure, derived from the HTTP
@@ -145,6 +167,10 @@ export default defineEventHandler(async (event) => {
      * pool, and `.slice()` on the view copies exactly those bytes.
      */
     const exactBytes = new Uint8Array(part.data.buffer, part.data.byteOffset, part.data.byteLength).slice()
+    if (!uploadContentMatchesType(exactBytes, ct)) {
+      errors.push({ filename, message: uploadContentMismatchMessage(ct) })
+      continue
+    }
     fd.append('title', autoTitle)
     if (folder) fd.append('folder', folder)
     fd.append('file', new Blob([exactBytes], { type: ct }), filename)
