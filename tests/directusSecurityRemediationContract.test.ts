@@ -40,7 +40,6 @@ const HARDENING: Record<string, string> = {
   AI_ENABLED: 'false',
   MARKETPLACE_TRUST: 'sandbox',
   PROJECT_OWNER_ENABLED: 'false',
-  TELEMETRY: 'false',
 }
 
 const compose = repoFile('docker-compose.yml')
@@ -81,9 +80,15 @@ describe('Directus attack-surface hardening', () => {
     expect(directus).not.toMatch(/^ {6}(WEBSOCKETS_(?:REST|GRAPHQL)_ENABLED|IP_TRUST_PROXY|CORS_ENABLED|EXTENSIONS_AUTO_RELOAD|MCP_OAUTH_ENABLED|AI_TELEMETRY_ENABLED|RATE_LIMITER_ENABLED): "?true"?$/m)
   })
 
-  it('says next to TELEMETRY that the Open Innovation Grant license ignores it', () => {
-    const at = directus.indexOf('      TELEMETRY: "false"')
-    expect(directus.slice(Math.max(0, at - 400), at)).toContain('telemetry_required = true')
+  /**
+   * GOVERNANCE-FIX-01 — the Open Innovation Grant requires telemetry, so a TELEMETRY value cannot switch it
+   * off. Declaring one anyway would read to an operator as "telemetry is off", so the file declares none and
+   * says why instead.
+   */
+  it('declares no TELEMETRY value and records that opt-out is unavailable on this license tier', () => {
+    expect(compose).not.toMatch(/^\s*TELEMETRY:/m)
+    expect(directus).toContain('telemetry_required = true')
+    expect(directus).toContain('telemetry opt-out is not available under the current OIG tier')
   })
 
   it('publishes Directus on loopback only', () => {

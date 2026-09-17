@@ -93,10 +93,11 @@ services:
       AI_ENABLED: "false"
       MARKETPLACE_TRUST: "sandbox"
       PROJECT_OWNER_ENABLED: "false"
-      # Honoured only when the license allows telemetry to be switched off. The Open Innovation Grant license
-      # requires it (entitlement telemetry_required = true), so while that license is active Directus ignores
-      # this value and sends its usage report to telemetry.directus.io (SECURITY-REMEDIATION-REVIEW.md §3).
-      TELEMETRY: "false"
+      # No TELEMETRY variable is declared here, deliberately (GOVERNANCE-FIX-01). The OIG entitlement requires
+      # telemetry (telemetry_required = true); telemetry opt-out is not available under the current OIG tier.
+      # A TELEMETRY: "false" line would be ignored by Directus while reading to an operator as "telemetry is
+      # off", so it was removed. Directus sends its usage report — aggregate counts, the public URL and the
+      # project id, no content — to telemetry.directus.io (SECURITY-REMEDIATION-REVIEW.md §3.7).
     volumes:
       - ${DIRECTUS_UPLOADS_DIR}:/directus/uploads
       # Read-write: snapshot output lands directly in Git working tree

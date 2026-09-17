@@ -309,8 +309,9 @@ release.
 > **Superseded for Directus (2026-09-18, D-042).** That re-review has happened: 12.3.1 is **MSCL-1.0-GPL**, not
 > BUSL-1.1, and the instance runs on an Open Innovation Grant key obtained by the business owner. The BUSL-1.1
 > row in §1.5 and the first row of §3 apply only to the retired 11.17.4 image. The current, still-open human
-> gates for Directus — OIG eligibility (revenue / headcount, grant usage agreement, one year renewable,
-> 5 activations) and the fact that this licence requires telemetry that cannot be switched off — are listed in
+> gates for Directus — OIG eligibility (revenue / headcount, grant usage agreement; the grant itself is perpetual,
+> with no expiration date and no renewal process, and each key carries 5 activations) and the fact that this
+> licence requires telemetry that cannot be switched off — are listed in
 > `docs/project/SECURITY-REMEDIATION-REVIEW.md` §7. The Poppler / libvips / util-linux rows are unchanged.
 
 ---

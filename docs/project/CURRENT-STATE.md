@@ -13,7 +13,7 @@ Active authorized module:           FINAL-RELEASE-SECURITY-REMEDIATION-01 — Di
 Active module authorization level:  A2 — LOCAL_IMPLEMENTATION（SAFE AUTOPILOT；push / merge / deploy 与 Final Release Verification 均不在授权内）
 Next candidate:                     无已授权候选（Final Release Verification NOT STARTED；安全模块已交付但须经 Controller 明确 PASS 才算关闭，不得自行进入）；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（安全修复已完成：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0，**但 PRE-RELEASE SECURITY BLOCKER 只能由 Controller 复核后关闭**，本地证据不构成生产事实；未决人工 gate：OIG 许可证资格（营收 / 人数、grant 协议、1 年可续、5 次激活）与 OIG 强制遥测无法关闭；Poppler / libvips / util-linux 人工审查维持；Final Release Verification NOT STARTED；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Production release:                 NOT APPROVED（安全修复已完成：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0，**但 PRE-RELEASE SECURITY BLOCKER 只能由 Controller 复核后关闭**，本地证据不构成生产事实；人工 gate：OIG 许可证——用户已自行确认组织满足营收 / 人数条件、自行阅读并提交申请，Directus 已发放 key；授予条款为**永久授予、无到期日、无需续期流程**，每个 key 5 次激活（Claude 不作法律资格判断）；OIG 强制遥测无法关闭，当前 OIG 层级不提供 telemetry opt-out；Poppler / libvips / util-linux 人工审查维持；Final Release Verification NOT STARTED；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
 Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：81f3fd9；其后 4e72a57 为 license key 接线）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)
@@ -11270,12 +11270,12 @@ P0 violations：NONE。Container Security 仍 `OPEN`，不写 `PROVEN`。
   - 激活绑定项目与绝对 `PUBLIC_URL`；离线 token 仅 Enterprise 可用。
 - **Open Innovation Grant：**
   - 年营收低于 500 万美元且员工少于 50 人的主体可免费商用自托管，受 grant usage agreement 约束；
-  - 一年有效，可续；
+  - ~~一年有效，可续~~ → **GOVERNANCE-FIX-01 订正（2026-09-18）：该授予为永久授予（granted in perpetuity），无到期日，也不需要续期流程**；第一阶段此处依据当时读到的页面记为"一年可续"，属过时描述；
   - 每个 key 5 次激活，销毁实例前须先停用激活。
 - **Telemetry：**
   - Core 为 `telemetry_required: true`，此时 `TELEMETRY=false` 被忽略；
   - 定价页只在 Enterprise 列出 telemetry opt-out；
-  - OIG 是否解除该要求：UNKNOWN（无 key 无法核实）。
+  - OIG 是否解除该要求：第一阶段为 UNKNOWN（无 key 无法核实）；**第二阶段已实测：不解除**——OIG 的 `telemetry_required = true`，当前 OIG 层级不提供 telemetry opt-out（见 §G.5）。
 
 ### C. 对 LITUBO 的影响（本地开发库只读查询 + 12.3.1 源码阅读，未执行）
 - **LITUBO 用量：** 20 个用户集合；1 个 Studio 席位（Administrator）+ 1 个 API-only 服务用户；0 Flow；无 SSO；无 Directus LLM。
@@ -11411,7 +11411,7 @@ P0 violations：NONE。Container Security 仍 `OPEN`，不写 `PROVEN`。
 - 新增并实测：`WEBSOCKETS_ENABLED=false`（`/websocket` 404）· `CACHE_ENABLED=false` · `TUS_ENABLED=false` · `GRAPHQL_INTROSPECTION=false`（管理员 introspection 查询 400）· `MCP_ENABLED=false`（`/mcp` 404，11.17.4 时是 403）· `AI_ENABLED=false`（`/ai/chat` 404）· `MARKETPLACE_TRUST=sandbox`（最严格值，安装扩展仍仅管理员，已安装 0）· `PROJECT_OWNER_ENABLED=false`（匿名 `POST /settings/owner` 403）。
 - `PUBLIC_REGISTRATION` 已移除：任何 Directus 运行时都不读取它，公开注册由数据库设置 `public_registration = false` 关闭。
 - 上述每一项都由 `tests/directusSecurityRemediationContract.test.ts` 断言且只允许出现一次，并禁止被重新打开。
-- **遥测：** `TELEMETRY: "false"` 已写入，但 OIG 的 `telemetry_required = true` 使其被忽略。Directus 会周期性向 telemetry.directus.io 上报汇总计数、公开 URL 与 project id（不含内容数据）。这是**业务负责人 gate**，不是工程缺陷，compose 中的注释已写明该条件。
+- **遥测：** OIG 的 `telemetry_required = true`，**当前 OIG 层级不提供 telemetry opt-out**。GOVERNANCE-FIX-01（2026-09-18）因此从 `docker-compose.yml` **删除了无效的 `TELEMETRY: "false"`**——该值不会生效，却会让运维人员误读为"遥测已关闭"；原位置改为注释写明该事实，契约测试断言不再声明任何 `TELEMETRY` 值且理由在案。Directus 会周期性向 telemetry.directus.io 上报汇总计数、公开 URL 与 project id（不含内容数据）。这是**业务负责人知情项**，不是工程缺陷。
 
 **G.6 代码修复：管理端上传不再相信客户端声明的类型**
 - `server/api/admin/media/upload.post.ts` 在任何字节到达 Directus 之前校验图片的字节签名：声明为 `image/*` 的文件若实际是 ISO-BMFF（HEIC / AVIF），直接拒绝并返回中文错误，不再进入 Directus 的图片管线（该管线的 sharp 内置 libheif 有 GHSA-rgj7 系列漏洞）。
@@ -11458,8 +11458,8 @@ P0 violations：NONE。Container Security 仍 `OPEN`，不写 `PROVEN`。
 - `CLAUDE.md`、`docs/ADMIN-CMS-SETUP.md`、`docs/ADMIN-CMS-SPEC.md`、`docs/OPERATIONS-HANDBOOK.md`（`node cli.js`、`/server/ping`、注册设置、无公开 CMS 地址）
 
 **G.12 未决人工 gate（事实，不作法律结论）**
-- **OIG 许可证资格：** owner 业务负责人。年营收低于 500 万美元且员工少于 50 人，按登录 Studio 的法人主体评估；受 grant usage agreement 约束；一年可续；5 次激活。
-- **OIG 强制遥测：** owner 业务负责人。该许可证下无法关闭用量上报。
+- **OIG 许可证：** owner 业务负责人。**用户已自行确认组织满足营收 / 人数条件（年营收低于 500 万美元、员工少于 50 人，按登录 Studio 的法人主体评估）、自行阅读并提交 OIG 申请，Directus 已发放 License Key。** 授予条款（GOVERNANCE-FIX-01 订正）：**永久授予、无到期日、无需续期流程**，每个 key 5 次激活；受 grant usage agreement 约束。此处只记录事实，Claude 不作法律资格判断。
+- **OIG 强制遥测：** owner 业务负责人知情项。OIG entitlement 要求遥测，当前 OIG 层级不提供 telemetry opt-out，用量上报无法关闭。
 - **Poppler（GPL）/ libvips（LGPL-2.1）/ util-linux（混合）：** 人工审查，维持 PR03 结论不变。
 - **PostgreSQL 剩余 1 Critical / 30 High：** 上游无更新的 16.x 镜像，已判定不可达；随上游更新再评估。
 

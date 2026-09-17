@@ -77,7 +77,10 @@ pin recreates a container, so take and verify a backup set first.
 **Directus 12.3.1 and its license (D-042).** `FINAL-RELEASE-SECURITY-REMEDIATION-01` moved Directus from 11.17.4
 to 12.3.1, the lowest release that fixes every Directus advisory that applied to 11.17.4. Directus 12 is
 relicensed (MSCL-1.0-GPL) and enforces its license in code. The business owner obtained an Open Innovation Grant
-(OIG) license key; its eligibility terms remain a human confirmation before production. Measured locally on 12.3.1:
+(OIG) license key: they confirmed the organisation meets the grant's revenue / headcount conditions themselves,
+submitted the application themselves, and Directus issued the key. The grant is perpetual — no expiration date and
+no renewal process — and carries five activations. This runbook records those facts and states no legal
+conclusion. Measured locally on 12.3.1:
 - **With the OIG key** the license is `active`, custom permission rules are entitled, and every public CMS response
   of the production build matched the 11.17.4 baseline (42 of 42 routes).
 - **Without a key** the instance stays `active` for LITUBO's usage, because only seats, collections, Flows and SSO
@@ -124,10 +127,15 @@ Required by `docker-compose.yml`: `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `POST
   project and `PUBLIC_URL` revalidates that environment's binding without a new activation.
   INFERRED from the licensing documentation, not tested: deactivating in such a copy would release the live
   environment's binding.
-- **Telemetry is part of the OIG license.** Its entitlement `telemetry_required` is `true`, so Directus sends its
-  usage report to `https://telemetry.directus.io` and ignores `TELEMETRY: "false"` while that license is active.
-  The report holds aggregate counts, the public URL and the project id, and no content. `PROJECT_OWNER_ENABLED:
-  "false"` still stops the separate owner registration.
+- **Telemetry is part of the OIG license.** Its entitlement `telemetry_required` is `true`: **OIG entitlement
+  requires telemetry; telemetry opt-out is not available under the current OIG tier.** Directus sends its usage
+  report to `https://telemetry.directus.io` — aggregate counts, the public URL and the project id, and no content.
+  `docker-compose.yml` deliberately declares **no `TELEMETRY` variable**: a value there would be ignored while
+  reading as "telemetry is off", so the file carries the reason as a comment instead. Do not add one.
+  `PROJECT_OWNER_ENABLED: "false"` still stops the separate owner registration.
+- **Grant terms.** The OIG is granted in perpetuity, has no expiration date and requires no renewal process; each
+  grant key carries five activations. Eligibility (revenue / headcount, grant usage agreement) is the business
+  owner's confirmation, and the runbook states no legal conclusion.
 
 **`DIRECTUS_TOKEN` — the one secret.** `DIRECTUS_TOKEN` is supplied once by deployment secret
 management and is used both to provision the nuxt-server service user's static token and by Nuxt at

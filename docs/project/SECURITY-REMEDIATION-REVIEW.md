@@ -199,7 +199,7 @@ in 11.17.4 or 12.3.1 and was removed; registration is the database setting `publ
 | `AI_ENABLED: "false"` | true | AI routes not mounted: `/ai/chat` 404 |
 | `MARKETPLACE_TRUST: "sandbox"` | sandbox | the most restrictive value; installing extensions stays administrator-only and 0 are installed. There is no switch to turn the marketplace off; `EXTENSIONS_LIMIT=0` would mean unlimited in 12.3.1 (`env['EXTENSIONS_LIMIT'] ? … : null`), so it is not used |
 | `PROJECT_OWNER_ENABLED: "false"` | true | no owner registration is sent; anonymous `POST /settings/owner` 403 |
-| `TELEMETRY: "false"` | true | ignored while the OIG license requires telemetry (§3.7) |
+| `TELEMETRY` — **deliberately not set** | true | opt-out is not available on the OIG tier, so a value here would be ignored while reading as "telemetry is off"; the file records the reason instead (§3.7, GOVERNANCE-FIX-01) |
 
 Anonymous surface of the upgraded instance:
 - 200: `/server/ping`, `/server/info` (keys `project`, `license` only), `/server/specs/oas` (the anonymous role's
@@ -218,10 +218,13 @@ The public policy holds 0 permissions.
   delay of up to 30 minutes, then every 6 hours to `TELEMETRY_URL` (`https://telemetry.directus.io`). The report
   holds aggregate counts and flags, the public URL and the random project id, and no content. The project owner
   registration is separate and is controlled by `PROJECT_OWNER_ENABLED`.
-- **Under the OIG license** `telemetry_required` is true, so the usage report is sent and `TELEMETRY: "false"`
-  cannot switch it off. The variable is set anyway, with a comment, so it takes effect if the license ever allows
-  it. An actual transmission was not captured; the outbound path exists, because the Directus container's network
-  is not internal (licensing needs it too).
+- **Under the OIG license** `telemetry_required` is true, so the usage report is sent and a `TELEMETRY` value
+  cannot switch it off: **OIG entitlement requires telemetry; telemetry opt-out is not available under the current
+  OIG tier.** GOVERNANCE-FIX-01 therefore **removed** the ineffective `TELEMETRY: "false"` from
+  `docker-compose.yml` and left a comment stating this, so no operator can read the file as "telemetry is off";
+  `tests/directusSecurityRemediationContract.test.ts` now asserts that no `TELEMETRY` value is declared and that
+  the reason is recorded. An actual transmission was not captured; the outbound path exists, because the Directus
+  container's network is not internal (licensing needs it too).
 - **LITUBO need.** None. Directus 11.17.4 sent the same report by default, so the change is that it is now
   documented and cannot be disabled under this license. It is not a vulnerability; it is recorded as a human gate
   (§7).
@@ -440,8 +443,8 @@ PostgreSQL is unchanged. The previous extractor image is kept locally as `litubo
 
 | Gate | Owner | Fact |
 |---|---|---|
-| Directus commercial eligibility | business owner | Directus 12.3.1 is MSCL-1.0-GPL and runs on an OIG key. OIG terms: under US $5M annual revenue and fewer than 50 employees, assessed on the legal entities whose representatives log into the Studio; grant usage agreement; one year, renewable; 5 activations |
-| Telemetry required by the OIG license | business owner | the usage report (aggregate counts, public URL, project id) cannot be disabled under this license (§3.7) |
+| Directus commercial eligibility | business owner | Directus 12.3.1 is MSCL-1.0-GPL and runs on an OIG key. Grant terms (corrected in GOVERNANCE-FIX-01): the grant is **granted in perpetuity**, has **no expiration date** and needs **no renewal process**; each grant key carries **5 activations**. Eligibility is the under-US $5M revenue / fewer-than-50-employees condition, assessed on the legal entities whose representatives log into the Studio, under the grant usage agreement. Record of what the business owner did: they confirmed for themselves that the organisation meets those conditions, read and submitted the OIG application themselves, and Directus issued the key. Claude assessed no eligibility and states no legal conclusion |
+| Telemetry required by the OIG license | business owner | **OIG entitlement requires telemetry; telemetry opt-out is not available under the current OIG tier.** The usage report (aggregate counts, public URL, project id — no content) cannot be disabled, and `docker-compose.yml` therefore declares no `TELEMETRY` value at all (§3.7) |
 | Poppler (GPL), libvips (LGPL-2.1), util-linux (mixed) | human review | unchanged from PR03 |
 
 ---
