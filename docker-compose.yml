@@ -68,6 +68,12 @@ services:
       ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL}
       ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
       PUBLIC_URL: ${DIRECTUS_PUBLIC_URL}
+      # SECRET — this project's Directus license key, read by Directus 12 and later. The value lives only in
+      # the ignored .env (locally) or the deployment secret manager, never in Git, and reaches the container
+      # only through this interpolation. Without it Directus 12 runs on the Core tier, which drops every
+      # nuxt-server permission row (docs/project/SECURITY-REMEDIATION-REVIEW.md). Activation binds the key
+      # to this project and PUBLIC_URL.
+      LICENSE_KEY: ${DIRECTUS_LICENSE_KEY}
       STORAGE_LOCATIONS: local
       STORAGE_LOCAL_ROOT: /directus/uploads
       WEBSOCKETS_ENABLED: "false"

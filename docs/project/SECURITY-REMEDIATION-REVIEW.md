@@ -5,6 +5,9 @@
 > license decision before changing anything. No image, dependency, configuration, network, permission or data
 > change was made, so every open item in `PRODUCTION-CAPACITY-DEPENDENCY-REVIEW.md` §2 is still open.
 > Final Release Verification: **NOT STARTED**. Nothing here is a legal conclusion or an eligibility assessment.
+>
+> **Update (2026-09-17):** the business owner obtained an Open Innovation Grant license key, and the module continues
+> on path A (§6). The key's value has never been seen or recorded here.
 
 ---
 
@@ -244,6 +247,14 @@ Facts for the next module, from the running 11.17.4 image:
 ---
 
 ## 6. Decision required
+
+**Decision taken (2026-09-17).** The business owner obtained an Open Innovation Grant license key and instructed
+the module to continue. The key is wired into the existing runtime secret path as `DIRECTUS_LICENSE_KEY`:
+- the ignored `.env` locally, the deployment secret manager in production;
+- Compose passes it to the Directus container as `LICENSE_KEY`;
+- details in `PRODUCTION-PROVISIONING-RUNBOOK.md` §2.
+
+The options below record the question as it stood when the module stopped.
 
 **Business owner.** Decide whether LITUBO obtains a Directus license key for 12.x:
 - through the Open Innovation Grant, which means checking eligibility against its criteria and accepting its

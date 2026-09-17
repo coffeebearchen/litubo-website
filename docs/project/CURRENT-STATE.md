@@ -8,13 +8,13 @@
 
 ```text
 Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B — PostgreSQL 不可变 pin · Node canonical release gate · 本地容量基线 · 依赖 / 许可证 / CVE 审查（Controller 签收，状态 BASELINE COMPLETE — SECURITY REMEDIATION REQUIRED · 39ce564 · not pushed · D-041 已登记）；此前 FINAL-RELEASE-PRODUCTION-READY-02 — 数据库 + Directus 媒体 Backup / Restore（Controller 接受 · 26d0238 · D-040 已登记）；FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C / 01D — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · 全部服务端 secret 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 / c8d5ccf · D-038 / D-039 已登记）；FINAL-RELEASE-FIX-F 314b005（D-037）、FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus / 容器安全修复（A2 · **STOP · SECURITY REMEDIATION INCOMPLETE — BLOCKING ITEMS REMAIN** · 未改任何镜像 / 依赖 / 配置 / 网络 / 权限 / 数据 · 21 条官方 Directus 公告对 11.17.4 生效、修复只在 12.x，最低覆盖版本 12.3.1 · Directus 12 改用 MSCL-1.0-GPL 并在代码中强制许可证：无 license key 时 nuxt-server 的 19 行权限（全部属于自定义规则）被移出权限判定、全新安装直接 locked → 须用户作许可证商业决定 · 审查记录 `docs/project/SECURITY-REMEDIATION-REVIEW.md` · 等待用户决定与 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（BASELINE COMPLETE / SECURITY BLOCKER OPEN · D-041）；前一 STOP 模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3（剩余用户授权的真实 provider 调用 = 0）
-Active authorized module:           NONE（FINAL-RELEASE-SECURITY-REMEDIATION-01 在 Directus 12 许可证商业决定处 STOP，并以只含治理文档的本地 commit 记录）
-Active module authorization level:  —
-Next candidate:                     无已授权候选。安全修复的后续路径取决于用户对 Directus 12 许可证的商业决定（Open Innovation Grant / 付费方案 / 不取得）与 Controller 的路径裁定（`docs/project/SECURITY-REMEDIATION-REVIEW.md` §6）；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
+Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B — PostgreSQL 不可变 pin · Node canonical release gate · 本地容量基线 · 依赖 / 许可证 / CVE 审查（BASELINE COMPLETE / SECURITY BLOCKER OPEN · 39ce564 · D-041 · 已签收）；前一 STOP 模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3（剩余用户授权的真实 provider 调用 = 0）
+Active authorized module:           FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus / 容器安全修复（进行中 · 暂停等待用户写入本机 secret：首次 STOP 于 Directus 12 许可证商业决定并记录为 81f3fd9；随后用户取得 Directus Open Innovation Grant license key 并授权继续；项目变量 `DIRECTUS_LICENSE_KEY` 已接入 docker-compose.yml（容器内为 `LICENSE_KEY`）/ `.env.example` / runbook，key 值未经 Claude 读取或记录；待用户写入被忽略的本机 `.env` 后继续 12.3.1 升级）
+Active module authorization level:  A2 — LOCAL_IMPLEMENTATION（SAFE AUTOPILOT；push / merge / deploy 与 Final Release Verification 均不在授权内）
+Next candidate:                     无已授权候选（Final Release Verification NOT STARTED，安全模块关闭并经 Controller 明确 PASS 前不授权）；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（PRE-RELEASE SECURITY BLOCKER 仍 OPEN：FINAL-RELEASE-SECURITY-REMEDIATION-01 STOP，FIXED 0；Directus 12 许可证商业决定未做；Directus 11.17.4 BUSL-1.1 商业资格须业务确认；Final Release Verification NOT STARTED，安全模块关闭并经 Controller 明确 PASS 前不授权；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：39ce564）
+Production release:                 NOT APPROVED（PRE-RELEASE SECURITY BLOCKER 仍 OPEN：FINAL-RELEASE-SECURITY-REMEDIATION-01 进行中，FIXED 0；Directus Open Innovation Grant license key 已由用户取得、尚未写入本机 `.env`，12.3.1 升级未执行；Directus 11.17.4 BUSL-1.1 商业资格须业务确认；Final Release Verification NOT STARTED；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：81f3fd9）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -11334,5 +11334,32 @@ P0 violations：NONE。Container Security 仍 `OPEN`，不写 `PROVEN`。
 - **维持 PR03 记录的 OPEN：** Directus 11.17.4 BUSL-1.1 商业资格确认、Poppler / libvips / util-linux 人工审查、生产容量、持续 CVE 监控、生产 / 异地备份存储、书面回滚步骤、生产 secret manager。
 - **Final Release Verification：** NOT STARTED。安全模块关闭并经 Controller 明确 PASS 前不授权。
 - **Production：** NOT AUTHORIZED。
+
+### F. 继续：接入 Directus license key（2026-09-17，暂停等待用户写入本机 secret）
+- **用户决定：**
+  - 用户已取得 Directus Open Innovation Grant license key，并授权本模块继续（路径 A）；
+  - 指令：不读取、打印、记录 key 值，也不要求用户提供；若必须由用户手工写入本机 secret 文件，只报告文件位置和变量名后 STOP。
+- **现有运行时 secret 注入方式（已核对）：**
+  - Directus 容器的 secret 来自被忽略的项目根 `.env`，经 Compose 变量插值注入（`DIRECTUS_SECRET` → `SECRET`、`DIRECTUS_ADMIN_PASSWORD` → `ADMIN_PASSWORD`、`DB_PASSWORD`）；
+  - `.gitignore` 忽略 `.env` / `.env.*`（`.env.example` 除外）；
+  - Nuxt 服务端 secret 仍按 D-039 只在运行时读取进程环境。
+  - 只按变量名计数：本机 `.env` 与当前 shell 环境中均无 `DIRECTUS_LICENSE_KEY` / `LICENSE_KEY` / `LICENSE_TOKEN`。
+- **接入：**
+  - `docker-compose.yml` 的 directus 服务：`LICENSE_KEY: ${DIRECTUS_LICENSE_KEY}`；
+  - `.env.example`：`DIRECTUS_LICENSE_KEY=`（空值，附说明）；
+  - `PRODUCTION-PROVISIONING-RUNBOOK.md` §2：compose 必需变量从 9 个增为 10 个，并说明该 key 的接收方、存放位置、何时必需、激活绑定与出站要求；
+  - 新测试 `tests/directusLicenseKeyWiring.test.ts`（6 项）：
+    - 只有 directus 服务收到它，且只来自 `DIRECTUS_LICENSE_KEY`；
+    - 其他服务与本地 override 均不涉及；无 `LICENSE_TOKEN`；
+    - `.env.example` 只有一处空声明；
+    - Nuxt 配置与服务端代码不读取它；
+    - key 形状检测含 Luhn mod 32 校验，用合成值测试；
+    - 所有已跟踪文件中不含有效 key，失败时只输出路径。
+- **验证（Node 22.22.2）：**
+  - 相关 7 个测试文件 155 passed / 33 skipped（skipped 为需要数据库容器变量的集成用例）；
+  - eslint（新测试）0；`npm run typecheck` 0；`git diff --check` 0；
+  - `docker compose config --quiet` exit 0，只提示 `DIRECTUS_LICENSE_KEY` 未设置（不输出任何配置值）。
+- **运行时：** Directus 仍为 11.17.4（不读取 `LICENSE_KEY`）；未重建或重启任何容器；没有发生许可证激活。
+- **暂停点：** 需要用户把 key 写入 `D:\LITUBO-website\.env`，变量名 `DIRECTUS_LICENSE_KEY`，然后继续本模块。
 
 *最后更新：2026-09-17，由 Claude Code 在 FINAL-RELEASE-SECURITY-REMEDIATION-01 任务中写入。*

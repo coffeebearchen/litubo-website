@@ -87,11 +87,25 @@ requests. The facts and the open decision are in `docs/project/SECURITY-REMEDIAT
 ## 2. Environment variables
 
 Names only — this repository never stores values. `.env.example` lists every name and is the
-authoritative list; it currently covers all nine variables `docker-compose.yml` requires.
+authoritative list; it currently covers all ten variables `docker-compose.yml` requires.
 
 Required by `docker-compose.yml`: `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `POSTGRES_DATA_DIR`,
 `DIRECTUS_UPLOADS_DIR`, `DIRECTUS_SECRET`, `DIRECTUS_ADMIN_EMAIL`, `DIRECTUS_ADMIN_PASSWORD`,
-`DIRECTUS_PUBLIC_URL`.
+`DIRECTUS_PUBLIC_URL`, `DIRECTUS_LICENSE_KEY`.
+
+**`DIRECTUS_LICENSE_KEY` — the Directus license key.**
+- **Who receives it.** Only the Directus container, as `LICENSE_KEY`, through `docker-compose.yml` — the same
+  way `DIRECTUS_SECRET` becomes `SECRET`.
+- **Where it lives.** Locally, in the ignored `.env`; in production, the deployment secret manager supplies
+  it to Compose. It is never in Git, never supplied to a Nuxt build, and never read by the Nuxt server or by
+  provisioning.
+- **When it is needed.** Directus 11.17.4 ignores it. From Directus 12 it is required: without it the Core
+  tier drops every `nuxt-server` permission row, and a newly provisioned instance is locked
+  (`docs/project/SECURITY-REMEDIATION-REVIEW.md` §3).
+- **Activation.** On first start with the key, Directus activates it against
+  `https://licensing.directus.com` and binds the activation to the project and `DIRECTUS_PUBLIC_URL`, so the
+  Directus container needs outbound HTTPS to that host. An Open Innovation Grant key has five activations.
+  Deactivate the license in an instance that activated it before destroying that instance.
 
 **`DIRECTUS_TOKEN` — the one secret.** `DIRECTUS_TOKEN` is supplied once by deployment secret
 management and is used both to provision the nuxt-server service user's static token and by Nuxt at
