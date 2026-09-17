@@ -7,14 +7,14 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-02 — 数据库 + Directus 媒体 Backup / Restore（Controller 接受：以 26d0238 作为 Production Ready 03 的 accepted 基线 · not pushed · D-040 已登记）；此前 FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C / 01D — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · 全部服务端 secret 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 / c8d5ccf · D-038 / D-039 已登记）；FINAL-RELEASE-FIX-F 314b005（D-037）、FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
-Latest completed module:            FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B — PostgreSQL 不可变 pin · Node canonical release gate · 本地容量基线 · 依赖 / 许可证 / CVE 审查（A2 · **BASELINE COMPLETE / SECURITY BLOCKER OPEN**，不是单纯 PASS · `postgres:16.15-alpine@sha256:cf78e766…`，重建前后数据指纹一致 · `npm run release:verify`：Node 24 在第一步 fail、Node 22.22.2 全链路通过 · 本地生产构建 720 个 GET 0 超时 / 0 5xx · npm 生产 critical 0 · Trivy 已扫描、Critical 未清零：分诊后 2 项 Directus Critical（admin-gated）与 5 项未认证 Directus 公告（生产网络暴露未证明）仍阻塞 · Directus BUSL-1.1 须业务确认 · D-041 已登记 · 等待 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-02（PASS · Backup / Restore：LOCAL_REHEARSAL_PROVEN · D-040）；前一 STOP 模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3（剩余用户授权的真实 provider 调用 = 0）
-Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-READY-03 已按 03 / 03A / 03B 施工单完成并本地 commit，等待 Controller 审查）
+Latest accepted module:             FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B — PostgreSQL 不可变 pin · Node canonical release gate · 本地容量基线 · 依赖 / 许可证 / CVE 审查（Controller 签收，状态 BASELINE COMPLETE — SECURITY REMEDIATION REQUIRED · 39ce564 · not pushed · D-041 已登记）；此前 FINAL-RELEASE-PRODUCTION-READY-02 — 数据库 + Directus 媒体 Backup / Restore（Controller 接受 · 26d0238 · D-040 已登记）；FINAL-RELEASE-PRODUCTION-READY-01 / 01A / 01B / 01C / 01D — runtime pin · 可复现 provisioning · 单一 `DIRECTUS_TOKEN` · 全部服务端 secret 仅运行时注入（Controller 接受 · 716a4ec / 6158b19 / cc0f494 / c8d5ccf · D-038 / D-039 已登记）；FINAL-RELEASE-FIX-F 314b005（D-037）、FINAL-RELEASE-FIX-E e77849d、PUBLIC-CLAIMS-HOTFIX-02 e0d6ff6、PUBLIC-CLAIMS-HOTFIX-01 02b0281、PUBLIC-CLAIMS-CLEANUP-01 5c48acc、FIX-A 926be4d、FIX-B 12a45b6、FIX-C 9a30b1b、FIX-D 26cec80 已接受
+Latest completed module:            FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus / 容器安全修复（A2 · **STOP · SECURITY REMEDIATION INCOMPLETE — BLOCKING ITEMS REMAIN** · 未改任何镜像 / 依赖 / 配置 / 网络 / 权限 / 数据 · 21 条官方 Directus 公告对 11.17.4 生效、修复只在 12.x，最低覆盖版本 12.3.1 · Directus 12 改用 MSCL-1.0-GPL 并在代码中强制许可证：无 license key 时 nuxt-server 的 19 行权限（全部属于自定义规则）被移出权限判定、全新安装直接 locked → 须用户作许可证商业决定 · 审查记录 `docs/project/SECURITY-REMEDIATION-REVIEW.md` · 等待用户决定与 Controller 审查）；此前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（BASELINE COMPLETE / SECURITY BLOCKER OPEN · D-041）；前一 STOP 模块 FINAL-RELEASE-LIVE-VALIDATION-01-R3（剩余用户授权的真实 provider 调用 = 0）
+Active authorized module:           NONE（FINAL-RELEASE-SECURITY-REMEDIATION-01 在 Directus 12 许可证商业决定处 STOP，并以只含治理文档的本地 commit 记录）
 Active module authorization level:  —
-Next candidate:                     FINAL-RELEASE-SECURITY-REMEDIATION-01（Final Release Verification 之前必须单独完成；NOT AUTHORIZED）；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
+Next candidate:                     无已授权候选。安全修复的后续路径取决于用户对 Directus 12 许可证的商业决定（Open Innovation Grant / 付费方案 / 不取得）与 Controller 的路径裁定（`docs/project/SECURITY-REMEDIATION-REVIEW.md` §6）；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（PRE-RELEASE SECURITY BLOCKER OPEN → FINAL-RELEASE-SECURITY-REMEDIATION-01；Directus 11.17.4 BUSL-1.1 商业资格须业务确认；Final Release Verification NOT AUTHORIZED UNTIL SECURITY MODULE CLOSED；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：26d0238）
+Production release:                 NOT APPROVED（PRE-RELEASE SECURITY BLOCKER 仍 OPEN：FINAL-RELEASE-SECURITY-REMEDIATION-01 STOP，FIXED 0；Directus 12 许可证商业决定未做；Directus 11.17.4 BUSL-1.1 商业资格须业务确认；Final Release Verification NOT STARTED，安全模块关闭并经 Controller 明确 PASS 前不授权；FINAL-RELEASE-AUDIT-01 的 2 项 P0 已关闭，其余 P1 仍 OPEN；npm run release:check-test-data 本地 PASS）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：39ce564）
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY)
 origin/master:                      8f2e384（本地 review 分支均未 merge / push）
 ```
@@ -11200,3 +11200,139 @@ P0 violations：NONE。Container Security 不写 `PROVEN`。
 - **Production：** NOT AUTHORIZED。
 
 *最后更新：2026-09-17，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-READY-03B 任务中写入。*
+
+---
+
+## FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus / 容器安全修复（**STOP**：Directus 12 许可证商业决定）
+
+**Module：** FINAL-RELEASE-SECURITY-REMEDIATION-01（A2 · LOCAL_IMPLEMENTATION · SAFE AUTOPILOT）。
+
+**Status：** **SECURITY REMEDIATION INCOMPLETE — BLOCKING ITEMS REMAIN**。
+- 停在施工单 STOP 条件 12（需要用户商业 / 法律决定）与 13（当前授权范围无法安全解决）。
+- 未升级、未改配置、未改网络、未改权限、未改数据。
+
+**Branch / 基线：**
+- 开工核对一致：分支 `review/final-release-production-ready-03-capacity-deps`、HEAD `39ce564`，6 个历史未跟踪路径不变。
+- CURRENT-STATE 由 10 个只读子任务分段全文读取，未发现与施工单冲突。
+- 本模块分支 `review/final-release-security-remediation-01`，从 `39ce564` 创建，以一个只含治理文档的本地 commit 记录 STOP。
+- 未 push / merge / deploy；origin/master 仍 `8f2e384`。
+
+**Safety gates touched：**
+- RSG-08：事实更新；
+- RSG-09：local commit only。
+
+P0 violations：NONE。Container Security 仍 `OPEN`，不写 `PROVEN`。
+
+### A. 官方公告矩阵（Directus 11.17.4）
+- **来源：** directus/directus 仓库 security advisories（GitHub API，78 条已发布）与 release 列表，均于 2026-09-17 取得。
+- **生效范围：** 对 11.17.4 生效 21 条（critical 1 / high 11 / medium 9）。
+  - 首个修复版本：12.0.0（2）· 12.1.0（12）· 12.2.0（5）· 12.3.1（2）。
+  - 11.17.4 之后 11.x 无新版本，也无回移。
+- **最低覆盖版本：** **12.3.1**（2026-08-25，也是当前最新版）。12.2.0 覆盖 19 条，余下 2 条在本地不适用。
+- **依赖版本（lockfile）：**
+  - v12.3.1：liquidjs 10.27.2、tar 7.5.22，均高于 PR03 两个 Trivy Critical 的修复版本；
+  - v11.17.4：liquidjs 10.25.7、tar 7.5.13；
+  - 12.3.1 镜像未拉取、未扫描。
+- **分类**（按本施工单规则，"仅管理员可达"不是安全结论）：
+  - BLOCKING（admin-gated）4 条 + 2 个容器 Critical：j5h6 文件导入 SSRF、7vcx 图片变换 DoS、5h38 邮件模板路径穿越、788p project color XSS。788p 在 PR03 记为已缓解，本次改为阻塞；
+  - BLOCKING / TO VERIFY（未认证、生产暴露未证明）5 条；
+  - MITIGATED / NOT APPLICABLE 12 条；
+  - FIXED 0。
+- 逐条矩阵见 `docs/project/SECURITY-REMEDIATION-REVIEW.md` §2。
+
+### B. Directus 12 许可证与强制执行（事实，不作法律结论）
+- **许可证文本：**
+  - tag v12.0.0 与 v12.3.1 的 `license` 相同（SHA-256 `f209dfa6…`），为 Monospace Sustainable Core License 1.0（MSCL-1.0-GPL）；
+  - v11.17.4 为 BUSL-1.1（`d8343504…`）；
+  - 12.0.0 release notes 把许可证变更列为 breaking change。
+- **Core tier（无许可证）权益**，来自 12.3.1 依赖的 `@directus/license` 0.4.0 `CORE_LICENSE`：
+  - 3 席位、25 集合、5 Flow；
+  - SSO 关、自定义 LLM 关、**自定义权限规则关**；
+  - **telemetry required**；
+  - activity / revision 历史 30 天；
+  - AI 翻译关。
+- **自定义权限规则：**
+  - 定义：非系统权限行只要字段清单不是 `*`，或带行过滤 / validation / presets，就算（推荐的 app 权限除外）；
+  - 无此权益时，`PermissionsService.readByQuery` 会剔除这些行，而运行时权限判定正是经由它读取权限。
+- **License 状态：**
+  - 无许可证且超出 Core 权益时，只有安装早于 v12 迁移至少一天的实例，在迁移后 30 天内为 `grace`；其余为 `locked`，全新安装直接 locked；
+  - locked 时 items / files / assets / GraphQL / MCP 请求与 Flow trigger 路由一律被拒，管理员也不例外。
+- **License key：**
+  - 通过 `LICENSE_KEY` 环境变量或 Studio 保存；
+  - 启动时联网 `https://licensing.directus.com` 激活或更新，激活 / 更新失败即退出进程；
+  - 在线模式定期复验，上报 project id、public URL 以及席位 / 集合 / Flow 数；
+  - 激活绑定项目与绝对 `PUBLIC_URL`；离线 token 仅 Enterprise 可用。
+- **Open Innovation Grant：**
+  - 年营收低于 500 万美元且员工少于 50 人的主体可免费商用自托管，受 grant usage agreement 约束；
+  - 一年有效，可续；
+  - 每个 key 5 次激活，销毁实例前须先停用激活。
+- **Telemetry：**
+  - Core 为 `telemetry_required: true`，此时 `TELEMETRY=false` 被忽略；
+  - 定价页只在 Enterprise 列出 telemetry opt-out；
+  - OIG 是否解除该要求：UNKNOWN（无 key 无法核实）。
+
+### C. 对 LITUBO 的影响（本地开发库只读查询 + 12.3.1 源码阅读，未执行）
+- **LITUBO 用量：** 20 个用户集合；1 个 Studio 席位（Administrator）+ 1 个 API-only 服务用户；0 Flow；无 SSO；无 Directus LLM。
+- **权限规则：** `site-readonly-policy`（nuxt-server）的 **19 行权限全部带显式字段清单，其中 15 行另有行过滤**，全部属于自定义权限规则。
+- **无许可证升级到 12.x 的后果：**
+  - 19 行全部移出权限判定 → 公开 CMS 读取全部被拒（fail closed）；
+  - 按仓库从零 provisioning 的生产实例直接 locked，LITUBO 后台发往 Directus 的 items / files / assets 请求也被拒；
+  - 本地开发库升级可获 30 天免锁定宽限；从同一代码推断（INFERRED，未实测），宽限期内这 19 行仍会被剔除。
+- **不可接受的适配方式：** 把字段清单与行过滤改成不受限的 `*` 来适配 Core，会失去 RSG-07 要求、由 D-034 工件管理的身份级最小权限。
+- **INFERRED（未实测）：** Core 的 30 天 activity / revision 窗口会限制 Content Center Change History（CC-IMP-07 读取 Directus revisions / activity）。
+
+### D. 留在 11.17.4 的结论
+- **LiquidJS 链：** 11.17.4 的配置合同（运行中镜像的 `@directus/env` 默认值）没有关闭 Flows 或邮件模板路径的开关，只有 `FLOWS_ENV_ALLOW_LIST`、`FLOWS_RUN_SCRIPT_MAX_MEMORY`、`FLOWS_RUN_SCRIPT_TIMEOUT`。因此 admin-gated 的 LiquidJS 链（CVE-2026-45618 + GHSA-5h38）既无修复，也无关闭功能式缓解 → 仍 BLOCKING。
+- **另两条 admin-gated：** 文件导入 SSRF、图片变换 DoS 若要靠 11.17.4 配置关闭，需要尚未取得的代码级证明 → 仍 BLOCKING。
+- **未认证公告：** 5 条仍依赖"生产 Directus 只能被 Nuxt 主机访问"的证明。
+
+### E. 未执行 / 状态不变的部分
+- **Directus 生产暴露：** TO VERIFY。
+  - 仓库依据：生产 base compose 只绑定 `127.0.0.1:8055`；`docs/ADMIN-CMS-SETUP.md` §6.2 / §7 规定生产管理只经 SSH 隧道、无 admin 子域、Nginx 无 Directus 路由。
+  - 缺口：仓库无 Nginx 配置；生产 Nuxt 运行方式未定。
+  - 文档漂移（未改）：`docs/OPERATIONS-HANDBOOK.md` §1 仍以 `https://cms.litubo.com/admin` 作示例地址，与上述意图矛盾。
+- **Directus 攻击面收紧：** 未改。11.17.4 的事实：
+  - `TELEMETRY` 默认 `true`，启动时及每 6 小时向 `https://telemetry.directus.io` 上报；Directus 容器所在网络非 internal，存在出站路由；未抓包，实际发送未观测。
+  - `MCP_ENABLED`、`AI_ENABLED` 默认 `true`；`MARKETPLACE_TRUST` 默认 `sandbox`；`GRAPHQL_INTROSPECTION` 默认 `true`。
+  - compose 里的 `PUBLIC_REGISTRATION` 不被 11.17.4 运行时读取，只出现在 `directus init` 的 env 模板中；公开注册实际由数据库设置 `public_registration = false` 关闭。
+- **document-extractor：** PR03 可达性分诊维持（14 个 Critical 有证据非阻塞）；生产拓扑 TO VERIFY；未改。
+- **PostgreSQL：** 16.15 不可变 pin 未改；gosu Critical 维持"正常运行路径不可达"，镜像不算 clean。
+- **Trivy：** 镜像未变，未重扫；PR03 扫描即 before，after 不适用。
+- **备份 / 迁移 / 回滚：** 未执行。本模块无运行时变更，不触发 D-040 的变更前备份要求；`backups/` 中仍是 PR02 / PR03 留下的三份备份集。
+- **回归测试与浏览器验收：** 未执行。本模块只改治理文档，按风险导向验证。
+
+### Verification
+- **只读核对：**
+  - git 状态、`docker compose ps`；
+  - 本地开发库只读 SQL：集合、用户、policy、权限行统计；
+  - 运行中 Directus 11.17.4 容器内的 `@directus/env` 默认值与 `@directus/api` dist 文件。
+- **外部只读访问：**
+  - GitHub API（advisories、releases、tree、contents）；
+  - raw.githubusercontent.com（license、lockfile、pnpm-workspace）；
+  - codeload.github.com（v12.3.1 源码包）；
+  - npm registry（`@directus/license` 0.4.0）；
+  - directus/docs 源文件，以及 directus.com 的文档与定价页；
+  - 下载物只在会话 scratch，未进 Git。
+- **运行时：** 未拉取镜像，未启动新容器；Directus / PostgreSQL / extractor 容器未重启。
+- **AI / 外部：** DeepSeek 0 · OpenAI 0 · email 0 · HubSpot 0。
+
+### Changed files
+- `docs/project/SECURITY-REMEDIATION-REVIEW.md`（新）
+- `docs/project/CURRENT-STATE.md`（§0 snapshot + 本节）
+- `docs/project/RELEASE-SAFETY-GATES.md`（§4.3 RSG-08 / RSG-09 事实）
+- `docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md`（§1 指向本审查的一段说明）
+
+### Open items
+- **Directus 12 许可证商业决定：** owner User / Business。是否为 12.x 取得 license key：Open Innovation Grant（自行核对资格并接受协议）、付费方案，或不取得。
+- **路径裁定：** owner Controller。
+  - A — 取得许可证后升级 12.3.1。新施工单需覆盖：`LICENSE_KEY` 仅运行时注入、到 licensing.directus.com 的出站、每个环境的绝对 `PUBLIC_URL`、恢复演练的激活管理、12.x breaking changes、完整回归。
+  - B — 留在 11.17.4。需 Controller 对 admin-gated 项作出明确决定，并证明生产暴露。
+  - C — 其他 CMS 方向，属架构变更。
+- **PRE-RELEASE SECURITY BLOCKER：** OPEN（BLOCKING 4 + 2 个容器 Critical；BLOCKING / TO VERIFY 5；FIXED 0）。
+- **Directus 与 extractor 生产网络暴露：** TO VERIFY。
+- **未改的文档 / 配置问题：** OPERATIONS-HANDBOOK 的 `cms.litubo.com/admin` 示例地址（文档漂移）；compose 的 `PUBLIC_REGISTRATION`（非 11.17.4 运行时配置项）。
+- **维持 PR03 记录的 OPEN：** Directus 11.17.4 BUSL-1.1 商业资格确认、Poppler / libvips / util-linux 人工审查、生产容量、持续 CVE 监控、生产 / 异地备份存储、书面回滚步骤、生产 secret manager。
+- **Final Release Verification：** NOT STARTED。安全模块关闭并经 Controller 明确 PASS 前不授权。
+- **Production：** NOT AUTHORIZED。
+
+*最后更新：2026-09-17，由 Claude Code 在 FINAL-RELEASE-SECURITY-REMEDIATION-01 任务中写入。*

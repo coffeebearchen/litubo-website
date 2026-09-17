@@ -75,6 +75,13 @@ security findings (owned by `FINAL-RELEASE-SECURITY-REMEDIATION-01`) and the bus
 Directus 11.17.4 BUSL-1.1 license terms. Changing the PostgreSQL pin recreates the database container, so
 take and verify a backup set first.
 
+`FINAL-RELEASE-SECURITY-REMEDIATION-01` stopped without changing anything: every official fix for the open Directus
+advisories is in Directus 12.x, which is relicensed (MSCL-1.0-GPL) and enforces its license in code. Without a
+license key, Directus 12 drops permission rows that carry field lists or item filters — all nineteen rows of the
+`nuxt-server` identity — and locks a newly provisioned instance that has such rows. Moving the Directus pin to 12.x
+before that license decision is made would therefore take down the site's CMS reads and the admin's Directus
+requests. The facts and the open decision are in `docs/project/SECURITY-REMEDIATION-REVIEW.md`.
+
 ---
 
 ## 2. Environment variables
