@@ -7,31 +7,30 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             PRODUCTION-BOOTSTRAP-SAFETY-01（**INFERRED accepted**：Controller 以 A3 单独授权把 `10feb70` fast-forward push 到 review 分支（`cab916f..10feb70`），随后以 `10feb70` 为基线发出 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 施工单；与此前各轮同一口径，Controller 未另行书面声明接受；该次 push 的 GitHub CI 结果未写入施工单，本文件不记录）；其前 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 及其 REVIEW-FIX-01（**INFERRED accepted**：`86637f7` + `cab916f` 经 A3 push，随后以 `cab916f` 为基线发出下一份施工单；CI 结果同样未写入施工单）；其前 PRODUCTION-PREFLIGHT-UID-CORRECTION-01（**INFERRED accepted**：`32e877a`，CI run `35303613756` completed / success，由 Controller 独立核实）；再前 FINAL-RELEASE-REVIEW-BRANCH-CI-01 — review branch 推送与 GitHub CI（Controller 已独立核实 final CI = PASS，并据此发出 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 施工单）；再前 FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS**）；再前 FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136`：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口）；再前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
-Latest completed module:            MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01（TYPE B · A2）— 全新环境的 Media Library 受保护系统目录 bootstrap（结论仍为 **PRODUCTION PREFLIGHT STILL INCOMPLETE**）：
-                                    · 新增已跟踪工件 `directus/schema/directus-media-folders-01-bootstrap.sql` + `.verify.sql`，作为 provisioning manifest 第 60 / 61 步（D-045）
-                                    · 只插入缺失的 10 个受保护系统目录：home / applications / company / products / resources，以及 products 下五个类目。已有目录保留原 UUID；不建 legacy / 冻结 / 计划 / 客户目录；不 update / move / delete 任何目录
-                                    · 以下情况拒绝且零写入，不自动修复：重复、大小写或空白变体、zone 外错位的 canonical 名称、父链环、名称含 `/`、表结构不符
-                                    · 本地证明：始终回滚的事务中建 TEST ONLY 副本表，用 write-spy 计数；另有编排脚本替身运行。开发库真实 `directus_folders` 未写入，前后指纹一致
-                                    · 15 步 manifest 未从空库完整重跑；生产未运行
-                                    0 生产接触。详见文末该节。
-                                    其前 PRODUCTION-BOOTSTRAP-SAFETY-01（`10feb70`：生产 provisioning 安全门 + D-044）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01（`cab916f`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02（`86637f7`：冻结 V1 拓扑 D-043）；PRODUCTION-PREFLIGHT-UID-CORRECTION-01（`32e877a`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-01（`1ac8457`）。各模块详情见文末对应节
-Active authorized module:           NONE（MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 已收口并 STOP，等待 Controller 审查。push 属 A3、merge 属 A4、deploy 属 A5，均须 Controller 单独授权）
-Active module authorization level:  —（无 Active 模块；上一模块为 A2 — LOCAL_IMPLEMENTATION：只允许本地 commit，**未授权 push**）
-Next candidate:                     无已授权候选。**Production Preflight = STILL INCOMPLETE，因此不登记 FINAL-RELEASE-MERGE-AND-DEPLOY-01 为候选**。首次非 AI 官网上线的 6 项（`PRODUCTION-PREFLIGHT.md` §53）：
-                                    1. `DIRECTUS_PUBLIC_URL` 决定 — **CLOSED**（D-044：`https://cms.litubo.com`）
-                                    2. canonical 域名 / TLS — canonical **CLOSED**（D-044：`https://litubo.com`）；TLS 终止方与证书仍 OPEN
-                                    3. 生产 provisioning 安全执行路径 — 安全门**已实现、本地证明**；服务器标记与首次获授权的生产运行仍 OPEN（A5）
-                                    4. Media Library 文件夹 bootstrap（真实媒体录入之前）— 工件**已实现、本地证明**（D-045，manifest 第 60 / 61 步）；在生产上的首次运行随首次获授权的生产 provisioning（A5）进行，仍 OPEN
-                                    5. systemd / Nginx / secret 注入的正式实施 — OPEN（另含验收域名 noindex、`cms.litubo.com` 的访问方式）
-                                    6. 首次生产部署所需的 backup / rollback 最低闭环 — OPEN
-                                    非上线 blocker：地域（美国弗吉尼亚，无冲突）、extractor 可复现性（后续 AI 模块）、AI provider、HubSpot、长期容量证明。**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
+Latest accepted module:             MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01（`64bfc56`：用户确认 GitHub CI run `35332837835` = success，并据此按 A4 把 master fast-forward 到 `64bfc56`，由原会话执行，见文末 LITUBO-SIMPLE-GO-LIVE-AUTOPILOT 一节）；其前 PRODUCTION-BOOTSTRAP-SAFETY-01（**INFERRED accepted**：Controller 以 A3 单独授权把 `10feb70` fast-forward push 到 review 分支（`cab916f..10feb70`），随后以 `10feb70` 为基线发出 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 施工单；与此前各轮同一口径，Controller 未另行书面声明接受；该次 push 的 GitHub CI 结果未写入施工单，本文件不记录）；其前 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 及其 REVIEW-FIX-01（**INFERRED accepted**：`86637f7` + `cab916f` 经 A3 push，随后以 `cab916f` 为基线发出下一份施工单；CI 结果同样未写入施工单）；其前 PRODUCTION-PREFLIGHT-UID-CORRECTION-01（**INFERRED accepted**：`32e877a`，CI run `35303613756` completed / success，由 Controller 独立核实）；再前 FINAL-RELEASE-REVIEW-BRANCH-CI-01 — review branch 推送与 GitHub CI（Controller 已独立核实 final CI = PASS，并据此发出 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 施工单）；再前 FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS**）；再前 FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136`：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口）；再前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
+Latest completed module:            LITUBO-SIMPLE-GO-LIVE-AUTOPILOT（A4 + A5，2026-09-18）— 新站部署到临时验收域名 `https://tuboluo.com`（noindex），生产服务已在运行；详见文末该节：
+                                    · A4：origin/master `8f2e384..64bfc56`（fast-forward）
+                                    · A5：同一台腾讯云主机；PostgreSQL（无端口）/ Directus 12.3.1（仅 127.0.0.1:8055）/ Nuxt systemd（仅 127.0.0.1:3310）/ 独立 Nginx vhost + Let's Encrypt；生产 provisioning 15/15 通过（含 Media Library 10 个系统目录）
+                                    · 外部 HTTPS 与 1440 / 375 验收 PASS；refrigerant-store 未受影响；litubo.com / www / Wix 未动
+                                    · 仍待用户登录一次后台后验收：CMS 编辑、Media 上传、Draft / Published、表单真实提交
+                                    其前 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01（`64bfc56`：D-045）；PRODUCTION-BOOTSTRAP-SAFETY-01（`10feb70`：生产 provisioning 安全门 + D-044）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01（`cab916f`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02（`86637f7`：冻结 V1 拓扑 D-043）。各模块详情见文末对应节
+Active authorized module:           LITUBO-SIMPLE-GO-LIVE-AUTOPILOT（进行中：部署与外部 / 响应式验收已完成；需用户登录的 CMS 验收未做）。正式切换 `litubo.com`、`64bfc56` 之后的任何 push 均未授权
+Active module authorization level:  A4（master fast-forward 至 `64bfc56`，已完成）+ A5（部署到 `https://tuboluo.com`，已完成）
+Next candidate:                     无已授权候选。首次非 AI 官网上线的 6 项（`PRODUCTION-PREFLIGHT.md` §53）在本次部署后的状态：
+                                    1. `DIRECTUS_PUBLIC_URL` — CLOSED（D-044：`https://cms.litubo.com`，生产首次启动即以此激活）
+                                    2. canonical / TLS — canonical CLOSED（`https://litubo.com`）；验收域名 TLS 已实施（主机 Nginx + Let's Encrypt，只含 `tuboluo.com`，到期 2026-12-17，自动续期）；`litubo.com` 切换时的 TLS 仍 OPEN
+                                    3. 生产 provisioning — DONE（主机标记已建，15/15 通过）
+                                    4. Media Library 文件夹 bootstrap — DONE（生产 10 个系统目录）
+                                    5. systemd / Nginx / secret 注入 — DONE（tuboluo.com，noindex）；`cms.litubo.com` 的访问方式仍未决定（Directus 只在 loopback，Studio 经 SSH 隧道）
+                                    6. backup / rollback 最低闭环 — OPEN
+                                    非上线 blocker 不变：extractor 可复现性（未启动，AI 关闭）、AI provider（未配置 Key）、HubSpot、长期容量证明。**剩余用户授权的真实 provider 调用 = 0**；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（Final Release Verification PASS、GitHub CI PASS、security BLOCKING 0 / UNKNOWN 0，**都只是 RC 的技术结论，不是生产批准**）。**Production Preflight = STILL INCOMPLETE（MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01，2026-09-18）**：生产主机已存在，但**没有任何 LITUBO 服务在运行**；V1 拓扑已冻结（D-043）；生产 URL 已决定（D-044）；provisioning 安全门与 Media Library 文件夹 bootstrap（D-045）均已在本地实现并证明；首次非 AI 上线仍有未关闭项（见上；`docs/project/PRODUCTION-PREFLIGHT.md` §53）。人工 gate：Poppler / libvips / util-linux 审查、隐私政策与 `PRIVACY_POLICY_VERSION` 仍 OPEN；OIG 资格与强制遥测已由业务负责人关闭（永久授予，5 次激活，净占用 1）。其余未决：长期容量与 extractor 可复现性（均不阻塞首次非 AI 上线）、持续 CVE 监控
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：10feb70 = PRODUCTION-BOOTSTRAP-SAFETY-01；其前 cab916f = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01、86637f7 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02、32e877a = PRODUCTION-PREFLIGHT-UID-CORRECTION-01、1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01、9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
+Production release:                 **已部署到临时验收域名 `https://tuboluo.com`（noindex），2026-09-18，LITUBO-SIMPLE-GO-LIVE-AUTOPILOT（A4 / A5）**。正式域名 `litubo.com` / `www.litubo.com` 仍在 Wix，正式切换未授权；backup / rollback 最低闭环仍 OPEN（见上）。生产数据为空库初始状态：0 产品、0 分类、0 内容、0 询盘、0 文件（导航里的产品类目页在分类录入 CMS 前返回 404，属预期初始状态）。人工 gate：Poppler / libvips / util-linux 审查、隐私政策与 `PRIVACY_POLICY_VERSION` 仍 OPEN；OIG 资格与强制遥测已由业务负责人关闭（永久授予，5 次激活；生产首次启动按 D-044 以 `https://cms.litubo.com` 激活，按用途推算净占用 2：本地开发 1 + 生产 1，未经管理员 `GET /license` 核实）。其余未决：长期容量与 extractor 可复现性（均不阻塞首次非 AI 上线）、持续 CVE 监控
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：64bfc56 = MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01；其前 10feb70 = PRODUCTION-BOOTSTRAP-SAFETY-01、cab916f = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01、86637f7 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02、32e877a = PRODUCTION-PREFLIGHT-UID-CORRECTION-01、1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01、9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)。本地 `directus_folders` 未改动：25 个目录，其中 10 个 canonical 目录各恰好一个；folder bootstrap 只在回滚的 TEST ONLY 副本中运行，从未对开发库 apply
-origin/master:                      8f2e384（未变；未 merge；**未启用 branch protection**——建议在 merge 前作为 HUMAN GATE 开启）· remote review branch `origin/review/final-release-verification-01` 以 `git ls-remote` 为准（MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 开工时 = `10feb70`：PRODUCTION-BOOTSTRAP-SAFETY-01 已按 A3 授权以 fast-forward push（`cab916f..10feb70`），remote SHA 与当时 local HEAD 相等；本模块的收口 commit **只在本地、未 push**，因此本地 HEAD 领先远端 1 个 commit；协议 §13.1 Layer 2 Remote Review；其余本地 review 分支仍未 push）
+origin/master:                      64bfc56（2026-09-18 按 A4 fast-forward `8f2e384..64bfc56`；**未启用 branch protection**）· remote review branch `origin/review/final-release-verification-01` = `64bfc56`（以 `git ls-remote` 为准）· 本节的收口 commit **只在本地、未 push**，因此本地 HEAD 领先远端 1 个 commit；其余本地 review 分支仍未 push
+Production runtime:                 腾讯云主机 43.165.125.203 · `/opt/litubo/repo` @ `64bfc56` · Nuxt `litubo-nuxt.service`（127.0.0.1:3310）· Compose 项目 `litubo-cms`（Directus 127.0.0.1:8055，PostgreSQL 无端口）· Nginx `/etc/nginx/sites-available/litubo-tuboluo` · 受保护配置 `/etc/litubo`（root 700）· 详见文末 LITUBO-SIMPLE-GO-LIVE-AUTOPILOT 一节
 ```
 
 ---
@@ -12248,3 +12247,48 @@ bootstrap 之后由 `buildFolderRegistry` 读回：
 **Next candidate：** 无已授权候选，等待 Controller 审查。
 
 *最后更新：2026-09-18，由 Claude Code 在 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 任务中写入。*
+
+---
+
+## LITUBO-SIMPLE-GO-LIVE-AUTOPILOT — tuboluo.com 验收部署（2026-09-18）
+
+**授权：** 用户在 LITUBO-SIMPLE-GO-LIVE-AUTOPILOT 中授权 A4（master fast-forward）与 A5（腾讯云部署到 `https://tuboluo.com`）。`64bfc56` 的 GitHub CI run `35332837835` = success，由用户确认。
+
+**两个会话同时施工（需要记住的事实）：** 本对话在 11:54 UTC 被 fork，原会话（"8 LITUBO 新会话仓库事实恢复、content center"）与 fork 会话收到了同一条指令，用同一 SSH 密钥在同一台主机上同时施工，直到用户指定 fork 会话为唯一施工方。
+- 原会话完成：master fast-forward；PostgreSQL 启动；生产 provisioning 15/15（临时单元 `litubo-provision`）；Directus 启动；`npm ci && npm run release:verify`（临时单元 `litubo-build`，`BUILD_EXIT=0`）；启用 `litubo-nuxt`；首版 Nginx vhost；把证书续期 webroot 从 `/var/www/html` 改为 `/var/www/litubo-acme`（原配置备份为 `/etc/letsencrypt/tuboluo.com.conf.ori`）。
+- fork 会话完成：服务器准备（主机标记、两个受保护配置模板、systemd unit、构建配置、certbot 安装）；识别并行施工；Nginx 收尾（`robots.txt`、上传上限、续期 hook）；全部验收。
+- 以后只在一个会话里施工。原会话已闲置，不要再对它发出部署指令。
+
+**服务器布局（非 secret）：**
+
+| 项 | 位置 / 值 |
+|---|---|
+| 主机标记 | `/etc/litubo/PRODUCTION` = `LITUBO_PRODUCTION_V1`（无换行，root 600） |
+| Compose 配置（含 secret） | `/etc/litubo/compose.env`（root 600，由用户本人填写）。在 `/opt/litubo/repo` 中以 `sudo docker compose --env-file /etc/litubo/compose.env -f docker-compose.yml …` 运行 |
+| Nuxt 运行时 secret | `/etc/litubo/nuxt.env`（root 600：`DIRECTUS_TOKEN`、`SUBMISSION_IP_SECRET`），由 systemd `EnvironmentFile` 注入 |
+| 构建配置（非 secret） | `/opt/litubo/build.env`：`NUXT_PUBLIC_SITE_URL=https://litubo.com`、`DIRECTUS_URL=http://127.0.0.1:8055`、两个 CMS 模式均为 `directus` |
+| 代码 / Node | `/opt/litubo/repo` @ `64bfc56`；`/opt/litubo/runtime/node-current`（22.22.2） |
+| 数据 | `/data/litubo/postgres`（70:70）、`/data/litubo/uploads`（1000:1000）、`/data/litubo/backups`（空） |
+| Nuxt | `litubo-nuxt.service`：DynamicUser、`ProtectSystem=strict`、只监听 127.0.0.1:3310、开机自启 |
+| Nginx | `/etc/nginx/sites-available/litubo-tuboluo`（已启用；修改前备份 `.bak-20260918T130601Z`）。80 端口只接 `tuboluo.com`（ACME + 301）；443 默认拒绝其他域名的握手；`tuboluo.com`：Host 原样传递、`X-Forwarded-For` 覆盖为真实客户端地址、全站 1 MB 且只有 `/api/admin/media/upload` 为 55 MB、`X-Robots-Tag: noindex, nofollow`、`robots.txt` 全部 Disallow |
+| 证书 | Let's Encrypt，只含 `tuboluo.com`，到期 2026-12-17；续期 webroot `/var/www/litubo-acme`，与 vhost 一致，经公网 HTTP 探测验证；`/etc/letsencrypt/renewal-hooks/deploy/litubo-reload-nginx` 先 `nginx -t` 再 reload |
+
+**验证结果：**
+- provisioning 15/15，所有 verify OK。`release:verify`：Node 22.22.2、两个镜像 pin、无已发布 TEST 数据、build 成功。构建产物中 6 个 secret 的值出现次数均为 0（D-039）。
+- Directus License 生效：以 `nuxt-server` 身份读取 CMS 均为 200，未生效时会是 503。
+- 外部 HTTPS：本机直连 12/12 次 200（TLS 1.2 与 1.3，证书校验 OK）；境外独立观测（WebFetch）页面正常；服务器经自身公网 IP 访问 3/3 次 200。中国大陆到该主机的链路慢且偶有中断，属网络路径问题。
+- 1440 / 375（本机无头 Edge，经 DevTools 协议精确设定视口，只读）：首页、产品、应用、资源、Technical Matching、Contact、后台登录 7 页均加载成功，无横向溢出、无破图。唯一的请求错误是后台登录页未登录时预期的 `401 /api/admin/auth/me`。375 的菜单抽屉与 Products 手风琴正常。canonical 均为 `https://litubo.com/…`。
+- 询盘接口经外部 HTTPS 校验：`consent=false` 返回 400，不写入。
+- 生产库计数：0 询盘、0 产品、0 分类、0 文章、0 内容、0 文件；10 个系统目录；2 个用户（管理员与 `nuxt-server`）。
+- refrigerant-store：3 个容器始终为 Up（未重启），首页 200 且哈希不变，`/api/` 403、`/admin/` 200、:8080 403；Nginx `default` 与 `nginx.conf` 哈希不变。
+- `litubo.com` / `www.litubo.com` 仍解析到 Wix，未做任何修改。
+
+**仍 OPEN：**
+1. 用户登录一次后台后验收：CMS 编辑、Media 上传、Draft / Published、表单真实提交（真实提交会写入询盘，须由用户决定）。
+2. 生产数据为空。导航中的产品类目页在分类录入前返回 404，属预期；真实产品按 D-043 (6) 的分阶段人工流程录入。
+3. backup / rollback 最低闭环；`cms.litubo.com` 的访问方式；document-extractor 未启动（AI 关闭）；正式切换 `litubo.com`（未授权）。
+4. `PRODUCTION-PREFLIGHT.md` §53 与 `RELEASE-SAFETY-GATES.md` 的相关行未随本次部署更新，只记录在本节与 §0。
+
+**生产足迹：** 生产数据库写入仅为 provisioning 15 步（空库初始化）。没有打印任何 secret；未配置 AI Key，AI 费用 0；Wix 与 `litubo.com` DNS 零修改。
+
+*最后更新：2026-09-18，由 Claude Code 在 LITUBO-SIMPLE-GO-LIVE-AUTOPILOT 任务中写入。*
