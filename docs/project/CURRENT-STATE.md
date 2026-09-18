@@ -8,30 +8,29 @@
 
 ```text
 Latest accepted module:             PRODUCTION-PREFLIGHT-UID-CORRECTION-01（**INFERRED accepted**：Controller 已独立核实其 final SHA `32e877a` 的 GitHub CI——run `35303613756`，completed / success——并以 `32e877a` 为基线发出 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 施工单；与上一轮 FINAL-RELEASE-REVIEW-BRANCH-CI-01 同一口径，Controller 未另行书面声明接受）；其前 FINAL-RELEASE-REVIEW-BRANCH-CI-01 — review branch 推送与 GitHub CI（Controller 已独立核实 final CI = PASS，并据此发出 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 施工单）；再前 FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS**）；再前 FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136`：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口）；再前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
-Latest completed module:            FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 — 以真实服务器证据复核 Production Preflight、冻结 V1 生产拓扑（**PRODUCTION PREFLIGHT STILL INCOMPLETE**）。生产主机已存在并经实测：腾讯云 Lighthouse 法兰克福 Zone 2 · Ubuntu 24.04.4 · x86_64 · 2 vCPU / 约 3.6 GiB，与既有 refrigerant-store 系统共用。复核结果：
-                                    · CLOSED：主机、OS / 架构、Docker / Compose、Nuxt 运行方式（D-043）、持久化路径、初始数据来源（全新空库）、上线功能策略、Nuxt 构建可行性
-                                    · PARTIALLY CLOSED：容量、反向代理、网络暴露、备份目录、secret 机制
-                                    · 仍 OPEN：`DIRECTUS_PUBLIC_URL`、canonical 域名 / TLS、备份调度 / 保留期 / 加密 / 异地、书面生产回滚
-                                    · 新增 3 项：与既有系统共存的入场核对、extractor 镜像来源、D-001 区域标签
-                                    仅文档，0 生产接触。详见 `docs/project/PRODUCTION-PREFLIGHT.md` Part II（§35–§48）与文末该节。
-                                    其前 PRODUCTION-PREFLIGHT-UID-CORRECTION-01（`32e877a`：PostgreSQL 生产 bind mount 属主订正为 70:70）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-01（`1ac8457`：只读评估，INCOMPLETE、8 项 BLOCKING，已由 PREFLIGHT-02 复核）；FINAL-RELEASE-REVIEW-BRANCH-CI-01（`be1df5a`：review branch 推送，CI run `35291162888` success）。各模块详情见文末对应节
-Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 已收口并 STOP，等待 Controller 审查。push 属 A3、merge 属 A4、deploy 属 A5，均须 Controller 单独授权）
+Latest completed module:            FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01 — 对 PREFLIGHT-02 的最小订正（结论 **PRODUCTION PREFLIGHT STILL INCOMPLETE** 不变）：
+                                    · 地域：生产主机为腾讯云 Lighthouse **美国弗吉尼亚（Virginia Zone 2）**，经用户在腾讯云控制台确认；与 D-001 的 "US Tencent Cloud server" 一致，无冲突（原误写为法兰克福）
+                                    · provisioning：脚本只按库名拦截 `prod` / `production` / `live`，`litubo_cms` 会通过，不是充分的生产安全边界 → 生产 provisioning 安全执行路径 = OPEN
+                                    · extractor 可复现性留给后续 AI / PDF，不阻塞首次非 AI 上线；Media Library 文件夹 bootstrap 仍 OPEN
+                                    · 首次非 AI 官网上线的 blocker 收敛为 6 项（见 Next candidate）
+                                    仅文档，0 生产接触。详见 `docs/project/PRODUCTION-PREFLIGHT.md` §48 / §49 与文末该节。
+                                    其前 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02（`86637f7`：以真实服务器证据复核、冻结 V1 拓扑 D-043）；PRODUCTION-PREFLIGHT-UID-CORRECTION-01（`32e877a`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-01（`1ac8457`）。各模块详情见文末对应节
+Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01 已收口并 STOP，等待 Controller 审查。push 属 A3、merge 属 A4、deploy 属 A5，均须 Controller 单独授权）
 Active module authorization level:  —（无 Active 模块；上一模块为 A1 — GOVERNANCE_DOCS：只允许本地 commit，**未授权 push**）
-Next candidate:                     无已授权候选。**Production Preflight = STILL INCOMPLETE，因此不登记 FINAL-RELEASE-MERGE-AND-DEPLOY-01 为候选**。推进所需的 Controller / 业务决定：
-                                    · 生产 `DIRECTUS_PUBLIC_URL`
-                                    · canonical 域名（apex / www）与 TLS 终止方
-                                    · 备份目的地、调度、保留期与加密
-                                    · 书面生产回滚
-                                    · 生产 provisioning 的执行路径与授权
-                                    · extractor 镜像来源
-                                    · D-001 区域标签确认
-                                    剩余 OPEN 项全表见 `PRODUCTION-PREFLIGHT.md` §47。**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
+Next candidate:                     无已授权候选。**Production Preflight = STILL INCOMPLETE，因此不登记 FINAL-RELEASE-MERGE-AND-DEPLOY-01 为候选**。首次非 AI 官网上线的 6 项 blocker（`PRODUCTION-PREFLIGHT.md` §48）：
+                                    1. `DIRECTUS_PUBLIC_URL` 决定（首次生产 Directus 激活之前）
+                                    2. canonical 域名 / TLS 决定
+                                    3. 生产 provisioning 安全执行路径
+                                    4. Media Library 文件夹 bootstrap（真实媒体录入之前）
+                                    5. systemd / Nginx / secret 注入的正式实施
+                                    6. 首次生产部署所需的 backup / rollback 最低闭环
+                                    非上线 blocker：地域（美国弗吉尼亚，无冲突）、extractor 可复现性（后续 AI 模块）、AI provider、HubSpot、长期容量证明。**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（Final Release Verification PASS、GitHub CI PASS、security BLOCKING 0 / UNKNOWN 0，**都只是 RC 的技术结论，不是生产批准**）。**Production Preflight = STILL INCOMPLETE（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02，2026-09-18）**：生产主机已存在，但**没有任何 LITUBO 服务在运行**；V1 拓扑已冻结（D-043）；B-1 / B-2 / B-8 已关闭，B-3 / B-5 部分关闭，B-4 / B-6 / B-7 仍 OPEN，另新增 3 项（`docs/project/PRODUCTION-PREFLIGHT.md` §47 / §48）。人工 gate：Poppler / libvips / util-linux 审查、隐私政策与 `PRIVACY_POLICY_VERSION` 仍 OPEN；OIG 资格与强制遥测已由业务负责人关闭（永久授予，5 次激活，净占用 1）。其余未决：长期容量、主机上的网络暴露实测、持续 CVE 监控
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：32e877a = PRODUCTION-PREFLIGHT-UID-CORRECTION-01；其前 1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01、9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
+Production release:                 NOT APPROVED（Final Release Verification PASS、GitHub CI PASS、security BLOCKING 0 / UNKNOWN 0，**都只是 RC 的技术结论，不是生产批准**）。**Production Preflight = STILL INCOMPLETE（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 及其 REVIEW-FIX-01，2026-09-18）**：生产主机已存在，但**没有任何 LITUBO 服务在运行**；V1 拓扑已冻结（D-043）；首次非 AI 上线仍有 6 项 blocker（见上；`docs/project/PRODUCTION-PREFLIGHT.md` §48）。人工 gate：Poppler / libvips / util-linux 审查、隐私政策与 `PRIVACY_POLICY_VERSION` 仍 OPEN；OIG 资格与强制遥测已由业务负责人关闭（永久授予，5 次激活，净占用 1）。其余未决：长期容量与 extractor 可复现性（均不阻塞首次非 AI 上线）、持续 CVE 监控
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：86637f7 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02；其前 32e877a = PRODUCTION-PREFLIGHT-UID-CORRECTION-01、1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01、9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)
-origin/master:                      8f2e384（未变；未 merge；**未启用 branch protection**——建议在 merge 前作为 HUMAN GATE 开启）· remote review branch `origin/review/final-release-verification-01` 以 `git ls-remote` 为准（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 开工时 = `32e877a`，其 CI run `35303613756` success；**本模块的收口 commit 只在本地、未 push**，因此本地 HEAD 领先远端 1 个 commit；协议 §13.1 Layer 2 Remote Review；其余本地 review 分支仍未 push）
+origin/master:                      8f2e384（未变；未 merge；**未启用 branch protection**——建议在 merge 前作为 HUMAN GATE 开启）· remote review branch `origin/review/final-release-verification-01` 以 `git ls-remote` 为准（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 开工时 = `32e877a`，其 CI run `35303613756` success；PREFLIGHT-02 的 `86637f7` 与 REVIEW-FIX-01 的收口 commit **都只在本地、未 push**，因此本地 HEAD 领先远端 2 个 commit；协议 §13.1 Layer 2 Remote Review；其余本地 review 分支仍未 push）
 ```
 
 ---
@@ -45,7 +44,7 @@ origin/master:                      8f2e384（未变；未 merge；**未启用 b
 | 当前分支 | `master` |
 | 当前 Git 基线 | 以 `git log -1 --oneline` 为准（此文件本身会产生提交，不硬编码 SHA）|
 
-**技术架构：** Nuxt 3 + Vue 3 + TypeScript（SSR/hybrid）/ Directus 12.3.1 + PostgreSQL 16.15（均为不可变 digest pin，D-041 / D-042；2026-09-18 由 FINAL-RELEASE-VERIFICATION-01 核对，此处原写 "Directus 11" 已过时）/ Docker Compose / 本地开发中，未来部署至腾讯云美国服务器，Cloudflare Free 作为前端边缘（DNS、TLS、缓存）。（2026-09-18 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 事实注记：实测生产主机为腾讯云 Lighthouse **法兰克福** Zone 2，也就是已在运行 refrigerant-store 的那台既有服务器。"美国"是 D-001 / `CLAUDE.md` 沿用的区域标签，与实测不符，待 Controller 确认。V1 拓扑见 D-043：Nuxt 为 systemd 宿主进程，Directus / PostgreSQL / extractor 由 Docker Compose 运行；Cloudflare 的角色与 TLS 终止方仍未决定。）
+**技术架构：** Nuxt 3 + Vue 3 + TypeScript（SSR/hybrid）/ Directus 12.3.1 + PostgreSQL 16.15（均为不可变 digest pin，D-041 / D-042；2026-09-18 由 FINAL-RELEASE-VERIFICATION-01 核对，此处原写 "Directus 11" 已过时）/ Docker Compose / 本地开发中，未来部署至腾讯云美国服务器，Cloudflare Free 作为前端边缘（DNS、TLS、缓存）。（2026-09-18 事实注记：生产主机为腾讯云 Lighthouse 美国弗吉尼亚（Virginia Zone 2），即已在运行 refrigerant-store 的那台既有服务器，与本行"腾讯云美国服务器"一致，用户已在腾讯云控制台确认。V1 拓扑见 D-043：Nuxt 为 systemd 宿主进程，Directus / PostgreSQL / extractor 由 Docker Compose 运行；Cloudflare 的角色与 TLS 终止方仍未决定。）
 
 ---
 
@@ -8277,7 +8276,7 @@ the one paid Beta request body itself was not independently captured.
 | Production RAM / CPU capacity | OPEN | extractor 镜像 633 MB，容器 512 MB / 1 CPU；生产服务器容量未核实（2026-09-18 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02：生产主机已实测为 2 vCPU / 约 3.6 GiB / 约 59 GB，构建后约 40 GB 可用，且与既有系统共用。结论只到"足以继续 rehearsal / 初始部署验证"，长期容量须待全栈运行后再测，故仍 OPEN） |
 | Native dependency license review | OPEN | Poppler、util-linux、libvips、Tesseract 及 eng / chi_sim 模型仅记录包内声明 |
 | Container / native package CVE review | OPEN | 未做正式扫描；npm audit 在当前镜像源不可用 |
-| Production extractor topology | OPEN | 生产 Nuxt 为宿主进程还是容器尚未确定（gateway vs 内网直连）（2026-09-18 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02：已由 Controller 在决定层面冻结。按 D-043，Nuxt 为 systemd 宿主进程，经 gateway `http://127.0.0.1:8787` 访问 extractor。主机上的隔离复验与 extractor 镜像来源仍待部署模块，故本行保持 OPEN） |
+| Production extractor topology | OPEN | 生产 Nuxt 为宿主进程还是容器尚未确定（gateway vs 内网直连）（2026-09-18 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02：已由 Controller 在决定层面冻结。按 D-043，Nuxt 为 systemd 宿主进程，经 gateway `http://127.0.0.1:8787` 访问 extractor。extractor 只服务 AI / PDF intake，首次非 AI 上线不需要；其镜像可复现性与主机上的隔离复验留给后续 AI / PDF 模块，故本行保持 OPEN，但不阻塞首次非 AI 上线） |
 | Production public-route / sitemap smoke | OPEN | 未对生产执行；本地公开 CMS 读取 401 |
 
 另：部署、push、`origin/master` 更新仍须单独授权；CH-DG-07 / CH-DG-08、BP-DG-06 / BP-DG-11 状态不变。
@@ -11781,6 +11780,8 @@ OIG 许可证资格（业务负责人已自行确认并取得 key；**永久授�
 
 **Module：** FINAL-RELEASE-PRODUCTION-PREFLIGHT-02（TYPE C · **A1 GOVERNANCE_DOCS** · 只允许本地 commit，**未授权 push**）。完整复核见 `docs/project/PRODUCTION-PREFLIGHT.md` Part II（§35–§48）。
 
+> **订正说明（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01）：** 本节有三处事实已由 review fix 订正：主机地域为美国弗吉尼亚而非法兰克福、provisioning 脚本的描述、extractor 的定性。上线 blocker 的收敛结论见文末 REVIEW-FIX-01 节，原文保留在 commit `86637f7`。
+
 **Status：** **COMPLETED — PRODUCTION PREFLIGHT STILL INCOMPLETE。**
 - 本模块只改文档，不涉及部署。生产服务启动 0 · 生产数据库写入 0 · 许可证激活 0 · secret 读取 0 · Nginx 改动 0 · DNS 改动 0 · 部署 0。
 - 此外：0 服务器接触、0 `.env` 创建或读取、0 License Key 使用、0 `npm audit fix` / `npm upgrade`、0 AI 调用、0 邮件。
@@ -11802,7 +11803,7 @@ OIG 许可证资格（业务负责人已自行确认并取得 key；**永久授�
 ### 二、写入的服务器事实
 
 来源：Controller 与用户在真实服务器上的只读核对与安全安装，由施工单转交。本模块未接触服务器。
-- **主机**：腾讯云 Lighthouse · 法兰克福 Zone 2 · Ubuntu Server 24.04.4 LTS · x86_64 · 2 vCPU · 标称 4 GB（主机可见约 3.6 GiB）· 60 GB 级磁盘（文件系统约 59 GB）· Nuxt 构建后约 40 GB 可用。
+- **主机**：腾讯云 Lighthouse · 美国弗吉尼亚（Virginia Zone 2）· Ubuntu Server 24.04.4 LTS · x86_64 · 2 vCPU · 标称 4 GB（主机可见约 3.6 GiB）· 60 GB 级磁盘（文件系统约 59 GB）· Nuxt 构建后约 40 GB 可用。
 - **容量结论**：只写到"足以继续 production rehearsal / initial deployment verification"，**不写成已证明长期生产容量充足**。
 - **同机既有系统（不得扰动）**：`/home/ubuntu/refrigerant-store`；`deploy_server_1` / `deploy_redis_1` / `deploy_mysql_1` 均为 `Up 3 weeks`；Nginx 监听 `:80`，其 `/api/` → `localhost:8080` 属旧应用；旧应用在 `:8080`。
 - **Docker**：Engine 29.1.3 · Compose v2 2.40.3 · legacy `docker-compose` 1.29.2（保留，不删除、不升级）。
@@ -11840,21 +11841,21 @@ OIG 许可证资格（业务负责人已自行确认并取得 key；**永久授�
   - 备份调度 / 保留期 / 加密 / 异地。
   - 书面生产回滚。
   - branch protection / merge：人工 gate，状态不变。
-  - 新增三项：与 refrigerant-store 共存的入场核对、extractor 镜像在主机上的来源、D-001 区域标签。
+  - 新增两项：与 refrigerant-store 共存的入场核对；extractor 镜像可复现性（留给后续 AI / PDF，不阻塞首次非 AI 上线）。原先列入的"D-001 区域标签"源于地域误记，已由 REVIEW-FIX-01 撤销。
 
 ### 五、本次复核中的仓库证据发现（均为只读核对，未改代码）
 
 1. **Nitro 默认监听**：未设 host 时 Nitro 监听全部网卡（`node_modules/nitropack/dist/presets/node/runtime/node-server.mjs` 17–18 行：端口取 `NITRO_PORT` / `PORT`，默认 3000；host 取 `NITRO_HOST` / `HOST`，没有默认值）。因此 systemd unit 必须显式设置 `127.0.0.1` 与 `3310`。
 2. **非 secret 配置在构建期固化**：`nuxt.config.ts` 求值时就读取非 secret 配置，构建期也不例外，涉及 `directusUrl`、`cmsMode`、`productsCmsMode`、`siteUrl` 和 i18n `baseUrl`。主机上那次构建的环境本模块没有看到，其中固化的非 secret 值未知。它证明主机能完成构建，但**不是 release 产物**。release 产物应由部署模块用 `npm run release:verify` 产出（需要 Directus 和 PostgreSQL 容器在运行），并带上生产的非 secret 配置。
-3. **provisioning 执行器按设计不做生产**：`scripts/provision-directus.mjs` 拒绝名字含 `prod` / `production` / `live` 的数据库，并写明生产 provisioning 是"独立、须授权的活动"。所以把已跟踪工件施加到生产库的方式属于 TYPE D 决定。另外，schema apply（第 10 步）会激活许可证，必须等 `DIRECTUS_PUBLIC_URL` 决定之后才能跑。
+3. **生产 provisioning 安全执行路径 = OPEN**（REVIEW-FIX-01 订正了原先"按设计不做生产"的过度表述）：`scripts/provision-directus.mjs` 的文档说明它只用于 local / scratch，但当前可执行的防护只有一条——拒绝名字中含 `prod` / `production` / `live` 的数据库。计划库名 `litubo_cms` 不含这些字符串，会通过这一名称检查，因此该防护不能当作充分的生产环境安全边界。另外，schema apply（第 10 步）会激活许可证，必须等 `DIRECTUS_PUBLIC_URL` 决定之后才能跑。
 4. **全新空库没有受治理的 Media 文件夹**：`FOLDER_POLICY` 对应的是 `directus_folders` 里的数据行，schema 快照和 provisioning 都不会建。上传仍可进入 Needs Classification，但 LITUBO 后台建不出受治理的根目录。真实媒体归档之前，需要先决定一个 bootstrap 方式。
 5. **对反向代理的要求**：
    - 生产 admin cookie 带 `Secure`，所以 HTTPS 是生产使用 `/admin` 和首个产品上线的前提。
    - CSRF 检查比对 `Origin` 的 host 与请求的 `Host`，代理必须透传原始 `Host`。
    - 公开询盘限流和后台登录锁定都取 `X-Forwarded-For` 的第一个地址，代理必须只给出一个可信的客户端地址，覆盖而不是追加。
    - 体积上限：后台上传单文件 50 MB，公开询盘 64 KB。
-6. **extractor 镜像来源**：基础镜像按 digest 固定，但 apt 层没有固定。在主机上重新构建会得到不同的镜像，而 D-042 的分类只覆盖 `sha256:8d3d0639…`。
-7. **区域标签冲突**：D-001、`CLAUDE.md`、`01-technical-decision.md`、`00-current-status.md` 都写"美国"，实测是法兰克福。D-001 的实质——复用既有腾讯云服务器作为唯一应用服务器——与实测一致，只有区域标签不符。这是可解释的标签过时，不是需要 STOP 的实质冲突。本模块没有改这些文件，只在本文件 §1 加了事实注记，待 Controller 确认。
+6. **extractor 镜像可复现性**：基础镜像按 digest 固定，但 apt 包没有固定版本。在主机上重新构建得到的镜像，不能直接视为 D-042 分类过的 `sha256:8d3d0639…`。extractor 只服务 AI / PDF intake，而首次上线不需要它，因此这是后续 AI / PDF 功能的 OPEN 项，**不是首次非 AI 官网上线的 blocker**（REVIEW-FIX-01 订正了定性）。
+7. **区域标签冲突——已撤销（REVIEW-FIX-01）**：本条所依据的"法兰克福"是误记。用户已在腾讯云控制台确认主机位于美国弗吉尼亚（Virginia Zone 2），D-001、`CLAUDE.md` 等文件写的"美国"本来就正确，不存在冲突。
 
 ### 六、改动文件
 
@@ -11869,7 +11870,7 @@ OIG 许可证资格（业务负责人已自行确认并取得 key；**永久授�
 - **未改的文件：**
   - `MASTER-ROADMAP.md`：M8 仍是"待授权"，没有里程碑变化。
   - `PRODUCTION-PROVISIONING-RUNBOOK.md`：§4"Nuxt 运行方式未决"已被 D-043 取代，但该文件不在本模块范围内，留给部署模块。
-  - `CLAUDE.md`、`01-technical-decision.md`、`00-current-status.md`：区域标签待 Controller 确认。
+  - `CLAUDE.md`、`01-technical-decision.md`、`00-current-status.md`：其"美国"表述本就正确，无需修改（REVIEW-FIX-01 订正）。
   - 任何 runtime、Compose、Vue / Nuxt、测试、Nginx、防火墙、DNS。
 
 ### 七、Safety Gates
@@ -11898,8 +11899,56 @@ OIG 许可证资格（业务负责人已自行确认并取得 key；**永久授�
 ### Open items / 等待 Controller
 
 - Controller 复核本模块。**Preflight 未 PASS，不登记 `FINAL-RELEASE-MERGE-AND-DEPLOY-01` 为候选。**
-- 推进所需的决定：生产 `DIRECTUS_PUBLIC_URL`；canonical 域名（apex / www）与 TLS 终止方；备份目的地、调度、保留期与加密；书面生产回滚；生产 provisioning 的执行路径与授权；extractor 镜像来源；D-001 区域标签。
+- 推进所需的决定：已由 REVIEW-FIX-01 收敛为首次非 AI 上线的 6 项 blocker（见 §0 Next candidate 与 `PRODUCTION-PREFLIGHT.md` §48）。
 - 本模块的 commit 只在本地。是否 push 由 Controller 另行授权（A3）。
 - 本模块未读取、未输出、未保存任何 `.env` 值、password、cookie、JWT、token、API key、`DIRECTUS_LICENSE_KEY`、`DIRECTUS_TOKEN` 或任何生产凭证。
 
 *最后更新：2026-09-18，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 任务中写入。*
+
+---
+
+## FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01 — PREFLIGHT-02 的最小事实订正（2026-09-18）
+
+**Module：** FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01（TYPE C · A1 GOVERNANCE_DOCS · 本地 commit，**不 push**）。这是上一模块的 review fix，不重做 PREFLIGHT-02。开工基线一致：HEAD `86637f7`，远端 review branch `32e877a`。
+
+**Status：** COMPLETED — **PRODUCTION PREFLIGHT STILL INCOMPLETE**。结论不变，没有任何 OPEN 被改为 PASS。
+
+**订正内容：**
+1. **地域**：用户已在腾讯云控制台确认，Current production host: Tencent Cloud Lighthouse, US Virginia, Virginia Zone 2。PREFLIGHT-02 依据施工单写入的"法兰克福 Zone 2"有误，据此推出的"D-001 区域标签冲突"随之撤销。D-001 与 `CLAUDE.md` 的 "US Tencent Cloud server" 本来就正确，未修改。未记录公网 IP、实例 ID。
+2. **provisioning**：删除"脚本按设计拒绝生产"的过度表述。正确结论是：脚本的文档说明只用于 local / scratch，但当前可执行的防护只拒绝库名中含 `prod` / `production` / `live` 的数据库；计划库名 `litubo_cms` 会通过，所以它不能当作充分的生产环境安全边界。**Production provisioning safety path = OPEN。** 未改脚本、未设计绕过、未运行 provisioning、未接触数据库。
+3. **Media Library 文件夹 bootstrap**：保留该发现，表述改为更简洁。fresh DB provisioning 会建立 Directus 系统表、schema、约束 / 触发器、role / policy / 服务身份与权限，但当前 `provisioning-manifest.json` 不建立 Media Library 的固定文件夹树。**Production Media Library folder bootstrap = OPEN**，须在真实产品媒体录入前解决。
+4. **extractor**：技术发现保留——apt 包没有固定版本，在服务器上重新构建不能视为与已分类的镜像相同。但首次上线不设 AI key、关闭 Apply、不需要 AI / PDF intake，所以定性改为 **OPEN for later AI / PDF functionality, NOT a blocker for the initial non-AI website launch**。未改 Dockerfile，未 rebuild。
+5. **上线 blocker 收敛**（`PRODUCTION-PREFLIGHT.md` §48）：
+   - **Initial website launch blockers**：
+     1. `DIRECTUS_PUBLIC_URL` 决策
+     2. canonical 域名 / TLS 决策
+     3. 生产 provisioning 安全执行路径
+     4. Media Library 文件夹 bootstrap（真实媒体录入之前）
+     5. systemd / Nginx / secret 注入的正式实施
+     6. 首次生产部署所需的 backup / rollback 最低闭环
+   - **Not initial-launch blockers**：地域（美国弗吉尼亚，无冲突）· extractor 可复现性（后续 AI 模块）· AI provider · HubSpot · 长期容量证明（全栈运行后测量）。
+   - 人工 gate（Poppler / libvips / util-linux 审查、隐私政策与版本）和授权层级（push / merge / deploy、branch protection）保持不变，单独列出。
+
+**保持不变（复核后仍然正确）：**
+- `.env.example` 中生产 localhost `DIRECTUS_PUBLIC_URL` 的 stale 标记。
+- RSG-08 仍为 `OPEN`。
+- 拓扑：Nuxt 为 systemd 宿主进程 `127.0.0.1:3310`；Directus `127.0.0.1:8055`；gateway `127.0.0.1:8787`；PostgreSQL 无发布端口。
+- 全新空库；AI 与 HubSpot 首次上线不启用。
+
+**改动文件：**
+- `docs/project/PRODUCTION-PREFLIGHT.md`：顶部结论、Part I 两处指引、§36 / §39 / §41 / §42 / §47 / §48 订正，新增简短的 §49。
+- `docs/project/CURRENT-STATE.md`：§0 snapshot、§1 注记、extractor 门禁行、PREFLIGHT-02 节订正，以及本节。
+- `docs/project/08-decision-log.md`：D-043 第 (1) 条的地域。
+- 另有两处同样由 PREFLIGHT-02 写入的"法兰克福"，按施工单 §2 一并做了最小订正：`docs/ADMIN-CMS-SETUP.md` §6 横幅中的一行；`docs/project/RELEASE-SAFETY-GATES.md` RSG-08 事实格（地域 + blocker 收敛，状态仍 `OPEN`）。
+
+**验证：** 读取上述文档的 9 个合同测试文件在 Node 22.22.2 上 **9 / 9 文件、331 / 331 通过**，exit 0。这 9 个文件是：`backupRestore`、`contentDraftService`、`directusRuntimeToken`、`documentExtractorInfra`、`directusSecurityRemediationContract`、`contentLifecycle`、`contentPublication`、`contentPublicDelivery`、`publicRouteCorrectness`。`git diff --check` exit 0。
+
+**Safety Gates：**
+- RSG-08 = PRESERVED：0 生产接触，状态仍 `OPEN`。
+- RSG-09 = PRESERVED：新建本地 commit，不 amend `86637f7`；push 0 · merge 0 · deploy 0。
+- P0 Violations：NONE。
+- UI：1440 / 375 = N/A（纯文档）。
+
+**Next candidate：** 无已授权候选，等待 Controller 审查。
+
+*最后更新：2026-09-18，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01 任务中写入。*

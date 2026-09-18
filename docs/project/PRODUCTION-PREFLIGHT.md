@@ -1,11 +1,12 @@
 # Production Preflight
 
-> **Current result — FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 (2026-09-18): PRODUCTION PREFLIGHT STILL INCOMPLETE.**
-> The production host now exists and has been measured, and the V1 deployment topology is frozen (D-043). Still open:
-> `DIRECTUS_PUBLIC_URL`, the canonical host and TLS, backup schedule / retention / encryption / offsite, the written
-> production rollback, the production secret files, and three items this pass found (§47). **Part II (§35–§48) is the
-> current assessment.** Part I (§1–§34) below is the FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 record as written from the
-> repository alone; it is kept, with a one-line pointer wherever Part II supersedes it.
+> **Current result — FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 (2026-09-18, with its review fix): PRODUCTION PREFLIGHT
+> STILL INCOMPLETE.** The production host exists and has been measured, and the V1 deployment topology is frozen
+> (D-043). Six items block the initial non-AI website launch (§48): the `DIRECTUS_PUBLIC_URL` decision, the canonical
+> domain / TLS decision, a safe production provisioning path, the Media Library folder bootstrap, the systemd / Nginx /
+> secret-injection implementation, and the minimum backup / rollback closure for the first deployment. **Part II
+> (§35–§49) is the current assessment.** Part I (§1–§34) below is the FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 record as
+> written from the repository alone; it is kept, with a one-line pointer wherever Part II supersedes it.
 
 > Module: FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 · 2026-09-18 · read-only assessment.
 > **Result: PRODUCTION PREFLIGHT INCOMPLETE — HUMAN / INFRA BLOCKERS REMAIN.**
@@ -48,8 +49,8 @@ approves. Deploying from an uncommitted working tree, a development server or an
 
 ## 3. Production host
 
-> **Superseded (§36–§37):** the production host now exists — Tencent Cloud Lighthouse, Frankfurt Zone 2, the server
-> that already runs the refrigerant-store system.
+> **Superseded (§36–§37):** the production host now exists — Tencent Cloud Lighthouse, US Virginia (Virginia Zone 2),
+> the existing US Tencent Cloud server of D-001, which already runs the refrigerant-store system.
 
 **PRODUCTION HOST = NOT YET PROVISIONED (no information of any kind in the repository).**
 
@@ -294,8 +295,9 @@ documentation forbids that command outright. **No production database was create
 | State | stateless — nothing to back up |
 | Production topology | **depends on §10**: a host-process Nuxt uses the loopback gateway; a containerized Nuxt would join the internal network and drop the gateway |
 
-> **Updated (§39):** Nuxt is a host process, so the loopback gateway path applies. The image a production host runs is
-> a new open item (§47 row 19).
+> **Updated (§39):** Nuxt is a host process, so the loopback gateway path applies. The extractor serves only AI / PDF
+> intake, which the initial launch does not use (§42); its image reproducibility is a later AI / PDF item (§47 row 19),
+> not an initial-launch blocker.
 
 ## 17. Uploads / media persistence
 
@@ -701,10 +703,10 @@ bring the new host facts in formally.
 
 > Module: **FINAL-RELEASE-PRODUCTION-PREFLIGHT-02** · 2026-09-18 · TYPE C · A1 `GOVERNANCE_DOCS` · local commit only.
 > **Result: PRODUCTION PREFLIGHT STILL INCOMPLETE.** The production host now exists and has been measured, and the
-> Controller has frozen the V1 deployment topology (D-043). What remains open is what a server cannot settle by
-> existing: `DIRECTUS_PUBLIC_URL`, the canonical host and TLS, backup schedule / retention / encryption / offsite, the
-> written production rollback and the production secret files — plus three items this pass found (§47 rows 18–20).
-> Production release remains **NOT APPROVED**; merge and deploy each still require their own authorization.
+> Controller has frozen the V1 deployment topology (D-043). What remains is what a server cannot settle by existing;
+> §48 separates the six items that block the initial non-AI website launch from those that do not. Production release
+> remains **NOT APPROVED**; merge and deploy each still require their own authorization. Three facts in this Part were
+> corrected by the module's review fix (§49).
 
 ## 35. Scope, baseline and evidence
 
@@ -732,7 +734,7 @@ change; no certificate; no AI call; no e-mail; no `npm audit fix` or `npm upgrad
 | Item | Value |
 |---|---|
 | Provider | Tencent Cloud Lighthouse |
-| Region | Frankfurt Zone 2 |
+| Region | US Virginia — Virginia Zone 2 |
 | Operating system | Ubuntu Server 24.04.4 LTS |
 | Architecture | x86_64 (`linux/amd64`) |
 | CPU | 2 vCPU |
@@ -742,12 +744,10 @@ change; no certificate; no AI call; no e-mail; no `npm audit fix` or `npm upgrad
 
 - **The architecture is the verified one.** `linux/amd64` is the only architecture this project has run and verified
   (§4), and both pinned images have now run on this host (§34). The §4 architecture concern is closed.
-- **The region differs from the documentation.** D-001, `CLAUDE.md`, `01-technical-decision.md` and
-  `00-current-status.md` describe "the existing **US** Tencent Cloud server". The verified host — the existing server
-  that already runs the refrigerant-store system — is in **Frankfurt**. The substance of D-001 (reuse the existing
-  Tencent Cloud server as the single application server) matches the verified host; only the region label does not.
-  This is recorded for the Controller to confirm (§47 row 20). This module does not edit D-001, `CLAUDE.md` or the
-  technical decision; it adds a fact note to `CURRENT-STATE.md` §1.
+- **The region matches the repository.** Current production host: Tencent Cloud Lighthouse, US Virginia, Virginia
+  Zone 2 — the "existing US Tencent Cloud server" of D-001 and `CLAUDE.md`, which already runs the refrigerant-store
+  system. There is no conflict. (This section first recorded Frankfurt in error; the user confirmed the region in the
+  Tencent Cloud console — §49.)
 
 ## 37. Existing workload on the same host — must not be disturbed
 
@@ -808,8 +808,8 @@ Nuxt → document-extractor-gateway 127.0.0.1:8787 → document-extractor (inter
 | Nuxt | host process under systemd, on LITUBO's own Node by explicit path; **not** in Compose | `127.0.0.1:3310`, never `0.0.0.0` | no unit file (deliberately not created here) | the unit, its environment and its logs |
 | Directus | Compose | `127.0.0.1:8055` | already so (`docker-compose.yml`, guarded by test) | verify the listener on the host; outbound HTTPS to the licensing and telemetry hosts |
 | PostgreSQL | Compose | no published port | already so | — |
-| document-extractor | Compose, `internal: true` network | no published port | already so | image provenance (§47 row 19) |
-| Extractor gateway | Compose | `127.0.0.1:8787` | already so | isolation was measured on Docker Desktop (also Engine 29.1.3); re-verify on Linux |
+| document-extractor | Compose, `internal: true` network | no published port | already so | later AI / PDF module: image reproducibility (§47 row 19) — not needed for the initial non-AI launch |
+| Extractor gateway | Compose | `127.0.0.1:8787` | already so | later AI / PDF module: re-verify the isolation on Linux (it was measured on Docker Desktop, also Engine 29.1.3) |
 | Nginx | existing host service | 80 / 443 | no configuration in Git | the LITUBO virtual host, after the canonical host / TLS decision (§44) |
 
 **Three repository facts the unit and the build depend on:**
@@ -874,19 +874,21 @@ the service identity come from the repository's tracked provisioning artifacts (
 
 Facts the deployment module has to carry (none of them decided here):
 
-1. **The provisioning executor is not a production tool as written.** `scripts/provision-directus.mjs` refuses any
-   database name containing `prod`, `production` or `live` — "this script has no production mode to opt into"
-   (lines 16–17, 52, 91–93) — and states that production provisioning is "a separate, authorized activity". How the
-   tracked artifacts are applied to the production database, and under which authorization, is a TYPE D decision.
+1. **Production provisioning safety path — OPEN.** `scripts/provision-directus.mjs` is documented as local / scratch
+   only, but its current executable guard only rejects database names containing `prod`, `production` or `live`
+   (`PRODUCTION_MARKERS`, line 52; checked at lines 91–93). The planned database name `litubo_cms` contains none of
+   them and would pass that name check, so the guard must not be treated as a sufficient production-environment
+   safety boundary. How the tracked artifacts are applied to the production database safely, and under which
+   authorization, is still to be decided. This module does not change the script, design a bypass, run provisioning
+   or touch a database.
 2. **Provisioning waits for `DIRECTUS_PUBLIC_URL`.** Step `10` (schema baseline) is where a key-bearing Directus
    activates the licence (`PRODUCTION-PROVISIONING-RUNBOOK.md` §2), and the activation binds to `PUBLIC_URL` (§43).
-3. **The Media Library folder tree is data, and a fresh database has none.** The governed folders
-   (`server/utils/folderRegistry.ts` lines 55–72: `home`, `applications`, `company`, `products/xray` and the other
-   product roots, `resources`, …) are rows in `directus_folders`; neither the schema snapshot nor any provisioning step
-   creates them. Uploads still work — they land in *Needs Classification*, because the upload route accepts no folder
-   (`server/api/admin/media/upload.post.ts` line 114) — but the LITUBO admin cannot create the governed roots, since a
-   new folder needs an existing zone parent (`validateFolderCreate`, `folderRegistry.ts` lines 388–426). A decided
-   bootstrap — a tracked artifact or a documented one-time step — is needed before real media is filed.
+3. **Media Library folder bootstrap — OPEN.** Fresh-database provisioning creates the Directus system tables, the
+   schema, the constraints and triggers, the role / policy / service identity and the permissions, but the current
+   `scripts/provisioning-manifest.json` does not create the Media Library's fixed folder tree (`FOLDER_POLICY`,
+   `server/utils/folderRegistry.ts` lines 55–72 — rows in `directus_folders`), and the LITUBO admin cannot create those
+   roots itself (`validateFolderCreate` needs an existing zone parent). **Production Media Library folder bootstrap =
+   OPEN**; it must be resolved before real product media is entered. Not designed or implemented here.
 4. **After provisioning:** restart Directus (it caches schema and permissions), then run
    `npm run release:check-test-data` against the production database — only exit 0 passes.
 5. **The explainable initial state** is unchanged from §26: 0 products, 0 content items, an empty sitemap and empty
@@ -898,6 +900,7 @@ Facts the deployment module has to carry (none of them decided here):
 |---|---|---|
 | AI providers | `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` unset | each provider reports "not configured"; no request, no cost |
 | Product AI Apply | `PRODUCT_AI_APPLY_ENABLED` unset | closed in production (503); generation and review still work |
+| AI / PDF intake (document-extractor) | not required for the initial launch | the extractor only reads PDF and image sources for AI analysis |
 | HubSpot | `HUBSPOT_ACCESS_TOKEN` unset | inquiries stored as `not_configured`; no HubSpot request |
 | SMTP | optional | without it the inquiry is **still stored** and only the notification is skipped; configuring it later is a separate step, and its values are never part of this module |
 
@@ -971,9 +974,12 @@ mechanically possible — but no written procedure exists, and data rollback sti
 
 ## 47. Blocker reconciliation
 
+This table records every item's status. It is not the launch blocker list: §48 sorts the open items into the six
+that block the initial non-AI website launch and the ones that do not.
+
 | # | Item | Previous state (Part I) | Current state | Evidence | Remaining action | Owner / next gate |
 |---|---|---|---|---|---|---|
-| 1 | Production host (B-1) | BLOCKING — no host information | **CLOSED** | Tencent Cloud Lighthouse, Frankfurt Zone 2 (§36) | — | — |
+| 1 | Production host (B-1) | BLOCKING — no host information | **CLOSED** | Tencent Cloud Lighthouse, US Virginia — Virginia Zone 2 (§36) | — | — |
 | 2 | OS / architecture (B-1) | NOT ASSESSABLE | **CLOSED** | Ubuntu Server 24.04.4 LTS; x86_64, the only verified architecture; both pinned images ran here (§34, §36) | — | — |
 | 3 | Docker / Compose (B-1) | unverified | **CLOSED** | Engine 29.1.3; Compose v2 2.40.3; legacy 1.29.2 kept (§40) | LITUBO uses `docker compose` (v2) only; the legacy tool stays | deployment module |
 | 4 | Capacity baseline | NOT ASSESSABLE (warning) | **PARTIALLY CLOSED** | 2 vCPU · about 3.6 GiB · about 59 GB · about 40 GB free after the build; shared host (§36–§38) | measure again with the full stack beside the existing workload | deployment module → post-deploy review |
@@ -981,7 +987,7 @@ mechanically possible — but no written procedure exists, and data rollback sti
 | 6 | Reverse proxy architecture (B-3) | BLOCKING — none | **PARTIALLY CLOSED** | frozen: existing host Nginx → own LITUBO virtual host → `127.0.0.1:3310` (§39); no virtual host exists | write it after row 13: `Host` pass-through, one trustworthy `X-Forwarded-For`, body size, timeouts (§44); old server blocks untouched | Controller (row 13) → deployment module |
 | 7 | Network exposure plan | design clear; not verifiable | **PARTIALLY CLOSED** | public 80 / 443 only; 3310 / 8055 / 8787 on loopback; 5432 unpublished; Studio via SSH tunnel; the Compose bindings are in the repository and tested (§39) | on the host: listener check, external probe, Lighthouse firewall rules (not part of the evidence), outbound HTTPS for Directus licensing and telemetry | deployment module |
 | 8 | Persistence paths | design ready; no host | **CLOSED** | `/data/litubo/postgres` 70:70 755; `/data/litubo/uploads` 1000:1000 755 (§40) | confirm both are empty before the first start | deployment module (entry check) |
-| 9 | Initial production data source (B-8) | BLOCKING — not chosen | **CLOSED** (decision) | fresh empty database; tracked provisioning artifacts; staged product rollout (§41) | the production provisioning path and its authorization (the executor refuses production names); a folder-tree bootstrap; runs only after row 12 | Controller → deployment module |
+| 9 | Initial production data source (B-8) | BLOCKING — not chosen | **CLOSED** (decision) | fresh empty database; tracked provisioning artifacts; staged product rollout (§41) | a safe production provisioning path — the script's name guard is not a sufficient boundary (§41); the Media Library folder bootstrap (§41); provisioning runs only after row 12 | Controller → deployment module |
 | 10 | Production build feasibility | not assessed | **CLOSED** (Nuxt) | host `npm ci` + `npm run build` at `32e877a`; Nuxt 3.21.11, as the lockfile pins; `.output/server/index.mjs` (§40) | produce the release artifact with `npm run release:verify` and the production non-secret configuration (§39) | deployment module |
 | 11 | Backup destination existence (B-5) | "exists only as text" | **PARTIALLY CLOSED** | `/data/litubo/backups` exists, mode 700, on the same disk as the data (§40, §46) | an offsite destination (row 14) | Controller |
 | 12 | `DIRECTUS_PUBLIC_URL` (B-4) | BLOCKING | **OPEN — BLOCKING BEFORE FIRST PRODUCTION DIRECTUS ACTIVATION** | undecided; stale `localhost` statements marked (§43) | decide the value and understand its licensing consequence; no key and no activation before then | Controller |
@@ -991,8 +997,8 @@ mechanically possible — but no written procedure exists, and data rollback sti
 | 16 | Secret injection | open — it depended on B-2 | **PARTIALLY CLOSED** | mechanism frozen; `/etc/litubo` (700) exists; no file, no value (§45) | create the protected configuration; presence-only check; secret-free release build | deployment module |
 | 17 | Branch protection / merge status | technically merge-ready; protection not enabled | **OPEN** — human gate, unchanged | remote review branch `32e877a`, CI run `35303613756` success; `origin/master` `8f2e384`; this module's commit is local only | push and merge decisions (A3 / A4); enabling protection before merge is recommended | Controller |
 | 18 | Co-tenancy with the refrigerant-store system | not known | **OPEN** (new) | its containers, Nginx `:80`, the app on `:8080`, `/api/` → `:8080` (§37) | own virtual host by host name; confirm 3310 / 8055 / 8787 are free; change nothing of the old system | deployment module (entry check) |
-| 19 | document-extractor image on the host | not raised | **OPEN** (new) | the base image is pinned by digest but the apt layer is not (`document-extractor/Dockerfile` lines 5, 15–16); D-042's classification covers image `sha256:8d3d0639…` only | run that exact image, or build → scan → classify to BLOCKING 0 / UNKNOWN 0 before production | Controller → deployment module |
-| 20 | Region label ("US" in D-001 and three documents) | not raised | **OPEN** (documentation) | verified region Frankfurt Zone 2 (§36) | the Controller confirms; the wording is corrected in an authorized module | Controller |
+| 19 | document-extractor image reproducibility | not raised | **OPEN** for later AI / PDF functionality — **not an initial-launch blocker** | the base image is pinned by digest but the apt packages are not version-pinned (`document-extractor/Dockerfile` lines 5, 15–16), so a rebuild on the server is not the image D-042 classified (`sha256:8d3d0639…`); AI / PDF intake is not required for the initial launch (§42) | before AI / PDF intake is enabled in production: run that exact image, or build → scan → classify to BLOCKING 0 / UNKNOWN 0 | later AI / PDF module |
+| 20 | Region — D-001's "existing US Tencent Cloud server" | not raised in Part I; raised in error by Part II's first version | **CLOSED** — no conflict | US Virginia, Virginia Zone 2, confirmed by the user in the Tencent Cloud console (§36, §49) | — | — |
 
 Human gates carried unchanged from §29: the Poppler / libvips / util-linux review and the privacy policy with
 `PRIVACY_POLICY_VERSION` are **OPEN**; OIG eligibility and the telemetry acceptance stay closed by the business owner.
@@ -1002,29 +1008,59 @@ Human gates carried unchanged from §29: the Poppler / libvips / util-linux revi
 ```text
 PRODUCTION PREFLIGHT STILL INCOMPLETE
 
-Closed             host · OS / architecture · Docker / Compose · Nuxt run mode (decided) · persistence paths ·
-                   initial data (decided) · launch feature policy (decided) · Nuxt build feasibility
-Partially closed   capacity · reverse proxy · network exposure · backup destination (local directory only) ·
-                   secret mechanism
-Open               DIRECTUS_PUBLIC_URL (blocking before the first production Directus activation) ·
-                   canonical host / TLS · backup schedule / retention / encryption / offsite ·
-                   written production rollback · co-tenancy entry checks · extractor image provenance ·
-                   region label in D-001
-Human gates        Poppler / libvips / util-linux review · privacy policy and version ·
-                   master branch protection · merge (A4) and deploy (A5) authorizations
+Initial website launch blockers (the non-AI launch)
+  1. DIRECTUS_PUBLIC_URL decision — before the first production Directus activation   (§43; row 12)
+  2. Canonical domain / TLS decision                                                  (§44; row 13)
+  3. A safe production provisioning execution path                                    (§41; row 9)
+  4. Media Library folder bootstrap — before real product media is entered            (§41)
+  5. systemd / Nginx / secret injection, implemented                                  (§39, §44, §45; rows 5–7, 16, 18)
+  6. The minimum backup / rollback closure the first production deployment needs      (§46; rows 11, 14, 15)
+
+Not initial-launch blockers
+  · Region — US Virginia, consistent with D-001's "US Tencent Cloud server"; no conflict   (row 20)
+  · Extractor reproducibility — later AI / PDF module                                    (row 19)
+  · AI provider setup — later; keys unset at launch                                      (§42)
+  · HubSpot — later; unset at launch                                                     (§42)
+  · Long-term capacity proof — measured once the full stack runs                         (§38; row 4)
+
+Outside this classification, unchanged
+  · Human gates: Poppler / libvips / util-linux review · privacy policy and PRIVACY_POLICY_VERSION
+  · Authorization gates: push (A3) · merge (A4) · deploy (A5); master branch protection recommended before merge (row 17)
 
 Production release NOT APPROVED
 Deploy             NOT AUTHORIZED — do not start
 ```
 
-**Why not PASS.** The server exists, so everything a server settles by existing is now settled. What remains are
-decisions only the Controller and the business owner can make — the Directus public URL, the canonical host and TLS,
-the backup destination and policy, the rollback procedure — and the artifacts that follow from them. None of these is
-resolved by writing code, and none may be closed early to reach a deployment. No `FINAL-RELEASE-MERGE-AND-DEPLOY-01`
-candidate is registered while the preflight is not PASS.
+- Blocker 5 carries the entry and exit checks recorded above: confirm that 3310 / 8055 / 8787 are free and change
+  nothing of the refrigerant-store system (§37); set Nuxt's host and port explicitly and produce the release artifact
+  with `npm run release:verify` (§39); verify the listeners and Directus's outbound licence / telemetry access on the
+  host (row 7).
+- Blocker 6: how much of the backup policy in §46 (schedule, retention, encryption, offsite) the first deployment
+  needs, beyond a written rollback and a working backup path, is part of that decision.
+
+**Why not PASS.** The server exists, so everything a server settles by existing is now settled. The six blockers are
+decisions only the Controller and the business owner can make, and the implementation that follows from them. None is
+resolved by writing code here, and none may be closed early to reach a deployment. No
+`FINAL-RELEASE-MERGE-AND-DEPLOY-01` candidate is registered while the preflight is not PASS.
 
 **This module's footprint on production: none.** Production service starts 0 · production database writes 0 · licence
 activations 0 · secret reads 0 · Nginx changes 0 · DNS changes 0 · deployments 0.
 
-*Part II written 2026-09-18 by Claude Code in FINAL-RELEASE-PRODUCTION-PREFLIGHT-02. The server facts are the
-Controller's and the user's measurements; nothing here is a production approval or a legal conclusion.*
+*Part II written 2026-09-18 by Claude Code in FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 and corrected by its review fix
+(§49). The server facts are the Controller's and the user's measurements; nothing here is a production approval or a
+legal conclusion.*
+
+## 49. Review fix — FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01
+
+> 2026-09-18 · TYPE C · A1 · documentation only. A new commit on top of `86637f7`, which keeps the original text.
+
+| Corrected | Before | After |
+|---|---|---|
+| Region | "Frankfurt Zone 2", with a supposed conflict against D-001's "US" label | **US Virginia, Virginia Zone 2**, confirmed by the user in the Tencent Cloud console. D-001 and `CLAUDE.md` were right; there is no conflict |
+| Provisioning script | described as refusing production | its guard only checks the database name for `prod` / `production` / `live`, and `litubo_cms` passes. It is not a sufficient production safety boundary: **production provisioning safety path = OPEN** |
+| document-extractor | its reproducibility treated as a production item | **OPEN for later AI / PDF functionality; not a blocker for the initial non-AI launch** |
+| Launch blockers | the open items were listed without separating what blocks the initial launch | six initial-launch blockers, listed apart from the non-blockers (§48) |
+
+The Media Library folder bootstrap stays **OPEN** and is now stated more concisely (§41). Nothing else changed: the
+topology (D-043), the fresh empty database, the launch feature policy, the stale marking of the `localhost`
+production `DIRECTUS_PUBLIC_URL`, and RSG-08 remaining `OPEN` all stand.

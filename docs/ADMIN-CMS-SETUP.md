@@ -201,7 +201,7 @@ docker compose -f docker-compose.yml exec directus \
 ## 6. 腾讯云生产环境部署
 
 > **2026-09-18 事实同步（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02）：**
-> - **主机**：生产主机已由 Controller 与用户实测，为腾讯云 Lighthouse 法兰克福 Zone 2，Ubuntu 24.04.4，x86_64。该主机与既有的 refrigerant-store 系统共用，不得扰动。
+> - **主机**：生产主机已由 Controller 与用户实测，为腾讯云 Lighthouse 美国弗吉尼亚（Virginia Zone 2），Ubuntu 24.04.4，x86_64。该主机与既有的 refrigerant-store 系统共用，不得扰动。
 > - **拓扑**：V1 生产拓扑已冻结（`docs/project/08-decision-log.md` D-043）。Nuxt 是 systemd 管理的宿主进程，使用 LITUBO 专用的 Node 22.22.2，监听 `127.0.0.1:3310`；Directus、PostgreSQL 与 document-extractor 仍由本 Compose 运行。
 > - **目录**：下面第 2、3 步的 `/data/litubo/postgres`（70:70）与 `/data/litubo/uploads`（1000:1000）已在该主机建立。
 > - **第 5 步已不适用**：第 5 步写于拓扑冻结之前。现在生产 Compose 的配置值与 Nuxt 的运行时 secret 都放在 Git 之外受保护的服务器端配置中，已预建目录 `/etc/litubo`（root:root 700）；具体文件与读取方式由后续获授权的部署模块确定。
