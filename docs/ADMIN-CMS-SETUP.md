@@ -200,6 +200,13 @@ docker compose -f docker-compose.yml exec directus \
 
 ## 6. 腾讯云生产环境部署
 
+> **2026-09-18 事实同步（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02）：**
+> - **主机**：生产主机已由 Controller 与用户实测，为腾讯云 Lighthouse 法兰克福 Zone 2，Ubuntu 24.04.4，x86_64。该主机与既有的 refrigerant-store 系统共用，不得扰动。
+> - **拓扑**：V1 生产拓扑已冻结（`docs/project/08-decision-log.md` D-043）。Nuxt 是 systemd 管理的宿主进程，使用 LITUBO 专用的 Node 22.22.2，监听 `127.0.0.1:3310`；Directus、PostgreSQL 与 document-extractor 仍由本 Compose 运行。
+> - **目录**：下面第 2、3 步的 `/data/litubo/postgres`（70:70）与 `/data/litubo/uploads`（1000:1000）已在该主机建立。
+> - **第 5 步已不适用**：第 5 步写于拓扑冻结之前。现在生产 Compose 的配置值与 Nuxt 的运行时 secret 都放在 Git 之外受保护的服务器端配置中，已预建目录 `/etc/litubo`（root:root 700）；具体文件与读取方式由后续获授权的部署模块确定。
+> - **本节仍不是可执行的上线步骤**：生产部署尚未授权。现状与剩余 blocker 见 `docs/project/PRODUCTION-PREFLIGHT.md` Part II（§35–§48）。
+
 ### 6.1 首次部署步骤
 
 ```bash
@@ -228,6 +235,10 @@ nano .env   # 或 vim .env
 # POSTGRES_DATA_DIR=/data/litubo/postgres
 # DIRECTUS_UPLOADS_DIR=/data/litubo/uploads
 # DIRECTUS_PUBLIC_URL=http://localhost:8055  （保持，通过 SSH 隧道访问）
+#   ↑ STALE / SUPERSEDED PENDING CONTROLLER DECISION（2026-09-18，FINAL-RELEASE-PRODUCTION-PREFLIGHT-02）：
+#     生产 DIRECTUS_PUBLIC_URL 尚未决定——OPEN / BLOCKING BEFORE FIRST PRODUCTION DIRECTUS ACTIVATION。
+#     OIG 激活绑定 project + PUBLIC_URL，激活次数有限；决定之前不得用许可证 key 启动生产 Directus。
+#     不要照抄上面这一行，也不要自行改成其他值（见 docs/project/PRODUCTION-PREFLIGHT.md §43）。
 
 # 6. 启动
 docker compose -f docker-compose.yml up -d

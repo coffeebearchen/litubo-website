@@ -1,5 +1,12 @@
 # Production Preflight
 
+> **Current result — FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 (2026-09-18): PRODUCTION PREFLIGHT STILL INCOMPLETE.**
+> The production host now exists and has been measured, and the V1 deployment topology is frozen (D-043). Still open:
+> `DIRECTUS_PUBLIC_URL`, the canonical host and TLS, backup schedule / retention / encryption / offsite, the written
+> production rollback, the production secret files, and three items this pass found (§47). **Part II (§35–§48) is the
+> current assessment.** Part I (§1–§34) below is the FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 record as written from the
+> repository alone; it is kept, with a one-line pointer wherever Part II supersedes it.
+
 > Module: FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 · 2026-09-18 · read-only assessment.
 > **Result: PRODUCTION PREFLIGHT INCOMPLETE — HUMAN / INFRA BLOCKERS REMAIN.**
 > This module changed no production system — none exists to change. It contacted no server, wrote no DNS, issued
@@ -25,6 +32,9 @@
 A production build must come from the merged `master` SHA, or from an exact release SHA the Controller
 approves. Deploying from an uncommitted working tree, a development server or an older `master` is forbidden.
 
+> **Updated (§35):** the remote review branch is now `32e877a` — documentation-only commits since `9f1da6f` — with
+> its own GitHub CI success (run `35303613756`); `origin/master` is still `8f2e384`.
+
 ## 2. Git / CI
 
 | Check | Result |
@@ -38,6 +48,9 @@ approves. Deploying from an uncommitted working tree, a development server or an
 
 ## 3. Production host
 
+> **Superseded (§36–§37):** the production host now exists — Tencent Cloud Lighthouse, Frankfurt Zone 2, the server
+> that already runs the refrigerant-store system.
+
 **PRODUCTION HOST = NOT YET PROVISIONED (no information of any kind in the repository).**
 
 Every reference is a placeholder or an intention: `ssh user@<server-host>`, `http://<server-public-ip>:8055`,
@@ -48,6 +61,8 @@ This is not a defect in the code. It is the missing input that blocks the infras
 The minimum information needed is listed in §31.
 
 ## 4. Operating system
+
+> **Superseded (§36):** Ubuntu Server 24.04.4 LTS on x86_64 — the architecture this project has verified.
 
 **NOT ASSESSABLE** — no host. Constraints that the target must satisfy:
 
@@ -61,6 +76,9 @@ The minimum information needed is listed in §31.
   (`PRODUCTION-PROVISIONING-RUNBOOK.md` §1).
 
 ## 5. CPU / RAM / disk
+
+> **Updated (§36, §38):** measured host — 2 vCPU, about 3.6 GiB, about 59 GB, shared with an existing workload;
+> sufficient for rehearsal and initial deployment verification, not proven for long-term production.
 
 **NOT ASSESSABLE** — no host. What the repository can say:
 
@@ -85,6 +103,9 @@ The minimum information needed is listed in §31.
 | Docker Engine + Compose plugin | required | **unverified — no host** |
 | Node (build / release entry) | **22.22.2 exactly** (`.nvmrc`, `engines`), enforced fail-closed by `scripts/verify-node-runtime.mjs` as the first step of `npm run release:verify` | ready as a contract; unverified on a host |
 | Node (running the built server) | the built `.output/server/index.mjs` runs under the same runtime contract | depends on the undecided run method (§10) |
+
+> **Updated (§39–§40):** Docker Engine 29.1.3 · Compose v2 2.40.3 · LITUBO's own Node 22.22.2 at
+> `/opt/litubo/runtime/node-current`; Nuxt runs as a systemd host process on that Node.
 
 ## 7. DNS — **measured today, read-only**
 
@@ -126,6 +147,9 @@ No certificate was issued or changed.
 
 ## 9. `PUBLIC_URL` — **BLOCKER**
 
+> **Still OPEN (§43).** The statements presenting `http://localhost:8055` as the production value, in `.env.example`
+> and `ADMIN-CMS-SETUP.md` §6.1, are now marked stale pending the Controller's decision.
+
 | Variable | Repository value | Requirement |
 |---|---|---|
 | `DIRECTUS_PUBLIC_URL` | `.env.example` and `ADMIN-CMS-SETUP.md` §6.1 both state **`http://localhost:8055` for production**, "SSH tunnel only — no public domain" | The preflight contract requires an absolute HTTPS URL that is not `localhost` and not a development URL |
@@ -147,6 +171,9 @@ Two distinct problems, both real:
 activation consequence understood) before deployment.** Not decided here.
 
 ## 10. Topology — **PARTIALLY DECIDED**
+
+> **Superseded (§39, D-043):** Nuxt runs as a host process under systemd on `127.0.0.1:3310`, so the extractor
+> address is the loopback gateway, `http://127.0.0.1:8787`.
 
 Decided, enforced in the repository and tested:
 
@@ -184,6 +211,9 @@ Intended public exposure (`OPERATIONS-HANDBOOK.md` §9):
 The Nuxt application's own listening port (3000 by default) must be reachable **only** by the reverse proxy,
 not from the Internet. Which interface it binds depends on §10.
 
+> **Updated (§39):** the Nuxt application listens on `127.0.0.1:3310`, set explicitly — Nitro binds every interface
+> when no host is given.
+
 **Status: intended design clear and enforced in Compose for the containers; unverifiable on a host that does
 not exist.**
 
@@ -194,6 +224,9 @@ Internet, and verify with `ss -tlnp | grep 8055` showing `127.0.0.1:8055` plus a
 timing out (`ADMIN-CMS-SETUP.md` §7). **DEPLOY-TIME GATE.** Nothing was changed here.
 
 ## 13. Reverse proxy — **BLOCKER**
+
+> **Partially superseded (§39, §44):** the architecture is frozen — the existing host Nginx gets its own LITUBO virtual
+> host in front of Nuxt; the virtual host itself, TLS and forwarded-header handling remain open.
 
 **The repository contains no reverse-proxy configuration of any kind** — no Nginx, Caddy or Traefik file, no
 `deploy/`, `infra/` or `ops/` directory. Documents reference one as if it existed:
@@ -261,6 +294,9 @@ documentation forbids that command outright. **No production database was create
 | State | stateless — nothing to back up |
 | Production topology | **depends on §10**: a host-process Nuxt uses the loopback gateway; a containerized Nuxt would join the internal network and drop the gateway |
 
+> **Updated (§39):** Nuxt is a host process, so the loopback gateway path applies. The image a production host runs is
+> a new open item (§47 row 19).
+
 ## 17. Uploads / media persistence
 
 | Item | State |
@@ -321,6 +357,9 @@ secret read once from `process.env` at runtime; a built server never reads a `.e
 puts those values into the Nuxt process environment in production is **undecided and unexercised**, because it
 depends on §10. No production secret manager has ever been exercised.
 
+> **Updated (§45):** the mechanism is frozen — protected server-side configuration injected into the systemd process
+> environment; no file exists yet. `DIRECTUS_URL` and `DOCUMENT_EXTRACTOR_URL` now follow from the topology (§39).
+
 ## 19. OIG production activation
 
 | Fact | Value |
@@ -353,6 +392,9 @@ key was never read.**
 
 **Status: HUMAN / INFRA GATE.** The tooling is ready and proven locally; the production destination, schedule,
 retention and encryption are undecided. This is **not** "offsite already exists" — it does not.
+
+> **Updated (§46):** `/data/litubo/backups` now exists on the host (mode 700); schedule, retention, encryption and
+> offsite storage remain open.
 
 ## 21. Offsite backup
 
@@ -427,6 +469,8 @@ checks above are actually performed in the first week (`OPERATIONS-HANDBOOK.md` 
 introduced.
 
 ## 26. Production initial data
+
+> **Superseded (§41):** option A is chosen — a fresh, empty production database.
 
 **Decision required — option not yet chosen.** The three admissible sources:
 
@@ -507,6 +551,9 @@ will be without explicit authorization.
 
 ## 31. Production host information needed
 
+> **Mostly answered (§36–§40):** items 1 and 3–7 are answered; item 2 is not part of the evidence; items 8–11 remain
+> open; item 12 is answered as a mechanism (§45), not yet as files.
+
 The minimum to move this preflight forward. **The user supplies these themselves; Claude reads no credential.**
 
 1. **Provider and region** — the existing US Tencent Cloud instance, or a new one?
@@ -526,6 +573,8 @@ The minimum to move this preflight forward. **The user supplies these themselves
     `.env` on the server).
 
 ## 32. Blockers and gates
+
+> **Superseded by the reconciliation in §47.**
 
 **BLOCKING — must be resolved before a deployment can be planned**
 
@@ -560,6 +609,8 @@ The minimum to move this preflight forward. **The user supplies these themselves
 | `master` branch protection | **recommended before merge** |
 
 ## 33. Final result
+
+> **Superseded by §48 — PRODUCTION PREFLIGHT STILL INCOMPLETE.**
 
 ```text
 PRODUCTION PREFLIGHT INCOMPLETE — HUMAN / INFRA BLOCKERS REMAIN
@@ -643,3 +694,337 @@ host's specification, operating system, architecture, Docker versions, network a
 bring the new host facts in formally.
 
 *Addendum written 2026-09-18 by Claude Code in PRODUCTION-PREFLIGHT-UID-CORRECTION-01.*
+
+---
+
+## Part II — FINAL-RELEASE-PRODUCTION-PREFLIGHT-02: reassessment with server evidence
+
+> Module: **FINAL-RELEASE-PRODUCTION-PREFLIGHT-02** · 2026-09-18 · TYPE C · A1 `GOVERNANCE_DOCS` · local commit only.
+> **Result: PRODUCTION PREFLIGHT STILL INCOMPLETE.** The production host now exists and has been measured, and the
+> Controller has frozen the V1 deployment topology (D-043). What remains open is what a server cannot settle by
+> existing: `DIRECTUS_PUBLIC_URL`, the canonical host and TLS, backup schedule / retention / encryption / offsite, the
+> written production rollback and the production secret files — plus three items this pass found (§47 rows 18–20).
+> Production release remains **NOT APPROVED**; merge and deploy each still require their own authorization.
+
+## 35. Scope, baseline and evidence
+
+| Item | Value |
+|---|---|
+| Branch / start HEAD | `review/final-release-verification-01` / `32e877a162bbbf6db86aedf56d3495afe8efa938` — matches the work order |
+| Remote review branch | `32e877a` — equal to the start HEAD |
+| GitHub CI for `32e877a` | run `35303613756`, completed / **success** — verified independently by the Controller |
+| Since `9f1da6f` (Part I's release SHA) | documentation only: six files under `docs/`, no runtime, test or workflow change |
+| `origin/master` | `8f2e3847e0d7acda1bd987ffd18c3af03377fef9` — unchanged, not merged |
+| Tracked changes at start | 0; the six historical untracked paths untouched |
+
+**Where the facts come from.** Every server fact in §36–§40 was measured on the real server by the Controller and the
+user — read-only checks plus a safe installation (the LITUBO Node runtime, the Git checkout, the build and the
+directories) — and handed to this module in its work order. This module did not contact the server. Facts drawn from
+the repository cite the file and line.
+
+**What this module did not do.** No deployment; no service, container or database started; no `docker compose up`; no
+schema apply or provisioning; no Directus administrator created; no licence key used and no activation consumed; no
+`.env` created or read; no secret read, printed or requested; no Nginx, firewall, DNS, Wix, Cloudflare or registrar
+change; no certificate; no AI call; no e-mail; no `npm audit fix` or `npm upgrade`; no push; no merge.
+
+## 36. Production host — measured
+
+| Item | Value |
+|---|---|
+| Provider | Tencent Cloud Lighthouse |
+| Region | Frankfurt Zone 2 |
+| Operating system | Ubuntu Server 24.04.4 LTS |
+| Architecture | x86_64 (`linux/amd64`) |
+| CPU | 2 vCPU |
+| Memory | nominal 4 GB; about 3.6 GiB visible to the host |
+| Disk | 60 GB class; filesystem about 59 GB |
+| Free disk after the Nuxt build | about 40 GB |
+
+- **The architecture is the verified one.** `linux/amd64` is the only architecture this project has run and verified
+  (§4), and both pinned images have now run on this host (§34). The §4 architecture concern is closed.
+- **The region differs from the documentation.** D-001, `CLAUDE.md`, `01-technical-decision.md` and
+  `00-current-status.md` describe "the existing **US** Tencent Cloud server". The verified host — the existing server
+  that already runs the refrigerant-store system — is in **Frankfurt**. The substance of D-001 (reuse the existing
+  Tencent Cloud server as the single application server) matches the verified host; only the region label does not.
+  This is recorded for the Controller to confirm (§47 row 20). This module does not edit D-001, `CLAUDE.md` or the
+  technical decision; it adds a fact note to `CURRENT-STATE.md` §1.
+
+## 37. Existing workload on the same host — must not be disturbed
+
+| Existing | Fact at verification |
+|---|---|
+| Application directory | `/home/ubuntu/refrigerant-store` |
+| Containers | `deploy_server_1`, `deploy_redis_1`, `deploy_mysql_1` — all `Up 3 weeks` |
+| Host Nginx | listening on `:80`; its `/api/` location proxies to `localhost:8080` for the old application |
+| Existing application | `:8080` |
+
+LITUBO work must not change, restart, migrate or redesign any of this. What that means for the deployment module:
+
+1. **LITUBO needs its own Nginx virtual host, selected by its own host name.** LITUBO's server API lives entirely under
+   `/api/*` (public CMS, inquiries, admin), so it can never share the old application's `/api/` location, and that
+   location is not to be edited.
+2. **No LITUBO host name may resolve to this server before the LITUBO virtual host exists** — until then Nginx would
+   answer that name with whichever server block it treats as the default.
+3. **Compose isolation is already in the repository.** `docker-compose.yml` fixes `name: litubo-cms`, so LITUBO's
+   containers and networks are namespaced apart from the old `deploy_*` project. Every LITUBO script and runbook uses
+   `docker compose` (the v2 plugin, 2.40.3 here); none uses the legacy `docker-compose` 1.29.2, which stays installed
+   for the old system and is not removed.
+4. **Port availability is not yet verified.** The evidence lists `:80` and `:8080` in use; whether `127.0.0.1:3310`,
+   `:8055` and `:8787` are free was not part of it. A read-only listener check is a deployment-module entry step.
+5. **Memory, CPU, disk and the Docker daemon are shared** — see §38.
+
+## 38. Capacity — sufficient for rehearsal, not proven for production
+
+The measured host (§36) is shared with the workload in §37. The repository's only sizing data is the local baseline
+(§5; `PRODUCTION-CAPACITY-DEPENDENCY-REVIEW.md`): Directus about 237 MiB idle and 280–316 MiB under load (measured on
+11.17.4; 12.3.1 not re-measured), PostgreSQL about 30 MiB, the Nuxt server 75–193 MiB, and declared caps of 512 MiB
+for the extractor and 96 MiB for its gateway. Directus and PostgreSQL declare no memory limit. Locally the Directus,
+PostgreSQL and extractor images occupy about 1.21 GB, 420 MB and 633 MB of disk.
+
+**Conclusion — the only one the evidence supports:** the host is **sufficient to continue production rehearsal and
+initial deployment verification.** It is **not** proven sufficient for long-term production. Memory, CPU, swap and disk
+growth (images, logs, backup sets) must be measured again once the full LITUBO stack runs beside the existing workload.
+
+## 39. Frozen V1 production topology (D-043)
+
+Decided by the Controller; recorded here, not designed here.
+
+```text
+Internet
+   ↓ 80 / 443
+Nginx — the existing host Nginx; LITUBO gets its own virtual host (not configured yet)
+   ↓
+Nuxt 127.0.0.1:3310 — host process under systemd, /opt/litubo/runtime/node-current/bin/node
+   ↓ server API only
+Directus 127.0.0.1:8055 — Compose; the Studio only through an SSH tunnel
+   ↓
+PostgreSQL — Compose network litubo-internal only; no published port
+
+Nuxt → document-extractor-gateway 127.0.0.1:8787 → document-extractor (internal: true network)
+```
+
+| Component | Runs as | Address | In the repository today | Left to the deployment module |
+|---|---|---|---|---|
+| Nuxt | host process under systemd, on LITUBO's own Node by explicit path; **not** in Compose | `127.0.0.1:3310`, never `0.0.0.0` | no unit file (deliberately not created here) | the unit, its environment and its logs |
+| Directus | Compose | `127.0.0.1:8055` | already so (`docker-compose.yml`, guarded by test) | verify the listener on the host; outbound HTTPS to the licensing and telemetry hosts |
+| PostgreSQL | Compose | no published port | already so | — |
+| document-extractor | Compose, `internal: true` network | no published port | already so | image provenance (§47 row 19) |
+| Extractor gateway | Compose | `127.0.0.1:8787` | already so | isolation was measured on Docker Desktop (also Engine 29.1.3); re-verify on Linux |
+| Nginx | existing host service | 80 / 443 | no configuration in Git | the LITUBO virtual host, after the canonical host / TLS decision (§44) |
+
+**Three repository facts the unit and the build depend on:**
+
+1. **Nitro listens on every interface unless told otherwise.** The built server takes its port from `NITRO_PORT` or
+   `PORT` (default 3000) and its host from `NITRO_HOST` or `HOST`, with no default host
+   (`node_modules/nitropack/dist/presets/node/runtime/node-server.mjs` lines 17–18; nitropack 2.13.4 per the lockfile).
+   The unit must set the host to `127.0.0.1` and the port to `3310` explicitly; leaving the host out binds all
+   interfaces.
+2. **One process.** The admin session-refresh coordinator, both rate limiters and pending AI proposals are per-process
+   memory state. A single systemd instance is what they were built for, and a restart clears them. The multi-instance
+   precondition in `MASTER-ROADMAP.md` M8 (a shared coordinator) does not arise.
+3. **Non-secret configuration is read whenever `nuxt.config.ts` is evaluated — including at build time.** Under D-043:
+
+| Setting | Build-time variable (default) | Run-time override | Value under D-043 |
+|---|---|---|---|
+| `directusUrl` | `DIRECTUS_URL` (empty) | `NUXT_DIRECTUS_URL` | `http://127.0.0.1:8055` |
+| `documentExtractorUrl` | `DOCUMENT_EXTRACTOR_URL` (`http://127.0.0.1:8787`) | `NUXT_DOCUMENT_EXTRACTOR_URL` | `http://127.0.0.1:8787` — the default |
+| `cmsMode` / `productsCmsMode` | `CMS_MODE` / `CMS_MODE_PRODUCTS` (`fixtures`) | `NUXT_CMS_MODE` / `NUXT_PRODUCTS_CMS_MODE` | `directus` — anything else fails closed (503) |
+| `public.siteUrl`; i18n `baseUrl` (line 35) | `NUXT_PUBLIC_SITE_URL` (`https://litubo.com`) | `NUXT_PUBLIC_SITE_URL` (for `siteUrl`) | the canonical host — **OPEN** (§44) |
+| Listen address | — | `NITRO_HOST` / `NITRO_PORT` | `127.0.0.1` / `3310` |
+
+These are addresses and switches, not secrets. The host's build of `32e877a` was made in an environment this module
+did not see, so the non-secret values baked into it are unknown: it proves the build works on the host, and it is
+**not** the release artifact. The release artifact comes from the canonical release entry `npm run release:verify`
+(Node gate → Directus pin → PostgreSQL pin → published-TEST-data check → build; D-041 (5)). That entry needs the
+Directus and PostgreSQL containers running, so it belongs to the deployment module, and it should run with the decided
+canonical host, because the i18n `baseUrl` is taken from the same variable when the configuration is evaluated.
+
+## 40. Runtime, checkout, build and directories — measured
+
+| Item | Fact |
+|---|---|
+| Docker Engine | 29.1.3 |
+| Docker Compose (v2 plugin) | 2.40.3 |
+| Legacy `docker-compose` | 1.29.2 — kept for the existing system; not removed, not upgraded, not a LITUBO entry point |
+| LITUBO Node | `/opt/litubo/runtime/node-current` — Node 22.22.2, npm 10.9.7 (matches `.nvmrc`; D-038 (1)) |
+| System Node | 18.20.8 / npm 10.8.2 — left in place; LITUBO does not replace it |
+| Checkout | `/opt/litubo/repo`, fast-forwarded to `32e877a`; working tree clean |
+| Build | `npm ci` and `npm run build` succeeded; Nuxt 3.21.11 (the version `package-lock.json` pins); `.output/server/index.mjs` exists |
+| npm advisories | `npm ci` printed an audit advisory; its content is not part of the evidence, and **nothing was fixed or upgraded** — no `npm audit fix`, no `--force`, no `npm upgrade`. The last recorded dependency review is D-041's (production dependencies: critical 0 / high 1, the build-time `glob` / moderate 2 / low 1) |
+
+| Path | Owner | Mode | Purpose |
+|---|---|---|---|
+| `/data/litubo/postgres` | 70:70 | 755 | PostgreSQL data bind mount (`POSTGRES_DATA_DIR`); owner = the pinned Alpine image's `postgres` user (§34) |
+| `/data/litubo/uploads` | 1000:1000 | 755 | Directus uploads bind mount (`DIRECTUS_UPLOADS_DIR`); owner = Directus uid 1000 |
+| `/data/litubo/backups` | not part of the evidence | 700 | local backup output |
+| `/etc/litubo` | root:root | 700 | protected server-side configuration |
+
+**Existence only.** These facts prove the paths exist with the recorded owner and mode — nothing about their contents,
+and nothing about a backup schedule, retention, encryption or offsite storage. **Entry check for the deployment
+module:** under the fresh-database policy (§41), `/data/litubo/postgres` and `/data/litubo/uploads` must be empty
+before the first start.
+
+## 41. Initial production data — decided
+
+**A fresh, empty production database** (§26 option A, now chosen). Nothing is copied from the development database, a
+test database, TEST ONLY products, local sessions, local Directus data or a rehearsal database. Schema, permissions and
+the service identity come from the repository's tracked provisioning artifacts (`scripts/provisioning-manifest.json`,
+13 steps). Real products follow a separate, human-controlled rollout — one Draft → human verification → first publish
+→ 3–5 products → verification → batch import (§27). This module created no product and no database.
+
+Facts the deployment module has to carry (none of them decided here):
+
+1. **The provisioning executor is not a production tool as written.** `scripts/provision-directus.mjs` refuses any
+   database name containing `prod`, `production` or `live` — "this script has no production mode to opt into"
+   (lines 16–17, 52, 91–93) — and states that production provisioning is "a separate, authorized activity". How the
+   tracked artifacts are applied to the production database, and under which authorization, is a TYPE D decision.
+2. **Provisioning waits for `DIRECTUS_PUBLIC_URL`.** Step `10` (schema baseline) is where a key-bearing Directus
+   activates the licence (`PRODUCTION-PROVISIONING-RUNBOOK.md` §2), and the activation binds to `PUBLIC_URL` (§43).
+3. **The Media Library folder tree is data, and a fresh database has none.** The governed folders
+   (`server/utils/folderRegistry.ts` lines 55–72: `home`, `applications`, `company`, `products/xray` and the other
+   product roots, `resources`, …) are rows in `directus_folders`; neither the schema snapshot nor any provisioning step
+   creates them. Uploads still work — they land in *Needs Classification*, because the upload route accepts no folder
+   (`server/api/admin/media/upload.post.ts` line 114) — but the LITUBO admin cannot create the governed roots, since a
+   new folder needs an existing zone parent (`validateFolderCreate`, `folderRegistry.ts` lines 388–426). A decided
+   bootstrap — a tracked artifact or a documented one-time step — is needed before real media is filed.
+4. **After provisioning:** restart Directus (it caches schema and permissions), then run
+   `npm run release:check-test-data` against the production database — only exit 0 passes.
+5. **The explainable initial state** is unchanged from §26: 0 products, 0 content items, an empty sitemap and empty
+   public lists.
+
+## 42. Launch feature policy — decided
+
+| Feature | Launch setting | Existing behaviour (unchanged) |
+|---|---|---|
+| AI providers | `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` unset | each provider reports "not configured"; no request, no cost |
+| Product AI Apply | `PRODUCT_AI_APPLY_ENABLED` unset | closed in production (503); generation and review still work |
+| HubSpot | `HUBSPOT_ACCESS_TOKEN` unset | inquiries stored as `not_configured`; no HubSpot request |
+| SMTP | optional | without it the inquiry is **still stored** and only the notification is skipped; configuring it later is a separate step, and its values are never part of this module |
+
+No AI key is connected, and no AI cost can arise from this configuration.
+
+## 43. `DIRECTUS_PUBLIC_URL` — OPEN / BLOCKING BEFORE FIRST PRODUCTION DIRECTUS ACTIVATION
+
+Unchanged from §9 and deliberately **not decided here**. No value is chosen — not `http://localhost:8055`, not
+`https://www.litubo.com`, not `https://litubo.com`, not `https://cms.litubo.com`, not a temporary IP address or host
+name. The OIG activation binds to the project and `PUBLIC_URL`, activations are limited (4 left), and production
+Directus has never started, so the value can still be chosen correctly, once.
+
+Until the Controller decides:
+
+- no production Directus is started with the licence key, and no activation is consumed;
+- the statements that presented `http://localhost:8055` as the production value are marked **stale / superseded
+  pending Controller decision** — the comment above `DIRECTUS_PUBLIC_URL` in `.env.example`, and
+  `docs/ADMIN-CMS-SETUP.md` §6.1 — without replacing them with any other value. The local-development value in
+  `.env.example` is unchanged.
+
+## 44. Canonical host and TLS — OPEN
+
+Unchanged: apex or `www` is not decided, and neither is the TLS terminator (Cloudflare or an origin certificate). The
+domain's nameservers are still Wix's and the old Wix site is live (§7), so cut-over is a nameserver migration. The
+evidence shows the host Nginx on `:80`; `:443` is not part of it. Nothing was changed.
+
+Whatever is decided, the application needs the following from the virtual host (repository facts):
+
+| Requirement | Why |
+|---|---|
+| **HTTPS before production admin use** | the admin session cookies are `Secure` in production (`server/api/admin/auth/login.post.ts` lines 50–52), so `/admin` — and with it the first product rollout — needs HTTPS |
+| **Pass the original `Host` header to Nuxt** | the admin CSRF check compares the `Origin` host with the request's `Host` (`server/middleware/admin-auth.ts` lines 81–90); a proxy that sends `Host: 127.0.0.1:3310` makes every admin write fail with 403 |
+| **Exactly one trustworthy client address in `X-Forwarded-For`** | the public inquiry limiter (`server/utils/publicInquiry.ts` lines 146–147) and the admin login lock-out (`login.post.ts` lines 5–6) both key on the first `X-Forwarded-For` address and fall back to the socket address. Overwrite the header with the real client address (restored from Cloudflare first, if Cloudflare is chosen) and never append to a client-supplied value, or the limits can be dodged; without the header every visitor is `127.0.0.1`, and five failed logins would lock every administrator out for 15 minutes |
+| **Body size** | public inquiries are capped at 64 KB in the application (`publicInquiry.ts` line 40); admin media uploads allow 50 MB per file (`upload.post.ts` line 93), and the proxy limit must admit that on the upload route |
+| **The old application's `/api/` location stays untouched** | §37 |
+
+## 45. Secret and configuration mechanism — frozen, not yet provisioned
+
+**Frozen (D-043):** Compose secret and configuration values stay **outside Git**; the Nuxt server's runtime secrets are
+**injected into the systemd process environment from protected server-side configuration**. The prepared directory is
+`/etc/litubo` (root:root, 700); nothing inside it is recorded, and this module created, read or checked no file there.
+
+**Unchanged contract (D-038, D-039):** one canonical name per secret; no `NUXT_*` alias for a secret; nothing secret in
+`.output`; a built server never reads a `.env` file; a missing secret fails closed.
+
+**Not yet done — deployment module:** create the protected configuration; define exactly how Compose and the unit read
+it; confirm the launch-required secrets are **present** — by name, never by value (§18: `DB_PASSWORD`,
+`DIRECTUS_SECRET`, the administrator bootstrap pair, `DIRECTUS_LICENSE_KEY`, `DIRECTUS_TOKEN`,
+`SUBMISSION_IP_SECRET`); and repeat the D-039 check that the release build contains no secret. `DIRECTUS_LICENSE_KEY`
+must not reach a production Directus before §43 is decided.
+
+## 46. Backup and rollback — re-classified on the new evidence
+
+| Item | State | Evidence / reason |
+|---|---|---|
+| Backup / restore tooling | **PROVEN locally** (D-040) | unchanged |
+| Backup output directory on the host | **EXISTS** | `/data/litubo/backups`, mode 700 — existence only |
+| Backup schedule | **OPEN** | nothing scheduled or deployed |
+| Retention | **OPEN** | not decided |
+| Encryption at rest | **OPEN** | not decided; a set is credential material (§20) |
+| Offsite destination (COS is a candidate) | **OPEN** | not chosen, not configured |
+| Offsite transfer verification | **OPEN** | nothing to verify yet |
+| Production restore / cut-over | **OPEN** | not a mode of the tool (§22) |
+| Written production rollback | **OPEN** | not provided (§23; `RELEASE-SAFETY-GATES.md` §3A.8 step 8) |
+| Restored uploads owned by uid 1000 on Linux | never rehearsed | the target directory's owner now matches (1000:1000) |
+
+`/data/litubo/backups` sits on the same disk as the data it would protect, so on its own it is a staging location, not
+an offsite destination (`PRODUCTION-BACKUP-RESTORE-RUNBOOK.md` §3: do not keep the only copy on the disk that holds
+the data it protects). The host has a Git checkout, which makes "check out the previous release SHA and rebuild"
+mechanically possible — but no written procedure exists, and data rollback still has no production path.
+
+## 47. Blocker reconciliation
+
+| # | Item | Previous state (Part I) | Current state | Evidence | Remaining action | Owner / next gate |
+|---|---|---|---|---|---|---|
+| 1 | Production host (B-1) | BLOCKING — no host information | **CLOSED** | Tencent Cloud Lighthouse, Frankfurt Zone 2 (§36) | — | — |
+| 2 | OS / architecture (B-1) | NOT ASSESSABLE | **CLOSED** | Ubuntu Server 24.04.4 LTS; x86_64, the only verified architecture; both pinned images ran here (§34, §36) | — | — |
+| 3 | Docker / Compose (B-1) | unverified | **CLOSED** | Engine 29.1.3; Compose v2 2.40.3; legacy 1.29.2 kept (§40) | LITUBO uses `docker compose` (v2) only; the legacy tool stays | deployment module |
+| 4 | Capacity baseline | NOT ASSESSABLE (warning) | **PARTIALLY CLOSED** | 2 vCPU · about 3.6 GiB · about 59 GB · about 40 GB free after the build; shared host (§36–§38) | measure again with the full stack beside the existing workload | deployment module → post-deploy review |
+| 5 | Nuxt production run mode (B-2) | BLOCKING — undecided | **CLOSED** (decision) | D-043: systemd host process, explicit Node path, `127.0.0.1:3310` (§39) | write the unit; set host and port explicitly | deployment module |
+| 6 | Reverse proxy architecture (B-3) | BLOCKING — none | **PARTIALLY CLOSED** | frozen: existing host Nginx → own LITUBO virtual host → `127.0.0.1:3310` (§39); no virtual host exists | write it after row 13: `Host` pass-through, one trustworthy `X-Forwarded-For`, body size, timeouts (§44); old server blocks untouched | Controller (row 13) → deployment module |
+| 7 | Network exposure plan | design clear; not verifiable | **PARTIALLY CLOSED** | public 80 / 443 only; 3310 / 8055 / 8787 on loopback; 5432 unpublished; Studio via SSH tunnel; the Compose bindings are in the repository and tested (§39) | on the host: listener check, external probe, Lighthouse firewall rules (not part of the evidence), outbound HTTPS for Directus licensing and telemetry | deployment module |
+| 8 | Persistence paths | design ready; no host | **CLOSED** | `/data/litubo/postgres` 70:70 755; `/data/litubo/uploads` 1000:1000 755 (§40) | confirm both are empty before the first start | deployment module (entry check) |
+| 9 | Initial production data source (B-8) | BLOCKING — not chosen | **CLOSED** (decision) | fresh empty database; tracked provisioning artifacts; staged product rollout (§41) | the production provisioning path and its authorization (the executor refuses production names); a folder-tree bootstrap; runs only after row 12 | Controller → deployment module |
+| 10 | Production build feasibility | not assessed | **CLOSED** (Nuxt) | host `npm ci` + `npm run build` at `32e877a`; Nuxt 3.21.11, as the lockfile pins; `.output/server/index.mjs` (§40) | produce the release artifact with `npm run release:verify` and the production non-secret configuration (§39) | deployment module |
+| 11 | Backup destination existence (B-5) | "exists only as text" | **PARTIALLY CLOSED** | `/data/litubo/backups` exists, mode 700, on the same disk as the data (§40, §46) | an offsite destination (row 14) | Controller |
+| 12 | `DIRECTUS_PUBLIC_URL` (B-4) | BLOCKING | **OPEN — BLOCKING BEFORE FIRST PRODUCTION DIRECTUS ACTIVATION** | undecided; stale `localhost` statements marked (§43) | decide the value and understand its licensing consequence; no key and no activation before then | Controller |
+| 13 | Canonical host / TLS (B-7) | BLOCKING | **OPEN** | nameservers on Wix; old site live; `:443` not part of the evidence; the admin cookie is `Secure` in production (§44) | decide apex or `www` and the terminator; then certificate, virtual host and a nameserver migration plan | Controller → deployment module |
+| 14 | Backup schedule / retention / encryption / offsite (B-5) | BLOCKING | **OPEN** | nothing decided or configured (§46) | decide, implement, verify an offsite transfer | Controller → operations module |
+| 15 | Production rollback (B-6) | BLOCKING | **OPEN** | no written production rollback or cut-over (§46) | write it — code, Directus image, data, DNS, proxy | Controller → deployment module |
+| 16 | Secret injection | open — it depended on B-2 | **PARTIALLY CLOSED** | mechanism frozen; `/etc/litubo` (700) exists; no file, no value (§45) | create the protected configuration; presence-only check; secret-free release build | deployment module |
+| 17 | Branch protection / merge status | technically merge-ready; protection not enabled | **OPEN** — human gate, unchanged | remote review branch `32e877a`, CI run `35303613756` success; `origin/master` `8f2e384`; this module's commit is local only | push and merge decisions (A3 / A4); enabling protection before merge is recommended | Controller |
+| 18 | Co-tenancy with the refrigerant-store system | not known | **OPEN** (new) | its containers, Nginx `:80`, the app on `:8080`, `/api/` → `:8080` (§37) | own virtual host by host name; confirm 3310 / 8055 / 8787 are free; change nothing of the old system | deployment module (entry check) |
+| 19 | document-extractor image on the host | not raised | **OPEN** (new) | the base image is pinned by digest but the apt layer is not (`document-extractor/Dockerfile` lines 5, 15–16); D-042's classification covers image `sha256:8d3d0639…` only | run that exact image, or build → scan → classify to BLOCKING 0 / UNKNOWN 0 before production | Controller → deployment module |
+| 20 | Region label ("US" in D-001 and three documents) | not raised | **OPEN** (documentation) | verified region Frankfurt Zone 2 (§36) | the Controller confirms; the wording is corrected in an authorized module | Controller |
+
+Human gates carried unchanged from §29: the Poppler / libvips / util-linux review and the privacy policy with
+`PRIVACY_POLICY_VERSION` are **OPEN**; OIG eligibility and the telemetry acceptance stay closed by the business owner.
+
+## 48. Final result
+
+```text
+PRODUCTION PREFLIGHT STILL INCOMPLETE
+
+Closed             host · OS / architecture · Docker / Compose · Nuxt run mode (decided) · persistence paths ·
+                   initial data (decided) · launch feature policy (decided) · Nuxt build feasibility
+Partially closed   capacity · reverse proxy · network exposure · backup destination (local directory only) ·
+                   secret mechanism
+Open               DIRECTUS_PUBLIC_URL (blocking before the first production Directus activation) ·
+                   canonical host / TLS · backup schedule / retention / encryption / offsite ·
+                   written production rollback · co-tenancy entry checks · extractor image provenance ·
+                   region label in D-001
+Human gates        Poppler / libvips / util-linux review · privacy policy and version ·
+                   master branch protection · merge (A4) and deploy (A5) authorizations
+
+Production release NOT APPROVED
+Deploy             NOT AUTHORIZED — do not start
+```
+
+**Why not PASS.** The server exists, so everything a server settles by existing is now settled. What remains are
+decisions only the Controller and the business owner can make — the Directus public URL, the canonical host and TLS,
+the backup destination and policy, the rollback procedure — and the artifacts that follow from them. None of these is
+resolved by writing code, and none may be closed early to reach a deployment. No `FINAL-RELEASE-MERGE-AND-DEPLOY-01`
+candidate is registered while the preflight is not PASS.
+
+**This module's footprint on production: none.** Production service starts 0 · production database writes 0 · licence
+activations 0 · secret reads 0 · Nginx changes 0 · DNS changes 0 · deployments 0.
+
+*Part II written 2026-09-18 by Claude Code in FINAL-RELEASE-PRODUCTION-PREFLIGHT-02. The server facts are the
+Controller's and the user's measurements; nothing here is a production approval or a legal conclusion.*

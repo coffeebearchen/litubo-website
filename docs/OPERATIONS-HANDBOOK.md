@@ -406,6 +406,11 @@ GitHub 仓库（代码库）包含：
 > nginx / Caddy / Traefik 配置文件**，也没有 Nuxt 应用的 Dockerfile——生产反向代理方案与 Nuxt 的生产运行方式
 > （宿主机进程还是容器）**尚未决定**，因此也不在 Git 的备份范围内。见
 > `docs/project/PRODUCTION-PREFLIGHT.md` §10 / §13。
+>
+> **同步（FINAL-RELEASE-PRODUCTION-PREFLIGHT-02，2026-09-18）：** 两者现已在决定层面冻结（`docs/project/08-decision-log.md`
+> D-043）：Nuxt 是 systemd 管理的宿主进程，不使用 Dockerfile；生产沿用主机上已有的 Nginx，为 LITUBO 单独建一个虚拟主机。
+> 但 LITUBO 的虚拟主机配置与 systemd unit **都还没有编写**，留给后续获授权的部署模块，所以仓库中仍然没有这些文件。见
+> `docs/project/PRODUCTION-PREFLIGHT.md` §39。
 
 **不包含**：
 - 运营数据（产品、文章、询盘记录）——存储在数据库
