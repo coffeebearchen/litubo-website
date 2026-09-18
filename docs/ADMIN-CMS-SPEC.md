@@ -62,6 +62,16 @@ LITUBO 管理后台是面向内部运营人员的内容操作界面，**不是**
 
 ### 2.2 安全边界（强制规则）
 
+> **⚠️ 本节的"管理后台"暴露方式已被取代（FINAL-RELEASE-PRODUCTION-PREFLIGHT-01，2026-09-18）。** 下方架构图与
+> "Nginx 安全配置要求"中关于 `https://admin.litubo.com/` 子域 + Nginx IP 白名单 + 反向代理到 Directus UI 的部分
+> **不再是生产设计，不得据此部署**。现行合同：Directus 与 document-extractor **没有任何公网地址**，Compose 只把
+> Directus 发布在 `127.0.0.1:8055`（由 `tests/directusSecurityRemediationContract.test.ts` 守护），**不创建
+> `admin.litubo.com` 子域，也不存在任何指向 Directus 的反向代理路由**；生产环境的 Directus Studio 只能通过 SSH
+> 隧道访问（`ssh -L 8055:localhost:8055`）。业务用户使用 Nuxt 的 `/admin`，不是 Directus Studio。
+> 依据：`08-decision-log.md` D-042 (11)、`docs/ADMIN-CMS-SETUP.md` §6.2 / §7、
+> `docs/project/SECURITY-REMEDIATION-REVIEW.md` §4.1、`docs/project/PRODUCTION-PREFLIGHT.md` §14。
+> 本节其余内容（前台数据链路规则、凭据管理、robots/sitemap 要求）继续有效；历史原文保留。
+
 #### 访问地址架构
 
 ```

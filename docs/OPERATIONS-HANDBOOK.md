@@ -400,7 +400,12 @@ GitHub 仓库（代码库）包含：
 - 所有前台源代码（Nuxt/Vue 页面、组件、API）
 - 后台 Schema 定义（`directus/schema/`）
 - 文档（`docs/`）
-- 配置文件（Dockerfile、docker-compose、nginx 配置）
+- 配置文件（`document-extractor/Dockerfile`、`docker-compose.yml` / `docker-compose.local.yml`）
+
+> **订正（FINAL-RELEASE-PRODUCTION-PREFLIGHT-01，2026-09-18）：** 本行原先还列出"nginx 配置"，但仓库中**没有任何
+> nginx / Caddy / Traefik 配置文件**，也没有 Nuxt 应用的 Dockerfile——生产反向代理方案与 Nuxt 的生产运行方式
+> （宿主机进程还是容器）**尚未决定**，因此也不在 Git 的备份范围内。见
+> `docs/project/PRODUCTION-PREFLIGHT.md` §10 / §13。
 
 **不包含**：
 - 运营数据（产品、文章、询盘记录）——存储在数据库
