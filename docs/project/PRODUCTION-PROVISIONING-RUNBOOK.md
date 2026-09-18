@@ -35,6 +35,7 @@ so it must be supplied. The repository provisions the identity that holds it and
 | the service user's static token, `DIRECTUS_TOKEN` | the deployment environment / secret manager | **never** |
 | the three Content permission rows | `directus-permissions-01-…sql` (D-034) | yes |
 | the sixteen legacy site permission rows | `directus-permissions-02-…sql` (FINAL-RELEASE-FIX-E) | yes |
+| the ten Media Library Protected System Folders (`directus_folders` rows) | `directus-media-folders-01-bootstrap.sql` (D-045) | yes |
 
 Provisioning therefore needs exactly one secret in its environment: `DIRECTUS_TOKEN`, the same
 secret the Nuxt server authenticates with (§2). Without it the run stops and reports the
@@ -295,20 +296,46 @@ Steps, and what each one exists for, are documented in `scripts/provisioning-man
 Summarised: Directus bootstrap → tracked schema baseline → database constraints → revision guard →
 lifecycle guard → schema-object verification → **access bootstrap → service token → access
 verification** → permissions artifact 01 → its verification → permissions artifact 02 → its
-verification.
+verification → **Media Library folder bootstrap → its verification**.
 
 **Order matters and is not cosmetic.** The constraint, revision-guard and lifecycle-guard SQL must run
 in that sequence; the access bootstrap must precede both permission artifacts, which own rows on a
 policy that has to exist already and fail closed when it does not; and permissions artifact 02
 refuses to run before artifact 01 has created its three rows.
 
+**The Media Library folder bootstrap (steps `60` / `61`, D-045).** A fresh database has no row in
+`directus_folders`, and the admin cannot create the governed roots itself: a customer folder needs an
+existing zone root as its parent. Step `60` creates the ten Protected System Folders the runtime
+policy (`server/utils/folderRegistry.ts`) is keyed on — `home`, `applications`, `company`,
+`products`, `resources` and the five product categories under `products` — and nothing else. It
+creates no legacy, frozen or customer folder, and no file. It depends only on step `00`, runs after
+everything else so the chain before it keeps its order, and step `61` verifies it at once. Over an
+existing environment it keeps every canonical folder with its UUID and creates only what is missing.
+It refuses, writing nothing, when it meets a tree it cannot interpret safely:
+- a duplicate canonical folder;
+- a case or whitespace variant of a canonical name;
+- a canonical name outside the customer zones, away from its canonical position — for example `xray`
+  at the root;
+- a parent cycle, or a folder name containing `/`;
+- an unexpected table shape.
+
+Folders are read from the database on each request, so they need no Directus restart of their own.
+
 The artifacts are idempotent: re-running the whole manifest over an already-provisioned database
 leaves 19 permission rows, 49 tables and 7 triggers unchanged, with both verifications still passing (measured on
-Directus 11.17.4).
+Directus 11.17.4). The folder bootstrap was measured separately, against the local PostgreSQL in TEST ONLY copies
+of `directus_folders` that were always rolled back:
+- a second run writes nothing and keeps every UUID;
+- over a copy of the development tree it writes nothing;
+- each refusal writes nothing.
+
+The full fifteen-step manifest has **not** been re-run from an empty database since steps `60` / `61` were added:
+that needs a disposable Directus, and so a license decision (§2).
 
 **Directus 12.3.1 (FINAL-RELEASE-SECURITY-REMEDIATION-01).** The image has no npm / npx, so the orchestrator starts
 the CLI as `node cli.js`. A fresh provision of an empty TEST database with the committed compose file completed
-13 of 13 steps in 35 s, with every verification passing and without changing any artifact. It produced:
+13 of 13 steps in 35 s, with every verification passing and without changing any artifact (that run predates steps
+`60` / `61`). It produced:
 - 53 tables (the 49 above plus Directus 12's four OAuth system tables), 20 collections, 19 permission rows and
   7 user triggers;
 - `public_registration = false`;
@@ -369,6 +396,10 @@ Read-only, after startup:
 - Each permission artifact has a `.rollback.sql` that removes **only** rows exactly matching what it
   owns, and refuses to delete drifted rows.
 - The guard SQL files document their own `DROP TRIGGER` / `DROP FUNCTION` order in their headers.
+- There is **no rollback for the Media Library folder bootstrap** (D-045). The bootstrap only adds
+  the Protected System Folders the runtime expects, and never changes a folder that exists. Undoing it
+  would mean deleting system folders that may already hold files and customer folders. A refused or
+  failed run is one transaction and has written nothing.
 - There is **no rollback for the schema baseline**. Undoing a schema apply means restoring a backup —
   which is why the backup prerequisite above is not optional (§1; restore procedure and its limits in
   `PRODUCTION-BACKUP-RESTORE-RUNBOOK.md`).
@@ -395,6 +426,13 @@ Stop and report rather than improvise if any of these hold:
 - The access bootstrap's `.verify.sql` does not print `directus_access_verify: OK`, or it reports
   that the policy is reachable from an identity other than the `nuxt-server` role.
 - Any step would need a manual `INSERT`, `UPDATE` or `DELETE` to get past it.
+- The Media Library folder bootstrap refuses, or its `.verify.sql` does not print
+  `directus_media_folders_verify: OK`, and the answer being considered is any of these:
+  - renaming, moving, merging or deleting a folder by hand;
+  - creating a system folder in Directus Studio;
+  - editing the artifact's list of folders.
+  That list changes only together with `server/utils/folderRegistry.ts`, in a module authorized to
+  change folder governance.
 - The provisioning safety gate refuses a run, and the answer being considered is to loosen it, to pass a
   different `--environment`, or to create, change or remove `/etc/litubo/PRODUCTION` outside the authorized
   deployment module.

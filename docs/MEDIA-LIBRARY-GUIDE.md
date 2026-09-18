@@ -32,6 +32,13 @@ LITUBO 媒体库使用 **Directus 内置文件系统（`directus_files`）**，�
 
 ## 2. 文件夹结构
 
+> **已被取代（2026-09-18，MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01）：** 下面这 16 个文件夹是阶段 2 在本地开发库手工建立的历史结构，不是新环境的文件夹合同。现行规则如下：
+> - 受保护系统目录只有 10 个（D-045），新环境由 `directus/schema/directus-media-folders-01-bootstrap.sql` 建立。
+> - `products/technical-docs`、`resources/*`、`company/global-service` 为 legacy 只读，`certifications` 已冻结。
+> - 客户目录只能建在五个产品类目之下（D-023，`server/utils/folderRegistry.ts`）。
+>
+> 本节以下内容保留为历史记录。
+
 媒体库共 **16 个文件夹**，按内容类型分层组织：
 
 ```

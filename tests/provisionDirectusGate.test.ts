@@ -8,9 +8,14 @@
  * shown to have made zero docker calls, and a run that passes can be shown to stop at its first,
  * read-only query. Nothing here runs docker, reaches a database or touches /etc/litubo, and the global
  * fetch is replaced so no HTTP request can leave either. Every token is random per run.
+ *
+ * When the double is given an answer for every call, the script runs the whole manifest; that is how the
+ * position of the media folder bootstrap and its verification is pinned (MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01).
  */
 
 import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 type MarkerState = ReturnType<typeof import('../scripts/provisioning-safety.mjs').readProductionMarker>
@@ -247,5 +252,62 @@ describe('provisioning orchestrator — a run the gate passes stops at the doubl
     ])
     expect(reapplied.stderr).toContain('00-directus-bootstrap did not succeed')
     expect(`${reapplied.stdout}${reapplied.stderr}`).not.toContain(TOKEN)
+  })
+})
+
+/**
+ * MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 — with every docker call answered, the real script runs the whole
+ * manifest. The gate is still decided before anything else, the media folder bootstrap runs after every
+ * earlier step, its verification runs immediately after it, and a verification that does not report its
+ * OK line fails the run.
+ */
+describe('provisioning orchestrator — the media folder bootstrap runs last and is verified at once', () => {
+  interface ManifestStep { id: string, expect?: string }
+  const repoFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
+  const steps = (JSON.parse(repoFile('scripts/provisioning-manifest.json')) as { steps: ManifestStep[] }).steps
+  const APPLY = repoFile('directus/schema/directus-media-folders-01-bootstrap.sql')
+  const VERIFY = repoFile('directus/schema/directus-media-folders-01-bootstrap.verify.sql')
+  const args = ['--environment', 'scratch', '--database', 'litubo_provisioning_test_contract']
+  const psqlOnScratch = ['compose', '-f', 'docker-compose.yml', 'exec', '-T', 'postgres', 'sh', '-c', 'psql -U "$POSTGRES_USER" -d litubo_provisioning_test_contract -X -At -v ON_ERROR_STOP=1']
+
+  /** The database exists and is empty; then each step answers its expected line, or nothing. */
+  const answers = (override: Record<string, string> = {}) =>
+    ['1\n', '0\n', ...steps.map(step => override[step.id] ?? (step.expect ? `${step.expect}\n` : ''))]
+
+  it('runs every step in manifest order, ending with 60 and then 61', async () => {
+    const run = await runOrchestrator(args, { answers: answers() })
+    expect(run.exit).toBe('finished without exiting')
+    expect(run.markerReads).toBe(1)
+    expect(run.dockerCalls).toHaveLength(2 + steps.length)
+    const apply = run.dockerCalls.findIndex(call => call.input === APPLY)
+    const verify = run.dockerCalls.findIndex(call => call.input === VERIFY)
+    expect(apply).toBe(run.dockerCalls.length - 2)
+    expect(verify).toBe(apply + 1)
+    expect(run.dockerCalls[apply]!.args).toEqual(psqlOnScratch)
+    expect(run.dockerCalls[verify]!.args).toEqual(psqlOnScratch)
+    expect(run.stdout).toContain('→ 51-permissions-02-verify\n   directus_permissions_legacy_verify: OK\n→ 60-media-folders-apply\n→ 61-media-folders-verify\n   directus_media_folders_verify: OK\n')
+    expect(run.stdout).toContain(`Provisioned "litubo_provisioning_test_contract" — ${steps.length} of ${steps.length} steps, every verification passed.`)
+    expect(run.fetchCalls).toBe(0)
+    expect(`${run.stdout}${run.stderr}`).not.toContain(TOKEN)
+  })
+
+  it('fails the run when the verification does not report its OK line', async () => {
+    const run = await runOrchestrator(args, { answers: answers({ '61-media-folders-verify': 'something else\n' }) })
+    expect(run.exit).toBe(1)
+    expect(run.stderr).toContain('61-media-folders-verify did not report "directus_media_folders_verify: OK".')
+    expect(run.stdout).not.toContain('Provisioned "')
+  })
+
+  it('stops at a failing bootstrap, before its verification', async () => {
+    const run = await runOrchestrator(args, { answers: answers().slice(0, 2 + steps.findIndex(step => step.id === '60-media-folders-apply')) })
+    expect(run.exit).toBe(1)
+    expect(run.stderr).toContain('60-media-folders-apply did not succeed')
+    expect(run.dockerCalls.at(-1)!.input).toBe(APPLY)
+    expect(run.dockerCalls.some(call => call.input === VERIFY)).toBe(false)
+  })
+
+  it('never reaches it when the gate refuses: production on an unmarked host makes no docker call at all', async () => {
+    const run = await runOrchestrator(PRODUCTION, { marker: ABSENT, answers: answers() })
+    expectRefusedBeforeDocker(run, 'this host has no production marker (/etc/litubo/PRODUCTION).')
   })
 })

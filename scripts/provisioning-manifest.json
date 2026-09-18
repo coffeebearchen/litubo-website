@@ -21,6 +21,14 @@
     "  · 32  service token        — one column of one row: directus_users.token. SECRET, NOT GIT DATA",
     "  · 40  permissions-01       — the three D-034 Content read rows",
     "  · 50  permissions-02       — the sixteen FINAL-RELEASE-FIX-E legacy site rows",
+    "  · 60  media folders        — the ten Protected System Folder rows of directus_folders (D-045):",
+    "                               home, applications, company, products, resources and the five",
+    "                               product categories. Never a legacy, frozen or customer folder",
+    "",
+    "Steps 00–51 are what RELEASE-SAFETY-GATES §3A.8 requires. Step 60 comes from D-045: a fresh",
+    "environment gets the folder skeleton the Media Library's folder governance is keyed on. It",
+    "depends only on step 00, which creates directus_folders, and runs last so that the verified",
+    "chain before it keeps its order; step 61 verifies it immediately.",
     "",
     "Step 32 is the one step whose input is a secret. It reads DIRECTUS_TOKEN, the same variable the",
     "running Nuxt server reads from its own process environment, and installs its value: one secret",
@@ -30,7 +38,8 @@
     "than provisioned without a working runtime credential.",
     "",
     "Business data is deliberately absent: provisioning builds an empty, correctly-shaped environment.",
-    "Seeding real content is a separate, human activity."
+    "The ten system folders are structure the runtime expects, not content: no file, product, content",
+    "item or customer folder is created. Seeding real content is a separate, human activity."
   ],
   "contract": "docs/project/RELEASE-SAFETY-GATES.md §3A.8",
   "runtime": {
@@ -123,6 +132,19 @@
       "file": "directus/schema/directus-permissions-02-nuxt-server-legacy-site.verify.sql",
       "expect": "directus_permissions_legacy_verify: OK",
       "description": "Mandatory verification. Also re-checks that the three D-034 rows are untouched."
+    },
+    {
+      "id": "60-media-folders-apply",
+      "kind": "psql",
+      "file": "directus/schema/directus-media-folders-01-bootstrap.sql",
+      "description": "MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 (D-045) — creates the missing Protected System Folders (home, applications, company, products, resources, and products/xray, products/metal-detection, products/checkweigher, products/combination, products/conveyor) and keeps every existing one with its UUID. Writes directus_folders rows and nothing else; never updates, moves or deletes a folder. Refuses, writing nothing, on a duplicate or case-variant canonical folder, a canonical name outside the customer zones away from its canonical position, a parent cycle, a folder name containing \"/\" or an unexpected table shape. Depends only on step 00."
+    },
+    {
+      "id": "61-media-folders-verify",
+      "kind": "psql-expect",
+      "file": "directus/schema/directus-media-folders-01-bootstrap.verify.sql",
+      "expect": "directus_media_folders_verify: OK",
+      "description": "Mandatory verification immediately after step 60: each of the ten canonical paths is held by exactly one folder, and none of the refusal conditions holds. Legacy and frozen folders of an older environment are not its concern."
     }
   ],
   "postSteps": [

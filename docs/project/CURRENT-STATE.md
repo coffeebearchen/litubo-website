@@ -7,30 +7,31 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 及其 REVIEW-FIX-01（**INFERRED accepted**：Controller 以 A3 单独授权把 `86637f7` + `cab916f` fast-forward push 到 review 分支，随后以 `cab916f` 为基线发出 PRODUCTION-BOOTSTRAP-SAFETY-01 施工单；与此前各轮同一口径，Controller 未另行书面声明接受；该次 push 的 GitHub CI 结果未写入施工单，本文件不记录）；其前 PRODUCTION-PREFLIGHT-UID-CORRECTION-01（**INFERRED accepted**：`32e877a`，CI run `35303613756` completed / success，由 Controller 独立核实）；再前 FINAL-RELEASE-REVIEW-BRANCH-CI-01 — review branch 推送与 GitHub CI（Controller 已独立核实 final CI = PASS，并据此发出 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 施工单）；再前 FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS**）；再前 FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136`：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口）；再前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
-Latest completed module:            PRODUCTION-BOOTSTRAP-SAFETY-01（TYPE B · A2）— 生产 provisioning 的 fail-closed 安全门 + 生产 URL 决策登记（结论仍为 **PRODUCTION PREFLIGHT STILL INCOMPLETE**）：
-                                    · `scripts/provision-directus.mjs` 在读取 manifest / secret、第一次 docker / psql / Directus 调用之前，先经 `scripts/provisioning-safety.mjs` 判定：`--environment` 必填（local / scratch / production）；production 须库名恰为 `litubo_cms` + `--allow-production` + `--confirm-production-database` 逐字一致 + 主机标记 `/etc/litubo/PRODUCTION` 恰为 `LITUBO_PRODUCTION_V1`；主机带标记时拒绝 local / scratch；库名 prod / production / live 检查保留为错名防护，不再视作生产识别（本地开发库同名 `litubo_cms`）
-                                    · 本地证明：A–L 用例 + 真实脚本进程内运行，每次拒绝 0 次 docker 调用；红灯验证通过。标记**未在任何地方创建**（属 A5 部署模块）
-                                    · D-044：Wix 继续承载 `litubo.com` / `www` 直到新站验收；`https://tuboluo.com` 为临时验收地址（noindex）；最终 canonical `https://litubo.com`（`www` → 301）；`DIRECTUS_PUBLIC_URL=https://cms.litubo.com`（身份，不是 8055 公网暴露）
-                                    · Media Library 文件夹 bootstrap 仍 OPEN，未实现
-                                    0 生产接触。详见 `docs/project/PRODUCTION-PREFLIGHT.md` §50–§53 与文末该节。
-                                    其前 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01（`cab916f`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02（`86637f7`：以真实服务器证据复核、冻结 V1 拓扑 D-043）；PRODUCTION-PREFLIGHT-UID-CORRECTION-01（`32e877a`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-01（`1ac8457`）。各模块详情见文末对应节
-Active authorized module:           NONE（PRODUCTION-BOOTSTRAP-SAFETY-01 已收口并 STOP，等待 Controller 审查。push 属 A3、merge 属 A4、deploy 属 A5，均须 Controller 单独授权）
+Latest accepted module:             PRODUCTION-BOOTSTRAP-SAFETY-01（**INFERRED accepted**：Controller 以 A3 单独授权把 `10feb70` fast-forward push 到 review 分支（`cab916f..10feb70`），随后以 `10feb70` 为基线发出 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 施工单；与此前各轮同一口径，Controller 未另行书面声明接受；该次 push 的 GitHub CI 结果未写入施工单，本文件不记录）；其前 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 及其 REVIEW-FIX-01（**INFERRED accepted**：`86637f7` + `cab916f` 经 A3 push，随后以 `cab916f` 为基线发出下一份施工单；CI 结果同样未写入施工单）；其前 PRODUCTION-PREFLIGHT-UID-CORRECTION-01（**INFERRED accepted**：`32e877a`，CI run `35303613756` completed / success，由 Controller 独立核实）；再前 FINAL-RELEASE-REVIEW-BRANCH-CI-01 — review branch 推送与 GitHub CI（Controller 已独立核实 final CI = PASS，并据此发出 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 施工单）；再前 FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS**）；再前 FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136`：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口）；再前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
+Latest completed module:            MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01（TYPE B · A2）— 全新环境的 Media Library 受保护系统目录 bootstrap（结论仍为 **PRODUCTION PREFLIGHT STILL INCOMPLETE**）：
+                                    · 新增已跟踪工件 `directus/schema/directus-media-folders-01-bootstrap.sql` + `.verify.sql`，作为 provisioning manifest 第 60 / 61 步（D-045）
+                                    · 只插入缺失的 10 个受保护系统目录：home / applications / company / products / resources，以及 products 下五个类目。已有目录保留原 UUID；不建 legacy / 冻结 / 计划 / 客户目录；不 update / move / delete 任何目录
+                                    · 以下情况拒绝且零写入，不自动修复：重复、大小写或空白变体、zone 外错位的 canonical 名称、父链环、名称含 `/`、表结构不符
+                                    · 本地证明：始终回滚的事务中建 TEST ONLY 副本表，用 write-spy 计数；另有编排脚本替身运行。开发库真实 `directus_folders` 未写入，前后指纹一致
+                                    · 15 步 manifest 未从空库完整重跑；生产未运行
+                                    0 生产接触。详见文末该节。
+                                    其前 PRODUCTION-BOOTSTRAP-SAFETY-01（`10feb70`：生产 provisioning 安全门 + D-044）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01（`cab916f`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02（`86637f7`：冻结 V1 拓扑 D-043）；PRODUCTION-PREFLIGHT-UID-CORRECTION-01（`32e877a`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-01（`1ac8457`）。各模块详情见文末对应节
+Active authorized module:           NONE（MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 已收口并 STOP，等待 Controller 审查。push 属 A3、merge 属 A4、deploy 属 A5，均须 Controller 单独授权）
 Active module authorization level:  —（无 Active 模块；上一模块为 A2 — LOCAL_IMPLEMENTATION：只允许本地 commit，**未授权 push**）
 Next candidate:                     无已授权候选。**Production Preflight = STILL INCOMPLETE，因此不登记 FINAL-RELEASE-MERGE-AND-DEPLOY-01 为候选**。首次非 AI 官网上线的 6 项（`PRODUCTION-PREFLIGHT.md` §53）：
                                     1. `DIRECTUS_PUBLIC_URL` 决定 — **CLOSED**（D-044：`https://cms.litubo.com`）
                                     2. canonical 域名 / TLS — canonical **CLOSED**（D-044：`https://litubo.com`）；TLS 终止方与证书仍 OPEN
                                     3. 生产 provisioning 安全执行路径 — 安全门**已实现、本地证明**；服务器标记与首次获授权的生产运行仍 OPEN（A5）
-                                    4. Media Library 文件夹 bootstrap（真实媒体录入之前）— OPEN
+                                    4. Media Library 文件夹 bootstrap（真实媒体录入之前）— 工件**已实现、本地证明**（D-045，manifest 第 60 / 61 步）；在生产上的首次运行随首次获授权的生产 provisioning（A5）进行，仍 OPEN
                                     5. systemd / Nginx / secret 注入的正式实施 — OPEN（另含验收域名 noindex、`cms.litubo.com` 的访问方式）
                                     6. 首次生产部署所需的 backup / rollback 最低闭环 — OPEN
                                     非上线 blocker：地域（美国弗吉尼亚，无冲突）、extractor 可复现性（后续 AI 模块）、AI provider、HubSpot、长期容量证明。**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（Final Release Verification PASS、GitHub CI PASS、security BLOCKING 0 / UNKNOWN 0，**都只是 RC 的技术结论，不是生产批准**）。**Production Preflight = STILL INCOMPLETE（PRODUCTION-BOOTSTRAP-SAFETY-01，2026-09-18）**：生产主机已存在，但**没有任何 LITUBO 服务在运行**；V1 拓扑已冻结（D-043）；生产 URL 已决定（D-044）；provisioning 安全门已在本地实现并证明；首次非 AI 上线仍有未关闭项（见上；`docs/project/PRODUCTION-PREFLIGHT.md` §53）。人工 gate：Poppler / libvips / util-linux 审查、隐私政策与 `PRIVACY_POLICY_VERSION` 仍 OPEN；OIG 资格与强制遥测已由业务负责人关闭（永久授予，5 次激活，净占用 1）。其余未决：长期容量与 extractor 可复现性（均不阻塞首次非 AI 上线）、持续 CVE 监控
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：cab916f = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01；其前 86637f7 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02、32e877a = PRODUCTION-PREFLIGHT-UID-CORRECTION-01、1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01、9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
+Production release:                 NOT APPROVED（Final Release Verification PASS、GitHub CI PASS、security BLOCKING 0 / UNKNOWN 0，**都只是 RC 的技术结论，不是生产批准**）。**Production Preflight = STILL INCOMPLETE（MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01，2026-09-18）**：生产主机已存在，但**没有任何 LITUBO 服务在运行**；V1 拓扑已冻结（D-043）；生产 URL 已决定（D-044）；provisioning 安全门与 Media Library 文件夹 bootstrap（D-045）均已在本地实现并证明；首次非 AI 上线仍有未关闭项（见上；`docs/project/PRODUCTION-PREFLIGHT.md` §53）。人工 gate：Poppler / libvips / util-linux 审查、隐私政策与 `PRIVACY_POLICY_VERSION` 仍 OPEN；OIG 资格与强制遥测已由业务负责人关闭（永久授予，5 次激活，净占用 1）。其余未决：长期容量与 extractor 可复现性（均不阻塞首次非 AI 上线）、持续 CVE 监控
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：10feb70 = PRODUCTION-BOOTSTRAP-SAFETY-01；其前 cab916f = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01、86637f7 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02、32e877a = PRODUCTION-PREFLIGHT-UID-CORRECTION-01、1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01、9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
-Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)
-origin/master:                      8f2e384（未变；未 merge；**未启用 branch protection**——建议在 merge 前作为 HUMAN GATE 开启）· remote review branch `origin/review/final-release-verification-01` 以 `git ls-remote` 为准（PRODUCTION-BOOTSTRAP-SAFETY-01 开工时 = `cab916f`：`86637f7` 与 `cab916f` 已按 A3 授权以 fast-forward push，remote SHA 与当时 local HEAD 相等；本模块的收口 commit **只在本地、未 push**，因此本地 HEAD 领先远端 1 个 commit；协议 §13.1 Layer 2 Remote Review；其余本地 review 分支仍未 push）
+Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)。本地 `directus_folders` 未改动：25 个目录，其中 10 个 canonical 目录各恰好一个；folder bootstrap 只在回滚的 TEST ONLY 副本中运行，从未对开发库 apply
+origin/master:                      8f2e384（未变；未 merge；**未启用 branch protection**——建议在 merge 前作为 HUMAN GATE 开启）· remote review branch `origin/review/final-release-verification-01` 以 `git ls-remote` 为准（MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 开工时 = `10feb70`：PRODUCTION-BOOTSTRAP-SAFETY-01 已按 A3 授权以 fast-forward push（`cab916f..10feb70`），remote SHA 与当时 local HEAD 相等；本模块的收口 commit **只在本地、未 push**，因此本地 HEAD 领先远端 1 个 commit；协议 §13.1 Layer 2 Remote Review；其余本地 review 分支仍未 push）
 ```
 
 ---
@@ -12044,3 +12045,206 @@ OIG 许可证资格（业务负责人已自行确认并取得 key；**永久授�
 **Next candidate：** 无已授权候选，等待 Controller 审查。
 
 *最后更新：2026-09-18，由 Claude Code 在 PRODUCTION-BOOTSTRAP-SAFETY-01 任务中写入。*
+
+---
+
+## MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 — 全新环境的 Media Library 受保护系统目录 bootstrap（2026-09-18）
+
+**Module：** MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01（TYPE B — Runtime / Backend / Data Safety · A2 LOCAL_IMPLEMENTATION · 本地 commit，**不 push**）。
+
+**开工基线一致：**
+- 分支 `review/final-release-verification-01`；HEAD 与远端 review 分支均为 `10feb70`；`origin/master` = `8f2e384`。远端经 PowerShell `git ls-remote` 重试取得，SSH 间歇性 reset。
+- tracked 改动 0，6 个历史 untracked 路径原样。
+- 本文件 1–12046 行已全文读取：
+  - 媒体段（4529–6273）与最新段（11687–12046）由本会话直接读取；
+  - 其余行由 6 个并行只读子任务分段读取；
+  - 没有发现与本模块结论冲突的记录。
+
+**Status：** COMPLETED（LOCAL COMPLETE）— **PRODUCTION PREFLIGHT STILL INCOMPLETE**。没有任何 OPEN 被改为 PASS。
+
+### 一、Repo reality reconciliation
+
+结论：各来源之间**没有无法解释的实质冲突**，按 Controller 预期的 10 个节点实施。
+
+| 来源 | 列出的目录 | 定位 |
+|---|---|---|
+| runtime `server/utils/folderRegistry.ts` `FOLDER_POLICY`（16 条） | 8 active-canonical、2 container-only、5 legacy-read-only、1 conflict-frozen | 当前运行时权威 |
+| runtime `CUSTOMER_MANAGEABLE_ROOTS` | 5 个产品类目 | 已声明的客户 zone |
+| D-023 / 治理决策 #9.2 | products、products/xray、resources、company、home、applications（以"如"列举） | 例示子集 |
+| Cloud Workspace Blueprint §3.1（Approved planning baseline） | 恰好 10 个 | 与 runtime 的非冻结条目完全一致 |
+| `docs/MEDIA-LIBRARY-GUIDE.md`（阶段 2） | 16 个 | 历史：本地开发库手工建立的树，其中 6 个后来被 runtime 定为 legacy 或 conflict |
+| `docs/ADMIN-CMS-SPEC.md` 第 182 / 574 / 850 行 | 6 个根目录，含 `certifications` | 历史规划 |
+| 治理决策 #2 的 v0.1 推荐表、`PHASE-9C-2-MEDIA-LIBRARY-FOUNDATION-SPEC.md` §2.1 | 含 `resources/manuals`、`resources/certificates`、`brand`、`test-only` | v0.1 推荐，从未创建 |
+| 本地开发库（只读查询） | 25 行：16 个阶段 2 目录，加上 9 个 zone 内的客户 / TEST ONLY 目录；全部可从根到达 | 10 个 canonical 目录各恰好一个 |
+
+- **v0.1 计划目录不建。** runtime 对这几个目录没有策略，建出来只会是 `unknown` 并被锁定；`folderRegistry.test.ts` 也明确断言 planned 目录不进 registry。
+- **legacy / conflict 目录不建。** 它们只因阶段 2 建过才存在。runtime 保留可浏览、但冻结，全新环境不主动制造冻结状态。
+- **`certifications` 与计划中的 `resources/certificates` 都不 bootstrap。** 两者的命名冲突从未裁定。9C-2R 施工单写明"不得擅自统一、迁移或创建二者"，但该文件是历史 untracked 资料，只作佐证。
+- **可按职责边界解释的差异，不算冲突：**
+  - Blueprint §3.2 以 `resources/2026-expo` 为客户目录示例，而 runtime 只声明了 5 个产品类目 zone。这是 ML-CLOUD-01 已记录的收窄，与本模块无关（本模块不建客户目录）。
+  - D-003 的 Resources 四类是公开站点的信息架构，不是媒体目录合同。Content Center 只存 Media UUID（D-031 / D-032）。
+- **运行时不依赖具体 UUID。** 全仓 grep 未发现任何写死的目录 UUID，也没有代码依赖 legacy 目录存在；新环境随机生成 UUID 是安全的。
+
+### 二、最终 bootstrap 树（10 个）
+
+```text
+home · applications · company · products · resources
+products/xray · products/metal-detection · products/checkweigher · products/combination · products/conveyor
+```
+
+bootstrap 之后由 `buildFolderRegistry` 读回：
+- 10 个目录全部为 `management: protected`；
+- `home` / `applications` / `company` 为 active-canonical；
+- `products` / `resources` 为 container-only；
+- 五个类目为 active-canonical 的 zone 根，可建客户目录；
+- 文件策略与 zone 语义和改动前完全相同。
+
+### 三、实现
+
+**工件：** `directus/schema/directus-media-folders-01-bootstrap.sql` 及其 `.verify.sql`。
+- 只写 `directus_folders`，而且只 INSERT 缺失的 canonical 行：
+  - 已有的 canonical 目录保留原 UUID；
+  - 不 update / rename / move / merge / delete 任何目录；
+  - 不写其他表，不建文件、产品、内容、lifecycle、权限、公开状态或 TEST 数据。
+- 按路径解析，不按 UUID；新目录用 `gen_random_uuid()` 生成，工件里没有任何环境的标识符。
+- 表加 SHARE ROW EXCLUSIVE 锁。所有检查基于一次读取的整棵树，在第一次写入之前完成。
+- **拒绝条件**（fail closed，零写入，不自动修复）：
+  1. 表结构不是 Directus 12.3.1 的 id / name / parent；
+  2. 有目录无法从根到达（父链环），或目录名含 `/`；
+  3. 某个 canonical 路径对应多个目录，即重复的根或重复的子目录；
+  4. canonical 位置上存在只差大小写或首尾空白的同级目录，例如根目录 `Products`；
+  5. zone 之外、canonical 位置以外出现 canonical 名称，例如根目录下的 `xray`、`resources/xray`。它可能是挂错父级的 canonical 目录，移动与否由人决定。zone 内的同名目录是普通客户目录，保持不动。
+- 表结构依据：本地开发库的 `directus_folders` 只有 3 列 id uuid / name varchar(255) / parent uuid，另有 parent 自引用外键；无触发器，无 (parent, name) 唯一约束。开发库经 12.3.1 迁移，结构只读取、未改动。
+- **没有 rollback 工件**，这是有意的：撤销 bootstrap 就意味着删除可能已装有文件和客户目录的受保护目录，而 D-023 不允许自动这样做。
+- 首尾空白的比较：第一版把 JavaScript `trim` 的 Unicode 空白集合写进了 SQL。为避免复杂的名称归一化，按"简单、稳定、少返工"原则收回为 ASCII 空白（space / tab / CR / LF / FF）。SQL 代码行由测试断言为纯 ASCII。
+
+**Manifest：** 新增第 `60-media-folders-apply`（psql）与第 `61-media-folders-verify`（psql-expect，`directus_media_folders_verify: OK`）两步，排在最后。原因：
+- 它只依赖第 `00` 步建出的 `directus_folders`，其他步骤也都不依赖它；
+- 放在最后，已验证的 `00`–`51` 链路一字不动，第 61 步紧随第 60 步校验；
+- `--allow-existing` 重跑时它作用于已有环境：开发库的目录树会被识别为完整，零写入。
+
+`_comment` 中的所有权清单已补上第 60 步，并写明 00–51 对应 RSG §3A.8、第 60 步来自 D-045。§3A.8 规范文本未改。
+
+**D-045**（`08-decision-log.md`）登记了以下内容：新的所有权类别、10 节点树、不 bootstrap 的目录、按路径而非 UUID 解析、只插入、幂等、fail closed、位置、无 rollback、生产零运行。
+
+**文档：**
+- `PRODUCTION-PROVISIONING-RUNBOOK.md`：
+  - §0 所有权表；
+  - §3 步骤摘要，并新增 folder bootstrap 说明；
+  - 幂等性说明中写明 15 步未从空库重跑；
+  - 12.3.1 那次 13/13 演练标注为早于第 60 / 61 步；
+  - §6 无 rollback；
+  - §7 新增一条 STOP。
+- `docs/MEDIA-LIBRARY-GUIDE.md` §2：只加一段简短的"已被取代"注记，历史正文保留。
+- `RELEASE-SAFETY-GATES.md` §4.3 RSG-08 事实格：追加本模块事实，状态仍 `OPEN`。该文件不在施工单第十一节的清单里；依据 RSG §7 第 6 步与 §9，触及 Gate 的模块收口时须更新矩阵中受影响行的事实，所以只做最小追加。
+
+### 四、测试与验证（Node 22.22.2 / npm 10.9.7）
+
+**`tests/mediaFolderBootstrap.test.ts`，新增 55 项，CI 可运行：**
+- 树与 runtime 一致：
+  - 等于 `FOLDER_POLICY` 的非冻结条目，也等于 Blueprint §3.1；
+  - apply 与 verify 两份声明一致；
+  - zone 列表等于 `CUSTOMER_MANAGEABLE_ROOTS`；
+  - 父目录排在子目录之前；
+  - 10 个 legacy / 冻结 / 计划目录一个都不建。
+- 写入面：
+  - 只有 1 条 INSERT，目标为 `directus_folders`；
+  - 不出现 UPDATE / DELETE / TRUNCATE / DROP / ALTER / CREATE / GRANT / REVOKE / COPY / MERGE；
+  - 只读 `directus_folders` 与列目录，只锁 `directus_folders`；
+  - 无 `public.`，无 UUID 字面量；
+  - 所有检查在第一次写入之前；
+  - SQL 代码为纯 ASCII。
+- verify 只读，末尾输出 OK。
+- manifest：前 13 步原样，最后两步为 60 / 61，其他步骤不接触 `directus_folders`。
+- registry 兼容性：见上文第二节；另验证客户目录的创建、改名、移动与上传语义不变。
+
+**`tests/mediaFolderBootstrapDbIntegration.test.ts`，新增 26 项，只在本地设置 `CONTENT_DB_TEST_CONTAINER=litubo-cms-postgres-1` 时运行，CI 中跳过。**
+
+做法：
+- 每个用例在同一个事务里做完以下全部动作，事务始终回滚：
+  - 建 TEST ONLY 私有 schema `litubo_folder_bootstrap_test_<随机>`；
+  - 用 `LIKE public.directus_folders INCLUDING ALL` 建副本表，再加 parent 自引用外键；
+  - `SET LOCAL search_path` 指向该 schema。
+- AFTER 触发器 write-spy 以 NOTICE 报告每次 INSERT / UPDATE / DELETE，事务中止后通知依然可见。
+- 开发库真实表在整个文件运行前后比对指纹，并确认没有 schema 残留。
+
+结果：
+- 全新：写入恰为 10 次 INSERT，得到 10 个 canonical 目录，verify 通过。
+- 幂等：第二次零写入，所有 UUID / parent / path 不变。
+- 部分已有：`products` + `products/xray` 保留 UUID，只建另外 8 个。
+- 旧环境（含 legacy、冻结、客户目录，以及 zone 内名为 `xray` 的客户目录）：零写入，原样保留。
+- 开发库目录树的副本：零写入，verify 通过。
+- 13 种拒绝各自零写入：
+  - 根目录下的 `xray`、`resources/xray`、`company/home`；
+  - canonical 已存在时的 `certifications/xray`；
+  - 两个根目录 `products`；
+  - 同一个 `products` 下两个 `xray`；
+  - 两个 `products` 根各带一个 `xray`；
+  - `Products`、` home `、`products/XRay`；
+  - 父链环、名称含 `/`、表结构不符。
+- verify 在以下情况均失败关闭：目录缺失、空表、重复、zone 外错位、大小写变体；verify 本身零写入。
+
+开发库真实 `directus_folders` 前后指纹一致：25 行，md5 `d02c7479…`；`directus_files` 仍为 60。
+
+**`tests/provisionDirectusGate.test.ts`，新增 4 项，现为 19 项：** 用 docker 替身应答所有调用，真实编排脚本完整跑完 15 步：
+- 安全门仍先读主机标记；
+- 60 在倒数第二位，61 紧随其后，两者都在目标库上执行 psql；
+- verify 输出不含 OK 时失败退出；
+- 第 60 步失败时第 61 步不执行；
+- 安全门拒绝时 docker 调用为 0。
+
+**红灯验证：** 以下改动都在验证后逐字节恢复，并经 `cmp` 核对。
+- A：停用 apply 的全部拒绝判断，12 项拒绝用例全部失败（表结构用例不在停用范围内）。
+- B：让 INSERT 无条件执行，幂等 / 部分已有 / 旧环境 / 开发库副本 / zone 内同名 5 项失败。
+- C：把 manifest 第 60 步挪到第 2 位，4 项顺序合同测试失败。
+
+**其余验证：**
+- 目标集（CI 口径）6 个文件 231 通过 / 33 跳过；33 个跳过的是 `directusAccessBootstrapDbIntegration` 中需要数据库的用例。
+- `folderRegistry` 回归 103 / 103 通过。
+- 全量（CI 口径，DB 与 extractor 集成变量已清空）：99 个文件（90 通过 · 9 跳过），3365 项测试（3172 通过 · 193 跳过），exit 0。与上一模块的 97 个文件 / 3280 项测试相比，恰好多出本模块 2 个新文件（55 + 26 项）和 4 项新测试；跳过数的增加恰为新 DB 集成文件的 26 项。
+- `npm run typecheck` exit 0；`npm run lint` exit 0；`npx nuxt build` exit 0（Build complete，8.26 MB / 2.06 MB gzip）；`git diff --check` exit 0。
+- UI：1440 = N/A、375 = N/A（本模块无 UI）。
+
+### 五、Safety Gates
+
+- **RSG-08 = STRENGTHENED，状态仍 `OPEN`：**
+  - 全新环境的目录骨架有了已跟踪、可验证的 provisioning 工件；
+  - 本地证据只来自回滚事务中的 TEST ONLY 副本；
+  - 15 步 manifest 未从空库完整重跑，因为那需要一次性 Directus 和许可证决定；
+  - 生产未运行。
+- 第 60 步位于安全门之后：安全门在任何 docker / psql / Directus 调用之前生效，本模块未改动它，并已用编排脚本替身运行证明。
+- **RSG-09 = PRESERVED：** 只做本地 commit；push 0 · merge 0 · deploy 0；报告分列 local HEAD / remote review / `origin/master`。
+- **P0 Violations：** NONE。
+- **Media governance：** `folderRegistry.ts`、客户目录 CRUD、Media Library UI、Product Workspace、Content Center、Directus 权限、media lifecycle 均未改动。
+
+**生产足迹：** Production DB writes 0 · Production media writes 0 · Production service starts 0 · Secret reads 0 · License activations 0 · Deployments 0。另外 0 Directus 启动、0 `.env` 读取、0 Nginx / DNS / Wix 改动；开发库 0 写入。
+
+### 六、改动文件（精确暂存）
+
+- 新增：
+  - `directus/schema/directus-media-folders-01-bootstrap.sql`
+  - `directus/schema/directus-media-folders-01-bootstrap.verify.sql`
+  - `tests/mediaFolderBootstrap.test.ts`
+  - `tests/mediaFolderBootstrapDbIntegration.test.ts`
+- 修改：
+  - `scripts/provisioning-manifest.json`：第 60 / 61 步与 `_comment`；
+  - `tests/provisionDirectusGate.test.ts`：新增 4 项并补一句头注释；
+  - `docs/project/08-decision-log.md`：D-045；
+  - `docs/project/PRODUCTION-PROVISIONING-RUNBOOK.md`；
+  - `docs/MEDIA-LIBRARY-GUIDE.md`：只加注记；
+  - `docs/project/RELEASE-SAFETY-GATES.md`：只追加 RSG-08 事实；
+  - `docs/project/CURRENT-STATE.md`：§0 snapshot 与本节。
+- 未改：`MASTER-ROADMAP.md`（里程碑无变化）、`PRODUCTION-PREFLIGHT.md`（见下）、任何 runtime 代码、`docker-compose.yml`、Directus 数据。
+
+### 七、范围外、未改（记录供后续处理）
+
+- **`PRODUCTION-PREFLIGHT.md` §53** 第 4 项仍写"Media Library folder bootstrap — OPEN"。按生产运行口径这仍然成立，因为生产尚未运行；"工件已实现、本地证明"只记录在本文件 §0 与本节。该文件不在本施工单的文档清单内。
+- **`RELEASE-SAFETY-GATES.md` §3A.8** 的规范清单没有列出目录 bootstrap。若 Controller 希望它成为规范要求，须另开 TYPE C 治理模块（RSG §9）。
+- **历史文档仍描述从未创建或已冻结的目录，本模块未改：**
+  - `MEDIA-AND-PRODUCT-DATA-GOVERNANCE.md` 决策 #2 的 v0.1 表与决策 #3 的 `resources/manuals`；施工单禁止重写 Media 文档。
+  - `ADMIN-CMS-SPEC.md` 第 182 / 574 / 850 行把 `certifications` 列为要建的根目录；这是历史设计文档。
+- **15 步从空库完整演练仍 OPEN。** 它需要一次性 Directus 容器与许可证激活安排，按 D-042 应使用空 `LICENSE_KEY`。本施工单禁止使用许可证，因此未做。
+
+**Next candidate：** 无已授权候选，等待 Controller 审查。
+
+*最后更新：2026-09-18，由 Claude Code 在 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 任务中写入。*
