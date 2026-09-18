@@ -52,8 +52,9 @@ The minimum information needed is listed in §31.
 **NOT ASSESSABLE** — no host. Constraints that the target must satisfy:
 
 - Linux with Docker Engine and the Docker Compose plugin (`docker compose version` must run).
-- The bind-mount ownership model assumes Linux uid semantics: `/data/litubo/postgres` owned by uid 999,
-  `/data/litubo/uploads` owned by uid 1000 (`docs/ADMIN-CMS-SETUP.md` §6.1).
+- The bind-mount ownership model assumes Linux uid semantics: `/data/litubo/postgres` owned by **uid/gid
+  70:70** — the `postgres` user of the pinned **Alpine** image; uid 999 belongs to the Debian variant and does not
+  apply (corrected in §34) — and `/data/litubo/uploads` owned by uid/gid 1000:1000 (`docs/ADMIN-CMS-SETUP.md` §6.1).
 - **Architecture: `linux/amd64` is the only one this project has actually run and verified.** The pinned
   Directus and PostgreSQL digests are multi-architecture image *indexes*, so `linux/arm64` would also pull —
   pinning does not decide the architecture, and arm64 has never been exercised here
@@ -239,7 +240,7 @@ kept. **No runtime, port, network or permission was touched.**
 |---|---|
 | Image | `postgres:16.15-alpine@sha256:cf78e766…` — immutable index digest, fail-closed by `verify-postgres-pin.mjs`; floating tags forbidden (D-041) |
 | Network | `litubo-internal` only, **no published port** |
-| Persistence | bind mount `${POSTGRES_DATA_DIR}:/var/lib/postgresql/data`; production path `/data/litubo/postgres`, owner uid 999 |
+| Persistence | bind mount `${POSTGRES_DATA_DIR}:/var/lib/postgresql/data`; production path `/data/litubo/postgres`, owner **uid/gid 70:70** (the pinned Alpine image's `postgres` user; corrected from uid 999 — §34) |
 | Health check | `pg_isready`, 10 s interval, 5 retries |
 | Restart policy | `unless-stopped` |
 | Database / user / encoding | `DB_DATABASE`, `DB_USER` from the environment; encoding and timezone are **not pinned in the repository** — they follow the image defaults (UTF-8, UTC) and have not been explicitly stated as a production contract |
@@ -595,3 +596,50 @@ code. It needs a server, four architecture decisions (§32 B-2, B-3, B-4, B-7), 
 *Written 2026-09-18 by Claude Code in FINAL-RELEASE-PRODUCTION-PREFLIGHT-01. No production system was
 contacted, no DNS or firewall was changed, no certificate was issued, no container was started or stopped, no
 secret was read, and nothing here is a production approval or a legal conclusion.*
+
+---
+
+## 34. Addendum — PostgreSQL bind-mount ownership corrected to 70:70
+
+> Added by **PRODUCTION-PREFLIGHT-UID-CORRECTION-01** (2026-09-18), a minimal fact correction inside this
+> preflight. Documentation only: no runtime, image pin, Compose file, network, secret, reverse proxy, DNS or
+> business code was changed.
+
+**What was wrong.** §4, §15, `docs/ADMIN-CMS-SETUP.md` §6.1 and one line of `CURRENT-STATE.md` gave the production
+PostgreSQL bind mount `/data/litubo/postgres` an owner of **uid 999** (`chown -R 999:999`). That is the `postgres`
+user of the **Debian** variant of the official image. This project pins the **Alpine** variant, whose `postgres`
+user is uid/gid **70**. Followed literally, the setup step would have given the data directory the wrong owner.
+
+**The facts, now recorded.**
+
+| Image (pinned) | Service user | Directory ownership |
+|---|---|---|
+| `postgres:16.15-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685` | `uid=70(postgres) gid=70(postgres)` | `/var/lib/postgresql` **70:70** · `/var/lib/postgresql/data` **70:70** |
+| `directus/directus:12.3.1@sha256:8978edf633ae28aa31464bb71c55300c94d8bc771ff3727b5fac485173283869` | `uid=1000 gid=1000` (`node`) | `/directus/uploads` **1000:1000** — unchanged |
+
+**Evidence.**
+
+- **Authoritative — Linux, the target cloud server.** The Controller ran both exact pinned digests on the Tencent
+  Cloud server and measured every value in the table above. Bind-mount ownership is a property of a Linux host,
+  so this measurement is the one the production contract rests on.
+- **Corroborating — the local development environment, same digests** (`verify-postgres-pin` and
+  `verify-directus-pin` both exit 0, so the running images are exactly the pins). Read-only `docker compose exec`:
+  PostgreSQL's `postgres` user `uid=70 gid=70`; its server process (PID 1) `70:70`; `/var/lib/postgresql`
+  `70:70`. Directus default user and server process `1000:1000`. Every **image** fact agrees.
+- **Not used as evidence.** Locally, the bind-mounted `/var/lib/postgresql/data` shows `70:0` and
+  `/directus/uploads` shows `0:0`. Both are Windows directories mounted through Docker Desktop, which presents
+  ownership its own way; a Windows workstation cannot demonstrate Linux bind-mount ownership. (`docker compose
+  exec postgres id` without a user name also reports root: the PostgreSQL image's default user is root and its
+  entrypoint drops to `postgres` for the server, which is why the named user and PID 1 were read instead.)
+
+**Corrected in:** §4 and §15 above; `docs/ADMIN-CMS-SETUP.md` §6.1 (`sudo chown -R 70:70 /data/litubo/postgres`,
+with the reason, so it is not "fixed" back to 999 later); `CURRENT-STATE.md`. A repository-wide search found no
+other statement of PostgreSQL ownership and no test asserting one. The Directus uploads owner stays 1000:1000.
+
+**What this addendum does not do.** It does not re-assess §3 / blocker B-1 or any other section. That a Tencent
+Cloud server has now run the pinned images is recorded here only as the provenance of the ownership fact; the
+host's specification, operating system, architecture, Docker versions, network and the other blockers are
+**not** re-assessed by this minimal correction, and the result in §33 is unchanged. A later preflight pass should
+bring the new host facts in formally.
+
+*Addendum written 2026-09-18 by Claude Code in PRODUCTION-PREFLIGHT-UID-CORRECTION-01.*

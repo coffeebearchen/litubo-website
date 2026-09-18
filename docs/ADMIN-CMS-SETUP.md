@@ -210,8 +210,10 @@ ssh user@<server-host>
 sudo mkdir -p /data/litubo/postgres /data/litubo/uploads
 
 # 3. 设置目录权限
-# postgres 容器以 uid 999 运行
-sudo chown -R 999:999 /data/litubo/postgres
+# postgres 容器以 uid 70 / gid 70（postgres）运行——本项目固定的是 Alpine 变体
+# （postgres:16.15-alpine@sha256:cf78e766…）；uid 999 属于 Debian 变体的 postgres 镜像，不适用。
+# 2026-09-18 已在固定 digest 上实测订正（PRODUCTION-PREFLIGHT-UID-CORRECTION-01）。
+sudo chown -R 70:70 /data/litubo/postgres
 # directus 容器以 uid 1000 (node) 运行
 sudo chown -R 1000:1000 /data/litubo/uploads
 

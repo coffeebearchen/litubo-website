@@ -8,16 +8,16 @@
 
 ```text
 Latest accepted module:             FINAL-RELEASE-REVIEW-BRANCH-CI-01 — review branch 推送与 GitHub CI（Controller 已独立核实 final CI = PASS，并据此发出 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 施工单）；其前 FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS**）；再前 FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136`：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口）；再前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
-Latest completed module:            FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 — 生产上线前只读评估（**PRODUCTION PREFLIGHT INCOMPLETE — HUMAN / INFRA BLOCKERS REMAIN**：软件侧就绪，但**生产主机尚未存在**，另有 Nuxt 生产运行方式、反向代理架构、生产 `DIRECTUS_PUBLIC_URL`、canonical 域名 / TLS 终止方、备份目的地与异地存储、书面生产回滚、生产初始数据来源共 8 项 BLOCKING 未决；DNS 仍在 Wix nameserver、旧站在线。0 生产接触、0 DNS / 防火墙 / 证书变更、0 secret 读取。详见 `docs/project/PRODUCTION-PREFLIGHT.md` 与文末该节）；其前 FINAL-RELEASE-REVIEW-BRANCH-CI-01（**REVIEW BRANCH PUSHED — GITHUB CI PASS**：`review/final-release-verification-01` @ `be1df5a`，workflow `CI` run `35291162888` conclusion `success`；CI 范围 87 files / 3075 tests，8 files / 167 tests 为需本地 DB / extractor 的 integration suites）
-Active authorized module:           NONE（FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 已收口并 STOP。merge 属 A4、deploy 属 A5，均须 Controller 单独授权）
+Latest completed module:            PRODUCTION-PREFLIGHT-UID-CORRECTION-01 — Preflight 内的最小事实纠正（PostgreSQL 生产 bind mount 属主 uid 999 → **70:70**，即固定 Alpine 镜像的 `postgres` 用户；Directus uploads 保持 1000:1000；仅文档，Preflight 结论不变。详见文末该节）；其前 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 — 生产上线前只读评估（**PRODUCTION PREFLIGHT INCOMPLETE — HUMAN / INFRA BLOCKERS REMAIN**：软件侧就绪，但**评估时仓库内无任何生产主机信息**，另有 Nuxt 生产运行方式、反向代理架构、生产 `DIRECTUS_PUBLIC_URL`、canonical 域名 / TLS 终止方、备份目的地与异地存储、书面生产回滚、生产初始数据来源共 8 项 BLOCKING 未决；DNS 仍在 Wix nameserver、旧站在线。0 生产接触、0 DNS / 防火墙 / 证书变更、0 secret 读取。详见 `docs/project/PRODUCTION-PREFLIGHT.md` 与文末该节）；其前 FINAL-RELEASE-REVIEW-BRANCH-CI-01（**REVIEW BRANCH PUSHED — GITHUB CI PASS**：`review/final-release-verification-01` @ `be1df5a`，workflow `CI` run `35291162888` conclusion `success`；CI 范围 87 files / 3075 tests，8 files / 167 tests 为需本地 DB / extractor 的 integration suites）
+Active authorized module:           NONE（PRODUCTION-PREFLIGHT-UID-CORRECTION-01 已收口并 STOP。merge 属 A4、deploy 属 A5，均须 Controller 单独授权）
 Active module authorization level:  —（无 Active 模块；上一模块为 A2 — LOCAL_IMPLEMENTATION + 允许 push 同一 review branch，merge / deploy 不在其授权内）
 Next candidate:                     无已授权候选。**Production Preflight = INCOMPLETE，因此按施工单 §41 不得登记 FINAL-RELEASE-MERGE-AND-DEPLOY-01 为候选**——须先关闭 `PRODUCTION-PREFLIGHT.md` §32 的 B-1～B-8。**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（Final Release Verification 已 PASS、GitHub CI 已 PASS 且 security BLOCKING 0 / UNKNOWN 0，**但这些只是 RC 的技术结论，不是生产批准**；未决人工 gate：OIG 许可证资格（用户已自行确认并取得 key；永久授予、无到期日、无需续期、5 次激活）、OIG 强制遥测无法关闭、Poppler / libvips / util-linux 人工审查；未决生产事项：生产容量、生产网络暴露实测、生产 / 异地备份存储、书面回滚步骤、生产 secret manager、持续 CVE 监控。**Production Preflight = INCOMPLETE（2026-09-18）：生产主机尚未存在，另有 8 项 BLOCKING 未决，见 `docs/project/PRODUCTION-PREFLIGHT.md` §32**）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01；其前 be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
+Production release:                 NOT APPROVED（Final Release Verification 已 PASS、GitHub CI 已 PASS 且 security BLOCKING 0 / UNKNOWN 0，**但这些只是 RC 的技术结论，不是生产批准**；未决人工 gate：OIG 许可证资格（用户已自行确认并取得 key；永久授予、无到期日、无需续期、5 次激活）、OIG 强制遥测无法关闭、Poppler / libvips / util-linux 人工审查；未决生产事项：生产容量、生产网络暴露实测、生产 / 异地备份存储、书面回滚步骤、生产 secret manager、持续 CVE 监控。**Production Preflight = INCOMPLETE（2026-09-18）：8 项 BLOCKING 未决，见 `docs/project/PRODUCTION-PREFLIGHT.md` §32**。B-1 评估时为"仓库内无任何生产主机信息"；其后 Controller 告知腾讯云服务器已存在，并已用固定 digest 运行过 PostgreSQL 与 Directus 镜像（该事实只用于 UID 订正，B-1 尚未据此复核））
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01；其前 9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)
-origin/master:                      8f2e384（未变；未 merge；**未启用 branch protection**——建议在 merge 前作为 HUMAN GATE 开启）· remote review branch `origin/review/final-release-verification-01` = `9f1da6f`（协议 §13.1 Layer 2 Remote Review；其余本地 review 分支仍未 push）
+origin/master:                      8f2e384（未变；未 merge；**未启用 branch protection**——建议在 merge 前作为 HUMAN GATE 开启）· remote review branch `origin/review/final-release-verification-01` 以 `git ls-remote` 为准（本次 UID 订正推送前为 `1ac8457`；协议 §13.1 Layer 2 Remote Review；其余本地 review 分支仍未 push）
 ```
 
 ---
@@ -11707,7 +11707,7 @@ GitHub CI 中被跳过的 8 个文件 / 167 个测试，是需要本地数据库
 
 ### 四、已就绪的部分（软件侧）
 
-Release SHA 明确（`9f1da6f`）；GitHub CI PASS；运行时 pin 三项 fail closed；Directus / PostgreSQL / extractor 的暴露面已在 Compose 中固定并有测试守护（Directus 仅 `127.0.0.1:8055`、PostgreSQL 无端口、extractor 在 `internal: true` 网络、gateway 仅 `127.0.0.1:8787`）；uploads 与数据库持久化采用 bind mount（`/data/litubo/uploads` uid 1000、`/data/litubo/postgres` uid 999），均不在 Git、不在容器可写层；secret 合同为"构建不含、运行时注入"，本地已证明；从零 provisioning 13/13 步 35 s 可复现；Draft / sitemap / 公开媒体三项合同在生产构建上实测成立；merge 技术上就绪（clean + CI PASS + 无 divergence）。
+Release SHA 明确（`9f1da6f`）；GitHub CI PASS；运行时 pin 三项 fail closed；Directus / PostgreSQL / extractor 的暴露面已在 Compose 中固定并有测试守护（Directus 仅 `127.0.0.1:8055`、PostgreSQL 无端口、extractor 在 `internal: true` 网络、gateway 仅 `127.0.0.1:8787`）；uploads 与数据库持久化采用 bind mount（`/data/litubo/uploads` uid/gid 1000:1000、`/data/litubo/postgres` uid/gid **70:70**——2026-09-18 订正：原写 uid 999，那是 Debian 变体 postgres 镜像的用户，不适用于本项目固定的 Alpine 镜像，见文末 PRODUCTION-PREFLIGHT-UID-CORRECTION-01），均不在 Git、不在容器可写层；secret 合同为"构建不含、运行时注入"，本地已证明；从零 provisioning 13/13 步 35 s 可复现；Draft / sitemap / 公开媒体三项合同在生产构建上实测成立；merge 技术上就绪（clean + CI PASS + 无 divergence）。
 
 ### 五、两处 preflight-only 文档订正（仅文档，0 runtime）
 
@@ -11735,3 +11735,28 @@ OIG 许可证资格（业务负责人已自行确认并取得 key；**永久授�
 - 本模块未读取、未输出、未保存任何 `.env` 值、password、cookie、JWT、token、API key、`DIRECTUS_LICENSE_KEY`、`DIRECTUS_TOKEN` 或任何生产凭证。
 
 *最后更新：2026-09-18，由 Claude Code 在 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 任务中写入。*
+
+---
+
+## PRODUCTION-PREFLIGHT-UID-CORRECTION-01 — PostgreSQL 生产 bind mount 属主订正为 70:70（2026-09-18）
+
+**性质：** Production Preflight 内的最小事实纠正，**不是架构变更**。仅文档：0 runtime、0 镜像 pin、0 Compose、0 网络拓扑、0 secret、0 Nginx、0 DNS、0 业务代码、0 UI；服务器上未做任何操作。
+
+**错在哪里：** `PRODUCTION-PREFLIGHT.md` §4 / §15、`docs/ADMIN-CMS-SETUP.md` §6.1（`sudo chown -R 999:999 /data/litubo/postgres`）与本文件 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 节第四段，都把 PostgreSQL 生产 bind mount 的属主写成 **uid 999**。那是 **Debian 变体** postgres 镜像的用户；本项目固定的是 **Alpine 变体**，其 `postgres` 用户是 **uid/gid 70**。照原文执行会给数据目录设错属主。
+
+**事实：**
+- `postgres:16.15-alpine@sha256:cf78e766…` → `uid=70(postgres) gid=70(postgres)`；`/var/lib/postgresql` 与 `/var/lib/postgresql/data` 均为 **70:70**。
+- `directus/directus:12.3.1@sha256:8978edf6…` → `uid=1000 gid=1000`；`/directus/uploads` 为 **1000:1000**（不变）。
+
+**证据：**
+- **权威（Linux 目标服务器）：** Controller 在腾讯云服务器上用两个固定 digest 独立实测上述全部数值。bind mount 属主是 Linux 主机属性，生产合同以此为准。
+- **佐证（本地、同一 digest，`verify-postgres-pin` / `verify-directus-pin` 均 exit 0）：** 只读 `docker compose exec` —— PostgreSQL 的 `postgres` 用户 `uid=70 gid=70`、服务进程（PID 1）`70:70`、`/var/lib/postgresql` `70:70`；Directus 默认用户与服务进程 `1000:1000`。**镜像层面的事实全部一致。**
+- **不作为证据：** 本地 bind mount 的 `/var/lib/postgresql/data` 显示 `70:0`、`/directus/uploads` 显示 `0:0`——两者都是经 Docker Desktop 挂载的 Windows 目录，属主呈现方式由挂载层决定，Windows 工作站无法证明 Linux bind mount 属主。（不带用户名的 `docker compose exec postgres id` 会显示 root：该镜像默认用户是 root，由 entrypoint 降权到 `postgres` 运行服务，因此改读具名用户与 PID 1。）
+
+**订正位置：** `PRODUCTION-PREFLIGHT.md` §4、§15，新增 §34 addendum；`docs/ADMIN-CMS-SETUP.md` §6.1（改为 `sudo chown -R 70:70 /data/litubo/postgres`，并注明为何不是 999，防止日后被"改回"）；本文件 PREFLIGHT 节第四段与 §0 snapshot。全仓只读搜索：其余所有 "999" 均与此无关（CSS `border-radius: 999px`、`#999` 颜色、测试中不存在的 id、TEST ONLY 陷阱数值、二进制图片）；**没有任何测试断言属主数值**，因此无合同测试需要修改。
+
+**本次未复核：** Preflight 的 §3 / B-1 及其余各节。"腾讯云服务器已存在并已运行固定镜像"只作为属主事实的出处记录；主机规格、OS、架构、Docker 版本、网络与其余 BLOCKING 均未在本次订正中复核，**Preflight 结论（INCOMPLETE）不变**，应由后续 preflight 复核正式纳入。
+
+**Git：** 自 `1ac8457` 起，精确暂存、本地 commit、push 同一 review branch；merge = 0 · deploy = 0。
+
+*最后更新：2026-09-18，由 Claude Code 在 PRODUCTION-PREFLIGHT-UID-CORRECTION-01 任务中写入。*
