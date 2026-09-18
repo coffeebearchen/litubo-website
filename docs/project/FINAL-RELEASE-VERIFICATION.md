@@ -390,3 +390,49 @@ Production Preflight: NOT STARTED — human gates in §22 must close first
 
 *Written 2026-09-18 by Claude Code in FINAL-RELEASE-VERIFICATION-01. Nothing in this document is a production
 approval, a legal conclusion, or evidence about any environment other than the local development environment.*
+
+---
+
+## 25. Addendum — review branch push and GitHub CI
+
+> Added by the later module **FINAL-RELEASE-REVIEW-BRANCH-CI-01** (2026-09-18, A3 · PUSH_REVIEW_BRANCH,
+> separately authorized by the Controller). Sections 1–24 above are left exactly as written: within
+> FINAL-RELEASE-VERIFICATION-01's own scope, push / merge / deploy were genuinely 0 / 0 / 0. This addendum records
+> what happened **after** that module closed, so §2 and §24 are read against the current facts.
+
+The verification branch was pushed to `origin` unchanged — no commit was added, amended or rebased, and the
+release candidate is byte-identical to the one verified above.
+
+| Item | Value |
+|---|---|
+| Remote branch | `origin/review/final-release-verification-01` |
+| Remote SHA | `be1df5a712a1c11c75e25de5edc7d07046976083` — equal to the local HEAD verified in §2 |
+| `origin/master` | `8f2e3847e0d7acda1bd987ffd18c3af03377fef9` — **unchanged, not merged** |
+| Workflow | `CI` (`.github/workflows/ci.yml`), permissions `contents: read`, no secrets, no deploy |
+| Run ID | **`35291162888`**, event `push`, status `completed`, conclusion **`success`** |
+| Job | `105434083787` — "Tests, types, lint, build (Node 22.22.2)" — **success** |
+| Steps | checkout · Node 22.22.2 · `npm ci` · Nuxt prepare · tests · typecheck · lint · production build — all success |
+| push / force push / master push / PR / merge / deploy | 1 / 0 / 0 / 0 / **0** / **0** |
+
+**CI test scope — recorded honestly.** GitHub CI ran **87 files passed, 8 skipped; 3075 tests passed, 167
+skipped**. The skipped suites are the ones that need a local PostgreSQL and the document-extractor container; a
+GitHub runner has neither, so they self-skip through their existing `describe.skipIf` guards. The green CI run
+therefore **does not** cover them. Their real evidence is the local serial full run recorded in §17 —
+**95 files / 3242 tests / 0 failed / 0 skipped**. The two results are complementary: CI's 87 / 3075 is not the
+full suite, and the local 95 / 3242 is not CI-verified.
+
+**Finding F-1 did not trigger in CI** and no workflow change was needed: `ci.yml` declares no `env:` at all, so
+`CONTENT_DB_TEST_CONTAINER` is never set and the parallel-fixture interference is structurally impossible there.
+No test, assertion, timeout or workflow was modified.
+
+**Evidence provenance.** The session that performed the push had no read-only channel to GitHub Actions — the
+repository is private (unauthenticated API 404 against a public control of 200), `gh` was not installed, the
+Chrome extension was not connected, the isolated browser pane was not signed in, and reading any token is
+forbidden. The run and job facts above were therefore obtained independently by the Controller through their own
+connected GitHub account and transcribed here. They were not inferred from a badge or from the workflow file.
+
+**Unchanged by this addendum:** production release stays **NOT APPROVED**, Production Preflight stays **NOT
+STARTED**, every human gate in §22 stays open, and every item in §23 stays open. A green CI run proves the build,
+types, lint and the CI-scoped tests on a clean checkout — it is not a production approval.
+
+*Addendum written 2026-09-18 by Claude Code in FINAL-RELEASE-REVIEW-BRANCH-CI-01.*

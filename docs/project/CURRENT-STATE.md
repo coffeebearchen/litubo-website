@@ -7,17 +7,17 @@
 > **Live Git always overrides this snapshot if stale.** 只放控制状态；恢复顺序见 `docs/project/PROJECT-EXECUTION-PROTOCOL.md` §9，模块详情见文末各节。
 
 ```text
-Latest accepted module:             FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136` 的技术实现与安全整改结果：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口：OIG 期限描述订正 + 删除无效的 TELEMETRY 配置）；此前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（BASELINE COMPLETE · 39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
-Latest completed module:            FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS — READY FOR REVIEW-BRANCH PUSH / GITHUB CI**：全量 95 文件 / 3242 测试串行全绿、typecheck 0、lint 0、release:verify exit 0、构建 8.26 MB、三项权限校验 OK、Draft 公开泄漏 0、secret 泄漏 0、security BLOCKING 0 / UNKNOWN 0、备份契约 PASS、数据完整性 PASS、HTTP smoke 无意外 401/403/503/5xx、1440 与 375 均 PASS；本地 commit，未 push；证据见 `docs/project/FINAL-RELEASE-VERIFICATION.md`）
-Active authorized module:           NONE（FINAL-RELEASE-VERIFICATION-01 已收口并 STOP。push review branch / GitHub CI 属 A3，须 Controller 单独授权；Production Preflight 与 deploy 另需授权并须先关闭人工 gate）
-Active module authorization level:  —（无 Active 模块；上一模块为 A2 — LOCAL_IMPLEMENTATION，push / merge / deploy 均不在其授权内）
-Next candidate:                     无已授权候选。技术侧 RC 验收已 PASS，生产发布仍受人工 gate 与 TYPE D 授权链约束；**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
+Latest accepted module:             FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS**；Controller 据此发出 A3 PUSH_REVIEW_BRANCH 授权 = FINAL-RELEASE-REVIEW-BRANCH-CI-01 施工单）；其前 FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136`：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口）；再前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
+Latest completed module:            FINAL-RELEASE-REVIEW-BRANCH-CI-01 — review branch 推送与 GitHub CI 取证（**REVIEW BRANCH PUSHED — GITHUB CI PASS**：`review/final-release-verification-01` @ `be1df5a` 已推送；workflow `CI` run `35291162888`（event `push`）status `completed` / conclusion `success`；**CI 测试范围 87 files passed / 8 skipped、3075 passed / 167 skipped**——跳过的是需要本地 DB / extractor 的 integration suites，其真实证据由 FINAL-RELEASE-VERIFICATION-01 的本地串行全量提供；merge 0 · deploy 0。详见文末该节）
+Active authorized module:           NONE（FINAL-RELEASE-REVIEW-BRANCH-CI-01 已收口并 STOP。merge 属 A4、deploy 属 A5，均须 Controller 单独授权；Production Preflight NOT STARTED，且须先关闭人工 gate）
+Active module authorization level:  —（无 Active 模块；上一模块为 A3 — PUSH_REVIEW_BRANCH，merge / deploy 不在其授权内）
+Next candidate:                     FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 — CANDIDATE / NOT AUTHORIZED（候选不是授权）。**剩余用户授权的真实 provider 调用 = 0**，任何后续真实调用须重新授权；FINAL-RELEASE-AUDIT-01 其余 P1 仍 OPEN
 Next candidate authorized:          NO
-Production release:                 NOT APPROVED（Final Release Verification 已 PASS 且 security BLOCKING 0 / UNKNOWN 0，**但这只是本地 RC 的技术结论**；未决人工 gate：OIG 许可证资格（用户已自行确认并取得 key；永久授予、无到期日、无需续期、5 次激活）、OIG 强制遥测无法关闭、Poppler / libvips / util-linux 人工审查；未决生产事项：生产容量、生产网络暴露实测、生产 / 异地备份存储、书面回滚步骤、生产 secret manager、持续 CVE 监控。Production Preflight NOT STARTED）
-Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：da8f445 = GOVERNANCE-FIX-01；其前 bb6c136 = 安全修复收口）
+Production release:                 NOT APPROVED（Final Release Verification 已 PASS、GitHub CI 已 PASS 且 security BLOCKING 0 / UNKNOWN 0，**但这些只是 RC 的技术结论，不是生产批准**；未决人工 gate：OIG 许可证资格（用户已自行确认并取得 key；永久授予、无到期日、无需续期、5 次激活）、OIG 强制遥测无法关闭、Poppler / libvips / util-linux 人工审查；未决生产事项：生产容量、生产网络暴露实测、生产 / 异地备份存储、书面回滚步骤、生产 secret manager、持续 CVE 监控。Production Preflight NOT STARTED）
+Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：be1df5a = FINAL-RELEASE-VERIFICATION-01；其前 da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)
-origin/master:                      8f2e384（本地 review 分支均未 merge / push）
+origin/master:                      8f2e384（未变；未 merge）· remote review branch `origin/review/final-release-verification-01` = `be1df5a`（FINAL-RELEASE-REVIEW-BRANCH-CI-01 推送，协议 §13.1 Layer 2 Remote Review；其余本地 review 分支仍未 push）
 ```
 
 ---
@@ -11591,3 +11591,80 @@ P0 violations：NONE。Container Security 仍 `OPEN`，不写 `PROVEN`。
 - push = 0 · merge = 0 · deploy = 0；未进入 Production Preflight、未部署、未连接生产。
 
 *最后更新：2026-09-18，由 Claude Code 在 FINAL-RELEASE-VERIFICATION-01 任务中写入。*
+
+---
+
+## FINAL-RELEASE-REVIEW-BRANCH-CI-01 — Review Branch 推送与 GitHub CI（**REVIEW BRANCH PUSHED — GITHUB CI PASS**，2026-09-18）
+
+**Module：** FINAL-RELEASE-REVIEW-BRANCH-CI-01（**A3 · PUSH_REVIEW_BRANCH · SAFE AUTOPILOT**）。
+
+**Status：** **REVIEW BRANCH PUSHED — GITHUB CI PASS — READY FOR CONTROLLER REVIEW。**
+- 本模块只做推送与取证：**0 runtime、0 业务代码、0 测试策略、0 workflow、0 镜像、0 权限、0 数据库写入、0 UI**；只写治理文档。
+- **merge = 0 · deploy = 0 · PR created = 0 · force push = 0 · master push = 0**；Production Preflight **NOT STARTED**。
+- 生产发布仍 **NOT APPROVED**：CI 绿是构建与测试的技术结论，不是生产批准。
+
+### 一、基线与推送
+
+- 开工核对完全一致：分支 `review/final-release-verification-01`、HEAD `be1df5a712a1c11c75e25de5edc7d07046976083`、tracked 0 变更、6 个历史 untracked 路径原样未触碰。
+- 远端核对：`origin/master` = **`8f2e384`**（与记录一致，未变）；`origin/master...HEAD` = **0 behind / 95 ahead**，`origin/master` 是 HEAD 的祖先，**无 divergence**，无需 merge / rebase / cherry-pick / reset。
+- `git push -u origin review/final-release-verification-01`（新分支，非 force）：remote ref = **`be1df5a712a1c11c75e25de5edc7d07046976083`** = local HEAD，**EQUAL**。GitHub 返回的 `pull/new/...` 提示按施工单 §15 **未被采纳，未创建 PR**。
+
+### 二、Push 前 workflow side-effect 审计
+
+仓库只有 `.github/workflows/ci.yml` 一个 workflow。`permissions: contents: read`；**0 个 `env:`、0 个 `secrets.` 引用**；第三方 action 仅 `actions/checkout@v4` 与 `actions/setup-node@v4`；步骤为 checkout → setup-node（`node-version-file: .nvmrc`）→ `npm ci` → `npx nuxt prepare` → `npx vitest run` → `npx vue-tsc --noEmit` → `npm run lint` → `npx nuxt build`。
+
+**确认不存在：** production deploy、production environment write、DNS、云资源写入、生产数据库写入、真实外部 email、HubSpot write、真实 AI API 调用、付费 API、release publish、package publish、GitHub Release creation。仓库无 `.npmrc`，git 无 remote URL 改写。
+
+### 三、F-1 的 CI 合同判定（**未触发，workflow 未修改**）
+
+CI 从不设置 `CONTENT_DB_TEST_CONTAINER`（`ci.yml` 无任何 `env:`），而 7 个真实 PostgreSQL 套件与 `tests/releaseTestDataCheck.test.ts` 的清理断言全部由 `describe.skipIf(!CONTAINER)` 把关，另两个 document-extractor 套件由 `DOCUMENT_EXTRACTOR_TEST_URL` 把关。因此 F-1 描述的并行竞态在 GitHub CI 中**结构上不可能发生**。
+
+Push 前已用与 CI 完全相同的命令与等效环境本地实测：`npx vitest run`（Node 22.22.2，三个集成环境变量均 UNSET）→ **87 files passed / 8 skipped，3075 passed / 167 skipped，exit 0**。
+
+据此**未做任何 pre-push 修复**：未改测试、未改 workflow、未加 `continue-on-error`、未 skip、未弱化断言、未禁用 integration suite、未扩大 timeout。
+
+### 四、GitHub CI 真实结果（Controller 独立取证）
+
+| 项 | 值 |
+|---|---|
+| Workflow | `CI` |
+| Run ID | **`35291162888`** |
+| Event / Branch / Commit | `push` · `review/final-release-verification-01` · `be1df5a712a1c11c75e25de5edc7d07046976083` |
+| Status / Conclusion | `completed` / **`success`** |
+| Job ID / Job | `105434083787` · `Tests, types, lint, build (Node 22.22.2)` = **success** |
+| Steps | checkout · Node 22.22.2 · `npm ci` · Nuxt prepare · tests · typecheck · lint · production build —— **全部 success** |
+| Workflow 权限 | 仅 `contents: read`，无 deploy / production mutation |
+
+**证据来源：** 本会话不具备观察 GitHub Actions 的只读通道——仓库私有（未认证 API 404，公开对照 200）、`gh` 未安装、Chrome 扩展未连接、内置浏览器未登录，且读取 token 被禁止。因此上述 run / job 事实由 **Controller 通过其自身已连接的 GitHub 独立取得并提供**，本模块如实记录，未自行推测，也未以 badge 或 workflow YAML 代替真实结果。
+
+### 五、CI 测试范围（必须如实记录，不得与本地全量混同）
+
+| 运行环境 | 文件 | 测试 | 结果 |
+|---|---|---|---|
+| **GitHub CI**（run `35291162888`） | 87 passed / **8 skipped** | 3075 passed / **167 skipped** | success |
+| **本地串行全量**（FINAL-RELEASE-VERIFICATION-01，`--fileParallelism=false`，真实 PostgreSQL + extractor） | **95 passed / 0 skipped** | **3242 passed / 0 failed / 0 skipped** | exit 0 |
+
+GitHub CI 中被跳过的 8 个文件 / 167 个测试，是需要本地数据库与 document-extractor 容器的 integration suites；CI runner 没有这些环境，套件按既有设计自我跳过。**GitHub CI 的绿不覆盖这部分**，其真实证据由本地串行全量提供。两者是互补的，不得把 CI 的 87/3075 说成全量，也不得把本地的 95/3242 说成 CI 已验证。
+
+### 六、环境事实（如实记录，不是缺陷）
+
+`github.com:22` 的 SSH 出站被间歇性重置（`ls-remote` 4 次成功 1 次；push 第 2 次尝试成功；443 正常）。这不影响已完成的推送与本次结果，但后续远端操作需要重试。Bash 沙箱内 git 远端操作一律失败，改用 PowerShell 执行。
+
+### Changed files
+
+- `docs/project/CURRENT-STATE.md`（§0 snapshot + 本节）
+- `docs/project/RELEASE-SAFETY-GATES.md`（§4.3 RSG-09 事实更新）
+- `docs/project/FINAL-RELEASE-VERIFICATION.md`（§25 addendum：推送与 CI 结果）
+
+未新增 Decision Log 条目：本模块只执行既有的分层发布规则（协议 §13），未形成新的长期决定。未改 MASTER-ROADMAP：里程碑状态未变（M8 的「所有代码 push 到 GitHub，CI 通过」是其进入条件之一，M8 本身仍未进入、仍未授权）。
+
+### Open items / 明确未做
+
+- Controller 复核最终 SHA 及其对应的 GitHub CI。
+- **merge（A4）、deploy（A5）、Production Preflight 均未授权、未开始。**
+- 未决人工 gate 不变：OIG 许可证资格（用户已自行确认并取得 key；永久授予、无到期日、无需续期、5 次激活）、OIG 强制遥测无法关闭、Poppler / libvips / util-linux 人工审查。
+- 未决生产事项不变：生产容量、生产网络暴露实测、生产 / 异地备份存储与保留 / 加密 / 调度、书面生产回滚与切换步骤、生产 secret manager、持续 CVE 与公告监控。
+- 既有 OPEN 不变：Products 侧 RSG-01 / RSG-02；Content AI Golden Path 未 live 证明；F-1（全量须串行）与 F-2（`nuxt dev` 期间构建产生的 `#app-manifest` 开发期产物）。
+- 本模块未读取、未输出、未保存任何 `.env` 值、password、cookie、JWT、token、API key、LICENSE_KEY 或 GitHub PAT。
+
+*最后更新：2026-09-18，由 Claude Code 在 FINAL-RELEASE-REVIEW-BRANCH-CI-01 任务中写入。*
