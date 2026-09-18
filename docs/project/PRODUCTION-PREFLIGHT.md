@@ -1,12 +1,14 @@
 # Production Preflight
 
-> **Current result — FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 (2026-09-18, with its review fix): PRODUCTION PREFLIGHT
-> STILL INCOMPLETE.** The production host exists and has been measured, and the V1 deployment topology is frozen
-> (D-043). Six items block the initial non-AI website launch (§48): the `DIRECTUS_PUBLIC_URL` decision, the canonical
-> domain / TLS decision, a safe production provisioning path, the Media Library folder bootstrap, the systemd / Nginx /
-> secret-injection implementation, and the minimum backup / rollback closure for the first deployment. **Part II
-> (§35–§49) is the current assessment.** Part I (§1–§34) below is the FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 record as
-> written from the repository alone; it is kept, with a one-line pointer wherever Part II supersedes it.
+> **Current result — PRODUCTION-BOOTSTRAP-SAFETY-01 (2026-09-18): PRODUCTION PREFLIGHT STILL INCOMPLETE.** The
+> production host exists and has been measured, the V1 deployment topology is frozen (D-043), and the production URLs are
+> decided (D-044). Of the six items that block the initial non-AI website launch: the `DIRECTUS_PUBLIC_URL` decision is
+> closed; the canonical domain is decided while TLS stays open; the production provisioning safety gate is implemented
+> and proven locally, while the host marker and the first authorized production run are not done; the Media Library
+> folder bootstrap, the systemd / Nginx / secret-injection implementation and the minimum backup / rollback closure
+> remain open (§53). **Part III (§50–§53) is the current assessment.** Part II (§35–§49, FINAL-RELEASE-PRODUCTION-
+> PREFLIGHT-02 and its review fix) and Part I (§1–§34, FINAL-RELEASE-PRODUCTION-PREFLIGHT-01, written from the repository
+> alone) are kept, with a one-line pointer wherever a later part supersedes them.
 
 > Module: FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 · 2026-09-18 · read-only assessment.
 > **Result: PRODUCTION PREFLIGHT INCOMPLETE — HUMAN / INFRA BLOCKERS REMAIN.**
@@ -132,6 +134,9 @@ address does not exist and the registrar / nameserver move has not been decided.
 
 ## 8. TLS
 
+> **Updated (§52, D-044):** the canonical host is decided — `https://litubo.com`, with `www` → 301 after cut-over;
+> `https://tuboluo.com` is the temporary, noindex acceptance host. The TLS terminator is still open.
+
 **NOT DECIDED.** The documents name two different terminators without choosing one:
 
 - `01-technical-decision.md` / D-001: Cloudflare Free provides TLS.
@@ -148,8 +153,8 @@ No certificate was issued or changed.
 
 ## 9. `PUBLIC_URL` — **BLOCKER**
 
-> **Still OPEN (§43).** The statements presenting `http://localhost:8055` as the production value, in `.env.example`
-> and `ADMIN-CMS-SETUP.md` §6.1, are now marked stale pending the Controller's decision.
+> **Decided (§52, D-044):** production `DIRECTUS_PUBLIC_URL` is `https://cms.litubo.com` — an identity, not a public
+> exposure. The `localhost` statements were marked stale in PREFLIGHT-02 (§43); `.env.example` now names the decided value.
 
 | Variable | Repository value | Requirement |
 |---|---|---|
@@ -364,6 +369,9 @@ depends on §10. No production secret manager has ever been exercised.
 
 ## 19. OIG production activation
 
+> **Updated (§52):** the binding input is decided (D-044); the activation itself happens only in the authorized
+> deployment module.
+
 | Fact | Value |
 |---|---|
 | Grant terms | granted **in perpetuity**, no expiration date, no renewal process; each key carries **5 activations** |
@@ -553,8 +561,8 @@ will be without explicit authorization.
 
 ## 31. Production host information needed
 
-> **Mostly answered (§36–§40):** items 1 and 3–7 are answered; item 2 is not part of the evidence; items 8–11 remain
-> open; item 12 is answered as a mechanism (§45), not yet as files.
+> **Mostly answered (§36–§40, §52):** items 1, 3–7 and 11 (D-044) are answered; item 2 is not part of the evidence;
+> items 8–10 remain open; item 12 is answered as a mechanism (§45), not yet as files.
 
 The minimum to move this preflight forward. **The user supplies these themselves; Claude reads no credential.**
 
@@ -872,6 +880,9 @@ the service identity come from the repository's tracked provisioning artifacts (
 13 steps). Real products follow a separate, human-controlled rollout — one Draft → human verification → first publish
 → 3–5 products → verification → batch import (§27). This module created no product and no database.
 
+> **Updated (§51, §52):** point 1 — the script now has a fail-closed production gate, implemented and proven locally;
+> point 2 — `DIRECTUS_PUBLIC_URL` is decided (D-044). Point 3 stays OPEN.
+
 Facts the deployment module has to carry (none of them decided here):
 
 1. **Production provisioning safety path — OPEN.** `scripts/provision-directus.mjs` is documented as local / scratch
@@ -908,6 +919,9 @@ No AI key is connected, and no AI cost can arise from this configuration.
 
 ## 43. `DIRECTUS_PUBLIC_URL` — OPEN / BLOCKING BEFORE FIRST PRODUCTION DIRECTUS ACTIVATION
 
+> **Decided (§52, D-044):** `DIRECTUS_PUBLIC_URL=https://cms.litubo.com` — the long-term production identity of
+> LITUBO's Directus, not a public exposure of 8055.
+
 Unchanged from §9 and deliberately **not decided here**. No value is chosen — not `http://localhost:8055`, not
 `https://www.litubo.com`, not `https://litubo.com`, not `https://cms.litubo.com`, not a temporary IP address or host
 name. The OIG activation binds to the project and `PUBLIC_URL`, activations are limited (4 left), and production
@@ -922,6 +936,9 @@ Until the Controller decides:
   `.env.example` is unchanged.
 
 ## 44. Canonical host and TLS — OPEN
+
+> **Partially decided (§52, D-044):** canonical `https://litubo.com` (`www` → 301 after cut-over); acceptance host
+> `https://tuboluo.com`, served noindex. The TLS terminator and the certificates stay open; the requirements below stand.
 
 Unchanged: apex or `www` is not decided, and neither is the TLS terminator (Cloudflare or an origin certificate). The
 domain's nameservers are still Wix's and the old Wix site is live (§7), so cut-over is a nameserver migration. The
@@ -974,6 +991,8 @@ mechanically possible — but no written procedure exists, and data rollback sti
 
 ## 47. Blocker reconciliation
 
+> **Updated (§53):** rows 9, 12 and 13 changed in PRODUCTION-BOOTSTRAP-SAFETY-01.
+
 This table records every item's status. It is not the launch blocker list: §48 sorts the open items into the six
 that block the initial non-AI website launch and the ones that do not.
 
@@ -1004,6 +1023,8 @@ Human gates carried unchanged from §29: the Poppler / libvips / util-linux revi
 `PRIVACY_POLICY_VERSION` are **OPEN**; OIG eligibility and the telemetry acceptance stay closed by the business owner.
 
 ## 48. Final result
+
+> **Superseded by §53.**
 
 ```text
 PRODUCTION PREFLIGHT STILL INCOMPLETE
@@ -1064,3 +1085,132 @@ legal conclusion.*
 The Media Library folder bootstrap stays **OPEN** and is now stated more concisely (§41). Nothing else changed: the
 topology (D-043), the fresh empty database, the launch feature policy, the stale marking of the `localhost`
 production `DIRECTUS_PUBLIC_URL`, and RSG-08 remaining `OPEN` all stand.
+
+---
+
+## Part III — PRODUCTION-BOOTSTRAP-SAFETY-01: provisioning safety gate and production URL decision
+
+> Module: **PRODUCTION-BOOTSTRAP-SAFETY-01** · 2026-09-18 · TYPE B · A2 `LOCAL_IMPLEMENTATION` · local commit only.
+> **Result: PRODUCTION PREFLIGHT STILL INCOMPLETE.** Two of the six initial-launch items move: the production
+> provisioning path gets a fail-closed gate in code, and the user's production URL decision is recorded (D-044).
+> Production release remains **NOT APPROVED**; push, merge and deploy each still require their own authorization.
+
+## 50. Scope, baseline and footprint
+
+| Item | Value |
+|---|---|
+| Branch / start HEAD | `review/final-release-verification-01` / `cab916fb8854b45e7acb1b2f15e768f24ba7c29b` — matches the work order |
+| Remote review branch at start | `cab916f` — equal to the start HEAD |
+| `origin/master` | `8f2e3847e0d7acda1bd987ffd18c3af03377fef9` — unchanged |
+| Scope | A. the production provisioning safety gate; B. the production URL and transitional host decision (D-044). The Media Library folder bootstrap stays OPEN and is not implemented |
+
+**Footprint on production: none.** Production service starts 0 · production database writes 0 · production secret reads
+0 · licence activations 0 · Nginx changes 0 · DNS changes 0 · deployments 0. No marker was created anywhere, no
+provisioning was run, no container was started, and no `.env` was read or created.
+
+## 51. The production provisioning safety gate
+
+**What was wrong (§41, §49).** The script's only production-related check refused database names containing `prod`,
+`production` or `live`. The production database `litubo_cms` passes it — and the local development database has the
+same name (`.env.example`: `DB_DATABASE=litubo_cms`) — so no name can tell the two apart.
+
+**What exists now.** `scripts/provisioning-safety.mjs` holds the decision as a pure function, with the marker reader
+kept separate; `scripts/provision-directus.mjs` consults it before it reads the manifest or any secret, and before its
+first docker, psql or Directus call.
+
+| Command line and host | Result |
+|---|---|
+| no `--environment`, or anything but exactly `local`, `scratch` or `production` | refused |
+| `--environment`, `--database` or `--confirm-production-database` given twice | refused |
+| no `--database`, or a database name that is not a plain PostgreSQL identifier | refused (unchanged) |
+| `local` / `scratch` on a host whose marker exists, or whose marker path cannot be checked | refused |
+| `local` / `scratch` with `--allow-production` or `--confirm-production-database` | refused as contradictory |
+| `local` / `scratch` with a name containing `prod`, `production` or `live` | refused — a typo guard, not production detection |
+| `production` without `--allow-production` | refused |
+| `production` without a `--confirm-production-database` that repeats `--database` exactly | refused |
+| `production` with any database other than `litubo_cms` | refused |
+| `production` on a host without the marker, whose marker cannot be read, or whose marker is not exactly `LITUBO_PRODUCTION_V1` | refused |
+| `production` with every requirement met, on the marked host | passes the gate; provisioning then runs as before |
+| `local` / `scratch` with an ordinary name, on a host without the marker | passes the gate, as before |
+
+Everything after the gate is unchanged: an explicit target; an empty database by default, and `--allow-existing` with
+its old meaning; `DIRECTUS_TOKEN` resolved before the first database call, passed on stdin and redacted from all
+output; fail-fast; no manual SQL; the manifest order.
+
+**The marker.** `/etc/litubo/PRODUCTION`, holding exactly `LITUBO_PRODUCTION_V1` with no trailing newline — an identity,
+not a secret. Only "no such file" counts as absent; any other failure to read it counts as "cannot rule out
+production". This module only recognises and verifies it. **It created no marker anywhere; creating it on the server
+belongs to the authorized deployment module (A5)**, which must do so before the first LITUBO database exists on the
+host, so local and scratch runs are refused there from the start. Because `/etc/litubo` is root:root 700 (§40), a run
+that cannot read the marker is refused in every mode; which account runs provisioning is the deployment module's
+decision, and the gate is not loosened for it. The runbook carries the contract (`PRODUCTION-PROVISIONING-RUNBOOK.md`
+§3, §7).
+
+**Evidence — local only.**
+- `tests/provisioningSafety.test.ts` drives the pure decision through cases A–L, tests the marker reader through an
+  injected file reader, and runs the real orchestrator twice with an empty `PATH`, so no docker binary could be reached
+  even if the gate failed.
+- `tests/provisionDirectusGate.test.ts` evaluates the real orchestrator with a docker double and a marker double. Every
+  refusal ends with **0 docker calls, 0 HTTP requests, no provisioning header and no token in the output**. A production
+  run that meets every requirement, and the legal local and scratch runs, make exactly one call — the read-only
+  `pg_database` existence query — where the double stops them; `--allow-existing` still reaches manifest step `00`.
+- **Red-light check:** with the refusal line temporarily removed from the script, all 13 tests that run the real
+  orchestrator on a refused command line failed; the line was then restored byte for byte.
+- No test touches `/etc/litubo`, runs docker or reaches a database.
+
+## 52. Production URL decision (D-044)
+
+Confirmed by the user and recorded in `08-decision-log.md` D-044:
+
+| Name | Role |
+|---|---|
+| `https://litubo.com`, `https://www.litubo.com` | the current customer site on Wix — unchanged until the new site has passed acceptance; DNS and Wix untouched |
+| `https://tuboluo.com` | temporary acceptance host for the new site on Tencent Cloud — **noindex** throughout acceptance, not canonical, never promoted as an SEO or sitemap domain |
+| `https://litubo.com` | the final canonical after cut-over; `https://www.litubo.com` → 301 → `https://litubo.com` |
+| `https://cms.litubo.com` | `DIRECTUS_PUBLIC_URL` — the long-term production identity of LITUBO's Directus; unchanged at cut-over |
+
+**Identity, not exposure.** `cms.litubo.com` is the absolute `PUBLIC_URL` Directus reports and its OIG activation binds
+to. It does not authorize publishing 8055: Directus keeps listening on `127.0.0.1:8055` only (D-043), and how an HTTPS
+route, access control and the SSH tunnel combine for that name is for a later authorized deployment module (D-044 (5)).
+
+**What this settles, and what it does not.**
+- §43 / row 12 — **the decision is closed.** The value exists before any production Directus has started, so the first
+  activation can use it; the activation itself remains a deployment step.
+- §44 / row 13 — **the canonical host is decided**; the TLS terminator and the certificates are not.
+- Still for the deployment module: the LITUBO virtual host(s) and their certificates; `noindex` on the acceptance host;
+  the access path for `cms.litubo.com`; any DNS record for `tuboluo.com` or `cms.litubo.com`. Nothing was configured here.
+- A repository fact for that module: `NUXT_PUBLIC_SITE_URL` defaults to `https://litubo.com`, the decided canonical, and
+  it is read at build time (§39); how the acceptance build is configured is its decision.
+
+## 53. Reconciliation and final result
+
+| # (§47) | Item | Previous state | Current state | Remaining action | Owner / next gate |
+|---|---|---|---|---|---|
+| 9 | Initial data / safe provisioning path | CLOSED (decision); safe path OPEN | CLOSED (decision); **safe path: gate implemented, proven locally** | create the marker before the first LITUBO database; one authorized production run with the confirmations; the Media Library folder bootstrap (§41) | deployment module (A5) |
+| 12 | `DIRECTUS_PUBLIC_URL` | OPEN — BLOCKING BEFORE FIRST PRODUCTION DIRECTUS ACTIVATION | **CLOSED (decision)** — `https://cms.litubo.com` (D-044) | use it at the first activation; decide the name's access path | deployment module |
+| 13 | Canonical host / TLS | OPEN | **canonical CLOSED (decision)** — `https://litubo.com`, `www` → 301 after cut-over; acceptance host `https://tuboluo.com`, noindex · **TLS OPEN** | choose the TLS terminator; certificates; virtual hosts; noindex on the acceptance host; the cut-over | Controller → deployment module |
+
+```text
+PRODUCTION PREFLIGHT STILL INCOMPLETE
+
+Initial website launch blockers (the non-AI launch)
+  1. DIRECTUS_PUBLIC_URL decision                      CLOSED — https://cms.litubo.com (D-044)
+  2. Canonical domain / TLS decision                   canonical CLOSED (D-044) · TLS terminator and certificates OPEN
+  3. A safe production provisioning execution path     gate IMPLEMENTED, proven locally · host marker and first authorized run OPEN (A5)
+  4. Media Library folder bootstrap                    OPEN — before real product media is entered
+  5. systemd / Nginx / secret injection, implemented   OPEN — now also: acceptance-host noindex, the cms.litubo.com access path
+  6. Minimum backup / rollback closure                 OPEN
+
+Not initial-launch blockers — unchanged (§48): region · extractor reproducibility · AI providers · HubSpot · long-term capacity
+Human and authorization gates — unchanged (§48)
+
+Production release NOT APPROVED
+Deploy             NOT AUTHORIZED — do not start
+```
+
+**Why not PASS.** Item 1 and the canonical half of item 2 were business decisions, and the user has made them. Item 3
+is code that has been tested locally but has never run on the server — the marker does not exist there yet — so it is
+not closed. Items 4–6 are untouched. Nothing is marked PASS to reach a deployment.
+
+*Part III written 2026-09-18 by Claude Code in PRODUCTION-BOOTSTRAP-SAFETY-01. No production system was contacted, and
+nothing here is a production approval or a legal conclusion.*

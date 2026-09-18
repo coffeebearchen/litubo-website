@@ -111,7 +111,8 @@ Required by `docker-compose.yml`: `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `POST
 - **Activation.** The first Directus process that starts with the key against a database holding no license
   activates it against `https://licensing.directus.com`. On a fresh environment that is provisioning step `10`
   (`schema apply` loads the license). The activation binds to the project and `DIRECTUS_PUBLIC_URL`, which must be
-  an absolute URL. Directus stores the key and the returned token in `directus_settings`, so every later backup
+  an absolute URL. In production it is `https://cms.litubo.com` (D-044) — Directus's identity, not a public address:
+  the container still listens on `127.0.0.1:8055` only. Directus stores the key and the returned token in `directus_settings`, so every later backup
   set carries them and is secret material. Later starts revalidate the binding online, so the Directus container
   needs outbound HTTPS to that host.
 - **Activations are limited.** An OIG key has five, meant for one project's environments. They are released only by
@@ -251,15 +252,44 @@ Two production values are load-bearing and fail closed if wrong:
 # 1. Create the target database (the script never creates databases).
 # 2. Put DIRECTUS_TOKEN in the environment (see §2) and run the canonical order.
 #    Supply it from your secret manager — never type it inline, and never commit it.
-node scripts/provision-directus.mjs --database <name>
+node scripts/provision-directus.mjs --environment local --database <name>     # the development database
+node scripts/provision-directus.mjs --environment scratch --database <name>   # a disposable rehearsal database
 ```
 
-The script refuses to run without an explicit `--database`, refuses any name containing `prod`,
-`production` or `live`, refuses anything that is not a plain PostgreSQL identifier, and refuses a
-database that already has tables unless `--allow-existing` is passed. It resolves every required
-secret **before** touching the database, so a missing one fails at once rather than half way through.
-It stops at the first failure and exits non-zero; it never skips a step, never swallows an error and
-never repairs drift.
+**The safety gate (PRODUCTION-BOOTSTRAP-SAFETY-01).** Before the script reads the manifest or any secret,
+and before its first docker, psql or Directus call, it passes one gate (`scripts/provisioning-safety.mjs`).
+A run the gate refuses exits 1 having made no docker call, so it has touched no database and no Directus.
+
+- `--environment` is required and is exactly `local`, `scratch` or `production`. `--database` is required
+  and must be a plain PostgreSQL identifier. Neither has a default, and neither may be given twice.
+- `local` and `scratch` are refused on a host that carries the production marker
+  `/etc/litubo/PRODUCTION`, or where that path cannot be checked. They are also refused for a database
+  whose name contains `prod`, `production` or `live` — a guard against a mistyped target, **not**
+  production detection: the production database `litubo_cms` contains none of them, and the local
+  development database has the same name, so no name can tell the two apart.
+- `production` is refused unless the database is exactly `litubo_cms`, `--allow-production` is given,
+  `--confirm-production-database` repeats the database exactly, and the marker holds exactly
+  `LITUBO_PRODUCTION_V1`.
+
+After the gate, nothing changed: the script refuses a database that already has tables unless
+`--allow-existing` is passed. It resolves every required secret **before** touching the database, so a
+missing one fails at once rather than half way through. It stops at the first failure and exits non-zero;
+it never skips a step, never swallows an error and never repairs drift.
+
+**Production runs.** The production form is
+
+```bash
+node scripts/provision-directus.mjs --environment production --database litubo_cms \
+  --allow-production --confirm-production-database litubo_cms
+```
+
+and this runbook does not authorize it: it belongs to an authorized deployment module (A5). That module
+also creates the marker — a non-secret identity file holding exactly `LITUBO_PRODUCTION_V1`, with no
+trailing newline (a line written by `echo` does not match) — and must create it **before** the first
+LITUBO database exists on the host, so that local and scratch runs are refused there from the start.
+`/etc/litubo` is `root:root 700` on the host (D-043), so only a run permitted to read it can read the
+marker; a run that cannot is refused. Which account runs provisioning is the deployment module's decision,
+and the gate is not loosened to suit it. This repository never creates, edits or removes the marker.
 
 Steps, and what each one exists for, are documented in `scripts/provisioning-manifest.json`.
 Summarised: Directus bootstrap → tracked schema baseline → database constraints → revision guard →
@@ -365,6 +395,9 @@ Stop and report rather than improvise if any of these hold:
 - The access bootstrap's `.verify.sql` does not print `directus_access_verify: OK`, or it reports
   that the policy is reachable from an identity other than the `nuxt-server` role.
 - Any step would need a manual `INSERT`, `UPDATE` or `DELETE` to get past it.
+- The provisioning safety gate refuses a run, and the answer being considered is to loosen it, to pass a
+  different `--environment`, or to create, change or remove `/etc/litubo/PRODUCTION` outside the authorized
+  deployment module.
 - The service token is unavailable, and the answer being considered is to generate one locally,
   commit one, reuse another environment's, or pass `--without-service-token` and carry on.
 - A deployment plan supplies a production server secret (§2) to the build, expects the built server to

@@ -12,9 +12,15 @@
  * by hand in a single database years into the project.
  *
  * Safety posture:
- *   - The target is explicit and has no default. Nothing runs until a caller
- *     names a database, and a name that looks like production is refused
- *     outright: this script has no production mode to opt into.
+ *   - Nothing runs until the run has passed the safety gate in
+ *     provisioning-safety.mjs (PRODUCTION-BOOTSTRAP-SAFETY-01) — before the
+ *     manifest is read, before any secret is read and before the first docker,
+ *     psql or Directus call. The caller names the kind of environment and the
+ *     database; neither has a default. Production additionally needs the exact
+ *     production database, two explicit confirmations and this host's production
+ *     marker, and a host that carries the marker refuses local and scratch runs.
+ *     A local or scratch database whose name looks like production is refused
+ *     too — a guard against a mistyped target, not how production is recognised.
  *   - It fails fast. No step is skipped, no error is swallowed, nothing is
  *     auto-repaired. A non-zero exit means the environment is NOT provisioned.
  *   - Exactly one step consumes a secret, and it takes the value from the
@@ -27,8 +33,12 @@
  *     the containers and never enter this process.
  *
  * Usage:
- *   node scripts/provision-directus.mjs --database <name> [--allow-existing]
- *                                       [--without-service-token]
+ *   node scripts/provision-directus.mjs --environment local|scratch --database <name>
+ *                                       [--allow-existing] [--without-service-token]
+ *   node scripts/provision-directus.mjs --environment production --database litubo_cms
+ *                                       --allow-production --confirm-production-database litubo_cms
+ *                                       [--allow-existing] [--without-service-token]
+ *   Production also requires /etc/litubo/PRODUCTION to contain exactly LITUBO_PRODUCTION_V1.
  *
  * Environment:
  *   DIRECTUS_TOKEN              the nuxt-server service user's static token: the one secret,
@@ -43,13 +53,11 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
+import { decideProvisioningSafety, parseProvisioningRequest, readProductionMarker } from './provisioning-safety.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
 const MANIFEST = join(HERE, 'provisioning-manifest.json')
-
-/** Names that must never be provisioned by this script, however they are spelled. */
-const PRODUCTION_MARKERS = ['prod', 'production', 'live']
 
 /** Secret values seen this run. Every byte written to a stream is filtered through these. */
 const secrets = []
@@ -71,28 +79,12 @@ function fail(message) {
   process.exit(1)
 }
 
-function arg(name) {
-  const i = process.argv.indexOf(`--${name}`)
-  if (i !== -1 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--')) return process.argv[i + 1]
-  const inline = process.argv.find(a => a.startsWith(`--${name}=`))
-  return inline ? inline.slice(name.length + 3) : null
-}
-
-const database = arg('database')
+// The safety gate comes before everything else: before the manifest, before any secret is read and
+// before the first docker, psql or Directus call. A run it refuses has touched nothing.
+const verdict = decideProvisioningSafety(parseProvisioningRequest(process.argv.slice(2)), readProductionMarker)
+if (!verdict.ok) fail(verdict.reason)
+const { environment, database } = verdict
 const allowExisting = process.argv.includes('--allow-existing')
-
-if (!database) {
-  fail('no target. Pass --database <name>. There is no default: a provisioning run must name the database it is about to change.')
-}
-if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(database)) {
-  fail(`database name ${JSON.stringify(database)} is not a plain PostgreSQL identifier. Refusing to interpolate it.`)
-}
-const lowered = database.toLowerCase()
-for (const marker of PRODUCTION_MARKERS) {
-  if (lowered.includes(marker)) {
-    fail(`database name "${database}" contains "${marker}". This script provisions local and scratch environments only; production provisioning is a separate, authorized activity.`)
-  }
-}
 
 const composeFiles = (process.env.PROVISION_COMPOSE_FILES ?? 'docker-compose.yml').split(':').filter(Boolean)
 const pgService = process.env.PROVISION_PG_SERVICE ?? 'postgres'
@@ -204,6 +196,7 @@ for (const step of steps) {
 }
 
 say(`\nProvisioning "${database}"\n`)
+say(`  environment      ${environment}\n`)
 say(`  contract         ${manifest.contract}\n`)
 say(`  Directus         ${manifest.runtime?.directusVersion}\n`)
 say(`  steps            ${steps.length}${skipped.length > 0 ? ` (${skipped.length} deliberately skipped)` : ''}\n\n`)

@@ -79,9 +79,12 @@ async function inRolledBackTransaction(setup: string, script: string): Promise<P
   return psql(`BEGIN;\n${setup}\n${script}\nROLLBACK;\n`)
 }
 
-/** Runs the provisioning orchestrator the way an operator would, with the given DIRECTUS_TOKEN. */
+/**
+ * Runs the provisioning orchestrator the way an operator would, with the given DIRECTUS_TOKEN. The targets
+ * are disposable scratch databases, so the run names that environment (PRODUCTION-BOOTSTRAP-SAFETY-01).
+ */
 function runOrchestrator(database: string, token: string) {
-  return spawnSync(process.execPath, [ORCHESTRATOR, '--database', database], {
+  return spawnSync(process.execPath, [ORCHESTRATOR, '--environment', 'scratch', '--database', database], {
     cwd: process.cwd(),
     encoding: 'utf8',
     timeout: 60_000,
