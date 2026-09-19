@@ -8,14 +8,19 @@
 
 ```text
 Latest accepted module:             MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01（`64bfc56`：用户确认 GitHub CI run `35332837835` = success，并据此按 A4 把 master fast-forward 到 `64bfc56`，由原会话执行，见文末 LITUBO-SIMPLE-GO-LIVE-AUTOPILOT 一节）；其前 PRODUCTION-BOOTSTRAP-SAFETY-01（**INFERRED accepted**：Controller 以 A3 单独授权把 `10feb70` fast-forward push 到 review 分支（`cab916f..10feb70`），随后以 `10feb70` 为基线发出 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01 施工单；与此前各轮同一口径，Controller 未另行书面声明接受；该次 push 的 GitHub CI 结果未写入施工单，本文件不记录）；其前 FINAL-RELEASE-PRODUCTION-PREFLIGHT-02 及其 REVIEW-FIX-01（**INFERRED accepted**：`86637f7` + `cab916f` 经 A3 push，随后以 `cab916f` 为基线发出下一份施工单；CI 结果同样未写入施工单）；其前 PRODUCTION-PREFLIGHT-UID-CORRECTION-01（**INFERRED accepted**：`32e877a`，CI run `35303613756` completed / success，由 Controller 独立核实）；再前 FINAL-RELEASE-REVIEW-BRANCH-CI-01 — review branch 推送与 GitHub CI（Controller 已独立核实 final CI = PASS，并据此发出 FINAL-RELEASE-PRODUCTION-PREFLIGHT-01 施工单）；再前 FINAL-RELEASE-VERIFICATION-01 — 对 RC `da8f445` 的最终独立综合验收（**FINAL RELEASE VERIFICATION PASS**）；再前 FINAL-RELEASE-SECURITY-REMEDIATION-01 — Directus 11.17.4 → 12.3.1 安全修复（Controller 已接受 `bb6c136`：BLOCKING 0 / UNKNOWN SECURITY EXPOSURE 0 · D-042；其后 GOVERNANCE-FIX-01 `da8f445` 为最小治理收口）；再前 FINAL-RELEASE-PRODUCTION-READY-03 / 03A / 03B（39ce564 · D-041）、02（26d0238 · D-040）、01 / 01A–01D（D-038 / D-039）
-Latest completed module:            LITUBO-SIMPLE-GO-LIVE-AUTOPILOT（A4 + A5，2026-09-18）— 新站部署到临时验收域名 `https://tuboluo.com`（noindex），生产服务已在运行；详见文末该节：
+Latest completed module:            LITUBO-PRODUCTION-ACCEPTANCE-01 工作包 1（2026-09-19）— tuboluo.com 生产环境的后台与询盘功能验收：**核心流程通过，hero 缺陷待关闭**（通过：产品建档与保存、规格参数、媒体上传、Draft → Review → Publish → 撤回、询盘提交与后台可查、1440 / 375 关键操作；待关闭：后台设置的 hero 主图在分类卡片不显示——LITUBO-HERO-FIX-01 已在本地修复并验证，随 LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 续轮提交并 push 到 review 分支，未部署，生产部署验收后才能关闭）。本轮 [TEST] 数据已按 id 全部删除。详见文末各节（hero 修复与公开媒体补充修复的本地结果见 LITUBO-HERO-FIX-01、LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 两节）。其前：
+                                    LITUBO-SIMPLE-GO-LIVE-AUTOPILOT（A4 + A5，2026-09-18）— 新站部署到临时验收域名 `https://tuboluo.com`（noindex），生产服务已在运行；详见文末该节：
                                     · A4：origin/master `8f2e384..64bfc56`（fast-forward）
                                     · A5：同一台腾讯云主机；PostgreSQL（无端口）/ Directus 12.3.1（仅 127.0.0.1:8055）/ Nuxt systemd（仅 127.0.0.1:3310）/ 独立 Nginx vhost + Let's Encrypt；生产 provisioning 15/15 通过（含 Media Library 10 个系统目录）
                                     · 外部 HTTPS 与 1440 / 375 验收 PASS；refrigerant-store 未受影响；litubo.com / www / Wix 未动
-                                    · 仍待用户登录一次后台后验收：CMS 编辑、Media 上传、Draft / Published、表单真实提交
+                                    · 登录后的后台验收已由 LITUBO-PRODUCTION-ACCEPTANCE-01 工作包 1 完成
                                     其前 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01（`64bfc56`：D-045）；PRODUCTION-BOOTSTRAP-SAFETY-01（`10feb70`：生产 provisioning 安全门 + D-044）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01（`cab916f`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02（`86637f7`：冻结 V1 拓扑 D-043）。各模块详情见文末对应节
-Active authorized module:           LITUBO-SIMPLE-GO-LIVE-AUTOPILOT（进行中：部署与外部 / 响应式验收已完成；需用户登录的 CMS 验收未做）。正式切换 `litubo.com`、`64bfc56` 之后的任何 push 均未授权
-Active module authorization level:  A4（master fast-forward 至 `64bfc56`，已完成）+ A5（部署到 `https://tuboluo.com`，已完成）
+Active authorized module:           LITUBO-PUBLIC-MEDIA-CLOSEOUT-01（2026-09-19，含续轮：区块图片、产品 OG 图、首页主图）— 本地验证全部通过；按施工单以本 commit 提交，并 push 到 review 分支 `review/final-release-verification-01`（SHA 以 `git log` / `git ls-remote` 为准）。PR 创建与远端 CI 核实由 GPT Controller 接手。三项状态分开记录：
+                                    · 主图修复（LITUBO-HERO-FIX-01）：本地验证通过，随本 commit 提交
+                                    · 公开媒体补充修复（产品详情 hero / gallery / 下载 / 区块图片 / OG 图、分类自身主图、首页主图按 RSG-06 过滤）：本地验证通过，随本 commit 提交
+                                    · 生产：未部署——tuboluo.com 仍运行 `64bfc56`（服务器侧状态待核实，见 Production runtime）
+                                    `39bf8f1`（tuboluo.com 部署记录）是本 commit 的父提交，本身不含上述修复。未合并、未部署。LITUBO-PRODUCTION-ACCEPTANCE-01 工作包 2 / 3（备份、恢复、回滚）未授权；正式切换 `litubo.com` 未授权；Stable Production SHA **未冻结**（候选仍为 `64bfc566…`）
+Active module authorization level:  A2 + A3（本地实现与验收、本地 commit、push review 分支；施工单明确不含合并、部署；PR 与远端 CI 由 GPT Controller 接手）。更早：工作包 1 的生产测试授权（已结束）；A4 + A5 已完成
 Next candidate:                     无已授权候选。首次非 AI 官网上线的 6 项（`PRODUCTION-PREFLIGHT.md` §53）在本次部署后的状态：
                                     1. `DIRECTUS_PUBLIC_URL` — CLOSED（D-044：`https://cms.litubo.com`，生产首次启动即以此激活）
                                     2. canonical / TLS — canonical CLOSED（`https://litubo.com`）；验收域名 TLS 已实施（主机 Nginx + Let's Encrypt，只含 `tuboluo.com`，到期 2026-12-17，自动续期）；`litubo.com` 切换时的 TLS 仍 OPEN
@@ -29,8 +34,8 @@ Production release:                 **已部署到临时验收域名 `https://tu
 Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：64bfc56 = MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01；其前 10feb70 = PRODUCTION-BOOTSTRAP-SAFETY-01、cab916f = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01、86637f7 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02、32e877a = PRODUCTION-PREFLIGHT-UID-CORRECTION-01、1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01、9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)。本地 `directus_folders` 未改动：25 个目录，其中 10 个 canonical 目录各恰好一个；folder bootstrap 只在回滚的 TEST ONLY 副本中运行，从未对开发库 apply
-origin/master:                      64bfc56（2026-09-18 按 A4 fast-forward `8f2e384..64bfc56`；**未启用 branch protection**）· remote review branch `origin/review/final-release-verification-01` = `64bfc56`（以 `git ls-remote` 为准）· 本节的收口 commit **只在本地、未 push**，因此本地 HEAD 领先远端 1 个 commit；其余本地 review 分支仍未 push
-Production runtime:                 腾讯云主机 43.165.125.203 · `/opt/litubo/repo` @ `64bfc56` · Nuxt `litubo-nuxt.service`（127.0.0.1:3310）· Compose 项目 `litubo-cms`（Directus 127.0.0.1:8055，PostgreSQL 无端口）· Nginx `/etc/nginx/sites-available/litubo-tuboluo` · 受保护配置 `/etc/litubo`（root 700）· 详见文末 LITUBO-SIMPLE-GO-LIVE-AUTOPILOT 一节
+origin/master:                      64bfc56（2026-09-18 按 A4 fast-forward `8f2e384..64bfc56`；**未启用 branch protection**）· remote review branch `origin/review/final-release-verification-01`：本轮 push 前为 `64bfc56`；按施工单 push 后依次包含 `39bf8f1`（部署记录）与本 commit（以 `git ls-remote` 为准）· 本机未创建 PR（无 gh，按施工单不另装工具；由 GPT Controller 接手）；其余本地 review 分支仍未 push
+Production runtime:                 **服务器侧状态待核实**（最后实测：2026-09-19 工作包 1；2026-09-19 的只读复核因 SSH 两次失败未完成）。已记录状态：腾讯云主机 43.165.125.203 · `/opt/litubo/repo` @ `64bfc56`（不含 HERO-FIX-01 与 PUBLIC-MEDIA-CLOSEOUT-01 的修复）· Nuxt `litubo-nuxt.service`（127.0.0.1:3310）· Compose 项目 `litubo-cms`（Directus 127.0.0.1:8055，PostgreSQL 无端口）· Nginx `/etc/nginx/sites-available/litubo-tuboluo` · 受保护配置 `/etc/litubo`（root 700）· 详见文末 LITUBO-SIMPLE-GO-LIVE-AUTOPILOT 一节
 ```
 
 ---
@@ -12292,3 +12297,247 @@ bootstrap 之后由 `buildFolderRegistry` 读回：
 **生产足迹：** 生产数据库写入仅为 provisioning 15 步（空库初始化）。没有打印任何 secret；未配置 AI Key，AI 费用 0；Wix 与 `litubo.com` DNS 零修改。
 
 *最后更新：2026-09-18，由 Claude Code 在 LITUBO-SIMPLE-GO-LIVE-AUTOPILOT 任务中写入。*
+
+---
+
+## LITUBO-PRODUCTION-ACCEPTANCE-01 — 工作包 1：后台与询盘功能验收（2026-09-19，核心流程通过，hero 缺陷待关闭）
+
+**授权与范围：** Geoffrey 授权在 `https://tuboluo.com` 用已有登录方式做后台测试，创建、修改、测试发布并清理本轮独有的 [TEST] 产品、媒体、询盘；执行中追加授权在 Directus Studio 创建本轮唯一的 [TEST] 分类并在测试期间发布。执行中范围收窄为：产品保存、媒体、发布 / 撤回、询盘、1440 / 375 关键操作；来源 / 证据关联**未做**。不含部署、生产配置修改、备份 / 恢复 / 回滚。标记 `[TEST]-PROD-ACCEPTANCE-20260919-0702`。
+
+**目标与运行构建：** 服务器 `/opt/litubo/repo` = `64bfc566569d87b50142d8081b6763a1bf68275e`（tracked 0、未跟踪 0）；检出 12:04 UTC → 构建 12:21–12:22 UTC（`BUILD_EXIT=0`）→ `litubo-nuxt` 12:34 UTC 启动、重启 0 次；`.output` 指纹 `32210fd901f7f94d` 验收前后相同。构建产物不含 SHA，未做字节级复现 → **运行构建来源未完全验证**（间接证据链完整）。本轮期间无其他会话施工。
+
+**登录方式：** 本机临时 Edge（临时配置，结束后已关闭并删除）；Geoffrey 本人登录 LITUBO 后台与经 SSH 隧道（本机 18055 → 服务器 127.0.0.1:8055）的 Directus Studio。Studio 侧操作（分类建 / 发布 / 撤回 / 删除、`is_public` 开关、询盘查询 / 删除、产品与文件删除）在 Studio 已登录会话内调用 Directus 标准 API 完成。结束时两处均已退出（401），隧道已关闭。
+
+| 项 | 结果 | 证据 |
+|---|---|---|
+| A 登录与受保护页面 | PASS | 6 个后台页正常、无跳回登录、无报错；`/api/admin/auth/me` 200 |
+| B 建产品草稿、编辑保存、刷新 | PASS | 产品 id 1；摘要 / 型号修改刷新后仍在；product_code、分类正确 |
+| B 规格参数（Workspace） | PASS | 参数组 1 / 参数 1 保存，刷新后仍在 |
+| C 上传、后台读取 | PASS | 文件 `ca0c7571-4b2f-4144-92a8-be61a6f26676`；后台资源 200 |
+| C 设为产品图片、前台读取 | PASS（gallery）/ 差异（hero） | 设为 gallery 时详情页 1440 / 375 均正常显示；设为 hero 时前台不显示，见下 |
+| D Draft → Review → Publish | PASS | 发布确认弹窗出现；公开 API / 页面 200；公开图片 7602 字节且 SHA 与上传一致 |
+| D 撤回 | PASS | 产品页、分类页、图片均 404；分类列表与 sitemap 不再出现 |
+| E 询盘 | PASS | 375 前台 Contact 提交，`POST /api/inquiries` 200；Directus 恰好 1 条，字段一致，`hubspot_sync_status=not_configured` |
+| F 1440 / 375 | PASS | 涉及页面均无横向溢出；保存、提交审核、Upload、Send message 等按钮无遮挡 |
+| 对外通知 | 未触发 | SMTP / HubSpot 未配置、Directus Flow 0；Nuxt 日志无 `[inquiry]` / `[hubspot]` / 邮件记录 |
+
+**清理：** 先撤下全部公开内容，再按 id 删除：询盘 1 → 产品 1（规格组 / 参数 / 媒体关联由外键级联删除）→ 分类 1 → 文件。四次删除均为 204；复查相关表均为 0 行，uploads 目录无该文件。审计日志保留（activity 42 / revisions 33，含本轮 4 条删除记录）。**残留：无。**
+
+**发现（未修改代码）：**
+1. **hero 主图在前台不显示（待关闭）。** 后台只能把图片设为产品媒体的 `hero` 角色；分类页产品卡片只读 `products.hero_image`（后台无入口设置），显示灰色占位；详情页只渲染 `gallery` 图。真实产品录入后，分类页卡片将没有图片。修复见下节 LITUBO-HERO-FIX-01（本地已修复并验证，未部署）；生产部署并通过最小验收后才能关闭。
+2. 公开图片须在 Directus Studio 打开 `is_public`（默认 false，LITUBO 后台无此开关），与运维手册一致；手册中的 `/assets/` 路径与 403 描述已过时（实际为 `/api/cms/media/<id>`，未公开时 404）。
+3. 新建产品前须先在 Directus Studio 建分类（LITUBO 后台无分类管理）；生产仍为 0 分类。
+4. 媒体库根目录不显示上传按钮（提示 "Open a folder to upload."），进入文件夹后 1440 / 375 均可用。本轮 C1 是在根目录直接使用页面的上传输入（与菜单同一处理与接口），文件进入"待分类"，普通操作员在根目录不能这样操作。
+5. 375 下图库图片按铺满方式裁切（16:9 测试图左右被裁），属视觉细节。
+6. 一次偶发：进入工作台媒体页时落到产品中心，重试正常，未能复现。
+
+**截图：** 仅保存在本机会话临时目录并交付给 Geoffrey，未放入仓库。
+
+**仍 OPEN：** hero 主图差异的修复（需改代码，会产生新 SHA、CI 与部署）；工作包 2 / 3（生产首份备份、恢复与回滚）未授权；Stable Production SHA **未冻结**；`cms.litubo.com` 的访问方式；正式切换 `litubo.com`。
+
+*最后更新：2026-09-19，由 Claude Code 在 LITUBO-PRODUCTION-ACCEPTANCE-01 工作包 1 中写入（未 commit）。*
+
+---
+
+## LITUBO-HERO-FIX-01 — 分类卡片显示后台设置的 hero 主图（2026-09-19，本地修复并验证；随 LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 续轮提交，未部署）
+
+**缺陷（来自工作包 1）：** 后台在产品媒体页把图片设为 `hero` 角色（`products_files.file_role = hero`）；分类页产品卡片只读 `products.hero_image`，因此显示灰色占位。
+
+**修复（只改读取端；不改数据结构、不新增媒体机制、不改权限）：**
+- 新增 `server/utils/productHero.ts`：`designatedHeroFileId` 是唯一的主图选择规则——已启用的 `hero` 关联优先（sort 小者优先，再按 id），没有时退回 `products.hero_image`，兼容只有旧字段的产品；`publicHeroFileIds` 为列表卡片批量取主图，并复用现有 `resolvePublicFiles`（RSG-06：`is_public = true` 且未在 Media Library 归档）。不合格就不输出，也不换成别的图。
+- `server/api/cms/products/[category].get.ts`：卡片主图改用上述规则；主图关联或媒体资格读取失败返回 503，与产品列表失败同一口径。
+- `server/api/cms/products/[category]/[slug].get.ts`：只把主图选择改为同一规则，gallery / 下载不变。
+- `nuxt-server` 现有只读权限已覆盖所需字段（`products_files`、`directus_files`），权限未改。
+
+**Gate：** RSG-06 —— 卡片输出主图前判定公开资格；RSG-02 §3.3 —— 列表与详情共用同一主图选择函数。
+
+**检查：**
+- `tests/publicRouteCorrectness.test.ts` 新增 8 条回归测试。测试替身补了两处：`/files` 表键，以及 `limit=-1` 按 Directus 语义返回全部行。
+- 把分类接口换回修复前版本时，其中 5 条失败，证明测试能抓到该缺陷。
+- 相关测试 81 / 81 通过；typecheck 0 错、lint 0 错；`nuxt build` 通过。本机为 Node 24，仅作开发检查，发布入口仍按 Node 22.22.2。
+
+**本地端到端（localhost:3000 + 本地 Directus；一次性 [TEST] 产品 id 7，本地分类 5）：**
+
+| 验证项 | 结果 |
+|---|---|
+| 可见 Upload 按钮上传 | 进入 Applications 文件夹 → Upload → Upload files → 选择两张测试图；两张均进入媒体库 |
+| 设置主图并刷新 | 产品媒体页设 A = Hero 主图、B = 图库，刷新后仍然有效 |
+| 未公开不泄露 | 发布后 A 未公开：卡片为占位；分类 API 与页面 HTML 均不含 A 的 id；`/api/cms/media/<A>` 404 |
+| 卡片正常显示 | A 公开后，1440 / 375 卡片均显示 A（图片已加载，无横向溢出，无报错） |
+| 详情页 gallery | 1440 / 375 均正常显示 B |
+| 替换主图 | 改为 B = 主图、A = 图库并重新发布后，1440 / 375 卡片显示 B，gallery 显示 A |
+| 清理 | 撤回后按 id 删除产品 7（关联级联）与两张图；3 号沙盒产品及其 11 条关联与基线完全一致；本地产品 4 个、文件 60 个（公开 1 个），与验证前相同 |
+
+**仍存在（本模块未处理，建议另开小修）：** 详情接口的 gallery / 下载 / hero URL 仍未在输出前做 RSG-06 预判，分类列表接口里分类自身的 `hero_image` 也一样。字节仍由公开媒体代理拦截，未公开时返回 404，但页面会出现坏图，公开输出中也会带出未公开文件的 id。→ 已由 LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 在本地处理（未 commit、未部署），见下节。
+
+**变更文件：**
+- 新增 `server/utils/productHero.ts`
+- 修改 `server/api/cms/products/[category].get.ts`、`server/api/cms/products/[category]/[slug].get.ts`、`tests/publicRouteCorrectness.test.ts`
+- 文档 `docs/OPERATIONS-HANDBOOK.md`：公开媒体路径改为 `/api/cms/media/<id>`；未公开时返回 404
+- 文档本文件：WP1 结论改为"核心流程通过，hero 缺陷待关闭"，并新增本节
+
+**hero 缺陷关闭条件：** 修复经授权 commit / push / CI / 部署到 tuboluo.com 后，按生产最小验收步骤通过。
+
+*最后更新：2026-09-19，由 Claude Code 在 LITUBO-HERO-FIX-01 中写入；提交状态见 LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 续轮。*
+
+---
+
+## LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 — 公开媒体输出按 RSG-06 补齐（2026-09-19，本地修复并验证；随下节续轮一并 commit、push 到 review 分支，未部署）
+
+**状态分开记录（本节写成时尚未 commit；提交与推送见下节续轮）：**
+- 主图本地修复（LITUBO-HERO-FIX-01）：本地验证通过，保留。
+- 公开媒体补充修复（本节）：本地验证通过。
+- 生产：未部署。tuboluo.com 仍运行 `64bfc56`；`39bf8f1` 不包含这些修复。
+
+**范围：** 上一节报告的三处——详情页 gallery、详情页下载文件、分类自身主图。详情页 hero 一并处理：上一节已把它列入同一缺口，且详情与卡片共用主图规则；不处理的话，卡片不显示的私有主图仍会出现在详情输出里（RSG-02 §3.3）。原有文档改动与 6 个未跟踪项未动。
+
+**核实的事实：**
+- RSG-06 要求任何公开输出的文件 URL（图片、下载、OG 图）都满足：`is_public = true`、未在 Media Library 归档、关联已启用、角色允许公开。
+- 修复前：详情接口的 gallery / 下载 / hero 直接输出关联文件 id（查询只过滤 `enabled`）；`categories` 与分类页接口直接输出 `hero_image`。未公开或已归档文件的 id 会进入 JSON 与 SSR 页面；页面图片出错后被 `onerror` 隐藏，下载链接点开为 404。
+- 本地库现有数据没有已发布产品，5 个分类都没有主图，看不到该缺口，因此改用一次性对象验证。
+
+**修复（只改读取端；复用 `resolvePublicFiles`；不改权限、schema，不新增媒体机制）：**
+- `server/api/cms/products/[category]/[slug].get.ts`：在媒体读取步骤内，对该产品关联的文件与 `hero_image` 做一次 RSG-06 判定；hero、gallery、下载只输出通过的文件，保持原有顺序；不合格的直接省略，不替换。判定失败与其他读取一样返回 503（catch 数量不变）。
+- `server/api/cms/products/[category].get.ts`、`server/api/cms/products/categories.get.ts`：分类自身主图只在文件公开且未归档时输出；判定失败返回 503。
+- `server/utils/contentPublic.ts`：新增 3 行 `publicFileId`，按 `resolvePublicFiles` 的结果取可公开的 id。
+
+**测试：** `tests/publicRouteCorrectness.test.ts` 新增 5 条：gallery、下载、详情 hero、分类图（分类页与分类列表）、判定读取失败返回 503。基础种子中的 gallery 文件补为公开；HERO-FIX 测试块的文件种子由覆盖改为追加。修复前运行：5 条新测试全部失败，原有 29 条通过；修复后 34 / 34。
+
+**检查（Node 22.22.2 / npm 10.9.7，经 `fnm exec --using=22.22.2` 运行，未改全局 Node）：**
+- `scripts/verify-node-runtime.mjs`：OK — Node 22.22.2
+- `npm run typecheck` 0 错；`npm run lint` 0 错
+- `npm test`：90 个文件 / 3185 条通过；9 个数据库 / extractor 集成测试文件（193 条）按环境开关跳过，与本改动无关
+- `npm run build`：通过，8.27 MB
+- 浏览器验证所用的 dev server 同样运行在 Node 22.22.2
+
+**本地端到端（localhost:3000 + 本地 Directus；全部为一次性对象）：**
+
+ID：分类 6（`test-public-media-closeout-01-local`）；产品 8；关联 29–33；归档记录 `7a9694a6…`。文件：
+- G1 `f02e7988…`：gallery，公开
+- G2 `d1a5c8fb…`：gallery，私有
+- G3 `307b9a47…`：gallery，公开；先在 Media Library 归档，再关联
+- C1 `999480b8…`：分类图
+- D1 `c92bbd02…`：datasheet，公开
+- D2 `7d77b186…`：manual，私有
+
+| 验证项 | 结果 |
+|---|---|
+| 上传 | 6 个文件经可见的 Upload 按钮进入 Applications 文件夹 |
+| 私有 / 归档不输出 | 发布后详情 API 的 gallery 只有 G1，下载只有 D1（Datasheet v1，`?download=true`）；G2 / G3 / D2 的 id 既不在 API 也不在页面 HTML。C1 私有时，两个分类接口与 `/products` HTML 都不含其 id |
+| 媒体代理 | G1 200（7028 B）；D1 200（PDF，`attachment; filename=…`）；G2 / G3 / C1 / D2 404 |
+| 详情页 1440 / 375 | gallery 1 张已加载，下载 1 条；无破图、无横向溢出、无请求错误或 console 错误 |
+| 分类图 | C1 私有时 `/products` 卡片为占位、无破图；公开后两个接口都输出 C1，1440 / 375 卡片显示且已加载 |
+| 请求时判定与顺序 | G2 改为公开后，无需重新发布即出现，gallery 顺序为 G1、G2 |
+| 清理 | 撤回后按 id 删除：产品 8（关联级联）→ 分类 6 → 归档记录 → 6 个文件，均为 204。计数与基线一致：分类 5、产品 4、关联 19、文件 60（公开 1）、归档记录 20（已归档 18）、目录 25；3 号沙盒 11 条关联的指纹不变；uploads 目录无残留。两处登录已退出，临时 Edge 配置已删除，dev server 已停止 |
+
+**Gate 结果：**
+- RSG-06：产品详情的 hero / gallery / 下载、分类自身主图，本地 PASS。
+- RSG-02 §3.3：详情与卡片共用同一主图规则和同一公开判定。
+- RSG-07：权限未改，`nuxt-server` 现有读权限已覆盖（本地实测）。
+- 生产侧未验证（未部署）。
+
+**仍存在（不在本轮范围，未修改）：**
+1. 详情页区块图片（`sections[].media`，后台可设置）、OG 图（`seo_image`，只能在 Studio 设置）、首页主图（`site_content` 的 `home.hero`）仍未在输出前做 RSG-06 判定。→ 已由下节续轮处理。
+2. 产品媒体关联接口不拒绝已归档文件（Content Center 会拒绝）；本轮正是用它把已归档文件关联到产品。公开输出已过滤这类文件，但后台仍能建立这种关联。
+3. `RELEASE-SAFETY-GATES.md` §4.3 的 RSG-06 行未随本轮更新（施工单只要求更新本文件）。
+
+**部署目标核对（只读，2026-09-19）：**
+- DNS：
+  - `tuboluo.com` → 43.165.125.203（腾讯云主机）
+  - `www.tuboluo.com` → 104.219.250.36，不是本主机，LITUBO 不服务该名
+  - `litubo.com` → 185.230.63.171、`www.litubo.com` → 34.149.87.45（Wix）
+  - `cms.litubo.com` 无记录
+- HTTP：
+  - `https://tuboluo.com/` 返回 200：`Server: nginx/1.24.0 (Ubuntu)`、`x-powered-by: Nuxt`、`X-Robots-Tag: noindex, nofollow`；`robots.txt` 全部 Disallow；canonical 指向 `https://litubo.com/`（D-044 的设计）。
+  - `https://litubo.com/` 301 到 `https://www.litubo.com/`：`Server: Pepyaka`、`x-wix-request-id`（Wix）。
+- 结论：下一次部署的目标是腾讯云主机上的 `/opt/litubo/repo` + `litubo-nuxt.service`，对外地址 `https://tuboluo.com`。`litubo.com` 是现网 Wix 客户站，不在部署范围。
+- 服务器侧只读核对（HEAD、服务状态、vhost）今天两次 SSH 失败（连接被重置、超时），按停止条件暂停。服务器侧状态**待核实**；已记录状态来自工作包 1：`/opt/litubo/repo` = `64bfc56`，`litubo-nuxt` active，`.output` 指纹 `32210fd901f7f94d`。
+
+**后续生产工作包（草案；每一步都需要单独授权）：**
+1. **发布链：** 本地 commit（A2）→ push review 分支，CI success（A3）→ fast-forward master（A4）→ 部署（A5）。commit 与 push 已在下节续轮完成；PR 创建与远端 CI 核实由 GPT Controller 接手；A4 / A5 仍各需单独授权。
+2. **部署前只读核对：**
+   - 主机标记存在；`/opt/litubo/repo` = `64bfc56` 且工作区干净；`litubo-nuxt` active。
+   - 记录 `.output` 指纹，方法同工作包 1：`cd .output && find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16`。
+   - 记录 refrigerant-store 基线：3 个容器、首页哈希、Nginx `default` 与 `nginx.conf` 的哈希。
+3. **备份：**
+   - 先把当前 `.output` 原样复制为回滚点（构建会原地覆盖它）。
+   - 数据库与 uploads 按 `docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md` 用 `scripts/backup-create.mjs` 做成一个备份集：需停 Directus 的维护窗口，校验 checksum。
+   - 本次发布不改数据库，数据库备份只作保险；这一步即工作包 2 的首份生产备份，需单独授权。
+4. **Node 22 发布检查：** fast-forward 到新 SHA；按上次方式用临时单元 `litubo-build` 执行 `npm ci && npm run release:verify`（`/opt/litubo/runtime/node-current` = 22.22.2，`/opt/litubo/build.env`）。
+   - 要求 `BUILD_EXIT=0`：Node gate、两个镜像 pin、无已发布 TEST 数据、构建通过。
+   - 构建产物中 6 个 secret 的出现次数为 0（D-039）。
+5. **切换与冒烟：**
+   - `systemctl restart litubo-nuxt`；确认 active、重启次数正常、HEAD 为新 SHA、`.output` 指纹已变化，日志无错误。
+   - `https://tuboluo.com/`、`/products`、后台登录页返回 200；`X-Robots-Tag: noindex`、`robots.txt` Disallow 仍在；`/api/cms/products/categories` 返回 200。
+6. **最小生产验收：** 需要测试数据授权，同工作包 1。Geoffrey 登录一次后台，并经 SSH 隧道登录 Studio。
+   - 建 1 个 [TEST] 分类（带分类图）和 1 个 [TEST] 产品：hero、公开与私有 gallery 各 1、公开与私有下载各 1。
+   - 私有时：详情与分类接口、页面都不含私有 id，分类卡片为占位。
+   - 公开后：卡片显示 hero，gallery 与下载只有公开项，`/products` 显示分类图，覆盖 1440 / 375；替换一次 hero。
+7. **清理：** 撤回 → 按 id 删除产品（关联级联）→ 分类改为草稿后删除 → 删除文件 → 计数回到基线 → 退出登录、关闭隧道。
+8. **失败恢复：**
+   - 构建失败：不重启；若 `.output` 已被改写，恢复第 3 步的副本，`git checkout 64bfc56`，重启后确认指纹回到 `32210fd901f7f94d`。
+   - 冒烟或验收失败：同样回到 `64bfc56` 与原 `.output`。
+   - 本次发布不改数据库，回滚不需要恢复数据库；测试数据仍按 id 清理。
+9. **收口：** refrigerant-store 与 `litubo.com` 零变化；更新本文件，关闭 hero 缺陷与本节缺口。Stable Production SHA 由 Controller 决定。
+
+**关闭条件：** hero 缺陷与本节的公开媒体缺口，在修复经授权 commit / push / CI / 部署到 tuboluo.com 并通过第 6 步验收后关闭。
+
+*最后更新：2026-09-19，由 Claude Code 在 LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 中写入；续轮更新提交与服务器待核实状态。*
+
+---
+
+## LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 续轮 — 区块图片、产品 OG 图、首页主图（2026-09-19，本地验证通过；commit 并 push 到 review 分支，未合并、未部署）
+
+**授权与范围：** 保留前两节的修复，只补区块图片、产品 OG 图、首页主图三处公开判定。后台"产品媒体关联可选已归档文件"按施工单暂缓。按施工单 commit 并 push `review/final-release-verification-01`（本 commit；SHA 以 `git log` / `git ls-remote` 为准）。PR 创建与远端 CI 核实由 GPT Controller 接手：本机没有 gh，按施工单不另装工具。未合并、未部署；ANYI 与其他项目未动。
+
+**修复（只改读取端；复用 `resolvePublicFiles` / `publicFileId`；不改权限、schema，不新增媒体机制）：**
+- `server/api/cms/products/[category]/[slug].get.ts`：`seo_image` 加入媒体步骤里的那一次 RSG-06 判定。区块只在关联文件公开且未归档时带 `media`，否则区块照常输出、不带图；`seo.ogImage` 同理，不合格时页面回退到站点默认 OG 图。判定失败仍为 503。
+- `server/api/cms/home.get.ts`：首页主图只在文件公开且未归档时输出，否则 `imageUrl` 为空，页面用默认静态图，文字不受影响。判定读取失败与首页原有读取失败同样回退（`hero: null`），不输出未经判定的图片。
+
+**测试：** `tests/publicRouteCorrectness.test.ts` 新增 4 条（区块图片、OG 图、首页主图、首页判定失败回退）。修复前 4 条全部失败，原有 34 条通过；修复后 38 / 38。三轮合计新增 17 条回归测试。
+
+**检查（Node 22.22.2 / npm 10.9.7，经 `fnm exec --using=22.22.2`）：**
+- Node gate OK；`npm run typecheck` 0 错；`npm run lint` 0 错。
+- `npm test`：90 个文件 / 3189 条通过；9 个数据库 / extractor 集成测试文件（193 条）按环境开关跳过。
+- `npm run build` 通过，8.27 MB。
+- 浏览器验证所用 dev server 运行在 Node 22.22.2。
+
+**本地端到端（localhost:3000 + 本地 Directus）：**
+
+一次性对象：产品 9（本地分类 5）、关联 34（role `detail`）、区块 6、归档记录 `0f2af2c0…`。文件：
+- SI `fb64d3eb…`：区块图片
+- OG `7a105d1b…`：OG 图
+- HH `de8885b8…`：首页主图
+
+首页记录 `site_content` 1 的主图临时换成 HH，结束后恢复原值 `eb7dfefd…`。
+
+| 验证项 | 结果 |
+|---|---|
+| 三个文件均未公开 | 详情 API：区块无 `media`、无 `ogImage`；SSR 的 `og:image` 为站点默认图（绝对地址）。首页 API：`imageUrl` 为空、文字保留。SI / OG / HH 的 id 不在详情与首页的 API 和 HTML 中；媒体代理三者均 404 |
+| 未公开时 1440 / 375 | 详情页区块照常显示、无图；首页主图为默认静态图且已加载；无破图、无横向溢出、无请求错误或 console 错误 |
+| 三个文件改为公开 | 区块 `media` = SI；`seo.ogImage`、SSR 的 `og:image` 与 `twitter:image` 均为 `/api/cms/media/<OG>`；首页 `imageUrl` = HH；媒体代理三者 200 |
+| 公开后 1440 / 375 | 区块图片与首页主图均显示且已加载；无破图、无溢出、无错误 |
+| HH 在 Media Library 归档 | 首页 `imageUrl` 回到空、id 不再出现，375 显示默认图 |
+| 上传备注 | 第一次批量上传只成功 2 个：本地 Directus 上传目录 `dev-data/uploads` 在项目内，`nuxt dev` 监视到新文件后整页刷新，中断了第 3 个。已确认 HH 未写入，再单独上传；无重复文件 |
+| 清理 | 先恢复首页主图，再撤回并按 id 删除产品 9（关联、区块级联）→ 归档记录 → 3 个文件，均为 204。计数与基线一致：分类 5、产品 4、关联 19、区块 3、区块项 6、文件 60（公开 1）、归档记录 20（已归档 18）、目录 25；3 号沙盒 11 条关联指纹不变；uploads 无残留。`site_content` 1 除 `updated_at`（Directus 写入时自动更新）外与基线完全一致。两处登录已退出，临时 Edge 配置已删除，dev server 已停止 |
+
+**Gate 结果：**
+- RSG-06：产品 hero / gallery / 下载 / 区块图片 / OG 图、分类自身主图、首页主图，本地 PASS。
+- RSG-02 §3.3：列表与详情共用同一判定。
+- RSG-07：权限未改（`nuxt-server` 现有读权限已覆盖，本地实测）。
+- 生产侧未验证（未部署）。
+
+**已知限制（未处理）：**
+1. 后台产品媒体关联接口不拒绝已归档文件（按施工单暂缓）；公开输出已过滤。
+2. 旧版文章接口（`server/api/cms/posts/*`）的 `cover_image`、`seo_og_image` 仍未做 RSG-06 判定（本轮发现，不在范围内）。
+3. 产品页的 `og:image` / `twitter:image` 是相对地址（`/api/cms/media/<id>`），原有行为；社交平台通常需要绝对地址。站点默认 OG 图为绝对地址。
+4. Media Library 的归档检查不把首页主图算作引用，首页正在使用的图片仍可被归档；公开输出会隐藏它。
+5. 本地开发：`nuxt dev` 监视 `dev-data/uploads`，批量上传时可能被整页刷新打断（只影响本地开发）。
+6. `RELEASE-SAFETY-GATES.md` §4.3 的 RSG-06 行未更新。
+7. 服务器侧状态待核实（见 §0 Production runtime）。
+
+**自动审阅：** 没有已接通的 LITUBO 自动审阅通道：本机在线会话只有 ANYI 一个，仓库只有 CI 工作流。交由 GPT Controller。
+
+**部署方案：** 见上一节"后续生产工作包"。本 commit 已完成其中第 1 步的 commit 与 push；此后依次为 Controller 核实 CI → A4 → 备份 → A5 部署与最小验收，每步单独授权。
+
+*最后更新：2026-09-19，由 Claude Code 在 LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 续轮中写入，随本 commit 推送。*

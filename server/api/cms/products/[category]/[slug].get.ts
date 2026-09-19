@@ -1,6 +1,8 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { directusFetch } from '~/server/utils/directus'
 import { requireCmsSource } from '~/server/utils/cmsSource'
+import { designatedHeroFileId } from '~/server/utils/productHero'
+import { publicFileId, resolvePublicFiles, type PublicFile } from '~/server/utils/contentPublic'
 import { DEMO_PRODUCT_CATEGORIES, DEMO_PRODUCTS } from '~/content/fixtures/products'
 import type {
   Product,
@@ -211,8 +213,12 @@ export default defineEventHandler(async (event) => {
 
   // 3. Fetch all related data. Every query is required: a failure is 503, never a partial product page.
 
-  // 3a. Media (gallery, hero override, downloads)
+  // 3a. Media (gallery, hero override, downloads), and RSG-06 for the files this product links: the
+  //     hero, gallery, downloads, section images and OG image below link a file only while it is
+  //     is_public and not archived in the Media Library right now (LITUBO-PUBLIC-MEDIA-CLOSEOUT-01).
+  //     Checked once, here, so a failed check is a 503 like every other read.
   let rawMedia: DirectusMedia[] = []
+  let publicFiles: Map<string, PublicFile>
   try {
     const mediaRes = await directusFetch<{ data: DirectusMedia[] }>(
       `/items/products_files?filter[products_id][_eq]=${productId}&filter[enabled][_eq]=true` +
@@ -220,6 +226,10 @@ export default defineEventHandler(async (event) => {
       `&sort=sort&limit=100`
     )
     rawMedia = mediaRes.data
+    publicFiles = await resolvePublicFiles(
+      directusFetch,
+      [p.hero_image, p.seo_image, ...rawMedia.map(m => m.directus_files_id)].filter((id): id is string => Boolean(id)),
+    )
   }
   catch (err) {
     console.error('[cms/products/slug] media fetch failed:', err instanceof Error ? err.message : err)
@@ -309,16 +319,18 @@ export default defineEventHandler(async (event) => {
         })
         itemsBySection.set(si.section_id, arr)
       }
-      // Build a lookup for media_id → MediaAsset using rawMedia
+      // Build a lookup for media_id → MediaAsset using rawMedia (enabled links only); a section links
+      // its image only while RSG-06 allows the file, otherwise the section is rendered without it.
       const mediaById = new Map<number, DirectusMedia>(rawMedia.map(m => [m.id, m]))
       sections = rawSections.map((s): PublicSection => {
         let media: MediaAsset | undefined
         if (s.media_id !== null) {
           const m = mediaById.get(s.media_id)
-          if (m?.directus_files_id) {
+          const fileId = publicFileId(publicFiles, m?.directus_files_id)
+          if (m && fileId) {
             media = {
-              id: m.directus_files_id,
-              url: mediaUrl(m.directus_files_id),
+              id: fileId,
+              url: mediaUrl(fileId),
               alt: ls(m.alt_en, null, null),
             }
           }
@@ -342,34 +354,35 @@ export default defineEventHandler(async (event) => {
 
   // ── Assemble product from raw data ─────────────────────────────────────
 
-  // Hero: prefer hero-role media file; fall back to products.hero_image field
-  const heroFile = rawMedia.find(m => m.file_role === 'hero' && m.directus_files_id)
-  const heroUuid = heroFile?.directus_files_id ?? p.hero_image
+  // Hero: prefer hero-role media file; fall back to products.hero_image field — the shared rule the
+  // category listing uses too (LITUBO-HERO-FIX-01), so page and card never disagree on the hero.
+  // A designated hero that RSG-06 does not allow is left out, as on the card; nothing is substituted.
+  const heroUuid = publicFileId(publicFiles, designatedHeroFileId(rawMedia, p.hero_image))
   const heroMedia: MediaAsset = {
     id: heroUuid ?? '',
     url: mediaUrl(heroUuid),
     alt: ls(p.name_en, p.name_es, p.name_pt),
   }
 
-  // Gallery
-  const gallery: MediaAsset[] = rawMedia
-    .filter(m => m.file_role === 'gallery' && m.directus_files_id)
-    .map(m => ({
-      id: m.directus_files_id!,
-      url: mediaUrl(m.directus_files_id),
-      alt: ls(m.alt_en, m.alt_es, m.alt_pt),
-    }))
+  // Gallery (in link order; a file RSG-06 does not allow is left out)
+  const gallery: MediaAsset[] = rawMedia.flatMap((m) => {
+    const id = m.file_role === 'gallery' ? publicFileId(publicFiles, m.directus_files_id) : null
+    return id ? [{ id, url: mediaUrl(id), alt: ls(m.alt_en, m.alt_es, m.alt_pt) }] : []
+  })
 
-  // Downloads
-  const downloads: PublicDownload[] = rawMedia
-    .filter(m => m.file_role && DOWNLOAD_ROLES.has(m.file_role) && m.directus_files_id)
-    .map(m => ({
-      uuid: m.directus_files_id!,
-      url: `/api/cms/media/${m.directus_files_id}?download=true`,
-      role: m.file_role!,
-      ...(m.version_label ? { versionLabel: m.version_label } : {}),
-      ...(m.file_date ? { fileDate: m.file_date } : {}),
-    }))
+  // Downloads (in link order; a file RSG-06 does not allow is left out)
+  const downloads: PublicDownload[] = rawMedia.flatMap((m) => {
+    const uuid = m.file_role && DOWNLOAD_ROLES.has(m.file_role) ? publicFileId(publicFiles, m.directus_files_id) : null
+    return uuid
+      ? [{
+          uuid,
+          url: `/api/cms/media/${uuid}?download=true`,
+          role: m.file_role!,
+          ...(m.version_label ? { versionLabel: m.version_label } : {}),
+          ...(m.file_date ? { fileDate: m.file_date } : {}),
+        }]
+      : []
+  })
 
   // Inline highlights from JSON (kept for backward compat)
   const highlights = ((p.highlights ?? []) as Array<{
@@ -392,6 +405,9 @@ export default defineEventHandler(async (event) => {
       value: ls(s.value_en ?? '', s.value_es ?? '', s.value_pt ?? ''),
       ...(s.unit ? { unit: s.unit } : {}),
     }))
+
+  // OG image: only while RSG-06 allows the file; otherwise the page falls back to the site default
+  const ogImageId = publicFileId(publicFiles, p.seo_image)
 
   const product: Product = {
     id: String(p.id),
@@ -416,7 +432,7 @@ export default defineEventHandler(async (event) => {
       title: ls(p.seo_title_en ?? p.name_en, p.seo_title_es, p.seo_title_pt),
       description: ls(p.seo_description_en, p.seo_description_es, p.seo_description_pt),
       canonicalPath: `/products/${categorySlug}/${p.slug}`,
-      ...(p.seo_image ? { ogImage: `/api/cms/media/${p.seo_image}` } : {}),
+      ...(ogImageId ? { ogImage: mediaUrl(ogImageId) } : {}),
       noIndex: p.seo_noindex ?? false,
     },
     status: p.status as Product['status'],

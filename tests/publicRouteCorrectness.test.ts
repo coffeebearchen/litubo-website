@@ -22,6 +22,7 @@ import postsHandler from '../server/api/cms/posts/index.get'
 import postHandler from '../server/api/cms/posts/[slug].get'
 import homeHandler from '../server/api/cms/home.get'
 import { requireCmsSource, resolveCmsSource, type CmsModeKey } from '../server/utils/cmsSource'
+import { designatedHeroFileId } from '../server/utils/productHero'
 import { isPublishedLocale, publicPageStatus } from '../utils/publicRoute'
 
 type Row = Record<string, unknown>
@@ -36,7 +37,8 @@ vi.mock('../server/utils/directus', () => ({
   directusFetch: async (path: string) => {
     directus.calls.push(path)
     const [base, query = ''] = path.split('?')
-    const table = base!.replace('/items/', '')
+    // `/files` is Directus's endpoint for the directus_files system collection.
+    const table = base === '/files' ? 'directus_files' : base!.replace('/items/', '')
     if (directus.failing.has(table)) throw new Error(`fetch failed (${table})`)
     let rows = directus.tables[table] ?? []
     const params = new URLSearchParams(query)
@@ -46,7 +48,9 @@ vi.mock('../server/utils/directus', () => ({
       const within = key.match(/^filter\[(\w+)\]\[_in\]$/)
       if (within) rows = rows.filter(row => value.split(',').includes(String(row[within[1]!])))
     }
-    return { data: rows.slice(0, Number(params.get('limit') ?? rows.length)) }
+    // As in Directus, `limit=-1` means every row.
+    const limit = Number(params.get('limit') ?? rows.length)
+    return { data: limit < 0 ? rows : rows.slice(0, limit) }
   },
 }))
 
@@ -105,6 +109,9 @@ function seed(): void {
       post({ id: 2, status: 'draft', content_type: 'technical_guide', slug: 'test-only-draft-guide', title_en: `${MARK} draft guide` }),
     ],
     site_content: [],
+    // The seeded gallery image is public: the page links a file only while RSG-06 allows it.
+    directus_files: [{ id: '11111111-1111-4111-8111-111111111111', is_public: true, type: 'image/png', title: 'TEST ONLY gallery image', filename_download: 'test-only-gallery.png' }],
+    media_file_lifecycle: [],
   }
   directus.failing.clear()
   directus.calls.length = 0
@@ -414,5 +421,283 @@ describe('FINAL-RELEASE-FIX-C — public page and API sources', () => {
     const env = source('.env.example')
     expect(env).toMatch(/^CMS_MODE=/m)
     expect(env).toMatch(/^CMS_MODE_PRODUCTS=/m)
+  })
+})
+
+describe('LITUBO-HERO-FIX-01 — a category card shows the hero the product media editor designates, only when RSG-06 allows it', () => {
+  const HERO = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  const OTHER = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+  const PRIVATE = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+  const ARCHIVED = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+
+  const heroLink = (id: number, fileId: string, overrides: Row = {}): Row => ({
+    id, products_id: 10, directus_files_id: fileId, file_role: 'hero', sort: null,
+    alt_en: null, alt_es: null, alt_pt: null, caption_en: null, enabled: true, version_label: null, file_date: null, ...overrides,
+  })
+  const file = (id: string, isPublic: boolean): Row => ({ id, is_public: isPublic, type: 'image/png', title: 'TEST ONLY image', filename_download: `${id}.png` })
+
+  async function card(): Promise<{ status: number, body: string, hero: { id: string, url: string } | null }> {
+    const reply = await get('/api/cms/products/test-only-category')
+    const json = reply.json as { products?: Array<{ slug: string, heroMedia: { id: string, url: string } }> } | null
+    return { status: reply.status, body: reply.body, hero: json?.products?.find(p => p.slug === 'test-only-product')?.heroMedia ?? null }
+  }
+
+  beforeEach(() => {
+    directus.tables.directus_files!.push(file(HERO, true), file(OTHER, true), file(PRIVATE, false), file(ARCHIVED, true))
+    directus.tables.media_file_lifecycle = [{ file_id: ARCHIVED, archived: true }]
+  })
+
+  it('the shared rule: the first enabled hero link (lowest sort, then lowest id), else products.hero_image', () => {
+    expect(designatedHeroFileId([], null)).toBeNull()
+    expect(designatedHeroFileId([], OTHER)).toBe(OTHER)
+    expect(designatedHeroFileId([{ directus_files_id: HERO, file_role: 'gallery' }], OTHER)).toBe(OTHER)
+    expect(designatedHeroFileId([{ directus_files_id: HERO, file_role: 'hero', enabled: false }], OTHER)).toBe(OTHER)
+    expect(designatedHeroFileId([{ directus_files_id: HERO, file_role: 'hero' }], OTHER)).toBe(HERO)
+    expect(designatedHeroFileId([
+      { id: 2, directus_files_id: OTHER, file_role: 'hero', sort: null },
+      { id: 3, directus_files_id: PRIVATE, file_role: 'hero', sort: 5 },
+      { id: 1, directus_files_id: HERO, file_role: 'hero', sort: 5 },
+    ], null)).toBe(HERO)
+  })
+
+  it('the defect: a hero set in the product media editor, with no products.hero_image, now reaches the card', async () => {
+    directus.tables.products_files!.push(heroLink(101, HERO))
+    expect(await card()).toMatchObject({ status: 200, hero: { id: HERO, url: `/api/cms/media/${HERO}` } })
+  })
+
+  it('an existing product that only has products.hero_image keeps its card image', async () => {
+    directus.tables.products![0]!.hero_image = OTHER
+    expect((await card()).hero).toMatchObject({ id: OTHER, url: `/api/cms/media/${OTHER}` })
+  })
+
+  it('the designated hero link wins over products.hero_image, and replacing the hero changes the card', async () => {
+    directus.tables.products![0]!.hero_image = OTHER
+    directus.tables.products_files!.push(heroLink(101, HERO))
+    expect((await card()).hero?.id).toBe(HERO)
+    directus.tables.products_files = directus.tables.products_files!.map(row => (row.id === 101 ? { ...row, file_role: 'gallery' } : row))
+    directus.tables.products_files.push(heroLink(102, OTHER))
+    expect((await card()).hero?.id).toBe(OTHER)
+  })
+
+  it('RSG-06: a private or archived hero is not emitted and nothing is substituted — its id never appears', async () => {
+    directus.tables.products![0]!.hero_image = OTHER // public, but not the designated hero
+    for (const blocked of [PRIVATE, ARCHIVED]) {
+      directus.tables.products_files = directus.tables.products_files!.filter(row => row.file_role !== 'hero')
+      directus.tables.products_files.push(heroLink(101, blocked))
+      const reply = await card()
+      expect(reply.status, blocked).toBe(200)
+      expect(reply.hero, blocked).toMatchObject({ id: '', url: '' })
+      expect(reply.body, blocked).not.toContain(blocked)
+    }
+  })
+
+  it('a disabled hero link does not count', async () => {
+    directus.tables.products_files!.push(heroLink(101, HERO, { enabled: false }))
+    expect((await card()).hero).toMatchObject({ id: '', url: '' })
+  })
+
+  it('a failed hero-link or media-eligibility read is 503, never a card that guesses', async () => {
+    directus.tables.products_files!.push(heroLink(101, HERO))
+    for (const table of ['products_files', 'directus_files', 'media_file_lifecycle']) {
+      directus.failing.clear()
+      directus.failing.add(table)
+      expect((await card()).status, table).toBe(503)
+    }
+  })
+
+  it('the product page and its card pick the same hero; the page gallery is unchanged', async () => {
+    directus.tables.products_files!.push(heroLink(101, HERO))
+    const detail = await get('/api/cms/products/test-only-category/test-only-product')
+    const json = detail.json as { heroMedia: { id: string }, gallery: unknown[] }
+    expect(json.heroMedia.id).toBe(HERO)
+    expect(json.gallery).toHaveLength(1)
+    expect((await card()).hero?.id).toBe(HERO)
+  })
+})
+
+describe('LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 — the product page gallery, hero and downloads, and a category\'s own image, link only files RSG-06 allows', () => {
+  const GALLERY = '11111111-1111-4111-8111-111111111111' // the seeded public gallery image
+  const PUBLIC = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+  const PRIVATE = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+  const ARCHIVED = '99999999-9999-4999-8999-999999999999'
+  const DISABLED = '88888888-8888-4888-8888-888888888888' // public file, but its product link is disabled
+  const PAGE = '/api/cms/products/test-only-category/test-only-product'
+
+  type Media = { id: string, url: string }
+  const link = (id: number, fileId: string, role: string, sort: number, overrides: Row = {}): Row => ({
+    id, products_id: 10, directus_files_id: fileId, file_role: role, sort,
+    alt_en: `TEST ONLY alt ${id}`, alt_es: null, alt_pt: null, caption_en: null, enabled: true, version_label: null, file_date: null, ...overrides,
+  })
+  const file = (id: string, isPublic: boolean): Row => ({ id, is_public: isPublic, type: 'image/png', title: 'TEST ONLY file', filename_download: `${id}.png` })
+
+  async function page(): Promise<{ status: number, body: string, json: { heroMedia: Media, gallery: unknown[], downloads: unknown[] } }> {
+    const reply = await get(PAGE)
+    return { ...reply, json: reply.json as { heroMedia: Media, gallery: unknown[], downloads: unknown[] } }
+  }
+
+  async function categoryImages(): Promise<{ page: Media | undefined, list: Media | undefined, bodies: string }> {
+    const categoryPage = await get('/api/cms/products/test-only-category')
+    const list = await get('/api/cms/products/categories')
+    expect([categoryPage.status, list.status]).toEqual([200, 200])
+    return {
+      page: (categoryPage.json as { category: { heroMedia: Media } }).category.heroMedia,
+      list: (list.json as Array<{ slug: string, heroMedia: Media }>).find(c => c.slug === 'test-only-category')?.heroMedia,
+      bodies: categoryPage.body + list.body,
+    }
+  }
+
+  beforeEach(() => {
+    directus.tables.directus_files!.push(file(PUBLIC, true), file(PRIVATE, false), file(ARCHIVED, true), file(DISABLED, true))
+    directus.tables.media_file_lifecycle = [{ file_id: ARCHIVED, archived: true }]
+  })
+
+  it('gallery: public images keep their order; private, archived and disabled ones are left out and their ids never appear', async () => {
+    directus.tables.products_files!.push(
+      link(101, PRIVATE, 'gallery', 2),
+      link(102, PUBLIC, 'gallery', 3),
+      link(103, ARCHIVED, 'gallery', 4),
+      link(104, DISABLED, 'gallery', 5, { enabled: false }),
+    )
+    const reply = await page()
+    expect(reply.status).toBe(200)
+    expect(reply.json.gallery).toEqual([
+      { id: GALLERY, url: `/api/cms/media/${GALLERY}`, alt: { en: 'TEST ONLY alt', es: '', pt: '' } },
+      { id: PUBLIC, url: `/api/cms/media/${PUBLIC}`, alt: { en: 'TEST ONLY alt 102', es: '', pt: '' } },
+    ])
+    for (const blocked of [PRIVATE, ARCHIVED, DISABLED]) expect(reply.body, blocked).not.toContain(blocked)
+  })
+
+  it('downloads: a public file keeps its download link, role, version and date; private, archived and disabled ones are left out', async () => {
+    directus.tables.products_files!.push(
+      link(111, PUBLIC, 'datasheet', 1, { version_label: 'v2', file_date: '2026-09-01' }),
+      link(112, PRIVATE, 'manual', 2),
+      link(113, ARCHIVED, 'certificate', 3),
+      link(114, DISABLED, 'brochure', 4, { enabled: false }),
+    )
+    const reply = await page()
+    expect(reply.status).toBe(200)
+    expect(reply.json.downloads).toEqual([
+      { uuid: PUBLIC, url: `/api/cms/media/${PUBLIC}?download=true`, role: 'datasheet', versionLabel: 'v2', fileDate: '2026-09-01' },
+    ])
+    for (const blocked of [PRIVATE, ARCHIVED, DISABLED]) expect(reply.body, blocked).not.toContain(blocked)
+  })
+
+  it('hero: a private or archived designated hero is left out of the page as it is of the card, and nothing is substituted', async () => {
+    directus.tables.products![0]!.hero_image = PUBLIC // public, but not the designated hero
+    for (const blocked of [PRIVATE, ARCHIVED]) {
+      directus.tables.products_files = directus.tables.products_files!.filter(row => row.file_role !== 'hero')
+      directus.tables.products_files.push(link(121, blocked, 'hero', 1))
+      const reply = await page()
+      expect(reply.status, blocked).toBe(200)
+      expect(reply.json.heroMedia, blocked).toMatchObject({ id: '', url: '' })
+      expect(reply.json.gallery, blocked).toHaveLength(1)
+      expect(reply.body, blocked).not.toContain(blocked)
+    }
+  })
+
+  it('category image: the category page and the category list emit it only while its file is public', async () => {
+    directus.tables.product_categories![0]!.hero_image = PUBLIC
+    let images = await categoryImages()
+    expect(images.page).toMatchObject({ id: PUBLIC, url: `/api/cms/media/${PUBLIC}` })
+    expect(images.list).toMatchObject({ id: PUBLIC, url: `/api/cms/media/${PUBLIC}` })
+    for (const blocked of [PRIVATE, ARCHIVED]) {
+      directus.tables.product_categories![0]!.hero_image = blocked
+      images = await categoryImages()
+      expect(images.page, blocked).toMatchObject({ id: '', url: '' })
+      expect(images.list, blocked).toMatchObject({ id: '', url: '' })
+      expect(images.bodies, blocked).not.toContain(blocked)
+    }
+  })
+
+  it('a failed media-eligibility read is 503 on the product page and on both category APIs, never a page with unchecked files', async () => {
+    directus.tables.product_categories![0]!.hero_image = PUBLIC
+    for (const table of ['directus_files', 'media_file_lifecycle']) {
+      directus.failing.clear()
+      directus.failing.add(table)
+      for (const path of [PAGE, '/api/cms/products/test-only-category', '/api/cms/products/categories']) {
+        const reply = await get(path)
+        expect(reply.status, `${path} (${table})`).toBe(503)
+        expect(reply.body, `${path} (${table})`).not.toContain('TEST ONLY')
+      }
+    }
+  })
+})
+
+describe('LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 — section images, the product OG image and the home hero image link only files RSG-06 allows', () => {
+  const PUBLIC = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+  const PRIVATE = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+  const ARCHIVED = '99999999-9999-4999-8999-999999999999'
+  const PAGE = '/api/cms/products/test-only-category/test-only-product'
+
+  type Media = { id: string, url: string, alt: Record<string, string> }
+  const file = (id: string, isPublic: boolean): Row => ({ id, is_public: isPublic, type: 'image/png', title: 'TEST ONLY file', filename_download: `${id}.png` })
+  const link = (id: number, fileId: string, role: string): Row => ({
+    id, products_id: 10, directus_files_id: fileId, file_role: role, sort: id,
+    alt_en: `TEST ONLY alt ${id}`, alt_es: null, alt_pt: null, caption_en: null, enabled: true, version_label: null, file_date: null,
+  })
+  const section = (id: number, mediaId: number | null): Row => ({
+    id, product_id: 10, type: 'text', title_en: `TEST ONLY section ${id}`, title_es: null, title_pt: null, eyebrow_en: null, eyebrow_es: null, eyebrow_pt: null,
+    body_en: 'TEST ONLY section body', body_es: null, body_pt: null, layout_variant: null, media_id: mediaId, external_url: null, enabled: true, sort: id,
+  })
+  const homeHero = (heroImage: string | null): Row => ({
+    id: 1, content_key: 'home.hero', status: 'published', hero_image: heroImage,
+    ...nulls('eyebrow_en', 'eyebrow_es', 'eyebrow_pt', 'title_es', 'title_pt', 'body_en', 'body_es', 'body_pt', 'cta_primary_label_en', 'cta_primary_label_es', 'cta_primary_label_pt', 'cta_primary_path', 'cta_secondary_label_en', 'cta_secondary_label_es', 'cta_secondary_label_pt', 'cta_secondary_path'),
+    title_en: 'TEST ONLY hero title',
+  })
+
+  beforeEach(() => {
+    directus.tables.directus_files!.push(file(PUBLIC, true), file(PRIVATE, false), file(ARCHIVED, true))
+    directus.tables.media_file_lifecycle = [{ file_id: ARCHIVED, archived: true }]
+  })
+
+  it('section images: a section links its image only while the file is public; a private or archived image is left out and the section stays', async () => {
+    directus.tables.products_files!.push(link(131, PUBLIC, 'detail'), link(132, PRIVATE, 'application'), link(133, ARCHIVED, 'overview'))
+    directus.tables.product_sections!.push(section(501, 131), section(502, 132), section(503, 133))
+    const reply = await get(PAGE)
+    expect(reply.status).toBe(200)
+    const sections = (reply.json as { sections: Array<{ title: { en: string }, media?: Media }> }).sections
+    expect(sections.map(s => s.title.en)).toEqual(['TEST ONLY section', 'TEST ONLY section 501', 'TEST ONLY section 502', 'TEST ONLY section 503'])
+    expect(sections[1]!.media).toEqual({ id: PUBLIC, url: `/api/cms/media/${PUBLIC}`, alt: { en: 'TEST ONLY alt 131', es: '', pt: '' } })
+    for (const index of [0, 2, 3]) expect(sections[index], String(index)).not.toHaveProperty('media')
+    for (const blocked of [PRIVATE, ARCHIVED]) expect(reply.body, blocked).not.toContain(blocked)
+  })
+
+  it('OG image: seo.ogImage is emitted only while the file is public; a private or archived OG image is left out', async () => {
+    directus.tables.products![0]!.seo_image = PUBLIC
+    const shown = await get(PAGE)
+    expect((shown.json as { seo: { ogImage?: string } }).seo.ogImage).toBe(`/api/cms/media/${PUBLIC}`)
+    for (const blocked of [PRIVATE, ARCHIVED]) {
+      directus.tables.products![0]!.seo_image = blocked
+      const reply = await get(PAGE)
+      expect(reply.status, blocked).toBe(200)
+      expect((reply.json as { seo: object }).seo, blocked).not.toHaveProperty('ogImage')
+      expect(reply.body, blocked).not.toContain(blocked)
+    }
+  })
+
+  it('home hero: the image is emitted only while the file is public; a private or archived image is left out and the hero text stays', async () => {
+    directus.tables.site_content = [homeHero(PUBLIC)]
+    expect(await get('/api/cms/home')).toMatchObject({ status: 200, json: { hero: { imageUrl: `/api/cms/media/${PUBLIC}`, title: { en: 'TEST ONLY hero title' } } } })
+    for (const blocked of [PRIVATE, ARCHIVED]) {
+      directus.tables.site_content = [homeHero(blocked)]
+      const reply = await get('/api/cms/home')
+      expect(reply, blocked).toMatchObject({ status: 200, json: { hero: { imageUrl: '', title: { en: 'TEST ONLY hero title' } } } })
+      expect(reply.body, blocked).not.toContain(blocked)
+    }
+    directus.tables.site_content = [homeHero(null)]
+    directus.calls.length = 0
+    expect(await get('/api/cms/home')).toMatchObject({ status: 200, json: { hero: { imageUrl: '' } } })
+    expect(directus.calls.some(call => call.startsWith('/files'))).toBe(false)
+  })
+
+  it('home hero: a failed media-eligibility read falls back like any failed home read — no hero and no unchecked image', async () => {
+    directus.tables.site_content = [homeHero(PUBLIC)]
+    for (const table of ['directus_files', 'media_file_lifecycle']) {
+      directus.failing.clear()
+      directus.failing.add(table)
+      const reply = await get('/api/cms/home')
+      expect(reply, table).toMatchObject({ status: 200, json: { hero: null } })
+      expect(reply.body, table).not.toContain(PUBLIC)
+    }
   })
 })

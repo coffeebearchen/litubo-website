@@ -224,6 +224,10 @@ export async function resolvePublicFiles(fetch: FetchFn, fileIds: readonly strin
   return out
 }
 
+/** The id under which `fileId` may be linked publicly, per a `resolvePublicFiles` result; null when it may not. */
+export const publicFileId = (files: ReadonlyMap<string, PublicFile>, fileId: string | null | undefined): string | null =>
+  (typeof fileId === 'string' ? files.get(fileId.toLowerCase())?.id : undefined) ?? null
+
 export const publicMediaUrl = (fileId: string, download = false) => `/api/cms/media/${fileId}${download ? '?download=true' : ''}`
 
 function imageOf(ref: ContentSnapshotFileRef | null | undefined, files: Map<string, PublicFile>): PublicContentImage | null {

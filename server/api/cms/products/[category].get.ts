@@ -1,6 +1,8 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
 import { directusFetch } from '~/server/utils/directus'
 import { requireCmsSource } from '~/server/utils/cmsSource'
+import { publicHeroFileIds } from '~/server/utils/productHero'
+import { publicFileId, resolvePublicFiles } from '~/server/utils/contentPublic'
 import { DEMO_PRODUCT_CATEGORIES, DEMO_PRODUCTS } from '~/content/fixtures/products'
 import type { ProductCategory, Product } from '~/types/content'
 
@@ -49,15 +51,16 @@ interface DirectusProduct {
   status: string
 }
 
-function mapCategory(c: DirectusCategory): ProductCategory {
+/** `heroFileId` is the category's own image, already RSG-06 checked (LITUBO-PUBLIC-MEDIA-CLOSEOUT-01). */
+function mapCategory(c: DirectusCategory, heroFileId: string | null): ProductCategory {
   return {
     id: String(c.id),
     slug: c.slug,
     title: { en: c.name_en, es: c.name_es ?? '', pt: c.name_pt ?? '' },
     intro: { en: c.intro_en ?? '', es: c.intro_es ?? '', pt: c.intro_pt ?? '' },
     heroMedia: {
-      id: c.hero_image ?? '',
-      url: c.hero_image ? `/api/cms/media/${c.hero_image}` : '',
+      id: heroFileId ?? '',
+      url: heroFileId ? `/api/cms/media/${heroFileId}` : '',
       alt: { en: c.name_en, es: c.name_es ?? '', pt: c.name_pt ?? '' },
     },
     order: c.sort ?? 0,
@@ -70,7 +73,8 @@ function mapCategory(c: DirectusCategory): ProductCategory {
   }
 }
 
-function mapProduct(p: DirectusProduct, catSlug: string): Product {
+/** `heroFileId` is the product's public hero (LITUBO-HERO-FIX-01): designated through the shared rule and already RSG-06 checked. */
+function mapProduct(p: DirectusProduct, catSlug: string, heroFileId: string | null): Product {
   return {
     id: String(p.id),
     categoryId: String(p.category_id),
@@ -78,8 +82,8 @@ function mapProduct(p: DirectusProduct, catSlug: string): Product {
     name: { en: p.name_en, es: p.name_es ?? '', pt: p.name_pt ?? '' },
     summary: { en: p.summary_en ?? '', es: p.summary_es ?? '', pt: p.summary_pt ?? '' },
     heroMedia: {
-      id: p.hero_image ?? '',
-      url: p.hero_image ? `/api/cms/media/${p.hero_image}` : '',
+      id: heroFileId ?? '',
+      url: heroFileId ? `/api/cms/media/${heroFileId}` : '',
       alt: { en: p.name_en, es: p.name_es ?? '', pt: p.name_pt ?? '' },
     },
     gallery: [],
@@ -124,15 +128,22 @@ export default defineEventHandler(async (event) => {
   }
 
   if (!catRes.data.length) throw createError({ statusCode: 404 })
-  const category = mapCategory(catRes.data[0])
+  const cat = catRes.data[0]
 
   // Product list failure is a 503 too (FINAL-RELEASE-FIX-C): answering the category with an empty
-  // product list would hide the outage behind a 200.
+  // product list would hide the outage behind a 200. The same holds for the card heroes
+  // (LITUBO-HERO-FIX-01) and the category's own image (LITUBO-PUBLIC-MEDIA-CLOSEOUT-01): an
+  // unverified file is never emitted, and a failed check is not a missing image.
   try {
     const prodRes = await directusFetch<{ data: DirectusProduct[] }>(
-      `/items/products?filter[category_id][_eq]=${catRes.data[0].id}&filter[status][_eq]=published&sort=sort,name_en&limit=200`
+      `/items/products?filter[category_id][_eq]=${cat.id}&filter[status][_eq]=published&sort=sort,name_en&limit=200`
     )
-    const products = prodRes.data.map(p => mapProduct(p, categorySlug))
+    const [heroes, categoryFiles] = await Promise.all([
+      publicHeroFileIds(directusFetch, prodRes.data),
+      resolvePublicFiles(directusFetch, cat.hero_image ? [cat.hero_image] : []),
+    ])
+    const category = mapCategory(cat, publicFileId(categoryFiles, cat.hero_image))
+    const products = prodRes.data.map(p => mapProduct(p, categorySlug, heroes.get(p.id) ?? null))
     return { category, products }
   }
   catch (err) {

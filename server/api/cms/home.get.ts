@@ -1,6 +1,7 @@
 import { defineEventHandler } from 'h3'
 import { directusFetch } from '~/server/utils/directus'
 import { requireCmsSource } from '~/server/utils/cmsSource'
+import { publicFileId, resolvePublicFiles } from '~/server/utils/contentPublic'
 import type { HomeContent } from '~/types/content'
 
 interface DirectusSiteContent {
@@ -34,11 +35,17 @@ export default defineEventHandler(async (): Promise<HomeContent> => {
   }
 
   let record: DirectusSiteContent | null = null
+  let heroImageId: string | null = null
   try {
     const res = await directusFetch<{ data: DirectusSiteContent[] }>(
       '/items/site_content?filter[content_key][_eq]=home.hero&filter[status][_eq]=published&limit=1'
     )
     record = res.data[0] ?? null
+    // RSG-06 (LITUBO-PUBLIC-MEDIA-CLOSEOUT-01)：主图文件须 is_public 且未在 Media Library 归档才输出；
+    // 判定读取失败与上面的读取失败一样回退，不输出未经判定的图片
+    if (record?.hero_image) {
+      heroImageId = publicFileId(await resolvePublicFiles(directusFetch, [record.hero_image]), record.hero_image)
+    }
   }
   catch {
     // Directus 不可达时静默回退，不使整页崩溃
@@ -57,7 +64,7 @@ export default defineEventHandler(async (): Promise<HomeContent> => {
 
   return {
     hero: {
-      imageUrl: record.hero_image ? `/api/cms/media/${record.hero_image}` : '',
+      imageUrl: heroImageId ? `/api/cms/media/${heroImageId}` : '',
       eyebrow: ls(record.eyebrow_en, record.eyebrow_es, record.eyebrow_pt),
       title: ls(record.title_en, record.title_es, record.title_pt),
       body: ls(record.body_en, record.body_es, record.body_pt),

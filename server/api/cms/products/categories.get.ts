@@ -1,6 +1,7 @@
 import { defineEventHandler, createError } from 'h3'
 import { directusFetch } from '~/server/utils/directus'
 import { requireCmsSource } from '~/server/utils/cmsSource'
+import { publicFileId, resolvePublicFiles } from '~/server/utils/contentPublic'
 import { DEMO_PRODUCT_CATEGORIES } from '~/content/fixtures/products'
 import type { ProductCategory } from '~/types/content'
 
@@ -24,15 +25,16 @@ interface DirectusCategory {
   sort: number | null
 }
 
-function toProductCategory(c: DirectusCategory): ProductCategory {
+/** `heroFileId` is the category's own image, already RSG-06 checked (LITUBO-PUBLIC-MEDIA-CLOSEOUT-01). */
+function toProductCategory(c: DirectusCategory, heroFileId: string | null): ProductCategory {
   return {
     id: String(c.id),
     slug: c.slug,
     title: { en: c.name_en, es: c.name_es ?? '', pt: c.name_pt ?? '' },
     intro: { en: c.intro_en ?? '', es: c.intro_es ?? '', pt: c.intro_pt ?? '' },
     heroMedia: {
-      id: c.hero_image ?? '',
-      url: c.hero_image ? `/api/cms/media/${c.hero_image}` : '',
+      id: heroFileId ?? '',
+      url: heroFileId ? `/api/cms/media/${heroFileId}` : '',
       alt: { en: c.name_en, es: c.name_es ?? '', pt: c.name_pt ?? '' },
     },
     order: c.sort ?? 0,
@@ -55,7 +57,10 @@ export default defineEventHandler(async () => {
     const data = await directusFetch<{ data: DirectusCategory[] }>(
       '/items/product_categories?filter[status][_eq]=published&sort=sort,name_en&limit=100'
     )
-    return data.data.map(toProductCategory) as ProductCategory[]
+    // RSG-06 (LITUBO-PUBLIC-MEDIA-CLOSEOUT-01): a category image is linked only while its file is
+    // is_public and not archived in the Media Library; a failed check is a 503 like the read above.
+    const files = await resolvePublicFiles(directusFetch, data.data.flatMap(c => (c.hero_image ? [c.hero_image] : [])))
+    return data.data.map(c => toProductCategory(c, publicFileId(files, c.hero_image))) as ProductCategory[]
   }
   catch (err) {
     console.error('[cms/products/categories] Directus fetch failed:', err instanceof Error ? err.message : err)

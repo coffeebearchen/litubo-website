@@ -115,10 +115,10 @@ docker compose up -d
 
 每个文件都有一个 `is_public` 开关（在文件自定义字段中）。
 
-- `is_public = true`：文件可通过前台 `/assets/` 路径公开访问，适用于需要在网页展示的图片和 PDF
+- `is_public = true`：文件可通过前台公开媒体地址 `/api/cms/media/<文件 id>` 访问，适用于需要在网页展示的图片和 PDF。该地址每次请求都会重新检查：文件必须 `is_public = true` 且未在 Media Library 归档
 - `is_public = false`：文件只有管理员可见，适用于内部文件
 
-**规则**：所有上传到前台使用的图片和 PDF，必须将 `is_public` 设为 `true`，否则前台会显示 403 错误。
+**规则**：所有上传到前台使用的图片和 PDF，必须将 `is_public` 设为 `true`，否则前台该地址返回 404（图片不显示）；已归档的文件同样返回 404。
 
 ### 绝对不要删除
 
