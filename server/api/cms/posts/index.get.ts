@@ -1,8 +1,8 @@
 import { defineEventHandler, getQuery } from 'h3'
 import { directusFetch } from '~/server/utils/directus'
 import { requireCmsSource } from '~/server/utils/cmsSource'
-import { publicFileId, resolvePublicFiles } from '~/server/utils/contentPublic'
-import { isLegacyPublicPostType, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
+import { publicFileId, resolvePublicFiles, type PublicFile } from '~/server/utils/contentPublic'
+import { isLegacyPublicPostType, legacyBodyFileIds, legacyPostHtml, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
 import { DEMO_POSTS_LIST } from '~/content/fixtures/posts'
 import type { PostListItem, PostsResult } from '~/types/content'
 
@@ -27,8 +27,9 @@ interface DirectusPost {
   body_pt: string | null
 }
 
-/** `coverFileId` is the post's cover, already RSG-06 checked (LITUBO-STABLE-BASELINE-CLOSEOUT-01). */
-function toListItem(r: DirectusPost, isFaq: boolean, coverFileId: string | null): PostListItem {
+/** `files` is the RSG-06 result for the covers and the FAQ bodies' files (LITUBO-STABLE-BASELINE-CLOSEOUT-01). */
+function toListItem(r: DirectusPost, isFaq: boolean, files: ReadonlyMap<string, PublicFile>): PostListItem {
+  const coverFileId = publicFileId(files, r.cover_image)
   const item: PostListItem = {
     id: String(r.id),
     contentType: r.content_type as PostListItem['contentType'],
@@ -42,7 +43,7 @@ function toListItem(r: DirectusPost, isFaq: boolean, coverFileId: string | null)
   }
   if (isFaq) {
     item.faqGroup = (r.faq_group ?? null) as PostListItem['faqGroup']
-    item.bodyHtml = { en: r.body_en ?? '', es: r.body_es ?? '', pt: r.body_pt ?? '' }
+    item.bodyHtml = { en: legacyPostHtml(r.body_en, files), es: legacyPostHtml(r.body_es, files), pt: legacyPostHtml(r.body_pt, files) }
   }
   return item
 }
@@ -112,10 +113,14 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
   try {
     const res = await directusFetch<{ data: DirectusPost[] }>(`/items/posts?${qs}`)
     const rows = res.data.filter(r => isLegacyPublicPostType(r.content_type))
-    // RSG-06 (LITUBO-STABLE-BASELINE-CLOSEOUT-01): a cover image is linked only while its file is is_public and
-    // not archived in the Media Library; a failed check falls back like a failed read (no posts, cmsError).
-    const files = await resolvePublicFiles(directusFetch, rows.flatMap(r => (r.cover_image ? [r.cover_image] : [])))
-    let items = rows.map(r => toListItem(r, isFaqQuery, publicFileId(files, r.cover_image)))
+    // RSG-06 (LITUBO-STABLE-BASELINE-CLOSEOUT-01): a cover image, and every file an FAQ body references, is
+    // linked only while its file is is_public and not archived in the Media Library; a failed check falls back
+    // like a failed read (no posts, cmsError), never an unchecked body.
+    const files = await resolvePublicFiles(directusFetch, [
+      ...rows.flatMap(r => (r.cover_image ? [r.cover_image] : [])),
+      ...(isFaqQuery ? rows.flatMap(r => legacyBodyFileIds(r.body_en, r.body_es, r.body_pt)) : []),
+    ])
+    let items = rows.map(r => toListItem(r, isFaqQuery, files))
     if (topics && topics.length > 0) {
       items = items.filter(p => topics.some(t => p.topics.includes(t as PostListItem['topics'][number])))
       items = items.slice(offset, offset + limit)

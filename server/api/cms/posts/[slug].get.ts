@@ -1,9 +1,8 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
-import sanitizeHtml from 'sanitize-html'
 import { directusFetch } from '~/server/utils/directus'
 import { publicFileId, resolvePublicFiles, type PublicFile } from '~/server/utils/contentPublic'
 import { requireCmsSource } from '~/server/utils/cmsSource'
-import { isLegacyPublicPostType, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
+import { isLegacyPublicPostType, legacyBodyFileIds, legacyPostHtml, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
 import { DEMO_POSTS } from '~/content/fixtures/posts'
 import type { Post } from '~/types/content'
 
@@ -37,57 +36,6 @@ interface DirectusPostDetail {
   seo_description_pt: string | null
 }
 
-// UUID pattern used to identify Directus /assets/{uuid} paths
-const UUID_IN_ASSETS = /\/assets\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
-
-const SANITIZE_CONFIG: sanitizeHtml.IOptions = {
-  allowedTags: [
-    'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li',
-    'strong', 'em', 'b', 'i', 's',
-    'a', 'blockquote', 'code', 'pre', 'br',
-    'table', 'thead', 'tbody', 'tr', 'th', 'td',
-    'img',
-  ],
-  allowedAttributes: {
-    a: ['href', 'target', 'rel'],
-    td: ['colspan', 'rowspan'],
-    th: ['colspan', 'rowspan'],
-    img: ['src', 'alt', 'width', 'height'],
-  },
-  allowedSchemes: ['http', 'https', 'mailto'],
-  transformTags: {
-    a: (_tagName, attribs) => ({
-      tagName: 'a',
-      attribs: {
-        href: attribs.href ?? '',
-        rel: 'noopener noreferrer',
-        target: (attribs.href ?? '').startsWith('/') ? '_self' : '_blank',
-      },
-    }),
-    img: (_tagName, attribs) => {
-      const src = attribs.src ?? ''
-      const match = src.match(UUID_IN_ASSETS)
-      // Only allow images whose src contains a Directus /assets/{uuid} path
-      if (!match) return { tagName: '', attribs: {} }
-      const uuid = match[1]
-      return {
-        tagName: 'img',
-        attribs: {
-          src: `/api/cms/media/${uuid}`,
-          alt: attribs.alt ?? '',
-          ...(attribs.width && { width: attribs.width }),
-          ...(attribs.height && { height: attribs.height }),
-        },
-      }
-    },
-  },
-}
-
-function safeHtml(raw: string | null): string {
-  if (!raw) return ''
-  return sanitizeHtml(raw, SANITIZE_CONFIG)
-}
-
 // Maps content_type to its public URL path prefix.
 // faq is intentionally excluded: FAQ items have no individual detail route.
 const CONTENT_TYPE_PATH: Record<string, string> = {
@@ -97,7 +45,7 @@ const CONTENT_TYPE_PATH: Record<string, string> = {
   news: '/resources/news',
 }
 
-/** `files` is the RSG-06 result for the cover and OG image (LITUBO-STABLE-BASELINE-CLOSEOUT-01): a file it does not allow is left out. */
+/** `files` is the RSG-06 result for the cover, the OG image and the body's files (LITUBO-STABLE-BASELINE-CLOSEOUT-01): a file it does not allow is left out. */
 function toPost(r: DirectusPostDetail, slug: string, files: ReadonlyMap<string, PublicFile>): Post {
   const postSlug = r.slug ?? slug
   const coverFileId = publicFileId(files, r.cover_image)
@@ -117,9 +65,9 @@ function toPost(r: DirectusPostDetail, slug: string, files: ReadonlyMap<string, 
     title: { en: r.title_en ?? '', es: r.title_es ?? '', pt: r.title_pt ?? '' },
     excerpt: { en: r.excerpt_en ?? '', es: r.excerpt_es ?? '', pt: r.excerpt_pt ?? '' },
     bodyHtml: {
-      en: safeHtml(r.body_en),
-      es: safeHtml(r.body_es),
-      pt: safeHtml(r.body_pt),
+      en: legacyPostHtml(r.body_en, files),
+      es: legacyPostHtml(r.body_es, files),
+      pt: legacyPostHtml(r.body_pt, files),
     },
     seo: {
       title: {
@@ -176,11 +124,14 @@ export default defineEventHandler(async (event): Promise<Post> => {
 
   if (!record || !isLegacyPublicPostType(record.content_type)) throw createError({ statusCode: 404, message: 'Not found' })
 
-  // RSG-06: the cover and OG image are linked only while the file is is_public and not archived in the
-  // Media Library right now; a failed check is a 503 like the read above, never a page with unchecked files.
+  // RSG-06: the cover, the OG image and every file the body references are linked only while the file is
+  // is_public and not archived in the Media Library right now; a failed check is a 503 like the read above,
+  // never a page with unchecked files or an unchecked body.
   let files: Map<string, PublicFile>
   try {
-    files = await resolvePublicFiles(directusFetch, [record.cover_image, record.seo_og_image].filter((id): id is string => Boolean(id)))
+    files = await resolvePublicFiles(directusFetch, [
+      record.cover_image, record.seo_og_image, ...legacyBodyFileIds(record.body_en, record.body_es, record.body_pt),
+    ].filter((id): id is string => Boolean(id)))
   }
   catch (err) {
     console.error(`[cms/posts/${slug}] media eligibility check failed:`, err instanceof Error ? err.message : err)

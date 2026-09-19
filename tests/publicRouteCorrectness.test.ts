@@ -23,6 +23,7 @@ import postHandler from '../server/api/cms/posts/[slug].get'
 import homeHandler from '../server/api/cms/home.get'
 import { requireCmsSource, resolveCmsSource, type CmsModeKey } from '../server/utils/cmsSource'
 import { designatedHeroFileId } from '../server/utils/productHero'
+import { legacyBodyFileIds, legacyPostHtml } from '../server/utils/legacyPosts'
 import { absoluteSiteUrl, isPublishedLocale, publicPageStatus } from '../utils/publicRoute'
 import { useSeoHead } from '../composables/useSeoHead'
 import { ref } from 'vue'
@@ -834,5 +835,263 @@ describe('LITUBO-STABLE-BASELINE-CLOSEOUT-01 — review follow-ups: cover and OG
       expect(images(other), String(other)).toEqual({ og: FALLBACK, twitter: FALLBACK })
     }
     delete config.public.siteUrl
+  })
+})
+
+describe('LITUBO-STABLE-BASELINE-CLOSEOUT-01 — legacy post bodies (Technical Guide detail, FAQ list) link only files RSG-06 allows', () => {
+  const PUBLIC = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+  const PRIVATE = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+  const ARCHIVED = '99999999-9999-4999-8999-999999999999'
+  const MISSING = '77777777-7777-4777-8777-777777777777' // referenced, but no directus_files row
+  const DIRECTUS = 'https://cms.example.test'
+  const DETAIL = '/api/cms/posts/test-only-guide'
+  const FAQ = '/api/cms/posts?content_type=faq'
+  const file = (id: string, isPublic: boolean): Row => ({ id, is_public: isPublic, type: 'image/png', title: 'TEST ONLY file', filename_download: `${id}.png` })
+  const BODY = [
+    '<p>TEST ONLY intro text</p>',
+    `<img src="${DIRECTUS}/assets/${PUBLIC}?width=800" alt="Public diagram">`,
+    `<img src="/assets/${PRIVATE}" alt="Private diagram">`,
+    `<img src="/assets/${ARCHIVED}" alt="Archived diagram">`,
+    `<img src="/assets/${MISSING}" alt="Missing diagram">`,
+    '<img src="https://images.example.com/external.png" alt="External image">',
+    `<p><a href="${DIRECTUS}/assets/${PUBLIC}?download">Public datasheet</a> `,
+    `<a href="/assets/${PRIVATE}">Private manual</a> `,
+    `<a href="/api/cms/media/${ARCHIVED}">Archived certificate</a> `,
+    `<a href="${DIRECTUS}/assets/${MISSING}">Missing brochure</a> `,
+    '<a href="https://example.com/standards">External standard</a> ',
+    '<a href="/products">Our products</a></p>',
+    '<script>alert(1)</script>',
+  ].join('\n')
+
+  function expectFiltered(html: string, reply: string, label: string) {
+    expect(html, label).toMatch(new RegExp(`<img src="/api/cms/media/${PUBLIC}" alt="Public diagram"`))
+    expect(html, label).toContain(`<a href="/api/cms/media/${PUBLIC}?download=true" rel="noopener noreferrer" target="_self">Public datasheet</a>`)
+    // A link to a file RSG-06 does not allow keeps its text and loses the link.
+    for (const text of ['Private manual', 'Archived certificate', 'Missing brochure']) {
+      expect(html, `${label}: ${text}`).toContain(text)
+      expect(html, `${label}: ${text}`).not.toMatch(new RegExp(`<a[^>]*>${text}`))
+    }
+    expect(html, label).toContain('<a href="https://example.com/standards" rel="noopener noreferrer" target="_blank">External standard</a>')
+    expect(html, label).toContain('<a href="/products" rel="noopener noreferrer" target="_self">Our products</a>')
+    expect(html, label).toContain('<p>TEST ONLY intro text</p>')
+    expect(html, label).not.toMatch(/<script|alert\(1\)|images\.example\.com|cms\.example\.test/)
+    for (const blocked of [PRIVATE, ARCHIVED, MISSING]) expect(reply, `${label}: ${blocked}`).not.toContain(blocked)
+  }
+
+  beforeEach(() => {
+    directus.tables.directus_files!.push(file(PUBLIC, true), file(PRIVATE, false), file(ARCHIVED, true))
+    directus.tables.media_file_lifecycle = [{ file_id: ARCHIVED, archived: true }]
+  })
+
+  it('legacyBodyFileIds: every UUID in the bodies once, lower-cased', () => {
+    expect(legacyBodyFileIds(BODY, `<img src="/assets/${PUBLIC.toUpperCase()}">`, null)).toEqual([PUBLIC, PRIVATE, ARCHIVED, MISSING])
+    expect(legacyBodyFileIds('<p>no files</p>', undefined)).toEqual([])
+  })
+
+  it('Technical Guide detail: allowed files go through the public proxy; private, archived and missing ones are removed (images) or unwrapped (links); text and other links stay', async () => {
+    directus.tables.posts![0]!.body_en = BODY
+    const reply = await get(DETAIL)
+    expect(reply.status).toBe(200)
+    expectFiltered((reply.json as { bodyHtml: { en: string } }).bodyHtml.en, reply.body, 'detail')
+    expect(directus.tables.posts![0]!.body_en, 'the stored body is not changed').toBe(BODY)
+  })
+
+  it('FAQ list: every body is sanitized and filtered the same way', async () => {
+    directus.tables.posts!.push(post({ id: 5, status: 'published', content_type: 'faq', slug: 'test-only-faq', title_en: `${MARK} faq`, faq_group: 'general', body_en: BODY }))
+    const reply = await get(FAQ)
+    expect(reply.status).toBe(200)
+    const faq = (reply.json as { posts: Array<{ slug: string, bodyHtml?: { en: string } }> }).posts.find(p => p.slug === 'test-only-faq')
+    expectFiltered(faq?.bodyHtml?.en ?? '', reply.body, 'faq list')
+    expect(directus.tables.posts![2]!.body_en, 'the stored body is not changed').toBe(BODY)
+  })
+
+  it('a failed media-eligibility read never passes an unchecked body: 503 on the detail, the cmsError fallback on the FAQ list', async () => {
+    directus.tables.posts![0]!.body_en = BODY
+    directus.tables.posts!.push(post({ id: 5, status: 'published', content_type: 'faq', slug: 'test-only-faq', title_en: `${MARK} faq`, faq_group: 'general', body_en: BODY }))
+    for (const table of ['directus_files', 'media_file_lifecycle']) {
+      directus.failing.clear()
+      directus.failing.add(table)
+      const detail = await get(DETAIL)
+      expect(detail.status, table).toBe(503)
+      expect(detail.body, table).not.toContain('TEST ONLY')
+      const faq = await get(FAQ)
+      expect(faq, table).toMatchObject({ status: 200, json: { posts: [], cmsError: true } })
+      expect(faq.body, table).not.toMatch(/TEST ONLY|assets|api\/cms\/media/)
+    }
+  })
+})
+
+describe('LITUBO-STABLE-BASELINE-CLOSEOUT-01 — legacy post bodies, review follow-ups: text, attributes, disguised links, other locales', () => {
+  const PUBLIC = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+  const PRIVATE = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+  const ARCHIVED = '99999999-9999-4999-8999-999999999999'
+  const DIRECTUS = 'https://cms.example.test'
+  const DETAIL = '/api/cms/posts/test-only-guide'
+  const file = (id: string, isPublic: boolean): Row => ({ id, is_public: isPublic, type: 'image/png', title: 'TEST ONLY file', filename_download: `${id}.png` })
+  const noRefusedId = (text: string, label: string) => {
+    for (const blocked of [PRIVATE, ARCHIVED]) expect(text.toLowerCase(), `${label}: ${blocked}`).not.toContain(blocked)
+  }
+  const bodyOf = async (locale: 'en' | 'es' | 'pt' = 'en') => {
+    const reply = await get(DETAIL)
+    expect(reply.status).toBe(200)
+    return { html: (reply.json as { bodyHtml: Record<string, string> }).bodyHtml[locale]!, reply: reply.body }
+  }
+
+  beforeEach(() => {
+    directus.tables.directus_files!.push(file(PUBLIC, true), file(PRIVATE, false), file(ARCHIVED, true))
+    directus.tables.media_file_lifecycle = [{ file_id: ARCHIVED, archived: true }]
+  })
+
+  it('a refused file URL used as link text, or written as plain text, is removed; an allowed one stays', async () => {
+    directus.tables.posts![0]!.body_en = [
+      `<p><a href="${DIRECTUS}/assets/${PRIVATE}">${DIRECTUS}/assets/${PRIVATE}</a></p>`,
+      `<p>See ${DIRECTUS}/assets/${ARCHIVED} and /api/cms/media/${PRIVATE}?download for details.</p>`,
+      `<p>Allowed: ${DIRECTUS}/assets/${PUBLIC}</p>`,
+    ].join('')
+    const { html, reply } = await bodyOf()
+    noRefusedId(reply, 'text')
+    expect(html).toContain('See  and  for details.')
+    expect(html).toContain(`Allowed: ${DIRECTUS}/assets/${PUBLIC}`)
+  })
+
+  it('refused references in the Spanish and Portuguese bodies are filtered too', async () => {
+    Object.assign(directus.tables.posts![0]!, {
+      body_es: `<p><img src="/assets/${PRIVATE}" alt="x"><a href="/assets/${ARCHIVED}">archivo</a></p>`,
+      body_pt: `<p><img src="/assets/${ARCHIVED}" alt="x"> ${DIRECTUS}/assets/${PRIVATE}</p>`,
+    })
+    const es = await bodyOf('es')
+    expect(es.html).toBe('<p>archivo</p>')
+    noRefusedId(es.reply, 'es/pt')
+    expect((await bodyOf('pt')).html).toBe('<p> </p>')
+  })
+
+  it('upper-case, protocol-relative and disguised (backslash, control character, percent-encoded) file links never stay clickable or carry a refused id', async () => {
+    directus.tables.posts![0]!.body_en = [
+      `<p><img src="//cms.example.test/ASSETS/${PRIVATE.toUpperCase()}" alt="u"></p>`,
+      `<p><a href="//cms.example.test/assets/${PRIVATE.toUpperCase()}">upper</a></p>`,
+      `<p><a href="https://cms.example.test\\assets\\${PRIVATE}">backslash</a></p>`,
+      `<p><a href="/ass&#9;ets/${ARCHIVED}">tab</a></p>`,
+      `<p><a href="/%61ssets/${PRIVATE}">encoded</a></p>`,
+      `<p><a href="/assets%2F${ARCHIVED}">encoded slash</a></p>`,
+    ].join('')
+    const { html, reply } = await bodyOf()
+    noRefusedId(reply, 'disguised')
+    expect(html).not.toMatch(/<a |<img /)
+    for (const text of ['upper', 'backslash', 'tab', 'encoded', 'encoded slash']) expect(html).toContain(text)
+  })
+
+  it('attribute values: an alt text loses a refused reference; width, height, colspan and rowspan keep plain numbers only', async () => {
+    directus.tables.posts![0]!.body_en = [
+      `<p><img src="/assets/${PUBLIC}" alt="see ${DIRECTUS}/assets/${PRIVATE} here" width="640px" height="360"></p>`,
+      `<table><tr><td colspan="2" rowspan="/assets/${ARCHIVED}">cell</td><th colspan="3x">head</th></tr></table>`,
+    ].join('')
+    const { html, reply } = await bodyOf()
+    noRefusedId(reply, 'attributes')
+    expect(html).toContain(`<img src="/api/cms/media/${PUBLIC}" alt="see  here" height="360" />`)
+    expect(html).toContain('<td colspan="2">cell</td>')
+    expect(html).toContain('<th>head</th>')
+  })
+
+  it('an allowed image may use the public proxy form; download=false stays an inline link; FAQ rows share one eligibility read', async () => {
+    directus.tables.posts![0]!.body_en = `<p><img src="/api/cms/media/${PUBLIC}" alt="proxy"> <a href="/assets/${PUBLIC}?download=false">inline</a></p>`
+    const { html } = await bodyOf()
+    expect(html).toContain(`<img src="/api/cms/media/${PUBLIC}" alt="proxy" />`)
+    expect(html).toContain(`<a href="/api/cms/media/${PUBLIC}" rel="noopener noreferrer" target="_self">inline</a>`)
+    directus.tables.posts!.push(
+      post({ id: 5, status: 'published', content_type: 'faq', slug: 'test-only-faq-1', title_en: `${MARK} faq 1`, faq_group: 'general', body_en: `<p><img src="/assets/${PUBLIC}" alt="one"></p>` }),
+      post({ id: 6, status: 'published', content_type: 'faq', slug: 'test-only-faq-2', title_en: `${MARK} faq 2`, faq_group: 'general', body_en: `<p><img src="/assets/${PRIVATE}" alt="two"></p>` }),
+    )
+    directus.calls.length = 0
+    const faq = await get('/api/cms/posts?content_type=faq')
+    const bodies = Object.fromEntries((faq.json as { posts: Array<{ slug: string, bodyHtml?: { en: string } }> }).posts.map(p => [p.slug, p.bodyHtml?.en]))
+    expect(bodies['test-only-faq-1']).toContain(`/api/cms/media/${PUBLIC}`)
+    expect(bodies['test-only-faq-2']).toBe('<p></p>')
+    noRefusedId(faq.body, 'faq rows')
+    expect(directus.calls.filter(call => call.startsWith('/files')).length).toBe(1)
+  })
+})
+
+describe('LITUBO-STABLE-BASELINE-CLOSEOUT-01 — legacy post bodies, second review: split references, mixed words, path tricks, long input', () => {
+  const PUBLIC = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+  const PRIVATE = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+  const DIRECTUS = 'https://cms.example.test'
+  const files = new Map([[PUBLIC, { id: PUBLIC, type: 'image/png', title: null, filename_download: null }]])
+  const html = (raw: string) => legacyPostHtml(raw, files)
+  const noPrivate = (out: string, label: string) => expect(out.toLowerCase(), label).not.toContain(PRIVATE)
+  const ZERO_WIDTH_SPACE = String.fromCharCode(0x200b)
+
+  beforeEach(() => {
+    directus.tables.directus_files!.push(
+      { id: PUBLIC, is_public: true, type: 'image/png', title: 'TEST ONLY file', filename_download: 'public.png' },
+      { id: PRIVATE, is_public: false, type: 'image/png', title: 'TEST ONLY file', filename_download: 'private.png' },
+    )
+  })
+
+  it('a reference split by dropped markup, comments or entities is still found and removed', () => {
+    for (const raw of [
+      `<p>See ${DIRECTUS}/assets/<span>${PRIVATE}</span> now</p>`,
+      `<p>See ${DIRECTUS}/assets/${PRIVATE.slice(0, 8)}<wbr>${PRIVATE.slice(8)} now</p>`,
+      `<p>See ${DIRECTUS}/assets/${PRIVATE.slice(0, 8)}<!-- x -->${PRIVATE.slice(8)} now</p>`,
+      `<p>See ${DIRECTUS}&#47;assets&#47;&#102;${PRIVATE.slice(1)} now</p>`,
+      `<p>${DIRECTUS}/assets/<a href="/assets/${PRIVATE}">${PRIVATE}</a> now</p>`,
+    ]) {
+      const out = html(raw)
+      noPrivate(out, raw)
+      expect(out, raw).toContain('now')
+    }
+  })
+
+  it('a refused id split by kept markup or invisible characters withholds the whole body (fail closed)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const raw of [
+      `<p>Intro</p><p>${PRIVATE.slice(0, 8)}<strong>${PRIVATE.slice(8)}</strong></p>`,
+      `<p>Intro</p><p>${PRIVATE.slice(0, 4)}&shy;${PRIVATE.slice(4)}</p>`,
+      `<p>Intro</p><p>${PRIVATE.slice(0, 4)}${ZERO_WIDTH_SPACE}${PRIVATE.slice(4)}</p>`,
+    ]) expect(html(raw), raw).toBe('')
+    expect(warn).toHaveBeenCalledTimes(3)
+    const split = `<p>${PUBLIC.slice(0, 8)}<strong>${PUBLIC.slice(8)}</strong></p>`
+    expect(html(split), 'an allowed id split the same way is left alone').toBe(split)
+  })
+
+  it('a word or alt text that carries a refused id next to an allowed one is removed whole', () => {
+    const out = html(`<p>${DIRECTUS}/assets/${PRIVATE},${DIRECTUS}/assets/${PUBLIC} x ${DIRECTUS}/assets/${PUBLIC}?fallback=/assets/${PRIVATE}</p>`
+      + `<p><img src="/assets/${PUBLIC}" alt="/assets/${PRIVATE}|/assets/${PUBLIC}"></p>`)
+    noPrivate(out, 'mixed')
+    expect(out).toBe(`<p> x </p><p><img src="/api/cms/media/${PUBLIC}" alt="" /></p>`)
+  })
+
+  it('dot segments, malformed escapes and other paths that carry a refused id never stay clickable', () => {
+    for (const href of [
+      `${DIRECTUS}/assets/./${PRIVATE}`, `/assets/x/../${PRIVATE}`, `/assets/%2e/${PRIVATE}`, `/assets/x/%2E%2E/${PRIVATE}`,
+      `/%61ssets/${PRIVATE}?%`, `/assets%2F${PRIVATE}#%zz`, `/assets//${PRIVATE}`, `/files/${PRIVATE}`,
+      `https://example.com/?id=${PRIVATE}`, `#${PRIVATE}`,
+    ]) expect(html(`<p><a href="${href}">link text</a></p>`), href).toBe('<p>link text</p>')
+    expect(html(`<p><a href="${DIRECTUS}/assets/./${PUBLIC}">ok</a></p>`), 'an allowed file behind a disguise still goes through the proxy')
+      .toBe(`<p><a href="/api/cms/media/${PUBLIC}" rel="noopener noreferrer" target="_self">ok</a></p>`)
+  })
+
+  it('srcset and data-* attributes never survive on an allowed image', () => {
+    expect(html(`<p><img src="/assets/${PUBLIC}" srcset="/assets/${PRIVATE} 2x" data-src="/assets/${PRIVATE}" alt="a"></p>`))
+      .toBe(`<p><img src="/api/cms/media/${PUBLIC}" alt="a" /></p>`)
+  })
+
+  it('a long whitespace-free body is processed in linear time', () => {
+    const raw = `<p>${'a'.repeat(60_000)}/assets/${PRIVATE}${'b'.repeat(60_000)}</p>`
+    const started = performance.now()
+    const out = html(raw)
+    expect(performance.now() - started).toBeLessThan(1500)
+    noPrivate(out, 'long')
+  })
+
+  it('FAQ list: the Spanish and Portuguese bodies are filtered too', async () => {
+    directus.tables.posts!.push(post({
+      id: 5, status: 'published', content_type: 'faq', slug: 'test-only-faq-locales', title_en: `${MARK} faq`, faq_group: 'general',
+      body_es: `<p><img src="/assets/${PRIVATE}" alt="es">texto ${DIRECTUS}/assets/${PRIVATE}</p>`,
+      body_pt: `<p><a href="/assets/${PRIVATE}">arquivo</a></p>`,
+    }))
+    const reply = await get('/api/cms/posts?content_type=faq')
+    const faq = (reply.json as { posts: Array<{ slug: string, bodyHtml?: Record<string, string> }> }).posts.find(p => p.slug === 'test-only-faq-locales')
+    expect(faq?.bodyHtml).toMatchObject({ es: '<p>texto </p>', pt: '<p>arquivo</p>' })
+    noPrivate(reply.body, 'faq es/pt')
   })
 })

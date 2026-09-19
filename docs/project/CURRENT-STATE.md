@@ -15,12 +15,13 @@ Latest completed module:            LITUBO-PRODUCTION-ACCEPTANCE-01 工作包 1�
                                     · 外部 HTTPS 与 1440 / 375 验收 PASS；refrigerant-store 未受影响；litubo.com / www / Wix 未动
                                     · 登录后的后台验收已由 LITUBO-PRODUCTION-ACCEPTANCE-01 工作包 1 完成
                                     其前 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01（`64bfc56`：D-045）；PRODUCTION-BOOTSTRAP-SAFETY-01（`10feb70`：生产 provisioning 安全门 + D-044）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01（`cab916f`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02（`86637f7`：冻结 V1 拓扑 D-043）。各模块详情见文末对应节
-Active authorized module:           LITUBO-STABLE-BASELINE-CLOSEOUT-01（2026-09-19，本包集中授权、包内连续执行；见文末该节）。当前停在"远端 CI 与审阅证据"门槛：
-                                    · 候选代码：产品 / 分类 / 首页 / 旧版文章公开媒体按 RSG-06 过滤、OG / Twitter 图绝对地址（本 commit；本地测试、typecheck、lint、build、1440 / 375 验证通过；Claude 独立只读子会话审阅无 blocker）
-                                    · 本机无法读取 PR #1 与 CI（无 gh、应用侧绑定 PR 失败、Chrome 扩展未连接、私有仓库）：本 commit 的远端 CI 与 GPT 审阅须由 GPT Controller 核实
+Active authorized module:           LITUBO-STABLE-BASELINE-CLOSEOUT-01（2026-09-19，本包集中授权、包内连续执行；见文末该节与"续修"小节）。当前停在"新提交的远端 CI 与独立审阅"门槛：
+                                    · 已由 Controller 核实：`64bf807` 的 CI run 35431238841 success（3197 passed、193 skipped）。这不代表 PR 已获独立审阅批准，也不延用到之后的提交
+                                    · 本 commit（续修：旧版文章正文与 FAQ 列表正文的公开媒体引用按 RSG-06 过滤）：最终代码上本地测试、typecheck、lint、build 通过；1440 / 375 浏览器验证在二审加固前的版本上完成，最终代码未重跑（并入服务器验收）；两轮 Claude 独立只读子会话审阅（非 GPT）的阻塞项已修复并补测试，按用户指示未开第三轮。它的远端 CI 与独立审阅须重新核实，不沿用旧结论
                                     · 已完成的生产准备：服务器只读核对、受保护配置备份、部署前产物回滚点、生产备份集（已独立校验）、隔离恢复演练（已清理）
-                                    · 未完成（等 CI 证据）：master fast-forward、部署前备份刷新、部署、服务器验收、应用回滚验证、Stable Production SHA 冻结
-                                    `fd807f6`（前两轮修复，Controller 已核实 CI run 35421325461）是本 commit 的祖先；未合并、未部署。正式切换 `litubo.com` 不在授权内；Stable Production SHA **未冻结**
+                                    · 未完成：master fast-forward、部署前备份刷新、部署、服务器验收、应用回滚验证、Stable Production SHA 冻结（**未冻结**）
+                                    · OG 域名过渡（验收站 OG 指向 litubo.com）单独待决；本地 OG 验证不是外部抓取验收，不记为通过。未改 siteUrl / canonical / sitemap / DNS
+                                    `fd807f6`、`64bf807` 是本 commit 的祖先；未合并、未部署。正式切换 `litubo.com` 不在授权内
 Active module authorization level:  LITUBO-STABLE-BASELINE-CLOSEOUT-01 集中授权：必要修复、文档订正、本地测试、commit、push 原 review 分支；审阅与 CI 通过后 fast-forward master；备份、部署 tuboluo.com 与短暂停机维护；最少量 [TEST] 验收数据；隔离恢复与应用回滚验证；门槛全满足后记录 Stable Production SHA。不含：切换 litubo.com / Wix / DNS、修改 ANYI / refrigerant-store / 其他项目、改数据库结构或权限模型、真实 AI / 邮件 / CRM、强推、覆盖生产数据库或媒体
 Next candidate:                     无已授权候选。首次非 AI 官网上线的 6 项（`PRODUCTION-PREFLIGHT.md` §53）在本次部署后的状态：
                                     1. `DIRECTUS_PUBLIC_URL` — CLOSED（D-044：`https://cms.litubo.com`，生产首次启动即以此激活）
@@ -35,7 +36,7 @@ Production release:                 **已部署到临时验收域名 `https://tu
 Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：64bfc56 = MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01；其前 10feb70 = PRODUCTION-BOOTSTRAP-SAFETY-01、cab916f = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01、86637f7 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02、32e877a = PRODUCTION-PREFLIGHT-UID-CORRECTION-01、1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01、9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)。本地 `directus_folders` 未改动：25 个目录，其中 10 个 canonical 目录各恰好一个；folder bootstrap 只在回滚的 TEST ONLY 副本中运行，从未对开发库 apply
-origin/master:                      64bfc56（2026-09-18 按 A4 fast-forward `8f2e384..64bfc56`；**未启用 branch protection**）· remote review branch `origin/review/final-release-verification-01`：本包 push 前为 `fd807f6`（前两轮修复），本包 push 后为本 commit（以 `git ls-remote` 为准）· PR https://github.com/coffeebearchen/litubo-website/pull/1 的 head 即该分支（PR 由 GPT Controller 创建；本机无法读取 PR / CI）；其余本地 review 分支仍未 push
+origin/master:                      64bfc56（2026-09-18 按 A4 fast-forward `8f2e384..64bfc56`；**未启用 branch protection**）· remote review branch `origin/review/final-release-verification-01`：本次 push 前为 `64bf807`，push 后为本 commit（以 `git ls-remote` 为准）· PR https://github.com/coffeebearchen/litubo-website/pull/1 的 head 即该分支（PR 由 GPT Controller 创建；本机无法读取 PR / CI）；其余本地 review 分支仍未 push
 Production runtime:                 2026-09-19T04:53Z 只读实测（LITUBO-STABLE-BASELINE-CLOSEOUT-01）：腾讯云主机 43.165.125.203（`VM-0-16-ubuntu`，主机标记在）· `/opt/litubo/repo` @ `64bfc566…`（工作区干净）· `.output` 指纹 `32210fd901f7f94d` · `litubo-nuxt.service` active、重启 0 次 · Compose `litubo-cms`（Directus 12.3.1 仅 127.0.0.1:8055，PostgreSQL 无端口）· Nginx `litubo-tuboluo`（只服务 `tuboluo.com`）· 受保护配置 `/etc/litubo`。部署前回滚产物 `/opt/litubo/releases/64bfc566…-32210fd901f7f94d`；备份集 `/data/litubo/backups/litubo-backup-20260919-052730`。以上为部署前的真实状态，部署时须再次核实
 ```
 
@@ -12563,7 +12564,7 @@ ID：分类 6（`test-public-media-closeout-01-local`）；产品 8；关联 29�
 | 备份路径与资源 | `/data/litubo/backups` 存在；磁盘可用 40 GB；内存可用 2.4 GB |
 | 验收浏览器 | 本机临时 Edge（临时配置，用完删除） |
 
-**候选代码（本 commit；`fd807f6` 是它的祖先，Controller 已核实 `fd807f6` 的 CI run 35421325461）：**
+**候选代码（`64bf807`；`fd807f6` 是它的祖先，Controller 已核实 `fd807f6` 的 CI run 35421325461）：**
 - 旧版文章接口：列表封面、详情封面与 OG 图复用 `resolvePublicFiles` 判定，不合格的直接省略。判定读取失败时，详情返回 503，列表沿用原有的 `{ posts: [], cmsError: true }`。
 - OG / Twitter 图：`utils/publicRoute.ts` 新增 `absoluteSiteUrl`，`useSeoHead` 用它从可信的 `runtimeConfig.public.siteUrl` 生成绝对地址。只接受本站路径和本站绝对地址，其余值回退站点默认图；不读请求 Host，不写死域名。Content Center 页面原本就传本站绝对地址，行为不变。
 - 测试（`tests/publicRouteCorrectness.test.ts`，46 / 46 通过）：
@@ -12579,7 +12580,7 @@ ID：分类 6（`test-public-media-closeout-01-local`）；产品 8；关联 29�
   - 站点 URL 为空时的配置依赖：原有问题，非阻塞。
   - 文章列表大批量时的 URL 长度：原有问题，非阻塞。
 
-**检查（Node 22.22.2 / npm 10.9.7，经 `fnm exec --using=22.22.2`）：**
+**检查（`64bf807`；Node 22.22.2 / npm 10.9.7，经 `fnm exec --using=22.22.2`）：**
 - Node gate OK；typecheck 0 错；lint 0 错。
 - `npm test`：90 个文件、3197 条通过；9 个数据库 / extractor 集成测试文件（193 条）按环境开关跳过，**不是全量通过**。前几轮同一口径为 3189、3194 条通过，跳过数同为 193。
 - build 通过，8.27 MB。
@@ -12649,10 +12650,76 @@ ID：分类 6（`test-public-media-closeout-01-local`）；产品 8；关联 29�
 **自动交接：** BLOCKED。本机没有接通 LITUBO PR #1 的通道：无 gh、应用侧绑定 PR 失败、Chrome 扩展未连接、仓库私有；本机唯一的另一个会话属于 ANYI。没有发布交接评论，也没有伪造成功。
 
 **已知事项（未处理）：**
-- 旧版文章正文内嵌文件未判定（RSG-06 OPEN）。
+- ~~旧版文章正文内嵌文件未判定（RSG-06 OPEN）~~ → 已由下方"续修"小节在本地关闭，服务器待部署验收。
 - 后台产品媒体关联不拒绝已归档文件。
 - Media Library 的归档检查不把首页主图算作引用。
 - 本地 `nuxt dev` 会监视 `dev-data/uploads`。
 - 备份集只保存在同一台主机上；异地副本、保留期、加密仍是待定的运维决定。
+
+### 续修：旧版文章正文公开媒体（2026-09-19，本 commit）
+
+**范围：** Controller 续修指令"关闭旧文章正文公开媒体缺口"：Technical Guide 详情正文与 FAQ 列表正文里的图片和文件链接。Controller 已核实 `64bf807` 的 CI run 35431238841 success（3197 passed、193 skipped），这不代表 PR 已获独立审阅批准。未改 siteUrl / canonical / sitemap / DNS，未改数据库里的原始正文。
+
+**修复（`server/utils/legacyPosts.ts` 的 `legacyPostHtml` / `legacyBodyFileIds`，详情与列表接口共用）：**
+- 按 id 判定：收集正文（en / es / pt）里的全部 UUID，与封面、OG 图一起用一次 `resolvePublicFiles` 判定。只有指向"存在、`is_public = true`、未归档"文件的 id 可以出现在输出里。
+- 图片：只保留指向被允许文件的 `/assets/<id>` 或 `/api/cms/media/<id>`，改走公开代理，其余删除。`srcset`、`data-*` 等属性不输出；`width` / `height` 只收数字（可带 %），`colspan` / `rowspan` 只收数字。
+- 链接：先按浏览器方式还原（去控制字符、反斜杠当斜杠、解码 %XX、解析 `.` / `..`、合并重复斜杠）再判定。带 UUID 的链接只有指向被允许文件时才保留，并改走代理（`?download` / `download=1|true` 仍为下载）；否则只留文字。不带 UUID 的链接照旧。
+- 文字与 alt：带被拒 id 的无空白片段整段删除；清洗后再扫一遍，删除所有未被允许的 UUID。
+- fail closed：被拒 id 被保留的标记（如 `<strong>`）或不可见字符（软连字符、零宽字符等）拆开后仍能读出时，该语言正文整体不输出（返回空并记 warn）。
+- 判定读取失败：详情 503；FAQ 列表回退 `{ posts: [], cmsError: true }`；不透传未检查的正文。
+- FAQ 列表正文现在与详情用同一套清洗（此前未清洗）。
+
+**对正常内容的影响（已知、接受）：**
+- 带任何 UUID 的外部链接会被去链、只留文字，因为无法判断它是否指向文件。
+- 被删的片段连同紧邻的标点一起删除。
+- FAQ 正文中白名单以外的标签（如 div / span / sup）被去掉、文字保留，排版可能变化。
+
+**测试（`tests/publicRouteCorrectness.test.ts`，62 / 62 通过）：** 本轮新增 16 条：首版 4 条、一审后 5 条、二审后 7 条。
+- 覆盖：私有 / 归档 / 不存在文件的图片与链接；链接文字和普通文字中的文件 URL；es / pt 正文；大小写、协议相对、反斜杠、控制字符、百分号编码伪装；属性值；代理形式；`download=false`；FAQ 各行共用一次判定读取；读取失败语义。
+- 二审补充：被标签、注释、实体拆开的引用；fail closed 整段不输出；同一片段里被拒与允许的 id 混合；点段与畸形转义；`/assets//id`、`/files/id`、`?id=`、`#id`；`srcset` / `data-*`；12 万字符无空白长文本（线性时间）；FAQ 列表的 es / pt。
+- 正文用例没有做修复前的对照运行。
+
+**独立审阅（Claude 独立只读子会话，非 GPT；共两轮，按用户指示不开第三轮）：**
+- 一审（首版）：
+  - 已修复并补测试：N1 变形 href 仍可点击；N2 属性值带出 id；S1 链接文字和普通文字中的文件 URL；N4 `download=false` 被当成下载；N5 图片不接受代理形式；N7 docblock。
+  - 接受为 fail closed：N3 匹配不看主机，外站同形链接会被去链。
+  - 登记待办：N6，见下。
+- 二审（一审修复版）：
+  - 阻塞项：B1 引用被标签、实体、注释、零宽字符拆开后漏出；B2 同一片段里有多个引用时只检查最后一个。已按"id 判定 + 清洗后扫描 + fail closed"重写，并补测试。
+  - 另两项一并修复并补测试：点段、畸形转义等写法仍可点击；长文本耗时为二次方。
+- 最终代码没有再送审；本 commit 的独立审阅由 Controller 安排。
+
+**检查（最终代码；Node 22.22.2 / npm 10.9.7，经 `fnm exec --using=22.22.2`）：**
+- Node gate OK；typecheck 0 错；lint 0 错。
+- `npm test`：90 个文件、3213 条通过；9 个数据库 / extractor 集成测试文件（193 条）按环境开关跳过，**不是全量通过**。
+- build 通过，8.28 MB。
+
+**本地浏览器验证（localhost，Node 22.22.2；在二审加固前的版本上完成，最终代码未重跑）：**
+- 一次性对象：
+  - 文件：PUB `3b036891…`（公开图）、PRIV `550a992a…`（私有）、ARCH `e7dd673d…`（公开但已归档，归档记录 `d03bdf06…`）、PDF `82a7f61c…`（公开）、PDFP `9ec0b360…`（私有）。
+  - 文章：10（Technical Guide）、11（FAQ）。
+- 指南正文：只输出 PUB（走代理）和 PDF 链接（走代理、下载）；私有和归档链接去链、只留文字；外链与站内链接保留。
+- FAQ：PUB 走代理；"Private FAQ manual" 只留文字；外链保留；script 删除。
+- API 与指南、FAQ、首页 HTML 中没有被拒 id；代理对公开文件返回 200，对被拒文件返回 404。
+- 1440 / 375：图片加载、无破图、无横向溢出。数据库里的原始正文未变。
+- FAQ 页的 hydration 警告来自原有的 `components/ui/Accordion.vue` 用 `Math.random()` 生成 id（`a2d1c4e`，2026-09-01），与本轮无关，未处理。
+- 清理：按 id 删除上述文件、归档记录和文章 10、11，均返回 204。
+  - 计数回到基线：分类 5、产品 4、关联 19、区块 3、文件 60（公开 1）、归档记录 20（已归档 18）、目录 25、文章 8、site_content 1。
+  - 3 号沙盒指纹 `0cf09914…`、文章指纹 `1b05339d…` 不变；uploads 130 个文件，无残留。
+  - Studio 已退出，临时 Edge 配置已删除，dev server 已停；`.claude/launch.json` 的临时 Node 22 启动配置已还原，未提交。
+
+**待办（非阻塞，本轮不改）：**
+- N6：被放行的链接只包着一张被拒图片时，输出空 `<a>`，没有可访问名称。
+- 被放行文件的 URL 写在正文文字里时，仍显示 Directus 主机地址（只涉及已公开文件）。
+- 正文因 fail closed 整体不输出时，后台没有提示编辑者。
+- 最终代码的浏览器 1440 / 375 复验：并入服务器部署验收。
+- FAQ 页 Accordion 的 hydration 警告（原有问题）。
+- 后台可关联已归档文件；归档检查不把首页主图算作引用（同上节）。
+
+**剩余门槛：**
+1. 本 commit 的远端 CI（Controller 核实）与独立审阅。
+2. 之后依次为 master fast-forward → 部署前备份刷新 → 部署 → 服务器验收（含私有 / 公开 / 归档输出与 1440 / 375）→ 应用回滚验证 → 冻结 Stable Production SHA（**未冻结**）。
+3. OG 域名过渡单独待决，不记为外部抓取验收通过。
+4. 自动交接仍为 BLOCKED。
 
 *最后更新：2026-09-19，由 Claude Code 在 LITUBO-STABLE-BASELINE-CLOSEOUT-01 中写入，随本 commit 推送。*
