@@ -15,12 +15,13 @@ Latest completed module:            LITUBO-PRODUCTION-ACCEPTANCE-01 工作包 1�
                                     · 外部 HTTPS 与 1440 / 375 验收 PASS；refrigerant-store 未受影响；litubo.com / www / Wix 未动
                                     · 登录后的后台验收已由 LITUBO-PRODUCTION-ACCEPTANCE-01 工作包 1 完成
                                     其前 MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01（`64bfc56`：D-045）；PRODUCTION-BOOTSTRAP-SAFETY-01（`10feb70`：生产 provisioning 安全门 + D-044）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01（`cab916f`）；FINAL-RELEASE-PRODUCTION-PREFLIGHT-02（`86637f7`：冻结 V1 拓扑 D-043）。各模块详情见文末对应节
-Active authorized module:           LITUBO-PUBLIC-MEDIA-CLOSEOUT-01（2026-09-19，含续轮：区块图片、产品 OG 图、首页主图）— 本地验证全部通过；按施工单以本 commit 提交，并 push 到 review 分支 `review/final-release-verification-01`（SHA 以 `git log` / `git ls-remote` 为准）。PR 创建与远端 CI 核实由 GPT Controller 接手。三项状态分开记录：
-                                    · 主图修复（LITUBO-HERO-FIX-01）：本地验证通过，随本 commit 提交
-                                    · 公开媒体补充修复（产品详情 hero / gallery / 下载 / 区块图片 / OG 图、分类自身主图、首页主图按 RSG-06 过滤）：本地验证通过，随本 commit 提交
-                                    · 生产：未部署——tuboluo.com 仍运行 `64bfc56`（服务器侧状态待核实，见 Production runtime）
-                                    `39bf8f1`（tuboluo.com 部署记录）是本 commit 的父提交，本身不含上述修复。未合并、未部署。LITUBO-PRODUCTION-ACCEPTANCE-01 工作包 2 / 3（备份、恢复、回滚）未授权；正式切换 `litubo.com` 未授权；Stable Production SHA **未冻结**（候选仍为 `64bfc566…`）
-Active module authorization level:  A2 + A3（本地实现与验收、本地 commit、push review 分支；施工单明确不含合并、部署；PR 与远端 CI 由 GPT Controller 接手）。更早：工作包 1 的生产测试授权（已结束）；A4 + A5 已完成
+Active authorized module:           LITUBO-STABLE-BASELINE-CLOSEOUT-01（2026-09-19，本包集中授权、包内连续执行；见文末该节）。当前停在"远端 CI 与审阅证据"门槛：
+                                    · 候选代码：产品 / 分类 / 首页 / 旧版文章公开媒体按 RSG-06 过滤、OG / Twitter 图绝对地址（本 commit；本地测试、typecheck、lint、build、1440 / 375 验证通过；Claude 独立只读子会话审阅无 blocker）
+                                    · 本机无法读取 PR #1 与 CI（无 gh、应用侧绑定 PR 失败、Chrome 扩展未连接、私有仓库）：本 commit 的远端 CI 与 GPT 审阅须由 GPT Controller 核实
+                                    · 已完成的生产准备：服务器只读核对、受保护配置备份、部署前产物回滚点、生产备份集（已独立校验）、隔离恢复演练（已清理）
+                                    · 未完成（等 CI 证据）：master fast-forward、部署前备份刷新、部署、服务器验收、应用回滚验证、Stable Production SHA 冻结
+                                    `fd807f6`（前两轮修复，Controller 已核实 CI run 35421325461）是本 commit 的祖先；未合并、未部署。正式切换 `litubo.com` 不在授权内；Stable Production SHA **未冻结**
+Active module authorization level:  LITUBO-STABLE-BASELINE-CLOSEOUT-01 集中授权：必要修复、文档订正、本地测试、commit、push 原 review 分支；审阅与 CI 通过后 fast-forward master；备份、部署 tuboluo.com 与短暂停机维护；最少量 [TEST] 验收数据；隔离恢复与应用回滚验证；门槛全满足后记录 Stable Production SHA。不含：切换 litubo.com / Wix / DNS、修改 ANYI / refrigerant-store / 其他项目、改数据库结构或权限模型、真实 AI / 邮件 / CRM、强推、覆盖生产数据库或媒体
 Next candidate:                     无已授权候选。首次非 AI 官网上线的 6 项（`PRODUCTION-PREFLIGHT.md` §53）在本次部署后的状态：
                                     1. `DIRECTUS_PUBLIC_URL` — CLOSED（D-044：`https://cms.litubo.com`，生产首次启动即以此激活）
                                     2. canonical / TLS — canonical CLOSED（`https://litubo.com`）；验收域名 TLS 已实施（主机 Nginx + Let's Encrypt，只含 `tuboluo.com`，到期 2026-12-17，自动续期）；`litubo.com` 切换时的 TLS 仍 OPEN
@@ -34,8 +35,8 @@ Production release:                 **已部署到临时验收域名 `https://tu
 Last closeout commit:               以 git log -1 -- docs/project/CURRENT-STATE.md 为准（上一次收口：64bfc56 = MEDIA-LIBRARY-PRODUCTION-BOOTSTRAP-01；其前 10feb70 = PRODUCTION-BOOTSTRAP-SAFETY-01、cab916f = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02-REVIEW-FIX-01、86637f7 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-02、32e877a = PRODUCTION-PREFLIGHT-UID-CORRECTION-01、1ac8457 = FINAL-RELEASE-PRODUCTION-PREFLIGHT-01、9f1da6f = FINAL-RELEASE-REVIEW-BRANCH-CI-01、be1df5a = FINAL-RELEASE-VERIFICATION-01、da8f445 = GOVERNANCE-FIX-01、bb6c136 = 安全修复收口）
 Local Directus runtime:             directus/directus:12.3.1@sha256:8978edf6…（D-042，已激活 OIG 许可证，source `env`）· postgres:16.15-alpine@sha256:cf78e766…（D-041，未变）· document-extractor 镜像已重建（移除 npm / npx / corepack），旧镜像保留为 `litubo-document-extractor:pre-sr01`
 Local Directus schema:              Content Foundation + draft revision guard trigger + lifecycle concurrency guard triggers + tracked Directus Access Bootstrap identity (D-038) + tracked nuxt-server Content read permissions (D-034) + tracked least-privilege legacy site permissions (FINAL-RELEASE-FIX-E) (LOCAL DEVELOPMENT ONLY；12.3.1 升级后 19 行权限与三项权限校验均 OK)。本地 `directus_folders` 未改动：25 个目录，其中 10 个 canonical 目录各恰好一个；folder bootstrap 只在回滚的 TEST ONLY 副本中运行，从未对开发库 apply
-origin/master:                      64bfc56（2026-09-18 按 A4 fast-forward `8f2e384..64bfc56`；**未启用 branch protection**）· remote review branch `origin/review/final-release-verification-01`：本轮 push 前为 `64bfc56`；按施工单 push 后依次包含 `39bf8f1`（部署记录）与本 commit（以 `git ls-remote` 为准）· 本机未创建 PR（无 gh，按施工单不另装工具；由 GPT Controller 接手）；其余本地 review 分支仍未 push
-Production runtime:                 **服务器侧状态待核实**（最后实测：2026-09-19 工作包 1；2026-09-19 的只读复核因 SSH 两次失败未完成）。已记录状态：腾讯云主机 43.165.125.203 · `/opt/litubo/repo` @ `64bfc56`（不含 HERO-FIX-01 与 PUBLIC-MEDIA-CLOSEOUT-01 的修复）· Nuxt `litubo-nuxt.service`（127.0.0.1:3310）· Compose 项目 `litubo-cms`（Directus 127.0.0.1:8055，PostgreSQL 无端口）· Nginx `/etc/nginx/sites-available/litubo-tuboluo` · 受保护配置 `/etc/litubo`（root 700）· 详见文末 LITUBO-SIMPLE-GO-LIVE-AUTOPILOT 一节
+origin/master:                      64bfc56（2026-09-18 按 A4 fast-forward `8f2e384..64bfc56`；**未启用 branch protection**）· remote review branch `origin/review/final-release-verification-01`：本包 push 前为 `fd807f6`（前两轮修复），本包 push 后为本 commit（以 `git ls-remote` 为准）· PR https://github.com/coffeebearchen/litubo-website/pull/1 的 head 即该分支（PR 由 GPT Controller 创建；本机无法读取 PR / CI）；其余本地 review 分支仍未 push
+Production runtime:                 2026-09-19T04:53Z 只读实测（LITUBO-STABLE-BASELINE-CLOSEOUT-01）：腾讯云主机 43.165.125.203（`VM-0-16-ubuntu`，主机标记在）· `/opt/litubo/repo` @ `64bfc566…`（工作区干净）· `.output` 指纹 `32210fd901f7f94d` · `litubo-nuxt.service` active、重启 0 次 · Compose `litubo-cms`（Directus 12.3.1 仅 127.0.0.1:8055，PostgreSQL 无端口）· Nginx `litubo-tuboluo`（只服务 `tuboluo.com`）· 受保护配置 `/etc/litubo`。部署前回滚产物 `/opt/litubo/releases/64bfc566…-32210fd901f7f94d`；备份集 `/data/litubo/backups/litubo-backup-20260919-052730`。以上为部署前的真实状态，部署时须再次核实
 ```
 
 ---
@@ -12453,8 +12454,8 @@ ID：分类 6（`test-public-media-closeout-01-local`）；产品 8；关联 29�
 - 结论：下一次部署的目标是腾讯云主机上的 `/opt/litubo/repo` + `litubo-nuxt.service`，对外地址 `https://tuboluo.com`。`litubo.com` 是现网 Wix 客户站，不在部署范围。
 - 服务器侧只读核对（HEAD、服务状态、vhost）今天两次 SSH 失败（连接被重置、超时），按停止条件暂停。服务器侧状态**待核实**；已记录状态来自工作包 1：`/opt/litubo/repo` = `64bfc56`，`litubo-nuxt` active，`.output` 指纹 `32210fd901f7f94d`。
 
-**后续生产工作包（草案；每一步都需要单独授权）：**
-1. **发布链：** 本地 commit（A2）→ push review 分支，CI success（A3）→ fast-forward master（A4）→ 部署（A5）。commit 与 push 已在下节续轮完成；PR 创建与远端 CI 核实由 GPT Controller 接手；A4 / A5 仍各需单独授权。
+**后续生产工作包（历史草案，已由文末 LITUBO-STABLE-BASELINE-CLOSEOUT-01 取代：本包集中授权、包内连续执行；以文末"部署与验收程序"为准）：**
+1. **发布链：** 本地 commit（A2）→ push review 分支，CI success（A3）→ fast-forward master（A4）→ 部署（A5）。commit 与 push 已在下节续轮完成；PR 创建与远端 CI 核实由 GPT Controller 接手；A4 / A5 已由 LITUBO-STABLE-BASELINE-CLOSEOUT-01 集中授权、包内连续执行。
 2. **部署前只读核对：**
    - 主机标记存在；`/opt/litubo/repo` = `64bfc56` 且工作区干净；`litubo-nuxt` active。
    - 记录 `.output` 指纹，方法同工作包 1：`cd .output && find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16`。
@@ -12462,7 +12463,7 @@ ID：分类 6（`test-public-media-closeout-01-local`）；产品 8；关联 29�
 3. **备份：**
    - 先把当前 `.output` 原样复制为回滚点（构建会原地覆盖它）。
    - 数据库与 uploads 按 `docs/project/PRODUCTION-BACKUP-RESTORE-RUNBOOK.md` 用 `scripts/backup-create.mjs` 做成一个备份集：需停 Directus 的维护窗口，校验 checksum。
-   - 本次发布不改数据库，数据库备份只作保险；这一步即工作包 2 的首份生产备份，需单独授权。
+   - 本次发布不改数据库，数据库备份只作保险；这一步即工作包 2 的首份生产备份，已由 LITUBO-STABLE-BASELINE-CLOSEOUT-01 集中授权。
 4. **Node 22 发布检查：** fast-forward 到新 SHA；按上次方式用临时单元 `litubo-build` 执行 `npm ci && npm run release:verify`（`/opt/litubo/runtime/node-current` = 22.22.2，`/opt/litubo/build.env`）。
    - 要求 `BUILD_EXIT=0`：Node gate、两个镜像 pin、无已发布 TEST 数据、构建通过。
    - 构建产物中 6 个 secret 的出现次数为 0（D-039）。
@@ -12475,8 +12476,8 @@ ID：分类 6（`test-public-media-closeout-01-local`）；产品 8；关联 29�
    - 公开后：卡片显示 hero，gallery 与下载只有公开项，`/products` 显示分类图，覆盖 1440 / 375；替换一次 hero。
 7. **清理：** 撤回 → 按 id 删除产品（关联级联）→ 分类改为草稿后删除 → 删除文件 → 计数回到基线 → 退出登录、关闭隧道。
 8. **失败恢复：**
-   - 构建失败：不重启；若 `.output` 已被改写，恢复第 3 步的副本，`git checkout 64bfc56`，重启后确认指纹回到 `32210fd901f7f94d`。
-   - 冒烟或验收失败：同样回到 `64bfc56` 与原 `.output`。
+   - 构建失败：不重启；若 `.output` 已被改写，恢复第 3 步的副本并回到部署前的 SHA，重启后确认指纹回到部署前记录的值。（`64bfc56` / `32210fd901f7f94d` 只是 2026-09-19 的历史记录；实际回滚点必须在部署前重新核实并备份。）
+   - 冒烟或验收失败：同样回到部署前重新核实的 SHA 与已备份的原 `.output`。
    - 本次发布不改数据库，回滚不需要恢复数据库；测试数据仍按 id 清理。
 9. **收口：** refrigerant-store 与 `litubo.com` 零变化；更新本文件，关闭 hero 缺陷与本节缺口。Stable Production SHA 由 Controller 决定。
 
@@ -12538,6 +12539,120 @@ ID：分类 6（`test-public-media-closeout-01-local`）；产品 8；关联 29�
 
 **自动审阅：** 没有已接通的 LITUBO 自动审阅通道：本机在线会话只有 ANYI 一个，仓库只有 CI 工作流。交由 GPT Controller。
 
-**部署方案：** 见上一节"后续生产工作包"。本 commit 已完成其中第 1 步的 commit 与 push；此后依次为 Controller 核实 CI → A4 → 备份 → A5 部署与最小验收，每步单独授权。
+**部署方案：** 见上一节"后续生产工作包"。本 commit 已完成其中第 1 步的 commit 与 push；此后依次为 Controller 核实 CI → A4 → 备份 → A5 部署与最小验收；已由 LITUBO-STABLE-BASELINE-CLOSEOUT-01 集中授权、包内连续执行，程序见文末该节。
 
 *最后更新：2026-09-19，由 Claude Code 在 LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 续轮中写入，随本 commit 推送。*
+
+---
+
+## LITUBO-STABLE-BASELINE-CLOSEOUT-01 — 稳定基线收尾（2026-09-19；候选代码已提交并 push，停在远端 CI / 审阅证据门槛；未合并、未部署）
+
+**授权：** 本包集中授权、包内连续执行（范围见 §0）。
+
+**分项结论：**
+- 网站稳定基线：**BLOCKED**，等本 commit 的远端 CI 与审阅证据；Stable Production SHA 未冻结。
+- 自动交接：**BLOCKED**，本机没有可用通道（见下文）。
+
+**执行能力核实：**
+
+| 项 | 结果 |
+|---|---|
+| GitHub PR / CI | 不可读。本机无 gh；应用侧绑定 PR 失败（需要 gh 登录）；Claude in Chrome 未连接；仓库私有（匿名 API 404）。只有 `git ls-remote` 可读，显示 PR #1 的 head 即 review 分支 |
+| 独立审阅 | GPT / Codex 审阅结果读不到。已用 Claude 独立只读子会话审阅（不带作者上下文；**不是 GPT 审阅**） |
+| SSH | 可用，但握手阶段频繁被 reset，需要重试。服务器维护动作都以 systemd 临时单元在服务器端运行，SSH 断开不影响 Directus 恢复 |
+| 备份路径与资源 | `/data/litubo/backups` 存在；磁盘可用 40 GB；内存可用 2.4 GB |
+| 验收浏览器 | 本机临时 Edge（临时配置，用完删除） |
+
+**候选代码（本 commit；`fd807f6` 是它的祖先，Controller 已核实 `fd807f6` 的 CI run 35421325461）：**
+- 旧版文章接口：列表封面、详情封面与 OG 图复用 `resolvePublicFiles` 判定，不合格的直接省略。判定读取失败时，详情返回 503，列表沿用原有的 `{ posts: [], cmsError: true }`。
+- OG / Twitter 图：`utils/publicRoute.ts` 新增 `absoluteSiteUrl`，`useSeoHead` 用它从可信的 `runtimeConfig.public.siteUrl` 生成绝对地址。只接受本站路径和本站绝对地址，其余值回退站点默认图；不读请求 Host，不写死域名。Content Center 页面原本就传本站绝对地址，行为不变。
+- 测试（`tests/publicRouteCorrectness.test.ts`，46 / 46 通过）：
+  - 新增 5 条；修复前 5 条失败、原有 38 条通过。
+  - 审阅后补 3 条：封面与 OG 分别判定、文件不存在、SEO head 行为。
+  - 加强 3 处：列表顺序、外域绝对地址被拒、读取 Host 的 API 检查。
+
+**独立审阅（Claude 独立只读子会话，非 GPT）：** 本次 diff 没有 blocker。
+- 外域绝对地址透传：已加固。
+- 缺失的负向用例：已补。
+- 未处理、登记为已知事项：
+  - 旧版文章正文 HTML 内嵌的 `/assets/<id>` 图片和链接未做判定。原有问题，不在本包点名范围内，列为 RSG-06 未关闭项。
+  - 站点 URL 为空时的配置依赖：原有问题，非阻塞。
+  - 文章列表大批量时的 URL 长度：原有问题，非阻塞。
+
+**检查（Node 22.22.2 / npm 10.9.7，经 `fnm exec --using=22.22.2`）：**
+- Node gate OK；typecheck 0 错；lint 0 错。
+- `npm test`：90 个文件、3197 条通过；9 个数据库 / extractor 集成测试文件（193 条）按环境开关跳过，**不是全量通过**。前几轮同一口径为 3189、3194 条通过，跳过数同为 193。
+- build 通过，8.27 MB。
+
+**本地验证（localhost；dev server 运行在 Node 22.22.2，并设 `NUXT_PUBLIC_SITE_URL=http://localhost:3000`，以验证绝对 OG 地址可访问）：**
+
+一次性对象：
+- 文件：CV `08f7d5f7…`（文章封面）、OGP `d2ca7503…`（文章 OG）、PO `4bbffdd1…`（产品 OG）
+- 文章 9（Technical Guide）、产品 10（本地分类 5）、归档记录 `d1c5b05b…`
+
+| 验证项 | 结果 |
+|---|---|
+| 文件未公开 | 文章封面、列表卡片、OG 都不输出。`og:image` 与 `twitter:image` 为站点默认图的本站绝对地址，请求 200。三个 id 都不出现在 API 和 HTML 中 |
+| 文件公开 | 文章封面与 Resources 卡片正常显示。文章页和产品页的 `og:image` / `twitter:image` 为本站绝对地址 `/api/cms/media/<id>`，请求 200、image/png |
+| 1440 / 375 | 无破图、无横向溢出、无请求或 console 错误 |
+| 封面归档 | 封面与卡片不再输出，id 不再出现 |
+| 清理 | 撤回后按 id 删除产品 10、文章 9、归档记录、3 个文件，均返回 204。计数与基线一致：分类 5、产品 4、关联 19、区块 3、文件 60（公开 1）、归档记录 20（已归档 18）、目录 25、文章 8、site_content 1。3 号沙盒与文章指纹不变；uploads 无残留；两处登录已退出，临时 Edge 配置已删除 |
+| 环境事件 | 会话中途本机 Docker Desktop 停止（WSL 退出），用 `docker desktop start` 恢复；本地容器按原重启策略恢复，本地数据与基线一致。重启后恢复的标签页抑制了发布按钮的原生 confirm，验证脚本改为在页面内按"确定"应答 |
+
+**生产准备（服务器上已完成）：**
+
+| 项 | 结果 |
+|---|---|
+| 只读核对（04:53Z） | 身份、HEAD、`.output` 指纹、服务、端口、挂载、磁盘、内存见 §0；无其他操作者 |
+| refrigerant-store 基线 | 3 个容器 Up；首页 200（哈希 `2cecbf67d1e6b545`）；`/api/` 403；`/admin/` 200；:8080 403；Nginx `nginx.conf` `48c6a4ec1e1fd28c`、`default` `906b8411bca95f5b` |
+| 受保护配置备份 | `/root/litubo-config-backup-20260919051756`（root 700）。只记录了文件名和大小：`build.env`、`/etc/litubo` 下 3 个文件、systemd unit、Nginx vhost |
+| 回滚产物 | `/opt/litubo/releases/64bfc566…-32210fd901f7f94d/.output` 加 `VERSION`；副本指纹等于线上指纹 |
+| 生产数据基线 | 分类、产品、关联、区块、文件、归档记录、文章、site_content、询盘都是 0；目录 10；用户 2 |
+| **备份创建** | 临时单元 `litubo-backup-20260919051756`：05:27:29Z 停 Directus → `backup-create`（2.2 s）→ 05:27:32Z 启 Directus → 05:27:48Z ping pong（Directus 停约 19 s）→ Nuxt API 200、站点 200。备份集 `litubo-backup-20260919-052730`：53 表、579 行，dump 185.1 KiB（383 TOC，有效），uploads 0 个文件；Directus 12.3.1（digest `8978edf6…`）、PostgreSQL 16.15 |
+| 独立校验 | `sha256sum -c SHA256SUMS` OK；`verifyBackupSet` OK |
+| **隔离恢复验证** | 临时单元 `litubo-restore-test-20260919051756`，恢复到 TEST 库 `litubo_restore_test_20260919051756` 和 TEST 目录，结果如下 |
+| — 数据 | 53 表、579 行、27 个序列，结构与备份一致 |
+| — 临时 Directus | 同一 digest，`LICENSE_KEY` 置空，只绑 127.0.0.1:8057，16 s 就绪；挂载 = TEST 目录 |
+| — 隔离性 | 临时实例的会话只进 TEST 库，生产库的会话只来自生产 Directus；迁移 107 → 107 |
+| — 匿名请求 | 7 个与生产一致；`/server/info` 唯一差异是 `license.source`（生产 env / 副本 settings），符合 runbook §9.1；未停用许可证 |
+| 恢复演练清理 | 临时容器、TEST 库、TEST 目录已删除（第一版清理脚本有引号错误，逐项核实后补删，无其他影响）。现在生产只有 `litubo_cms`、`postgres` 两个库，8057 未监听，生产 Directus 许可证来源仍为 env；备份集保留 |
+| **应用回滚验证** | 未执行（等 CI 证据后在部署维护窗口内进行） |
+
+**部署与验收程序（本包集中授权、包内连续执行；以此为准）：**
+0. **门槛：** Controller 核实本 commit（或其后只含文档的 commit）的远端 CI 为 success，且审阅没有未解决的阻塞；否则不合并、不部署。
+1. **合并：** fast-forward master 到已核实的准确 SHA。不强推；master 已被他人推进则停止。
+2. **部署前复核：** 再次只读核实服务器 HEAD、`.output` 指纹、服务和磁盘。与上表不同，就先重新保存回滚产物。
+3. **部署前刷新备份：** 停 Directus → `backup-create` → 独立校验（`sha256sum -c`、`verifyBackupSet`）→ 启 Directus → 健康检查（ping、Nuxt API、站点）。
+   - 以 systemd 临时单元运行，退出时一律启动 Directus。
+   - 备份失败：停止发布推进，确认服务恢复后报告。
+4. **维护窗口内构建：** 停 `litubo-nuxt` → `git fetch` 并检出准确 SHA → `npm ci && npm run release:verify`（Node 22.22.2、`/opt/litubo/build.env`，临时单元）→ 确认构建产物 secret 计数为 0 → 保存新产物副本 → 启 `litubo-nuxt` → 健康检查。
+   - 任一步失败：恢复第 2 步的回滚产物和原 SHA，启动服务，确认指纹回到原值，停止推进。
+5. **验收：**
+   - 首页、产品入口、后台登录、相关 API；HTTPS、noindex、robots。
+   - 登录后产品编辑保存、媒体、发布与撤回。
+   - 私有 / 公开 / 归档文件的输出。
+   - OG 元数据与图片访问（见下条限制）；1440 / 375。
+6. **应用回滚验证（维护窗口内，不动数据库）：** 停服务 → 换回部署前产物与 SHA → 启动并检查端点 → 再停 → 换回候选产物 → 启动，确认健康与最终指纹。
+7. **清理：** 按 id 清理本包 [TEST] 对象，核对计数与残留；确认 refrigerant-store、Wix 域名无变化。
+8. **冻结：** 全部门槛满足后，在本文件记录 Stable Production SHA（验证环境 = tuboluo.com 验收站；litubo.com 仍在 Wix）。之后只记录结果的文档 commit 另列。
+
+旧 SHA `64bfc56` 与指纹 `32210fd901f7f94d` 只是历史记录；实际回滚点以第 2 步重新核实的结果为准。
+
+**验收站上的 OG 地址限制（需用户 / Controller 决定）：**
+- 生产构建的 `NUXT_PUBLIC_SITE_URL` 是 `https://litubo.com`（`/opt/litubo/build.env`，D-044 canonical）。
+- 部署后，tuboluo.com 上的 `og:image` / `twitter:image` 会和 canonical 一样指向 `https://litubo.com/...`。正式切换前这个地址由 Wix 服务、访问不到；切换后才有效。
+- 本地已用本机站点地址证明"可信站点地址 + 本站路径"能访问。
+- 如果要求验收期间也能访问，需要把验收部署的站点地址改为 tuboluo.com，这会同时改变 canonical 和 sitemap，属于配置决定，本包没有改。
+
+**部署、服务器验收：** 未执行（等 CI 证据）。
+
+**自动交接：** BLOCKED。本机没有接通 LITUBO PR #1 的通道：无 gh、应用侧绑定 PR 失败、Chrome 扩展未连接、仓库私有；本机唯一的另一个会话属于 ANYI。没有发布交接评论，也没有伪造成功。
+
+**已知事项（未处理）：**
+- 旧版文章正文内嵌文件未判定（RSG-06 OPEN）。
+- 后台产品媒体关联不拒绝已归档文件。
+- Media Library 的归档检查不把首页主图算作引用。
+- 本地 `nuxt dev` 会监视 `dev-data/uploads`。
+- 备份集只保存在同一台主机上；异地副本、保留期、加密仍是待定的运维决定。
+
+*最后更新：2026-09-19，由 Claude Code 在 LITUBO-STABLE-BASELINE-CLOSEOUT-01 中写入，随本 commit 推送。*

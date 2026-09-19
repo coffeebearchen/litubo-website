@@ -1,6 +1,7 @@
 import { computed, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import type { Locale } from '~/types/content'
+import { absoluteSiteUrl } from '~/utils/publicRoute'
 
 export interface SeoHeadOptions {
   title: MaybeRefOrGetter<string>
@@ -12,7 +13,10 @@ export interface SeoHeadOptions {
    * - Empty string: no canonical or hreflang (FAQ post records, noindex pages).
    */
   canonicalPath: MaybeRefOrGetter<string>
-  /** Absolute URL for og:image. Falls back to site default when omitted. */
+  /**
+   * og:image / twitter:image. An absolute URL, or a site-relative path that is made absolute with the
+   * configured site URL (`absoluteSiteUrl`). Falls back to the site default when omitted or unusable.
+   */
   ogImage?: MaybeRefOrGetter<string | undefined>
   /** true → outputs noindex,follow; suppresses canonical and hreflang. */
   noIndex?: MaybeRefOrGetter<boolean | undefined>
@@ -73,7 +77,7 @@ export function useSeoHead(options: SeoHeadOptions) {
     }
 
     const ogUrl = canonicalUrl || `${siteUrl}/`
-    const ogImage = ogImageProp || `${siteUrl}${OG_IMAGE_FALLBACK}`
+    const ogImage = absoluteSiteUrl(siteUrl, ogImageProp) ?? `${siteUrl}${OG_IMAGE_FALLBACK}`
     const ogLocale = OG_LOCALE_MAP[currentLocale] ?? 'en_US'
 
     const showCanonicalHreflang = !noIndex && isEnLocale && !!canonicalUrl

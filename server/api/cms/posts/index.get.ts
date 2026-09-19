@@ -1,6 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3'
 import { directusFetch } from '~/server/utils/directus'
 import { requireCmsSource } from '~/server/utils/cmsSource'
+import { publicFileId, resolvePublicFiles } from '~/server/utils/contentPublic'
 import { isLegacyPublicPostType, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
 import { DEMO_POSTS_LIST } from '~/content/fixtures/posts'
 import type { PostListItem, PostsResult } from '~/types/content'
@@ -26,7 +27,8 @@ interface DirectusPost {
   body_pt: string | null
 }
 
-function toListItem(r: DirectusPost, isFaq: boolean): PostListItem {
+/** `coverFileId` is the post's cover, already RSG-06 checked (LITUBO-STABLE-BASELINE-CLOSEOUT-01). */
+function toListItem(r: DirectusPost, isFaq: boolean, coverFileId: string | null): PostListItem {
   const item: PostListItem = {
     id: String(r.id),
     contentType: r.content_type as PostListItem['contentType'],
@@ -34,7 +36,7 @@ function toListItem(r: DirectusPost, isFaq: boolean): PostListItem {
     publishDate: r.publish_date ?? null,
     author: r.author ?? null,
     topics: (r.topics ?? []) as PostListItem['topics'],
-    coverImageUrl: r.cover_image ? `/api/cms/media/${r.cover_image}` : '',
+    coverImageUrl: coverFileId ? `/api/cms/media/${coverFileId}` : '',
     title: { en: r.title_en ?? '', es: r.title_es ?? '', pt: r.title_pt ?? '' },
     excerpt: { en: r.excerpt_en ?? '', es: r.excerpt_es ?? '', pt: r.excerpt_pt ?? '' },
   }
@@ -109,7 +111,11 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
 
   try {
     const res = await directusFetch<{ data: DirectusPost[] }>(`/items/posts?${qs}`)
-    let items = res.data.filter(r => isLegacyPublicPostType(r.content_type)).map(r => toListItem(r, isFaqQuery))
+    const rows = res.data.filter(r => isLegacyPublicPostType(r.content_type))
+    // RSG-06 (LITUBO-STABLE-BASELINE-CLOSEOUT-01): a cover image is linked only while its file is is_public and
+    // not archived in the Media Library; a failed check falls back like a failed read (no posts, cmsError).
+    const files = await resolvePublicFiles(directusFetch, rows.flatMap(r => (r.cover_image ? [r.cover_image] : [])))
+    let items = rows.map(r => toListItem(r, isFaqQuery, publicFileId(files, r.cover_image)))
     if (topics && topics.length > 0) {
       items = items.filter(p => topics.some(t => p.topics.includes(t as PostListItem['topics'][number])))
       items = items.slice(offset, offset + limit)

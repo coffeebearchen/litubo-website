@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam, createError } from 'h3'
 import sanitizeHtml from 'sanitize-html'
 import { directusFetch } from '~/server/utils/directus'
+import { publicFileId, resolvePublicFiles, type PublicFile } from '~/server/utils/contentPublic'
 import { requireCmsSource } from '~/server/utils/cmsSource'
 import { isLegacyPublicPostType, LEGACY_PUBLIC_POST_TYPES } from '~/server/utils/legacyPosts'
 import { DEMO_POSTS } from '~/content/fixtures/posts'
@@ -96,8 +97,11 @@ const CONTENT_TYPE_PATH: Record<string, string> = {
   news: '/resources/news',
 }
 
-function toPost(r: DirectusPostDetail, slug: string): Post {
+/** `files` is the RSG-06 result for the cover and OG image (LITUBO-STABLE-BASELINE-CLOSEOUT-01): a file it does not allow is left out. */
+function toPost(r: DirectusPostDetail, slug: string, files: ReadonlyMap<string, PublicFile>): Post {
   const postSlug = r.slug ?? slug
+  const coverFileId = publicFileId(files, r.cover_image)
+  const ogFileId = publicFileId(files, r.seo_og_image)
   const pathPrefix = CONTENT_TYPE_PATH[r.content_type]
   return {
     id: String(r.id),
@@ -109,7 +113,7 @@ function toPost(r: DirectusPostDetail, slug: string): Post {
     faqGroup: (r.faq_group ?? null) as Post['faqGroup'],
     relatedProductSlugs: r.related_product_slugs ?? [],
     relatedApplicationSlugs: r.related_application_slugs ?? [],
-    coverImageUrl: r.cover_image ? `/api/cms/media/${r.cover_image}` : '',
+    coverImageUrl: coverFileId ? `/api/cms/media/${coverFileId}` : '',
     title: { en: r.title_en ?? '', es: r.title_es ?? '', pt: r.title_pt ?? '' },
     excerpt: { en: r.excerpt_en ?? '', es: r.excerpt_es ?? '', pt: r.excerpt_pt ?? '' },
     bodyHtml: {
@@ -129,7 +133,7 @@ function toPost(r: DirectusPostDetail, slug: string): Post {
         pt: r.seo_description_pt ?? '',
       },
       canonicalPath: pathPrefix ? `${pathPrefix}/${postSlug}` : '',
-      ogImage: r.seo_og_image ? `/api/cms/media/${r.seo_og_image}` : undefined,
+      ogImage: ogFileId ? `/api/cms/media/${ogFileId}` : undefined,
     },
   }
 }
@@ -172,5 +176,16 @@ export default defineEventHandler(async (event): Promise<Post> => {
 
   if (!record || !isLegacyPublicPostType(record.content_type)) throw createError({ statusCode: 404, message: 'Not found' })
 
-  return toPost(record, slug)
+  // RSG-06: the cover and OG image are linked only while the file is is_public and not archived in the
+  // Media Library right now; a failed check is a 503 like the read above, never a page with unchecked files.
+  let files: Map<string, PublicFile>
+  try {
+    files = await resolvePublicFiles(directusFetch, [record.cover_image, record.seo_og_image].filter((id): id is string => Boolean(id)))
+  }
+  catch (err) {
+    console.error(`[cms/posts/${slug}] media eligibility check failed:`, err instanceof Error ? err.message : err)
+    throw createError({ statusCode: 503, message: 'Content unavailable' })
+  }
+
+  return toPost(record, slug, files)
 })

@@ -24,3 +24,19 @@ export function publicPageStatus(error: { statusCode?: number } | null | undefin
   }
   return hasData ? null : 404
 }
+
+/**
+ * LITUBO-STABLE-BASELINE-CLOSEOUT-01 — an Open Graph / Twitter image URL must be absolute. A site-relative
+ * path (the public media proxy `/api/cms/media/<id>`, a static `/images/…` file) is made absolute with the
+ * trusted configured site URL — never the request Host — the way canonical URLs and Content Center pages
+ * already build theirs. An absolute URL is kept only when it is already on that site URL; anything else
+ * (another origin, protocol-relative, other schemes, a bare name) is not an image URL this site emits, so
+ * the caller falls back to the site default.
+ */
+export function absoluteSiteUrl(siteUrl: string, value: string | null | undefined): string | undefined {
+  if (!value) return undefined
+  const base = siteUrl.replace(/\/+$/, '')
+  if (/^https?:\/\//i.test(value)) return value.startsWith(`${base}/`) ? value : undefined
+  if (!value.startsWith('/') || value.startsWith('//')) return undefined
+  return `${base}${value}`
+}

@@ -23,7 +23,9 @@ import postHandler from '../server/api/cms/posts/[slug].get'
 import homeHandler from '../server/api/cms/home.get'
 import { requireCmsSource, resolveCmsSource, type CmsModeKey } from '../server/utils/cmsSource'
 import { designatedHeroFileId } from '../server/utils/productHero'
-import { isPublishedLocale, publicPageStatus } from '../utils/publicRoute'
+import { absoluteSiteUrl, isPublishedLocale, publicPageStatus } from '../utils/publicRoute'
+import { useSeoHead } from '../composables/useSeoHead'
+import { ref } from 'vue'
 
 type Row = Record<string, unknown>
 
@@ -54,7 +56,7 @@ vi.mock('../server/utils/directus', () => ({
   },
 }))
 
-const config: { cmsMode: string | undefined, productsCmsMode: string | undefined, public: { publishedLocales: string[] } } = {
+const config: { cmsMode: string | undefined, productsCmsMode: string | undefined, public: { publishedLocales: string[], siteUrl?: string } } = {
   cmsMode: 'directus',
   productsCmsMode: 'directus',
   public: { publishedLocales: ['en'] },
@@ -699,5 +701,138 @@ describe('LITUBO-PUBLIC-MEDIA-CLOSEOUT-01 — section images, the product OG ima
       expect(reply, table).toMatchObject({ status: 200, json: { hero: null } })
       expect(reply.body, table).not.toContain(PUBLIC)
     }
+  })
+})
+
+describe('LITUBO-STABLE-BASELINE-CLOSEOUT-01 — legacy post cover / OG images link only files RSG-06 allows; OG image URLs are absolute from the configured site URL', () => {
+  const PUBLIC = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+  const PRIVATE = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+  const ARCHIVED = '99999999-9999-4999-8999-999999999999'
+  const DETAIL = '/api/cms/posts/test-only-guide'
+  const LIST = '/api/cms/posts?content_type=technical_guide'
+  const source = (file: string) => readFileSync(resolve(process.cwd(), file), 'utf8')
+  const file = (id: string, isPublic: boolean): Row => ({ id, is_public: isPublic, type: 'image/png', title: 'TEST ONLY file', filename_download: `${id}.png` })
+
+  beforeEach(() => {
+    directus.tables.directus_files!.push(file(PUBLIC, true), file(PRIVATE, false), file(ARCHIVED, true))
+    directus.tables.media_file_lifecycle = [{ file_id: ARCHIVED, archived: true }]
+  })
+
+  it('post detail: the cover and OG image are emitted only while the file is public; private or archived ones are left out', async () => {
+    Object.assign(directus.tables.posts![0]!, { cover_image: PUBLIC, seo_og_image: PUBLIC })
+    const shown = await get(DETAIL)
+    expect(shown).toMatchObject({ status: 200, json: { coverImageUrl: `/api/cms/media/${PUBLIC}`, seo: { ogImage: `/api/cms/media/${PUBLIC}` } } })
+    for (const blocked of [PRIVATE, ARCHIVED]) {
+      Object.assign(directus.tables.posts![0]!, { cover_image: blocked, seo_og_image: blocked })
+      const reply = await get(DETAIL)
+      expect(reply, blocked).toMatchObject({ status: 200, json: { coverImageUrl: '' } })
+      expect((reply.json as { seo: object }).seo, blocked).not.toHaveProperty('ogImage')
+      expect(reply.body, blocked).not.toContain(blocked)
+    }
+  })
+
+  it('post list: a Technical Guide card keeps its cover only while the file is public', async () => {
+    directus.tables.posts![0]!.cover_image = PUBLIC
+    directus.tables.posts!.push(
+      post({ id: 3, status: 'published', content_type: 'technical_guide', slug: 'test-only-guide-private-cover', title_en: `${MARK} private cover`, cover_image: PRIVATE }),
+      post({ id: 4, status: 'published', content_type: 'technical_guide', slug: 'test-only-guide-archived-cover', title_en: `${MARK} archived cover`, cover_image: ARCHIVED }),
+    )
+    const reply = await get(LIST)
+    expect(reply.status).toBe(200)
+    const cards = (reply.json as { posts: Array<{ slug: string, coverImageUrl: string }> }).posts
+    // Same order as the upstream rows; only the unverified covers are blanked.
+    expect(cards.map(p => [p.slug, p.coverImageUrl])).toEqual([
+      ['test-only-guide', `/api/cms/media/${PUBLIC}`],
+      ['test-only-guide-private-cover', ''],
+      ['test-only-guide-archived-cover', ''],
+    ])
+    for (const blocked of [PRIVATE, ARCHIVED]) expect(reply.body, blocked).not.toContain(blocked)
+  })
+
+  it('a failed media-eligibility read is 503 on the post detail and the existing cmsError fallback on the list — never unchecked files', async () => {
+    directus.tables.posts![0]!.cover_image = PUBLIC
+    for (const table of ['directus_files', 'media_file_lifecycle']) {
+      directus.failing.clear()
+      directus.failing.add(table)
+      const detail = await get(DETAIL)
+      expect(detail.status, table).toBe(503)
+      expect(detail.body, table).not.toContain('TEST ONLY')
+      const list = await get(LIST)
+      expect(list, table).toMatchObject({ status: 200, json: { posts: [], cmsError: true } })
+      expect(list.body, table).not.toContain(PUBLIC)
+    }
+  })
+
+  it('absoluteSiteUrl: a site-relative path becomes absolute with the configured site URL; an absolute URL is kept; anything else is refused', () => {
+    expect(absoluteSiteUrl('https://litubo.com', `/api/cms/media/${PUBLIC}`)).toBe(`https://litubo.com/api/cms/media/${PUBLIC}`)
+    expect(absoluteSiteUrl('https://litubo.com/', '/images/home/home-hero-inspection-line.png')).toBe('https://litubo.com/images/home/home-hero-inspection-line.png')
+    expect(absoluteSiteUrl('https://litubo.com', 'https://litubo.com/api/cms/media/x')).toBe('https://litubo.com/api/cms/media/x')
+    for (const refused of [undefined, null, '', 'https://evil.example/a.png', 'https://litubo.com.evil.example/a.png', 'http://localhost:3000/a.png', '//evil.example/a.png', 'javascript:alert(1)', 'data:image/png;base64,AA', 'api/cms/media/x']) {
+      expect(absoluteSiteUrl('https://litubo.com', refused), String(refused)).toBeUndefined()
+    }
+  })
+
+  it('the SEO head builds og:image and twitter:image with absoluteSiteUrl from the configured site URL, never from the request host', () => {
+    const head = source('composables/useSeoHead.ts')
+    expect(head).toMatch(/const siteUrl = \(config\.public\.siteUrl as string\)/)
+    expect(head).toMatch(/const ogImage = absoluteSiteUrl\(siteUrl, ogImageProp\) \?\? `\$\{siteUrl\}\$\{OG_IMAGE_FALLBACK\}`/)
+    expect(head).toMatch(/name: 'twitter:image', content: ogImage/)
+    expect(head).not.toMatch(/useRequestURL|useRequestHeaders?\(|useRequestEvent|getRequestHost|getRequestURL|getHeader|headers\.host|location\.origin|x-forwarded-host/i)
+    // The product and Technical Guide pages hand their API's site-relative OG path to the SEO head.
+    expect(source('pages/products/[category]/[slug].vue')).toMatch(/ogImage: computed\(\(\) => product\.value\?\.seo\.ogImage\)/)
+    expect(source('pages/resources/technical-guides/[slug].vue')).toMatch(/ogImage: computed\(\(\) => post\.value\?\.seo\?\.ogImage\)/)
+  })
+})
+
+describe('LITUBO-STABLE-BASELINE-CLOSEOUT-01 — review follow-ups: cover and OG image checked separately, missing files, SEO head behaviour', () => {
+  const PUBLIC = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+  const PRIVATE = 'ffffffff-ffff-4fff-8fff-ffffffffffff'
+  const MISSING = '77777777-7777-4777-8777-777777777777' // referenced, but no directus_files row
+  const DETAIL = '/api/cms/posts/test-only-guide'
+  const SITE = 'https://litubo.com'
+  const FALLBACK = `${SITE}/images/home/home-hero-inspection-line.png`
+  const file = (id: string, isPublic: boolean): Row => ({ id, is_public: isPublic, type: 'image/png', title: 'TEST ONLY file', filename_download: `${id}.png` })
+
+  beforeEach(() => {
+    directus.tables.directus_files!.push(file(PUBLIC, true), file(PRIVATE, false))
+  })
+
+  it('the cover and the OG image are checked separately: a public cover with a private OG image, and the reverse', async () => {
+    Object.assign(directus.tables.posts![0]!, { cover_image: PUBLIC, seo_og_image: PRIVATE })
+    let reply = await get(DETAIL)
+    expect(reply).toMatchObject({ status: 200, json: { coverImageUrl: `/api/cms/media/${PUBLIC}` } })
+    expect((reply.json as { seo: object }).seo).not.toHaveProperty('ogImage')
+    expect(reply.body).not.toContain(PRIVATE)
+    Object.assign(directus.tables.posts![0]!, { cover_image: PRIVATE, seo_og_image: PUBLIC })
+    reply = await get(DETAIL)
+    expect(reply).toMatchObject({ status: 200, json: { coverImageUrl: '', seo: { ogImage: `/api/cms/media/${PUBLIC}` } } })
+    expect(reply.body).not.toContain(PRIVATE)
+  })
+
+  it('a cover or OG image whose file no longer exists is left out', async () => {
+    Object.assign(directus.tables.posts![0]!, { cover_image: MISSING, seo_og_image: MISSING })
+    const reply = await get(DETAIL)
+    expect(reply).toMatchObject({ status: 200, json: { coverImageUrl: '' } })
+    expect((reply.json as { seo: object }).seo).not.toHaveProperty('ogImage')
+    expect(reply.body).not.toContain(MISSING)
+  })
+
+  it('the SEO head emits absolute og:image and twitter:image from the configured site URL and falls back to the site default for anything else', () => {
+    const heads: Array<{ value: { meta: Array<Record<string, string>> } }> = []
+    vi.stubGlobal('useI18n', () => ({ locale: ref('en') }))
+    vi.stubGlobal('useHead', (input: { value: { meta: Array<Record<string, string>> } }) => { heads.push(input) })
+    config.public.siteUrl = `${SITE}/`
+    const images = (ogImage: string | undefined) => {
+      heads.length = 0
+      useSeoHead({ title: 'TEST ONLY', description: 'TEST ONLY', canonicalPath: '/resources/technical-guides/test-only-guide', ogImage })
+      const meta = heads[0]!.value.meta
+      return { og: meta.find(m => m.property === 'og:image')?.content, twitter: meta.find(m => m.name === 'twitter:image')?.content }
+    }
+    expect(images(`/api/cms/media/${PUBLIC}`)).toEqual({ og: `${SITE}/api/cms/media/${PUBLIC}`, twitter: `${SITE}/api/cms/media/${PUBLIC}` })
+    expect(images(`${SITE}/api/cms/media/${PUBLIC}`).og).toBe(`${SITE}/api/cms/media/${PUBLIC}`)
+    for (const other of [undefined, '', 'https://evil.example/a.png', '//evil.example/a.png', 'javascript:alert(1)']) {
+      expect(images(other), String(other)).toEqual({ og: FALLBACK, twitter: FALLBACK })
+    }
+    delete config.public.siteUrl
   })
 })
