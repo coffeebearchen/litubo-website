@@ -8,9 +8,12 @@ const route = useRoute()
 const { data: inquiry, error } = await useFetch<AdminInquiry>(`/api/admin/inquiries/${route.params.id}`)
 const form = reactive({ status: inquiry.value?.status ?? 'new', note: inquiry.value?.note ?? '' })
 const saving = ref(false)
+const retryingHubspot = ref(false)
 const feedback = ref('')
+const hubspotFeedback = ref('')
 const label = (value: string) => value.replaceAll('_', ' ')
 const details = computed(() => Object.entries(inquiry.value?.raw_fields ?? {}).filter(([key, value]) => value && !['contact_name', 'contact_email', 'contact_company', 'contact_country', 'message'].includes(key)))
+const canRetryHubspot = computed(() => ['failed', 'not_configured'].includes(inquiry.value?.hubspot_sync_status ?? 'not_configured'))
 async function save() {
   saving.value = true
   feedback.value = ''
@@ -19,6 +22,17 @@ async function save() {
     feedback.value = 'Follow-up saved.'
   } catch { feedback.value = 'Could not save. Please try again.' }
   finally { saving.value = false }
+}
+async function retryHubspot() {
+  retryingHubspot.value = true
+  hubspotFeedback.value = ''
+  try {
+    inquiry.value = await $fetch<AdminInquiry>(`/api/admin/inquiries/${route.params.id}/retry-hubspot`, { method: 'POST' })
+    hubspotFeedback.value = inquiry.value.hubspot_sync_status === 'synced'
+      ? 'HubSpot contact synchronized.'
+      : 'HubSpot is not configured yet. The inquiry remains safely stored here.'
+  } catch { hubspotFeedback.value = 'HubSpot retry failed. The inquiry remains safely stored here.' }
+  finally { retryingHubspot.value = false }
 }
 </script>
 
@@ -33,7 +47,7 @@ async function save() {
         <div>
           <article class="panel"><h2>Contact</h2><p><strong>{{ inquiry.contact_name || 'Name not supplied' }}</strong></p><p>{{ inquiry.contact_company }}<span v-if="inquiry.contact_country"> · {{ inquiry.contact_country }}</span></p><p><a :href="`mailto:${inquiry.contact_email}`">{{ inquiry.contact_email }}</a></p><p>{{ inquiry.contact_phone }}</p></article>
           <article class="panel"><h2>Customer message</h2><p class="message">{{ inquiry.message || 'No additional message.' }}</p><dl v-if="details.length"><template v-for="[key, value] in details" :key="key"><dt>{{ label(key) }}</dt><dd>{{ value }}</dd></template></dl></article>
-          <article class="panel"><h2>Source and CRM</h2><p>Page: {{ inquiry.source_url || 'Not recorded' }}</p><p>Language: {{ inquiry.locale }}</p><p>HubSpot: {{ label(inquiry.hubspot_sync_status || 'not_configured') }}</p><p v-if="inquiry.hubspot_sync_status === 'failed'" class="muted">CRM synchronization needs attention. The inquiry is safely stored here.</p></article>
+          <article class="panel"><h2>Source and CRM</h2><p>Page: {{ inquiry.source_url || 'Not recorded' }}</p><p>Language: {{ inquiry.locale }}</p><p>HubSpot: {{ label(inquiry.hubspot_sync_status || 'not_configured') }}</p><p v-if="inquiry.hubspot_sync_status === 'failed'" class="muted">CRM synchronization needs attention. The inquiry is safely stored here.</p><button v-if="canRetryHubspot" type="button" :disabled="retryingHubspot" @click="retryHubspot">{{ retryingHubspot ? 'Retrying…' : 'Retry HubSpot sync' }}</button><p v-if="hubspotFeedback" role="status" class="muted">{{ hubspotFeedback }}</p></article>
         </div>
         <form class="panel follow-up" @submit.prevent="save"><h2>Follow-up</h2><label for="inquiry-status">Status</label><select id="inquiry-status" v-model="form.status"><option v-for="value in INQUIRY_STATUSES" :key="value" :value="value">{{ label(value) }}</option></select><label for="inquiry-note">Internal notes</label><textarea id="inquiry-note" v-model="form.note" rows="10" maxlength="8000" placeholder="Record your follow-up and next action." /><p class="muted">Internal notes stay in the backend. Saving does not send a customer reply.</p><button type="submit" :disabled="saving">{{ saving ? 'Saving…' : 'Save follow-up' }}</button><p v-if="feedback" role="status">{{ feedback }}</p></form>
       </div>

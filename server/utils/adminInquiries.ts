@@ -1,6 +1,7 @@
 import { createError } from 'h3'
 import { INQUIRY_STATUSES, INQUIRY_TYPES } from '../../types/inquiries'
 import type { AdminInquiry, AdminInquiriesResult } from '../../types/inquiries'
+import type { HubspotSyncInput } from './syncHubspot'
 import type { FetchFn } from './mediaLifecycle'
 
 const FIELDS = 'id,status,inquiry_type,submitted_at,updated_at,first_handled_at,contact_name,contact_email,contact_company,contact_country,contact_phone,message,locale,note,model_number,serial_number,related_product_slug,source_url,hubspot_sync_status,hubspot_error_summary,raw_fields'
@@ -30,6 +31,21 @@ export async function getAdminInquiry(id: number, fetch: FetchFn): Promise<Admin
   const result = await fetch<{ data: AdminInquiry[] }>(`/items/inquiries?filter[id][_eq]=${id}&fields=${FIELDS}&limit=1`)
   if (!result.data?.length) throw createError({ statusCode: 404, message: 'Inquiry not found' })
   return result.data[0]
+}
+
+export function hubspotInputFromInquiry(inquiry: AdminInquiry): HubspotSyncInput {
+  return {
+    contact_email: inquiry.contact_email,
+    contact_name: inquiry.contact_name,
+    contact_company: inquiry.contact_company,
+    contact_phone: inquiry.contact_phone,
+    inquiry_type: inquiry.inquiry_type,
+    source_url: inquiry.source_url ?? '',
+    utm_source: null,
+    utm_medium: null,
+    utm_campaign: null,
+    product_interest: inquiry.related_product_slug ?? inquiry.raw_fields?.tm_product_interest ?? null,
+  }
 }
 
 export async function updateAdminInquiry(id: number, body: unknown, fetch: FetchFn): Promise<AdminInquiry> {

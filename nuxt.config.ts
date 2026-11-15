@@ -103,6 +103,9 @@ export default defineNuxtConfig({
     aiDefaultProvider: process.env.AI_DEFAULT_PROVIDER ?? 'deepseek',
     openaiModel: process.env.OPENAI_MODEL ?? '',
     deepseekModel: process.env.DEEPSEEK_MODEL ?? '',
+    // Public visitor assistant release gate. It remains off unless explicitly enabled at runtime;
+    // a configured provider alone never makes a paid public endpoint available.
+    visitorAiEnabled: process.env.VISITOR_AI_ENABLED ?? 'false',
     // AI-PDF-SOURCE-01 — where the server reaches the document-extractor sidecar that
     // reads text-layer PDFs. Server-side only, never runtimeConfig.public: the browser
     // never talks to it. Not a secret. The default is the loopback port docker-compose.yml

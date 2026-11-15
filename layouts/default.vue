@@ -11,6 +11,7 @@ useHead(computed(() => ({ htmlAttrs: { lang: locale.value } })))
     </main>
     <SiteFooter />
     <MobileConversionBar />
+    <VisitorAssistant />
   </div>
 </template>
 

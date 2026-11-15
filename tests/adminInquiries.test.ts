@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { getAdminInquiry, inquiryId, listAdminInquiries, updateAdminInquiry } from '../server/utils/adminInquiries'
+import { getAdminInquiry, hubspotInputFromInquiry, inquiryId, listAdminInquiries, updateAdminInquiry } from '../server/utils/adminInquiries'
+import type { AdminInquiry } from '../types/inquiries'
 
 describe('inquiry operator workflow', () => {
   it('paginates and validates filters without accepting arbitrary Directus fields', async () => {
@@ -30,5 +31,44 @@ describe('inquiry operator workflow', () => {
     await expect(updateAdminInquiry(4, { status: 'resolved', note: '', contact_email: 'changed@example.test' }, fetch)).rejects.toMatchObject({ statusCode: 400 })
     await expect(updateAdminInquiry(4, { status: 'resolved', note: 'a'.repeat(8001) }, fetch)).rejects.toMatchObject({ statusCode: 400 })
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('builds a bounded HubSpot retry payload without sending the customer message', () => {
+    const inquiry = {
+      id: 9,
+      status: 'new',
+      submitted_at: null,
+      updated_at: null,
+      first_handled_at: null,
+      contact_email: 'buyer@example.test',
+      contact_name: 'Buyer',
+      contact_company: 'Example Foods',
+      contact_country: null,
+      contact_phone: '+1 555 0100',
+      inquiry_type: 'technical_matching',
+      source_url: '/products/metal-detection/example',
+      related_product_slug: 'example-detector',
+      message: 'Private message',
+      locale: 'en',
+      note: null,
+      model_number: null,
+      serial_number: null,
+      hubspot_sync_status: 'failed',
+      hubspot_error_summary: 'TIMEOUT',
+      raw_fields: { tm_product_interest: 'fallback', message: 'private message' },
+    } satisfies AdminInquiry
+
+    expect(hubspotInputFromInquiry(inquiry)).toEqual({
+      contact_email: 'buyer@example.test',
+      contact_name: 'Buyer',
+      contact_company: 'Example Foods',
+      contact_phone: '+1 555 0100',
+      inquiry_type: 'technical_matching',
+      source_url: '/products/metal-detection/example',
+      utm_source: null,
+      utm_medium: null,
+      utm_campaign: null,
+      product_interest: 'example-detector',
+    })
   })
 })
