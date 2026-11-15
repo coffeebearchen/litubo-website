@@ -22,6 +22,7 @@ Active authorized module:           LITUBO-STABLE-BASELINE-CLOSEOUT-01（2026-09
                                     · 未完成：master fast-forward、部署前备份刷新、部署、服务器验收、应用回滚验证、Stable Production SHA 冻结（**未冻结**）
                                     · OG 域名过渡（验收站 OG 指向 litubo.com）单独待决；本地 OG 验证不是外部抓取验收，不记为通过。未改 siteUrl / canonical / sitemap / DNS
                                     `fd807f6`、`64bf807` 是本 commit 的祖先；未合并、未部署。正式切换 `litubo.com` 不在授权内
+Testing status:                     **2026-09-20：用户主动暂停剩余测试**（LITUBO-STATUS-HANDOFF-NO-TEST-01，报告 `docs/project/LITUBO-STATUS-HANDOFF-NO-TEST-01.md`）。该轮只整理现有资料与证据，**未执行任何新测试**（无 tests / typecheck / lint / build / 浏览器 / CI），未 commit / push / 部署。已知失败与未测项一律保留、未修：例如 Content AI Live Golden Path 两次 STOP、F-1 集成套件并行下 10 条断言失败、线上 `64bfc56` 仍含 hero 与公开媒体两处缺陷。**当前不是"全面验收通过"的稳定生产基线**；Stable Production SHA 未冻结。ANYI 代码派生仍未启动
 Active module authorization level:  LITUBO-STABLE-BASELINE-CLOSEOUT-01 集中授权：必要修复、文档订正、本地测试、commit、push 原 review 分支；审阅与 CI 通过后 fast-forward master；备份、部署 tuboluo.com 与短暂停机维护；最少量 [TEST] 验收数据；隔离恢复与应用回滚验证；门槛全满足后记录 Stable Production SHA。不含：切换 litubo.com / Wix / DNS、修改 ANYI / refrigerant-store / 其他项目、改数据库结构或权限模型、真实 AI / 邮件 / CRM、强推、覆盖生产数据库或媒体
 Next candidate:                     无已授权候选。首次非 AI 官网上线的 6 项（`PRODUCTION-PREFLIGHT.md` §53）在本次部署后的状态：
                                     1. `DIRECTUS_PUBLIC_URL` — CLOSED（D-044：`https://cms.litubo.com`，生产首次启动即以此激活）
@@ -12723,3 +12724,28 @@ ID：分类 6（`test-public-media-closeout-01-local`）；产品 8；关联 29�
 4. 自动交接仍为 BLOCKED。
 
 *最后更新：2026-09-19，由 Claude Code 在 LITUBO-STABLE-BASELINE-CLOSEOUT-01 中写入，随本 commit 推送。*
+
+---
+
+## LITUBO-STATUS-HANDOFF-NO-TEST-01 — 现状盘点与测试暂停（2026-09-20，只读整理，未执行新测试）
+
+**用户决定：暂停剩余测试。** 本轮只整理现有工作与证据，不做验证、不修问题、不推进发布。
+
+**本轮做了什么：** 只读查看 Git（目录、remote、分支、完整 HEAD、status、既有 diff）与仓库内既有治理 / 状态 / 报告文档，产出盘点报告 `docs/project/LITUBO-STATUS-HANDOFF-NO-TEST-01.md`，并更新本文件 §0 的 `Testing status` 行与本节。**只读查看 Git 与既有日志不代表测试通过。**
+
+**本轮没有做：** 未运行 tests / typecheck / lint / build / 浏览器 / dev server / CI / 调度器 / 模型审查；未安装依赖；未修改任何应用代码、数据库、媒体、认证或运行器；未重启、未部署；**未 commit / push / merge**；未初始化或克隆 ANYI，未改 ANYI 开工门槛；未删除任何测试脚本、历史报告或未提交成果。修改本文件前已在会话临时目录留有备份（SHA-256 与修改前一致）。
+
+**版本事实（2026-09-20）：**
+- 分支 `review/final-release-verification-01`，本地完整 HEAD **`186fe3b16f352a3f1fa71336fc9692f65e4b997d`**；已跟踪文件未提交修改 0；未跟踪项 6 个（5 个外部交付包目录 / 文件 + 本轮新增报告，报告与本节改动均未 commit）。**HEAD 不包含这些未跟踪内容，不能被描述成"当前全部成果"。**
+- 本地 `master` 分支停在 `b6125f68…`（2026-09-09），落后远端 master 96 个提交，不能当基线。
+- 线上 SHA 只引用既有部署记录：`/opt/litubo/repo` = **`64bfc566…`**、`.output` 指纹 `32210fd901f7f94d`（§0 `Production runtime` 行，2026-09-19T04:53Z 只读实测）。本轮**未登录服务器核实**；此后未部署。线上**不含** `fd807f6` / `64bf807` / `186fe3b` 三个修复。
+
+**结论：** 已知失败与未测项全部保留、未修；当前**不是**"全面验收通过"的稳定生产基线，Stable Production SHA **未冻结**；ANYI 代码派生**仍未启动**。四类明细（已完成有证据 / 已完成未测 / 尚未实现 / 已知问题）见盘点报告。
+
+**收口轮（同日，仍不测试）补充三点：**
+
+1. **`186fe3b` 只是开发候选 HEAD**：远端 CI 未核实、独立审阅未做、未合并 master、未部署。它不是 Stable Production SHA，**Stable Production SHA 仍未冻结**；线上仍是 `64bfc56`。
+2. **PWS（Product Workspace）分类已更正**（报告 §4A）。首版笼统写成"未开始"，与仓库实际不符：`pages/admin/product-workspace/[id]/` 下实际有 overview / page-content / specifications / media-resources / sources-evidence / ai-source-intake / ai-proposal-review 七个页面，且因本地 `master`（`b6125f6`）是线上 `64bfc56` 的祖先，这些代码**已随线上构建部署**。更正后的三分类为：**未实现** = `PWS-08` Change History；**已实现未部署** = 无（PWS 范围内为空）；**已实现未验收** = `PWS-01`、`PWS-07`、产品 AI 工作流（生产 Apply fail-closed 关闭）；规格参数页在生产验收中 PASS，但其 PWS 编号归属、`overview.vue` 是否按 `PWS-00` 合同实现、`PWS-02`…`PWS-06` 的实现状态在记录中均无结论，一律写 **状态待核实**，不笼统归为"尚未实现"。
+3. **资料缺口如实记录**（报告 §9）：本轮没有任何只读任务仍在运行；Gate / Preflight 读取任务已完成并并入报告，`CURRENT-STATE.md` 全文逐行清点任务中途因 API 连接错误失败、无可用结果，按指示**不新开任务补查**。因此本文件第 1–10,100 行左右的历史段落未逐行清点，报告 §5 的已知问题清单是"目前已收集到的"，不宣称穷尽。
+
+*最后更新：2026-09-20，由 Claude Code 在 LITUBO-STATUS-HANDOFF-NO-TEST-01 中写入（未 commit）。*

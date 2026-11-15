@@ -61,6 +61,29 @@ button {
     linear-gradient(135deg, #0e2f28 0%, var(--color-primary) 52%, #156d58 100%) !important;
 }
 
+/* ─── Branded media placeholder — used wherever a photo slot has no image yet.
+   A deep-green gradient with a faint diagonal texture and a warm corner glow,
+   so an empty slot reads as a design surface rather than a broken box. ─── */
+.img-placeholder {
+  background-color: #10382f;
+  background-image:
+    radial-gradient(120% 120% at 12% 6%, rgba(208, 111, 27, 0.26), transparent 52%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 14px),
+    linear-gradient(135deg, #0e2f28 0%, #0f5c4b 62%, #14705b 100%);
+  display: grid;
+  place-items: center;
+}
+
+.img-placeholder::before {
+  content: '';
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: radial-gradient(circle at 38% 34%, rgba(255, 255, 255, 0.16), transparent 62%);
+  box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.05);
+}
+
 /* ─── Focus visible ─────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--color-accent);

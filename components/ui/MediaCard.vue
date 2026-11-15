@@ -26,7 +26,7 @@ const imgError = ref(false)
           loading="lazy"
           @error="imgError = true"
         >
-        <div v-else class="media-card__image-placeholder" aria-hidden="true" />
+        <div v-else class="media-card__image-placeholder img-placeholder" aria-hidden="true" />
       </div>
       <div class="media-card__body">
         <p v-if="tag" class="media-card__tag">{{ tag }}</p>
@@ -84,7 +84,6 @@ const imgError = ref(false)
 .media-card__image-placeholder {
   width: 100%;
   height: 100%;
-  background: var(--color-line);
 }
 
 .media-card__body {

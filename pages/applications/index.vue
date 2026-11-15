@@ -42,7 +42,7 @@ useSeoHead({
             :to="localePath(`/applications/${INDUSTRY_GUIDES[index].slug}`)"
           >
             <div class="app-card__image-wrap">
-              <div class="app-card__image-placeholder" aria-hidden="true" />
+              <div class="app-card__image-placeholder img-placeholder" aria-hidden="true" />
             </div>
             <div class="app-card__body">
               <h2 class="app-card__title">{{ industry }}</h2>
@@ -113,7 +113,6 @@ useSeoHead({
 .app-card__image-placeholder {
   width: 100%;
   height: 100%;
-  background: var(--color-primary-deep);
   border-bottom: 4px solid var(--color-accent);
 }
 

@@ -304,8 +304,8 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 </template>
 
 <style scoped>
-.product-intro { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: var(--space-16); padding-top: var(--space-6); }
-.product-intro__media { background: white; border-radius: var(--radius-sm); aspect-ratio: 4 / 3; padding: var(--space-8); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.product-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); align-items: center; gap: var(--space-12); padding-top: var(--space-6); }
+.product-intro__media { background: white; border-radius: var(--radius-sm); aspect-ratio: 1 / 1; padding: var(--space-6); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .product-intro__media img { width: 100%; height: 100%; object-fit: contain; }
 .product-intro__placeholder { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-4); color: var(--color-primary); }
 .product-intro__brand { font-size: 32px; font-weight: 700; letter-spacing: .12em; }
