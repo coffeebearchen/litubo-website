@@ -13,8 +13,8 @@
 |---|---|
 | 仓库 | coffeebearchen/litubo-website（私有） |
 | 本地工作分支 | `work/litubo-dsh-local` |
-| 当前提交 | `888d4d2`（重建：de81911 + 5bc7a53 + 77ef2a3；offline-review 是重复已跳过） |
-| 本地代码目录 | `D:\LITUBO-website-dsh`（worktree） |
+| 当前提交 | `9e334d4`（888d4d2 重建 + RESUME.md + wix-media-upload.mjs） |
+| 本地代码目录 | `D:\LITUBO-website`（唯一目录，已收拢 worktree） |
 | 开发 Directus | `http://127.0.0.1:8055`（OIG 授权、license.source=env，未消耗新激活） |
 | 产品数据 | `private-product-source/`（git-ignored） |
 | push 状态 | **未 push**（等负责人授权） |
