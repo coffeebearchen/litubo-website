@@ -54,7 +54,7 @@ useSeoHead({ title: t('seo.support.title'), description: t('seo.support.descript
 .section-gap { padding: var(--space-16) 0; }
 .support-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-5); }
 .support-card { display: block; padding: var(--space-6); background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); box-shadow: var(--shadow-card); text-decoration: none; transition: box-shadow var(--transition-normal); }
-.support-card:hover { box-shadow: 0 4px 16px rgba(18,60,50,0.12); }
+.support-card:hover { box-shadow: 0 4px 16px rgba(27, 66, 36,0.12); }
 .support-card__title { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 600; color: var(--color-primary); margin-bottom: var(--space-2); }
 .support-card__body { font-size: var(--text-sm); color: var(--color-ink-muted); line-height: var(--leading-normal); }
 </style>

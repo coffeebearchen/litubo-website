@@ -2286,7 +2286,7 @@ const selectedFileFolderIsLegacy = computed(() => {
   display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
 }
 .banner--error > span { min-width: 0; overflow-wrap: anywhere; }
-.banner--success { background: #d1f0e8; color: #0f5c4b; border-bottom: 1px solid #a3dbc8; }
+.banner--success { background: #d1f0e8; color: #2F6B3A; border-bottom: 1px solid #a3dbc8; }
 .banner--warn { background: #fffbf0; color: #7a6030; border-bottom: 1px solid #f0e0b0; }
 .error-list { margin: var(--space-1) 0 0 var(--space-4); padding: 0; }
 .error-list li { margin: 2px 0; }
@@ -2660,9 +2660,9 @@ const selectedFileFolderIsLegacy = computed(() => {
   text-align: left;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.file-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(18,60,50,0.1); }
-.file-card--selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(18,60,50,0.15); }
-.file-card--checked { border-color: var(--color-primary); background: rgba(18,60,50,0.03); }
+.file-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(27, 66, 36,0.1); }
+.file-card--selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(27, 66, 36,0.15); }
+.file-card--checked { border-color: var(--color-primary); background: rgba(27, 66, 36,0.03); }
 .file-card--archived { opacity: 0.65; }
 
 .file-card__check {
@@ -2854,7 +2854,7 @@ const selectedFileFolderIsLegacy = computed(() => {
 }
 .lifecycle-loading { font-size: var(--text-xs); color: var(--color-ink-muted); }
 .lifecycle-refs { display: flex; flex-direction: column; gap: var(--space-1); }
-.refs-none { font-size: var(--text-xs); color: #0f5c4b; margin: 0; }
+.refs-none { font-size: var(--text-xs); color: #2F6B3A; margin: 0; }
 .refs-count { font-size: var(--text-xs); color: var(--color-ink); margin: 0; }
 .refs-note {
   font-size: 10px; color: var(--color-ink-muted);

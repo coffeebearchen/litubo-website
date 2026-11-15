@@ -387,7 +387,7 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
   text-decoration: none;
 }
 :deep(.btn--accent)        { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
-:deep(.btn--accent:hover)  { background: #b85f15; border-color: #b85f15; }
+:deep(.btn--accent:hover)  { background: #B87A00; border-color: #B87A00; }
 :deep(.btn--outline)       { background: transparent; color: var(--color-primary); border-color: var(--color-primary); }
 :deep(.btn--outline:hover) { background: var(--color-primary); color: #fff; }
 

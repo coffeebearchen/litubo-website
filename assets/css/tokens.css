@@ -1,9 +1,12 @@
 /* ─── Brand colour tokens ─────────────────────────────────────────────── */
 :root {
   --color-canvas:       #FAF8F3;
-  --color-primary:      #0F5C4B;
-  --color-primary-deep: #123C32;
-  --color-accent:       #D06F1B;
+  /* Leaf-green family, sampled from the LITUBO logo (#5E933E). */
+  --color-primary:      #2F6B3A;
+  --color-primary-deep: #1B4224;
+  /* Brand gold, sampled from the LITUBO wordmark / headline (#D99200). */
+  --color-accent:       #D99200;
+  --color-accent-hover: #B87A00;
   --color-ink:          #18332B;
   --color-ink-muted:    #4A5E58;
   --color-line:         #D9DDD6;
@@ -62,8 +65,8 @@
   --transition-normal: 200ms ease;
 
   /* ─── Shadows ──────────────────────────────────────────────────── */
-  --shadow-card: 0 1px 3px rgba(18, 60, 50, 0.08);
-  --shadow-menu: 0 4px 24px rgba(18, 60, 50, 0.12);
+  --shadow-card: 0 1px 3px rgba(27, 66, 36, 0.08);
+  --shadow-menu: 0 4px 24px rgba(27, 66, 36, 0.12);
 }
 
 @media (min-width: 768px) {

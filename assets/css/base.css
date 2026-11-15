@@ -57,19 +57,19 @@ button {
 /* ─── Hero — richer gradient + subtle accent glow (replaces flat solid) ── */
 .page-hero {
   background-image:
-    radial-gradient(900px 380px at 88% -14%, rgba(208, 111, 27, 0.20), transparent 60%),
-    linear-gradient(135deg, #0e2f28 0%, var(--color-primary) 52%, #156d58 100%) !important;
+    radial-gradient(900px 380px at 88% -14%, rgba(217, 146, 0, 0.20), transparent 60%),
+    linear-gradient(135deg, #1B4224 0%, var(--color-primary) 52%, #3D7F49 100%) !important;
 }
 
 /* ─── Branded media placeholder — used wherever a photo slot has no image yet.
    A deep-green gradient with a faint diagonal texture and a warm corner glow,
    so an empty slot reads as a design surface rather than a broken box. ─── */
 .img-placeholder {
-  background-color: #10382f;
+  background-color: #1B4224;
   background-image:
-    radial-gradient(120% 120% at 12% 6%, rgba(208, 111, 27, 0.26), transparent 52%),
+    radial-gradient(120% 120% at 12% 6%, rgba(217, 146, 0, 0.26), transparent 52%),
     repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 14px),
-    linear-gradient(135deg, #0e2f28 0%, #0f5c4b 62%, #14705b 100%);
+    linear-gradient(135deg, #1B4224 0%, #2F6B3A 62%, #3D7F49 100%);
   display: grid;
   place-items: center;
 }
@@ -89,14 +89,14 @@ button {
 .img-placeholder--light {
   background-color: #eef2ec;
   background-image:
-    radial-gradient(110% 110% at 85% 10%, rgba(208, 111, 27, 0.10), transparent 55%),
-    repeating-linear-gradient(45deg, rgba(18, 60, 50, 0.035) 0 2px, transparent 2px 16px);
+    radial-gradient(110% 110% at 85% 10%, rgba(217, 146, 0, 0.10), transparent 55%),
+    repeating-linear-gradient(45deg, rgba(27, 66, 36, 0.035) 0 2px, transparent 2px 16px);
 }
 
 .img-placeholder--light::before {
-  border-color: rgba(18, 60, 50, 0.22);
-  background: radial-gradient(circle at 38% 34%, rgba(18, 60, 50, 0.10), transparent 62%);
-  box-shadow: 0 0 0 10px rgba(18, 60, 50, 0.03);
+  border-color: rgba(27, 66, 36, 0.22);
+  background: radial-gradient(circle at 38% 34%, rgba(27, 66, 36, 0.10), transparent 62%);
+  box-shadow: 0 0 0 10px rgba(27, 66, 36, 0.03);
 }
 
 /* Warm variants — the site is green-dominant; these carry the amber/orange
@@ -118,14 +118,14 @@ button {
 .img-placeholder--warm-light {
   background-color: #f7efe3;
   background-image:
-    radial-gradient(110% 110% at 82% 10%, rgba(208, 111, 27, 0.22), transparent 58%),
+    radial-gradient(110% 110% at 82% 10%, rgba(217, 146, 0, 0.22), transparent 58%),
     repeating-linear-gradient(45deg, rgba(138, 69, 18, 0.05) 0 2px, transparent 2px 16px);
 }
 
 .img-placeholder--warm-light::before {
   border-color: rgba(138, 69, 18, 0.28);
-  background: radial-gradient(circle at 38% 34%, rgba(208, 111, 27, 0.16), transparent 62%);
-  box-shadow: 0 0 0 10px rgba(208, 111, 27, 0.06);
+  background: radial-gradient(circle at 38% 34%, rgba(217, 146, 0, 0.16), transparent 62%);
+  box-shadow: 0 0 0 10px rgba(217, 146, 0, 0.06);
 }
 
 /* ─── Focus visible ─────────────────────────────────────────────────── */

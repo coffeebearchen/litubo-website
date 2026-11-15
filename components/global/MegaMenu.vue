@@ -291,7 +291,7 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 .mega-menu__app-card:hover {
-  box-shadow: 0 4px 16px rgba(18, 60, 50, 0.12);
+  box-shadow: 0 4px 16px rgba(27, 66, 36, 0.12);
 }
 
 .mega-menu__app-card-photo {

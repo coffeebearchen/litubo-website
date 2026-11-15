@@ -575,7 +575,7 @@ defineExpose({ save, dirty, canSave, saving })
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: 0 4px 16px rgba(18, 60, 50, 0.12);
+  box-shadow: 0 4px 16px rgba(27, 66, 36, 0.12);
 }
 
 .cce-savebar-status { font-size: var(--text-sm); color: var(--color-ink); }

@@ -70,7 +70,7 @@ const isMatchingPage = computed(() =>
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--color-white);
   border-top: 1px solid var(--color-line);
-  box-shadow: 0 -2px 12px rgba(18, 60, 50, 0.08);
+  box-shadow: 0 -2px 12px rgba(27, 66, 36, 0.08);
 }
 
 .mobile-cbar__btn {

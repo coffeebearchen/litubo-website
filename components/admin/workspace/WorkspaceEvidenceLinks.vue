@@ -308,7 +308,7 @@ function sourceDisplayName(m: ProductMedia): string {
 
 .ws-evidence-row { cursor: pointer; }
 .ws-evidence-row:hover { background: var(--color-surface-alt); }
-.ws-evidence-row--selected { background: rgba(15,92,75,0.06); }
+.ws-evidence-row--selected { background: rgba(47, 107, 58,0.06); }
 
 .ws-spec-cell { display: flex; flex-direction: column; gap: 2px; }
 .ws-spec-group { font-size: 0.6875rem; color: var(--color-ink-muted); text-transform: uppercase; letter-spacing: 0.04em; }

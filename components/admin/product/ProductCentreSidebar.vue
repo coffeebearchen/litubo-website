@@ -174,10 +174,10 @@ const railOpen = ref(false)
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.rail-item:hover { background: rgba(18, 60, 50, 0.07); }
+.rail-item:hover { background: rgba(27, 66, 36, 0.07); }
 
 .rail-item--active {
-  background: rgba(15, 92, 75, 0.12);
+  background: rgba(47, 107, 58, 0.12);
   color: var(--color-primary);
   font-weight: 600;
 }
@@ -200,7 +200,7 @@ const railOpen = ref(false)
 }
 
 .rail-item--active .rail-item-count {
-  background: rgba(15, 92, 75, 0.16);
+  background: rgba(47, 107, 58, 0.16);
   color: var(--color-primary);
 }
 

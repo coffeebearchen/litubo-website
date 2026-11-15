@@ -255,7 +255,7 @@ const failedFiles = computed(() => (result.value?.fileResults ?? []).filter(f =>
 .cai-locales { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .cai-locales-label { font-size: var(--text-xs); font-weight: 600; color: var(--color-ink); margin-right: var(--space-1); }
 .cai-locale { border: 1px solid var(--color-line); border-radius: 999px; background: var(--color-surface); color: var(--color-ink); cursor: pointer; font-size: var(--text-xs); padding: var(--space-1) var(--space-3); min-height: 32px; }
-.cai-locale--current { border-color: var(--color-primary); color: var(--color-primary-deep); font-weight: 600; background: rgba(15, 92, 75, 0.06); }
+.cai-locale--current { border-color: var(--color-primary); color: var(--color-primary-deep); font-weight: 600; background: rgba(47, 107, 58, 0.06); }
 .cai-locale-note { color: var(--color-ink-muted); font-weight: 400; }
 .cai-notice { margin: 0; padding: var(--space-4); border: 1px dashed var(--color-line); border-radius: var(--radius-md); color: var(--color-ink-muted); font-size: var(--text-sm); }
 .cai-count { font-size: var(--text-xs); font-weight: 600; color: var(--color-ink-muted); background: var(--color-surface-alt); border: 1px solid var(--color-line); border-radius: 999px; padding: var(--space-1) var(--space-3); white-space: nowrap; }
@@ -263,7 +263,7 @@ const failedFiles = computed(() => (result.value?.fileResults ?? []).filter(f =>
 .cai-empty p { margin: 0 0 var(--space-2); }
 .cai-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .cai-source { border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.cai-source--selected { border-color: var(--color-primary); background: rgba(15, 92, 75, 0.06); }
+.cai-source--selected { border-color: var(--color-primary); background: rgba(47, 107, 58, 0.06); }
 .cai-source--unavailable { background: var(--color-surface-alt); }
 .cai-source-label { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; min-width: 0; }
 .cai-check { flex-shrink: 0; width: 18px; height: 18px; }

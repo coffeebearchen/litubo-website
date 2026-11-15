@@ -138,7 +138,7 @@ useSeoHead({
 }
 
 .category-card:hover {
-  box-shadow: 0 4px 20px rgba(18, 60, 50, 0.14);
+  box-shadow: 0 4px 20px rgba(27, 66, 36, 0.14);
 }
 
 .category-card__image-wrap {

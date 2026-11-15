@@ -560,7 +560,7 @@ const conflictProblems = computed(() => Object.fromEntries((proposal.value?.conf
 .cpr-locales { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .cpr-locales-label { font-size: var(--text-xs); font-weight: 600; color: var(--color-ink); margin-right: var(--space-1); }
 .cpr-locale { border: 1px solid var(--color-line); border-radius: 999px; background: var(--color-surface); color: var(--color-ink); cursor: pointer; font-size: var(--text-xs); padding: var(--space-1) var(--space-3); min-height: 32px; }
-.cpr-locale--current { border-color: var(--color-primary); color: var(--color-primary-deep); font-weight: 600; background: rgba(15, 92, 75, 0.06); }
+.cpr-locale--current { border-color: var(--color-primary); color: var(--color-primary-deep); font-weight: 600; background: rgba(47, 107, 58, 0.06); }
 .cpr-locale-note { color: var(--color-ink-muted); font-weight: 400; }
 .cpr-notice { margin: 0; padding: var(--space-4); border: 1px dashed var(--color-line); border-radius: var(--radius-md); color: var(--color-ink-muted); font-size: var(--text-sm); }
 .cpr-empty { text-align: left; }
@@ -569,7 +569,7 @@ const conflictProblems = computed(() => Object.fromEntries((proposal.value?.conf
 .cpr-chip { font-size: var(--text-xs); border: 1px solid var(--color-line); border-radius: 999px; padding: var(--space-1) var(--space-3); color: var(--color-ink); overflow-wrap: anywhere; max-width: 100%; }
 .cpr-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .cpr-item, .cpr-conflict { border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.cpr-item--accepted, .cpr-item--edited, .cpr-conflict--chosen, .cpr-conflict--edited { border-color: var(--color-primary); background: rgba(15, 92, 75, 0.04); }
+.cpr-item--accepted, .cpr-item--edited, .cpr-conflict--chosen, .cpr-conflict--edited { border-color: var(--color-primary); background: rgba(47, 107, 58, 0.04); }
 .cpr-item--rejected, .cpr-conflict--rejected { background: var(--color-surface-alt); }
 .cpr-conflict--unresolved { border-left: 3px solid #D9A036; background: #FFFBF3; }
 .cpr-item-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
@@ -581,7 +581,7 @@ const conflictProblems = computed(() => Object.fromEntries((proposal.value?.conf
 .cpr-state--unresolved { background: #FFF4E0; border-color: #F0D5A5; color: #8A5A00; }
 .cpr-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .cpr-col { min-width: 0; border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: var(--space-3); background: var(--color-surface); }
-.cpr-col--proposed { background: rgba(15, 92, 75, 0.05); border-color: #CFE3DB; }
+.cpr-col--proposed { background: rgba(47, 107, 58, 0.05); border-color: #CFE3DB; }
 .cpr-col-label { margin: 0 0 var(--space-1); font-size: var(--text-xs); font-weight: 600; color: var(--color-ink-muted); padding: 0; }
 .cpr-value { margin: 0 0 var(--space-1); font-size: var(--text-sm); color: var(--color-ink); white-space: pre-line; overflow-wrap: anywhere; }
 .cpr-value--empty { color: var(--color-ink-muted); font-style: italic; }

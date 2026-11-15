@@ -317,7 +317,7 @@ const categories = [
   transition: box-shadow var(--transition-normal), border-color var(--transition-fast);
 }
 .cat-nav-card:hover {
-  box-shadow: 0 2px 12px rgba(18,60,50,0.10);
+  box-shadow: 0 2px 12px rgba(27, 66, 36,0.10);
   border-color: var(--color-primary);
 }
 .cat-nav-card__title {
@@ -403,7 +403,7 @@ const categories = [
   transition: box-shadow var(--transition-normal);
 }
 .resource-card:hover {
-  box-shadow: 0 4px 16px rgba(18,60,50,0.12);
+  box-shadow: 0 4px 16px rgba(27, 66, 36,0.12);
 }
 .resource-card__link {
   display: flex;

@@ -53,7 +53,7 @@ const imgError = ref(false)
 }
 
 .media-card:hover {
-  box-shadow: 0 4px 16px rgba(18, 60, 50, 0.12);
+  box-shadow: 0 4px 16px rgba(27, 66, 36, 0.12);
 }
 
 .media-card__inner {

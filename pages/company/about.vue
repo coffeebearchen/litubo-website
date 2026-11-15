@@ -147,7 +147,7 @@ useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'
 .about-hero__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, rgba(18,60,50,0.85) 0%, rgba(18,60,50,0.45) 70%, rgba(18,60,50,0.15) 100%);
+  background: linear-gradient(to right, rgba(27, 66, 36,0.85) 0%, rgba(27, 66, 36,0.45) 70%, rgba(27, 66, 36,0.15) 100%);
 }
 
 .about-hero__content {

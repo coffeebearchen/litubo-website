@@ -231,7 +231,7 @@ const canAnalyze = computed(() =>
   color: var(--color-primary-deep);
   font-weight: 600;
   border-color: var(--color-primary);
-  background: rgba(15,92,75,0.06);
+  background: rgba(47, 107, 58,0.06);
 }
 .ws-step--current .ws-step-index { background: var(--color-primary); color: white; }
 
@@ -322,7 +322,7 @@ const canAnalyze = computed(() =>
   gap: var(--space-2);
 }
 
-.ws-file-card--selected { border-color: var(--color-primary); background: rgba(15,92,75,0.06); }
+.ws-file-card--selected { border-color: var(--color-primary); background: rgba(47, 107, 58,0.06); }
 
 .ws-file-label { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; }
 .ws-file-label--disabled { cursor: not-allowed; opacity: 0.6; }
@@ -354,7 +354,7 @@ const canAnalyze = computed(() =>
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-deep); }
 .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; background: var(--color-surface-alt); color: var(--color-ink-muted); }
 
-.btn-analyze { font-weight: 700; font-size: var(--text-base); padding: var(--space-3) var(--space-6); box-shadow: 0 1px 2px rgba(15,92,75,0.25); }
+.btn-analyze { font-weight: 700; font-size: var(--text-base); padding: var(--space-3) var(--space-6); box-shadow: 0 1px 2px rgba(47, 107, 58,0.25); }
 .btn-analyze:disabled { box-shadow: none; }
 
 .ws-analyze-error {

@@ -362,7 +362,7 @@ function thumbUrl(fileId: string) {
   padding: 1px 7px;
 }
 
-.cat-tab--active .cat-tab-count { background: rgba(15, 92, 75, 0.16); color: var(--color-primary); }
+.cat-tab--active .cat-tab-count { background: rgba(47, 107, 58, 0.16); color: var(--color-primary); }
 
 .pc-main-header {
   display: flex;
@@ -459,7 +459,7 @@ tbody tr:last-child td { border-bottom: none; }
 .product-row:hover { background: var(--color-surface-alt); }
 
 .product-row.selected {
-  background: rgba(15, 92, 75, 0.08);
+  background: rgba(47, 107, 58, 0.08);
   box-shadow: inset 3px 0 0 var(--color-primary);
 }
 

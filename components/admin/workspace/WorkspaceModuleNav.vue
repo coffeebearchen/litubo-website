@@ -248,7 +248,7 @@ function routeFor(key: string): string {
 }
 
 .ws-nav-item--active {
-  background: rgba(15, 92, 75, 0.12);
+  background: rgba(47, 107, 58, 0.12);
   color: var(--color-primary);
   font-weight: 600;
 }

@@ -85,7 +85,7 @@ const isTextarea = computed(() => props.type === 'textarea')
 .form-field__input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(15, 92, 75, 0.12);
+  box-shadow: 0 0 0 3px rgba(47, 107, 58, 0.12);
 }
 
 .form-field--error .form-field__input {

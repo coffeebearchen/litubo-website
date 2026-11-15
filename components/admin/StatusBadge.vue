@@ -27,6 +27,6 @@ const label: Record<ProductStatus, string> = {
 }
 .badge--draft    { background: #E8EDE8; color: #4A5E58; }
 .badge--review   { background: #FFF3CD; color: #856404; }
-.badge--published{ background: #D1F0E8; color: #0F5C4B; }
+.badge--published{ background: #D1F0E8; color: #2F6B3A; }
 .badge--archived { background: #F0EDED; color: #8B7070; }
 </style>

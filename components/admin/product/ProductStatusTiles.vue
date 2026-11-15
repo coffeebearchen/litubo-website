@@ -56,7 +56,7 @@ const tiles = computed(() => buildStatusTiles(props.summary))
 
 .status-tile--active {
   border-color: var(--color-primary);
-  background: rgba(15, 92, 75, 0.07);
+  background: rgba(47, 107, 58, 0.07);
 }
 
 .status-tile-label {

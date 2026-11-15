@@ -476,7 +476,7 @@ onMounted(loadAiProviders)
 .btn-danger:hover { background: #f5c6c2; }
 
 .error-banner { background: #FDF0EE; border: 1px solid #F5C6C2; border-radius: var(--radius-sm); color: #C0392B; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: 0; }
-.success-banner { background: #D1F0E8; border: 1px solid #A3DBC8; border-radius: var(--radius-sm); color: #0F5C4B; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: 0; }
+.success-banner { background: #D1F0E8; border: 1px solid #A3DBC8; border-radius: var(--radius-sm); color: #2F6B3A; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: 0; }
 
 @media (max-width: 767px) {
   .page { padding: var(--space-4); }

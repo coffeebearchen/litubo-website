@@ -755,7 +755,7 @@ defineExpose({ save, dirty, canSave })
 }
 
 .csl-pill--draft { background: #E8EDE8; border-color: #D5DED7; color: #4A5E58; }
-.csl-pill--published { background: #D1F0E8; border-color: #B5E2D4; color: #0F5C4B; }
+.csl-pill--published { background: #D1F0E8; border-color: #B5E2D4; color: #2F6B3A; }
 .csl-pill--published_with_changes { background: #FFF6E0; border-color: #E8C66A; color: #5C4300; }
 
 .csl-tabpanel { min-width: 0; }
@@ -917,7 +917,7 @@ defineExpose({ save, dirty, canSave })
   font-weight: 700;
 }
 
-.csl-check-item--ok .csl-check-icon { background: #D1F0E8; color: #0F5C4B; }
+.csl-check-item--ok .csl-check-icon { background: #D1F0E8; color: #2F6B3A; }
 .csl-check-item--note .csl-check-icon { background: #E8EDE8; color: #4A5E58; }
 .csl-check-item--attention .csl-check-icon { background: #FFF6E0; color: #8A5A00; }
 .csl-check-text { display: flex; flex-direction: column; min-width: 0; }
@@ -949,7 +949,7 @@ defineExpose({ save, dirty, canSave })
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: 0 4px 16px rgba(18, 60, 50, 0.12);
+  box-shadow: 0 4px 16px rgba(27, 66, 36, 0.12);
 }
 
 .csl-savebar-status { font-size: var(--text-sm); color: var(--color-ink); }

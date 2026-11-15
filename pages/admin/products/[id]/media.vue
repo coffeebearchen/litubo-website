@@ -580,7 +580,7 @@ async function removeMedia(mid: number) {
   border-radius: 99px;
   font-weight: 500;
 }
-.role-badge--set { background: #d1f0e8; color: #0f5c4b; }
+.role-badge--set { background: #d1f0e8; color: #2F6B3A; }
 .role-badge--none { background: #f0f0f0; color: var(--color-ink-muted); }
 .media-card__caption { font-size: var(--text-xs); color: var(--color-ink-muted); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -602,7 +602,7 @@ async function removeMedia(mid: number) {
   cursor: pointer;
   min-height: 32px;
 }
-.btn-toggle--on { background: #d1f0e8; color: #0f5c4b; border-color: #a3dbc8; }
+.btn-toggle--on { background: #d1f0e8; color: #2F6B3A; border-color: #a3dbc8; }
 .btn-toggle--off { background: #f0f0f0; color: var(--color-ink-muted); border-color: var(--color-line); }
 .btn-toggle--on:hover { background: #a3dbc8; }
 .btn-toggle--off:hover { background: #e0e0e0; }
@@ -715,7 +715,7 @@ async function removeMedia(mid: number) {
 .btn-cancel:hover { background: var(--color-line); }
 
 .error-banner { background: #fdf0ee; border: 1px solid #f5c6c2; border-radius: var(--radius-sm); color: #c0392b; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
-.success-banner { background: #d1f0e8; border: 1px solid #a3dbc8; border-radius: var(--radius-sm); color: #0f5c4b; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
+.success-banner { background: #d1f0e8; border: 1px solid #a3dbc8; border-radius: var(--radius-sm); color: #2F6B3A; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
 
 /* "从媒体库选择" 按钮 */
 .btn-from-lib {
@@ -803,7 +803,7 @@ async function removeMedia(mid: number) {
   white-space: nowrap;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
-.lib-folder-pill:hover { background: rgba(18,60,50,0.06); color: var(--color-ink); }
+.lib-folder-pill:hover { background: rgba(27, 66, 36,0.06); color: var(--color-ink); }
 .lib-folder-pill--active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
 
 /* Filter */
@@ -845,7 +845,7 @@ async function removeMedia(mid: number) {
   overflow: hidden; cursor: pointer; text-align: left; padding: 0; background: white;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.lib-card:hover:not(.lib-card--already) { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(18,60,50,0.12); }
+.lib-card:hover:not(.lib-card--already) { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(27, 66, 36,0.12); }
 .lib-card--already { opacity: 0.55; cursor: not-allowed; }
 
 .lib-card__thumb {

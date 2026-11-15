@@ -197,7 +197,7 @@ function closeMenu() {
   flex-shrink: 0;
 }
 
-.topbar-menu-btn:hover { background: rgba(18, 60, 50, 0.06); }
+.topbar-menu-btn:hover { background: rgba(27, 66, 36, 0.06); }
 
 .topbar-brand {
   font-size: var(--text-sm);
@@ -266,7 +266,7 @@ function closeMenu() {
   flex-shrink: 0;
 }
 
-.sidebar-close:hover { background: rgba(18, 60, 50, 0.06); }
+.sidebar-close:hover { background: rgba(27, 66, 36, 0.06); }
 
 /* ── 导航 ── */
 .sidebar-nav {
@@ -303,12 +303,12 @@ function closeMenu() {
 }
 
 .nav-item:not(.nav-item--disabled):hover {
-  background: rgba(18, 60, 50, 0.06);
+  background: rgba(27, 66, 36, 0.06);
   color: var(--color-primary-deep);
 }
 
 .nav-item--active {
-  background: rgba(18, 60, 50, 0.1) !important;
+  background: rgba(27, 66, 36, 0.1) !important;
   color: var(--color-primary-deep) !important;
   font-weight: 500;
 }

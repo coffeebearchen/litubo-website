@@ -63,8 +63,8 @@ defineProps<{
   border-color: var(--color-accent);
 }
 .base-btn--accent:hover {
-  background: #b85f15;
-  border-color: #b85f15;
+  background: #B87A00;
+  border-color: #B87A00;
 }
 
 .base-btn--outline {

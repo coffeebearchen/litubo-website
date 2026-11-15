@@ -352,7 +352,7 @@ const linkedFileIds = computed(() => [...existingFileIds.value])
   font-family: inherit;
 }
 .ws-media-card:hover { border-color: var(--color-primary); }
-.ws-media-card--selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(15,92,75,0.12); }
+.ws-media-card--selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(47, 107, 58,0.12); }
 .ws-media-card--disabled { opacity: 0.55; }
 .ws-media-card--pending-delete { border-style: dashed; opacity: 0.7; }
 
@@ -371,7 +371,7 @@ const linkedFileIds = computed(() => [...existingFileIds.value])
   position: absolute;
   top: 6px;
   left: 6px;
-  background: rgba(18,60,50,0.85);
+  background: rgba(27, 66, 36,0.85);
   color: white;
   font-size: 10px;
   font-weight: 600;
@@ -446,7 +446,7 @@ const linkedFileIds = computed(() => [...existingFileIds.value])
 .ws-table tr:last-child td { border-bottom: none; }
 .ws-doc-row { cursor: pointer; }
 .ws-doc-row:hover { background: var(--color-surface-alt); }
-.ws-doc-row--selected { background: rgba(15,92,75,0.06); }
+.ws-doc-row--selected { background: rgba(47, 107, 58,0.06); }
 .ws-doc-row--pending-delete { opacity: 0.6; }
 .ws-doc-name { font-weight: 500; overflow-wrap: anywhere; }
 .ws-doc-actions { white-space: nowrap; }

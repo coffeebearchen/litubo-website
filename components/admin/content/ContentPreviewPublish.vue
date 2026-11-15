@@ -342,13 +342,13 @@ const stateLabel = (check: ContentReadinessCheck) => (check.state === 'pass' ? '
 
 .cpp-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .cpp-tab { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-height: 44px; padding: var(--space-2) var(--space-4); border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-ink); font-family: inherit; cursor: pointer; text-align: left; }
-.cpp-tab--active { border-color: var(--color-primary); background: rgba(15, 92, 75, 0.08); }
+.cpp-tab--active { border-color: var(--color-primary); background: rgba(47, 107, 58, 0.08); }
 .cpp-tab:disabled { cursor: not-allowed; opacity: 0.6; }
 .cpp-tab-label { font-size: var(--text-sm); font-weight: 600; }
 .cpp-tab-state { font-size: var(--text-xs); color: var(--color-ink-muted); }
 
 .cpp-notice { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); font-size: var(--text-sm); }
-.cpp-notice--success { background: #D1F0E8; color: #0F5C4B; }
+.cpp-notice--success { background: #D1F0E8; color: #2F6B3A; }
 .cpp-notice--warning { background: #FFF4E0; color: #7A4400; }
 .cpp-notice--error { background: #FDECEC; color: #9B1C1C; }
 
@@ -386,7 +386,7 @@ const stateLabel = (check: ContentReadinessCheck) => (check.state === 'pass' ? '
 .cpp-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .cpp-check { display: flex; align-items: flex-start; gap: var(--space-2); min-width: 0; }
 .cpp-check-badge { flex-shrink: 0; min-width: 64px; text-align: center; font-size: 0.6875rem; font-weight: 700; border-radius: var(--radius-sm); padding: 2px var(--space-2); }
-.cpp-check--pass .cpp-check-badge { background: #D1F0E8; color: #0F5C4B; }
+.cpp-check--pass .cpp-check-badge { background: #D1F0E8; color: #2F6B3A; }
 .cpp-check--fail .cpp-check-badge { background: #FDECEC; color: #9B1C1C; }
 .cpp-check--warn .cpp-check-badge { background: #FFF4E0; color: #7A4400; }
 .cpp-check-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
@@ -399,7 +399,7 @@ const stateLabel = (check: ContentReadinessCheck) => (check.state === 'pass' ? '
 .cpp-row dd { font-size: var(--text-xs); color: var(--color-ink); margin: 0; text-align: right; overflow-wrap: anywhere; }
 
 .cpp-blocked { font-size: var(--text-sm); color: #9B1C1C; background: #FDECEC; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); margin: 0 0 var(--space-3); overflow-wrap: anywhere; }
-.cpp-blocked--info { color: #0F5C4B; background: #D1F0E8; }
+.cpp-blocked--info { color: #2F6B3A; background: #D1F0E8; }
 .cpp-publish { width: 100%; min-height: 44px; border: 1px solid var(--color-primary); border-radius: var(--radius-sm); background: var(--color-primary); color: white; font-weight: 600; font-family: inherit; cursor: pointer; }
 .cpp-publish:hover:not(:disabled) { background: var(--color-primary-deep); }
 .cpp-publish:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -408,7 +408,7 @@ const stateLabel = (check: ContentReadinessCheck) => (check.state === 'pass' ? '
 .cpp-unpublish { width: 100%; margin-top: var(--space-3); color: #9B1C1C; border-color: #E8B4B4; }
 
 .cpp-headline { font-size: var(--text-lg, 1.125rem); font-weight: 700; margin: 0 0 var(--space-1); }
-.cpp-headline--ready { color: #0F5C4B; }
+.cpp-headline--ready { color: #2F6B3A; }
 .cpp-headline--blocked { color: #9B1C1C; }
 .cpp-rules { margin: 0; padding-left: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-ink-muted); line-height: 1.5; }
 

@@ -309,7 +309,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
   transition: color var(--transition-fast);
 }
 
-.home-all-link:hover { color: #b85f15; }
+.home-all-link:hover { color: #B87A00; }
 
 /* ─── Hero ─────────────────────────────────────────────── */
 .home-hero {
@@ -343,10 +343,10 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
   /* Desktop: readable left, the photograph shows through on the right */
   background: linear-gradient(
     90deg,
-    rgba(18, 60, 50, 0.86) 0%,
-    rgba(18, 60, 50, 0.76) 38%,
-    rgba(18, 60, 50, 0.40) 62%,
-    rgba(18, 60, 50, 0.16) 100%
+    rgba(27, 66, 36, 0.86) 0%,
+    rgba(27, 66, 36, 0.76) 38%,
+    rgba(27, 66, 36, 0.40) 62%,
+    rgba(27, 66, 36, 0.16) 100%
   );
 }
 
@@ -422,8 +422,8 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 }
 
 .hero-btn--primary:hover {
-  background: #b85f15;
-  border-color: #b85f15;
+  background: #B87A00;
+  border-color: #B87A00;
 }
 
 .hero-btn--outline {
@@ -577,7 +577,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 }
 
 .resource-card:hover {
-  box-shadow: 0 4px 20px rgba(18, 60, 50, 0.1);
+  box-shadow: 0 4px 20px rgba(27, 66, 36, 0.1);
 }
 
 .resource-card__link {
@@ -754,8 +754,8 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
   background: linear-gradient(
     90deg,
     var(--color-primary-deep) 0%,
-    rgba(15, 92, 75, 0.5) 40%,
-    rgba(15, 92, 75, 0.3) 100%
+    rgba(47, 107, 58, 0.5) 40%,
+    rgba(47, 107, 58, 0.3) 100%
   ),
   repeating-linear-gradient(
     -45deg,
@@ -780,7 +780,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
   /* Hero: stack vertically, image visible as full-bleed bg behind text */
   .home-hero__bg-overlay {
     /* Uniform strong overlay — text spans full width on mobile */
-    background: rgba(18, 60, 50, 0.87);
+    background: rgba(27, 66, 36, 0.87);
   }
   .home-hero__bg-img {
     /* Crop to mid-conveyor / device area */
@@ -869,7 +869,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 .home-cats__sub { color: var(--color-ink-muted); font-size: var(--text-base); margin: var(--space-2) 0 var(--space-8); }
 .home-cats__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-6); }
 .home-cat-card { display: flex; flex-direction: column; background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); overflow: hidden; text-decoration: none; color: inherit; transition: box-shadow var(--transition-normal); }
-.home-cat-card:hover { box-shadow: 0 4px 20px rgba(18,60,50,.14); }
+.home-cat-card:hover { box-shadow: 0 4px 20px rgba(27, 66, 36,.14); }
 .home-cat-card__media { aspect-ratio: 4 / 3; }
 .home-cat-card__body { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); flex: 1; }
 .home-cat-card__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary); margin: 0; }
@@ -889,7 +889,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
   text-decoration: none;
   transition: border-color var(--transition-fast), box-shadow var(--transition-normal);
 }
-.home-app-card:hover { border-color: var(--color-accent); box-shadow: 0 4px 16px rgba(208, 111, 27, 0.12); }
+.home-app-card:hover { border-color: var(--color-accent); box-shadow: 0 4px 16px rgba(217, 146, 0, 0.12); }
 .home-app-card__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary); line-height: var(--leading-snug); }
 .home-app-card__link { font-size: var(--text-sm); font-weight: 600; color: var(--color-accent); }
 

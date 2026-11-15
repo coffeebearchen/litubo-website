@@ -185,7 +185,7 @@ const hasNext = computed(() => history.value.page < history.value.pages)
 .chi { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
 .chi-notice { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); font-size: var(--text-sm); }
-.chi-notice--success { background: #D1F0E8; color: #0F5C4B; }
+.chi-notice--success { background: #D1F0E8; color: #2F6B3A; }
 .chi-notice--warning { background: #FFF4E0; color: #7A4400; }
 .chi-notice--error { background: #FDECEC; color: #9B1C1C; }
 
@@ -208,7 +208,7 @@ const hasNext = computed(() => history.value.page < history.value.pages)
 .chi-event-top { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .chi-category { font-size: 0.6875rem; font-weight: 600; border-radius: var(--radius-sm); padding: 1px var(--space-2); background: var(--color-surface-alt); color: var(--color-ink-muted); border: 1px solid var(--color-line); }
 .chi-event--lifecycle .chi-category { background: #FFF4E0; color: #7A4400; border-color: #F0D9B5; }
-.chi-event--publication .chi-category { background: #D1F0E8; color: #0F5C4B; border-color: #B5E3D6; }
+.chi-event--publication .chi-category { background: #D1F0E8; color: #2F6B3A; border-color: #B5E3D6; }
 .chi-label { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); overflow-wrap: anywhere; }
 .chi-detail { font-size: var(--text-xs); color: var(--color-ink-muted); margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
 .chi-actor { font-size: var(--text-xs); color: var(--color-ink-muted); margin: var(--space-1) 0 0; overflow-wrap: anywhere; }

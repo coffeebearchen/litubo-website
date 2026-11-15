@@ -280,7 +280,7 @@ onUnmounted(() => {
 
 .mobile-nav__sub-link:hover {
   color: var(--color-primary);
-  background: rgba(15, 92, 75, 0.05);
+  background: rgba(47, 107, 58, 0.05);
 }
 
 .mobile-nav__actions {
@@ -365,7 +365,7 @@ onUnmounted(() => {
 }
 
 :deep(.btn--accent:hover) {
-  background: #b85f15;
-  border-color: #b85f15;
+  background: #B87A00;
+  border-color: #B87A00;
 }
 </style>

@@ -285,7 +285,7 @@ onUnmounted(() => { document.removeEventListener('click', handleOutsideClick) })
   height: var(--header-height);
   background: var(--color-white);
   border-bottom: 1px solid var(--color-line);
-  box-shadow: 0 1px 4px rgba(18, 60, 50, 0.06);
+  box-shadow: 0 1px 4px rgba(27, 66, 36, 0.06);
 }
 
 .site-header__container {

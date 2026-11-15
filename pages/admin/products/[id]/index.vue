@@ -219,7 +219,7 @@ async function changeStatus(newStatus: ProductStatus) {
   background: #D1F0E8;
   border: 1px solid #A3DBC8;
   border-radius: var(--radius-sm);
-  color: #0F5C4B;
+  color: #2F6B3A;
   font-size: var(--text-sm);
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-5);

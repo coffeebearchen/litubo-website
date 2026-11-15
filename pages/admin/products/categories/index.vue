@@ -250,7 +250,7 @@ tbody tr:last-child td { border-bottom: none; }
 .cat-row:hover { background: var(--color-surface-alt); }
 
 .cat-row.selected {
-  background: rgba(15, 92, 75, 0.08);
+  background: rgba(47, 107, 58, 0.08);
   box-shadow: inset 3px 0 0 var(--color-primary);
 }
 

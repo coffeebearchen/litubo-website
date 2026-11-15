@@ -175,7 +175,7 @@ const aiSourceIntakeHref = computed(() => workspaceAiSourceIntakeRoute(props.pro
 .ws-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .ws-btn-full { width: 100%; margin-top: var(--space-4); box-sizing: border-box; }
 
-.ws-card--ai { border-color: var(--color-primary); background: rgba(15, 92, 75, 0.04); }
+.ws-card--ai { border-color: var(--color-primary); background: rgba(47, 107, 58, 0.04); }
 
 .ws-btn-ai {
   display: inline-flex;

@@ -326,7 +326,7 @@ const seo = computed(() => contentSeoSummary(primary.value))
 
 .cc-pill--neutral { background: #E8EDE8; color: #4A5E58; }
 .cc-pill--muted { background: var(--color-surface-alt); color: var(--color-ink-muted); border: 1px solid var(--color-line); }
-.cc-pill--ok { background: #D1F0E8; color: #0F5C4B; }
+.cc-pill--ok { background: #D1F0E8; color: #2F6B3A; }
 
 .cc-locale-list,
 .cc-module-list {
