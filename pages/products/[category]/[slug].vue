@@ -58,6 +58,19 @@ const relatedProducts = computed(() =>
   (categoryData.value?.products ?? []).filter(p => p.slug !== slug).slice(0, 4)
 )
 
+// Gallery: hero image first, then the product's gallery images
+const galleryImages = computed(() => {
+  const out: { id: string; url: string; alt: string }[] = []
+  const p = product.value
+  if (p?.heroMedia?.url) {
+    out.push({ id: p.heroMedia.id || 'hero', url: p.heroMedia.url, alt: loc(p.heroMedia.alt) || loc(p.name) })
+  }
+  for (const g of p?.gallery ?? []) {
+    if (g?.url) out.push({ id: g.id, url: g.url, alt: loc(g.alt) })
+  }
+  return out
+})
+
 // FAQ open/close state
 const openFaq = ref<number | null>(null)
 function toggleFaq(i: number) {
@@ -98,8 +111,7 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
     <section class="product-intro">
       <div class="container product-intro__grid">
         <div class="product-intro__media">
-          <img v-if="product.heroMedia.url && !heroImageError" :src="product.heroMedia.url" :alt="loc(product.heroMedia.alt) || loc(product.name)" loading="eager" fetchpriority="high" @error="heroImageError = true">
-          <div v-else class="product-intro__placeholder" aria-hidden="true" />
+          <ProductGallery :images="galleryImages" />
         </div>
         <div class="product-intro__copy">
           <p class="product-intro__summary">{{ loc(product.summary) }}</p>
@@ -123,23 +135,6 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
     <nav class="product-jump" :aria-label="t('pages.productDetail.sectionsLabel')"><div class="container"><a href="#product-overview">{{ t('pages.productDetail.overview') }}</a><a v-if="hasSpecGroups || hasSpecsFlat" href="#product-specifications">{{ t('pages.productDetail.specifications') }}</a><a v-if="product.downloads?.length" href="#product-documents">{{ t('pages.productDetail.documents') }}</a><NuxtLink :to="localePath(inquiryPath)">{{ t('common.talkToEngineer') }} →</NuxtLink></div></nav>
 
     <div id="product-overview" class="product-anchor" />
-
-    <!-- Gallery -->
-    <section v-if="product.gallery.length" class="section-gap">
-      <div class="container">
-        <div class="gallery-grid">
-          <img
-            v-for="img in product.gallery"
-            :key="img.id"
-            :src="img.url"
-            :alt="loc(img.alt)"
-            class="gallery-img"
-            loading="lazy"
-            @error="($event.target as HTMLImageElement).style.display = 'none'"
-          >
-        </div>
-      </div>
-    </section>
 
     <!-- Inline highlights (fixtures mode / legacy) -->
     <section v-if="product.highlights.length" class="section-gap">
@@ -346,7 +341,7 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 .product-intro__media { background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); aspect-ratio: 1 / 1; padding: var(--space-6); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .product-intro__media img { width: 100%; height: 100%; object-fit: contain; }
 .product-intro__placeholder { width: 100%; height: 100%; border-radius: var(--radius-sm); }
-.product-intro__summary { font-size: var(--text-lg); line-height: var(--leading-normal); color: var(--color-ink); margin: 0 0 var(--space-6); }
+.product-intro__summary { font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--color-ink); margin: 0 0 var(--space-6); }
 .product-keys { margin: 0 0 var(--space-6); }
 .product-keys__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary-deep); margin: 0 0 var(--space-3); }
 .product-keys__list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
@@ -393,7 +388,7 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 }
 
 .section-body {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   color: var(--color-ink-muted);
   line-height: var(--leading-relaxed);
   white-space: pre-line;

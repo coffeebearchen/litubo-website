@@ -6,6 +6,7 @@ useHead(computed(() => ({ htmlAttrs: { lang: locale.value } })))
 <template>
   <div class="layout">
     <SiteHeader />
+    <CategoryStrip class="cat-strip-offset" />
     <main class="page-content">
       <slot />
     </main>
@@ -24,5 +25,11 @@ useHead(computed(() => ({ htmlAttrs: { lang: locale.value } })))
 
 .page-content {
   flex: 1;
+  padding-top: 0;
+}
+
+/* The fixed header (72px) is followed by the category strip in normal flow. */
+.cat-strip-offset {
+  margin-top: var(--header-height);
 }
 </style>

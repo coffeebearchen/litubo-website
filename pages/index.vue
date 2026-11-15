@@ -35,6 +35,15 @@ const heroPrimaryPath = computed(() => hero.value?.ctaPrimary.path || '/products
 const heroSecondaryLabel = computed(() => cmsText(hero.value?.ctaSecondary.label, 'pages.home.heroCtaSecondary'))
 const heroSecondaryPath = computed(() => hero.value?.ctaSecondary.path || '/contact')
 
+// Home category grid — the five stable product lines
+const catCards = [
+  { slug: 'x-ray-inspection', title: t('nav_products.xray'), desc: 'Advanced X-ray inspection for packaged food and packaging.' },
+  { slug: 'metal-detection', title: t('nav_products.metal'), desc: 'High-sensitivity metal detection for food processing lines.' },
+  { slug: 'checkweighers', title: t('nav_products.checkweighers'), desc: 'Dynamic checkweighing for accurate fill weights.' },
+  { slug: 'combination-inspection', title: t('nav_products.combination'), desc: 'Integrated multi-technology inspection systems.' },
+  { slug: 'conveyors-reject-systems', title: t('nav_products.conveyors'), desc: 'Conveyors and reject systems for LITUBO equipment.' },
+]
+
 useSeoHead({
   title: t('seo.home.title'),
   description: t('seo.home.description'),
@@ -107,56 +116,55 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
       </div>
     </section>
 
-    <!-- ─── Find the right path ───────────────────────── -->
-    <section class="home-path section-gap">
+    <!-- ─── About LITUBO (ANYI-style two-column) ───────── -->
+    <section class="home-about section-gap">
+      <div class="container home-about__grid">
+        <div class="home-about__copy">
+          <p class="home-about__eyebrow">ABOUT LITUBO</p>
+          <h2 class="home-about__title">A clear route to the right inspection system.</h2>
+          <p class="home-about__body">LITUBO supplies food and packaging inspection equipment — X-ray, metal detection, checkweighing and combination systems — with application clarification, product selection and configuration support.</p>
+          <p class="home-about__body">Tell us your product, packaging and line conditions. We discuss the exact model with your team.</p>
+          <ul class="home-about__features">
+            <li>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20V8l8-4 8 4v12M4 20h16M9 20v-6h6v6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <strong>Application-specific selection</strong>
+            </li>
+            <li>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              <strong>Exact-model specifications</strong>
+            </li>
+            <li>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v11H9l-4 4V5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 9h8M8 12h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              <strong>Technical enquiry support</strong>
+            </li>
+          </ul>
+          <NuxtLink :to="localePath('/company/about')" class="home-about__link">About LITUBO →</NuxtLink>
+        </div>
+        <div class="home-about__media">
+          <img v-if="heroImgSrc && !heroImgError" :src="heroImgSrc" alt="LITUBO inspection systems in production" loading="lazy">
+          <div v-else class="home-about__media-placeholder img-placeholder" aria-hidden="true" />
+          <p class="home-about__caption">Production line inspection — illustrative image</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Find inspection systems (category grid) ───── -->
+    <section class="home-cats section-gap section-alt">
       <div class="container">
-        <h2 class="home-path__title">{{ t('pages.home.pathTitle') }}</h2>
-        <div class="home-path__cards">
-
-          <!-- Card 1: Looking for equipment -->
-          <div class="home-path__card">
-            <div class="home-path__card-photo img-placeholder" aria-hidden="true" />
-            <div class="home-path__card-body">
-              <h3 class="home-path__card-title">{{ t('pages.home.pathCard1Title') }}</h3>
-              <div class="home-path__card-actions">
-                <NuxtLink :to="localePath('/products')" class="path-card-btn">
-                  {{ t('pages.home.pathCard1Cta1') }}
-                  <svg width="12" height="9" viewBox="0 0 14 10" fill="none" aria-hidden="true">
-                    <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </NuxtLink>
-                <NuxtLink :to="localePath('/applications')" class="path-card-btn">
-                  {{ t('pages.home.pathCard1Cta2') }}
-                  <svg width="12" height="9" viewBox="0 0 14 10" fill="none" aria-hidden="true">
-                    <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </NuxtLink>
-              </div>
+        <div class="home-cats__header">
+          <h2 class="home-section-title">Find inspection systems</h2>
+          <NuxtLink :to="localePath('/products')" class="home-all-link">Explore all categories →</NuxtLink>
+        </div>
+        <p class="home-cats__sub">Five proven technology lines, configurable for your production environment.</p>
+        <div class="home-cats__grid">
+          <NuxtLink v-for="c in catCards" :key="c.slug" :to="localePath(`/products/${c.slug}`)" class="home-cat-card">
+            <div class="home-cat-card__media img-placeholder" aria-hidden="true" />
+            <div class="home-cat-card__body">
+              <h3 class="home-cat-card__title">{{ c.title }}</h3>
+              <p class="home-cat-card__desc">{{ c.desc }}</p>
+              <span class="home-cat-card__link">Explore systems →</span>
             </div>
-          </div>
-
-          <!-- Card 2: Already working with LITUBO -->
-          <div class="home-path__card">
-            <div class="home-path__card-photo home-path__card-photo--alt img-placeholder" aria-hidden="true" />
-            <div class="home-path__card-body">
-              <h3 class="home-path__card-title">{{ t('pages.home.pathCard2Title') }}</h3>
-              <div class="home-path__card-actions">
-                <NuxtLink :to="localePath('/technical-matching')" class="path-card-btn">
-                  {{ t('pages.home.pathCard2Cta1') }}
-                  <svg width="12" height="9" viewBox="0 0 14 10" fill="none" aria-hidden="true">
-                    <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </NuxtLink>
-                <NuxtLink :to="localePath('/contact')" class="path-card-btn">
-                  {{ t('pages.home.pathCard2Cta2') }}
-                  <svg width="12" height="9" viewBox="0 0 14 10" fill="none" aria-hidden="true">
-                    <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </NuxtLink>
-              </div>
-            </div>
-          </div>
-
+          </NuxtLink>
         </div>
       </div>
     </section>
@@ -801,4 +809,33 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
     height: 140px;
   }
 }
+
+/* ─── About LITUBO (ANYI-style) ─── */
+.home-about { background: var(--color-white); }
+.home-about__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: var(--space-16); align-items: center; }
+.home-about__eyebrow { color: var(--color-primary); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 var(--space-3); }
+.home-about__title { font-family: var(--font-display); font-size: clamp(var(--text-2xl), 3vw, var(--text-4xl)); font-weight: 600; line-height: var(--leading-tight); color: var(--color-primary-deep); margin: 0 0 var(--space-5); }
+.home-about__body { font-size: var(--text-base); line-height: var(--leading-normal); color: var(--color-ink-muted); margin: 0 0 var(--space-4); max-width: 560px; }
+.home-about__features { list-style: none; padding: 0; margin: var(--space-6) 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.home-about__features li { display: flex; align-items: center; gap: var(--space-3); color: var(--color-ink); font-size: var(--text-sm); }
+.home-about__features svg { color: var(--color-primary); flex: 0 0 auto; }
+.home-about__link { color: var(--color-primary); font-weight: 600; font-size: var(--text-sm); text-decoration: none; }
+.home-about__link:hover { text-decoration: underline; }
+.home-about__media { position: relative; }
+.home-about__media img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-sm); }
+.home-about__media-placeholder { width: 100%; aspect-ratio: 4 / 3; border-radius: var(--radius-sm); }
+.home-about__caption { font-size: var(--text-xs); color: var(--color-ink-muted); margin: var(--space-2) 0 0; text-align: right; }
+
+/* ─── Find inspection systems (category grid) ─── */
+.home-cats__header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
+.home-cats__sub { color: var(--color-ink-muted); font-size: var(--text-base); margin: var(--space-2) 0 var(--space-8); }
+.home-cats__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-6); }
+.home-cat-card { display: flex; flex-direction: column; background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); overflow: hidden; text-decoration: none; color: inherit; transition: box-shadow var(--transition-normal); }
+.home-cat-card:hover { box-shadow: 0 4px 20px rgba(18,60,50,.14); }
+.home-cat-card__media { aspect-ratio: 4 / 3; }
+.home-cat-card__body { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); flex: 1; }
+.home-cat-card__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary); margin: 0; }
+.home-cat-card__desc { font-size: var(--text-sm); color: var(--color-ink-muted); line-height: var(--leading-normal); margin: 0; flex: 1; }
+.home-cat-card__link { font-size: var(--text-sm); font-weight: 600; color: var(--color-accent); }
+@media (max-width: 900px) { .home-about__grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); } }
 </style>
