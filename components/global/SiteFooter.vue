@@ -100,24 +100,24 @@ const companyLinks = [
               <a :href="`mailto:${email}`" class="site-footer__contact-link">{{ email }}</a>
               <span class="site-footer__address">Kunshan, Jiangsu Province, China</span>
             </address>
-            <div class="site-footer__social" aria-label="Social media">
-              <a
-                v-for="link in socialLinks"
-                :key="link.platform"
-                :href="link.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                :aria-label="`LITUBO on ${link.platform}`"
-              >
-                <svg v-if="SOCIAL_ICONS[link.platform]" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path :d="SOCIAL_ICONS[link.platform]" />
-                </svg>
-              </a>
+            <div v-if="socialLinks.length" class="site-footer__social-block">
+              <p class="site-footer__social-label">Follow LITUBO</p>
+              <div class="site-footer__social" aria-label="Social media">
+                <a
+                  v-for="link in socialLinks"
+                  :key="link.platform"
+                  :href="link.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  :aria-label="`LITUBO on ${link.platform}`"
+                  :title="link.platform"
+                >
+                  <svg v-if="SOCIAL_ICONS[link.platform]" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path :d="SOCIAL_ICONS[link.platform]" />
+                  </svg>
+                </a>
+              </div>
             </div>
-            <NuxtLink :to="localePath('/contact')" class="site-footer__cta">
-              {{ t('nav.contact') }}
-              <span aria-hidden="true">→</span>
-            </NuxtLink>
           </div>
         </div>
 
@@ -244,33 +244,36 @@ const companyLinks = [
 
 .site-footer__address { font-size: var(--text-xs); color: rgba(255, 255, 255, 0.55); }
 
-.site-footer__social { display: flex; gap: var(--space-2); }
+/* Social row replaces the old "Contact" CTA (which duplicated the CTA band above the footer). */
+.site-footer__social-block { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
+
+.site-footer__social-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.site-footer__social { display: flex; gap: var(--space-3); }
 
 .site-footer__social a {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.8);
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  color: rgba(255, 255, 255, 0.85);
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
 }
-.site-footer__social a:hover { color: var(--color-accent); border-color: var(--color-accent); }
-
-.site-footer__cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 10px 18px;
-  background: var(--color-accent);
+.site-footer__social a:hover {
   color: #fff;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-decoration: none;
-  border-radius: var(--radius-sm);
-  transition: background var(--transition-fast);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
+
 .site-footer__cta:hover { background: var(--color-accent-hover); }
 
 /* ── Link columns ────────────────────────────────── */
