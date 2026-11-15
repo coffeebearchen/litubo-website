@@ -1,10 +1,9 @@
 <script setup lang="ts">
+import { INDUSTRY_GUIDES } from '~/content/industry-guides'
 const { t } = useI18n()
 const localePath = useLocalePath()
 
-// PUBLIC-CLAIMS-CLEANUP-01 (D-036): the hub lists the eight confirmed industries (D-002) using the site's own
-// navigation labels, so no DEMO fixture is read here. Per-industry pages stay closed until real, confirmed
-// content exists (D-014), which is why the cards are presentation only and link nowhere.
+// The confirmed industry labels link to editorial enquiry guides; no invented customer cases or results.
 const industries = computed(() => [
   t('nav_applications.packaged'),
   t('nav_applications.bottled'),
@@ -36,18 +35,20 @@ useSeoHead({
     <section class="section-gap">
       <div class="container">
         <div class="applications-grid">
-          <div
-            v-for="industry in industries"
+          <NuxtLink
+            v-for="(industry, index) in industries"
             :key="industry"
             class="app-card"
+            :to="localePath(`/applications/${INDUSTRY_GUIDES[index].slug}`)"
           >
             <div class="app-card__image-wrap">
               <div class="app-card__image-placeholder" aria-hidden="true" />
             </div>
             <div class="app-card__body">
               <h2 class="app-card__title">{{ industry }}</h2>
+              <p class="app-card__link">Discuss your inspection needs →</p>
             </div>
-          </div>
+          </NuxtLink>
         </div>
       </div>
     </section>
@@ -112,16 +113,19 @@ useSeoHead({
 .app-card__image-placeholder {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
+  background: var(--color-primary-deep);
+  border-bottom: 4px solid var(--color-accent);
 }
 
 .app-card__body {
   padding: var(--space-5);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-4);
 }
+
+.app-card__link { color: var(--color-ink-muted); font-size: var(--text-sm); }
 
 .app-card__title {
   font-family: var(--font-display);

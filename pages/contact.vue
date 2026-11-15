@@ -1,6 +1,9 @@
 <script setup lang="ts">
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
+const route = useRoute()
+const relatedProduct = computed(() => typeof route.query.product === 'string' && /^[a-z0-9-]{1,200}$/.test(route.query.product) ? route.query.product : '')
+const relatedApplication = computed(() => typeof route.query.application === 'string' && /^[a-z0-9-]{1,200}$/.test(route.query.application) ? route.query.application : '')
 
 useSeoHead({
   title: t('seo.contact.title'),
@@ -14,7 +17,7 @@ const form = reactive({
   email: '',
   country: '',
   phone: '',
-  message: '',
+  message: route.query.topic === 'demonstration' ? 'I would like demonstration information for the following equipment / application: ' : '',
   consent: false,
 })
 
@@ -46,6 +49,8 @@ async function submit() {
         contact_country: form.country,
         contact_phone: form.phone,
         message: form.message,
+        related_product_slug: relatedProduct.value || undefined,
+        related_application_slug: relatedApplication.value || undefined,
         consent: form.consent,
         website: '',
       },

@@ -12,6 +12,7 @@
 import { describe, expect, it } from 'vitest'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { INDUSTRY_GUIDES, industryGuide } from '../content/industry-guides'
 
 const root = process.cwd()
 const source = (file: string) => readFileSync(resolve(root, file), 'utf8')
@@ -119,7 +120,7 @@ describe('PUBLIC-CLAIMS-CLEANUP-01 — the home FAQ teaser follows real publishe
   })
 })
 
-describe('PUBLIC-CLAIMS-CLEANUP-01 — Applications: confirmed categories only, DEMO details closed', () => {
+describe('Applications: confirmed industries and useful editorial guides, no DEMO facts', () => {
   it('the hub lists the eight confirmed industries from navigation labels and reads no fixture', () => {
     const text = source(APPLICATIONS_HUB)
     for (const key of ['packaged', 'bottled', 'meat', 'frozen', 'bakery', 'nuts', 'powder', 'pharma']) {
@@ -128,22 +129,25 @@ describe('PUBLIC-CLAIMS-CLEANUP-01 — Applications: confirmed categories only, 
     expect(text).not.toMatch(/useApplications|useApplication\(|useProductCategories|content\/fixtures/)
   })
 
-  it('the hub links to no Application detail route', () => {
-    expect(template(APPLICATIONS_HUB)).not.toMatch(/\/applications\/\$\{|applications\/\${app|:to="localePath\(`\/applications\//)
-    expect(source(APPLICATIONS_HUB)).not.toMatch(/applications\/\$\{/)
+  it('links exactly the confirmed industry guides', () => {
+    expect(INDUSTRY_GUIDES).toHaveLength(8)
+    expect(new Set(INDUSTRY_GUIDES.map(guide => guide.slug)).size).toBe(8)
+    expect(template(APPLICATIONS_HUB)).toContain('INDUSTRY_GUIDES[index].slug')
+    expect(industryGuide('unknown-industry')).toBeUndefined()
   })
 
-  it('every Application detail URL is a 404 with no indexable metadata and no fixture read', () => {
+  it('unknown routes and unpublished languages remain closed, without any DEMO fixture read', () => {
     const text = source(APPLICATIONS_DETAIL)
     expect(text).toMatch(/createError\(\{ statusCode: 404, fatal: true \}\)/)
-    expect(text).toMatch(/noIndex: true/)
-    expect(text).not.toMatch(/useApplication|useProductCategories|TODO_CONTENT|seo\.title|seo\.description/)
+    expect(text).toContain('if (!guide)')
+    expect(text).toContain('assertPublishedLocale()')
+    expect(text).not.toMatch(/content\/fixtures|TODO_CONTENT|DEMO_APPLICATIONS/)
   })
 
-  it('no public page or component links to an Application detail route', () => {
-    for (const file of [...publicFiles('pages'), ...publicFiles('components'), ...publicFiles('layouts')]) {
-      expect(source(file), file).not.toMatch(/localePath\('\/applications\/[a-z-]/)
-    }
+  it('the guides make no invented certifications, results or customer case claims', () => {
+    const text = JSON.stringify(INDUSTRY_GUIDES)
+    expect(text).not.toMatch(/guaranteed|certified|\bISO\s?9001|99\.\d%|case study|our customer|\b\d+\s?mm\b/i)
+    expect(INDUSTRY_GUIDES.every(guide => guide.considerations.length === 4)).toBe(true)
   })
 
   it('the DEMO Application fixtures are still present for development and tests', () => {

@@ -127,6 +127,14 @@
     "503": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" }
   },
   "pages": {
+    "productDetail": {
+      "selectionNote": "La configuración final, el rendimiento y la idoneidad se confirman con nuestro equipo según su producto y línea de producción.",
+      "imageOnRequest": "Solicite imágenes y detalles de configuración a nuestro equipo.",
+      "sectionsLabel": "Información del producto",
+      "overview": "Descripción",
+      "specifications": "Especificaciones",
+      "documents": "Documentos"
+    },
     "home": {
       "heroEyebrow": "TODO_TRANSLATION",
       "heroTitle": "TODO_TRANSLATION",

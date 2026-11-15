@@ -1236,7 +1236,7 @@ describe('PWS-03-R1 duplicate protection is enforced both client-side (staging) 
 
   it('the POST endpoint enforces the duplicate guard server-side, so a direct repeat POST (bypassing the UI) is still rejected', () => {
     const postSource = repoFile('server/api/admin/products/[id]/media/index.post.ts')
-    expect(postSource).toContain("import { assertNoDuplicateMediaLink } from '~/server/utils/productMediaLinks'")
+    expect(postSource).toContain("import { assertNoDuplicateMediaLink, assertMediaFileLinkable } from '~/server/utils/productMediaLinks'")
     expect(postSource).toContain('await assertNoDuplicateMediaLink(Number(id), body.directus_files_id, fetch)')
   })
 
@@ -1245,7 +1245,7 @@ describe('PWS-03-R1 duplicate protection is enforced both client-side (staging) 
     expect(guardSource).toContain('export async function assertNoDuplicateMediaLink')
     expect(guardSource).toMatch(/statusCode:\s*409/)
     const guardTest = repoFile('tests/productMediaLinks.test.ts')
-    expect(guardTest).toContain("import { assertNoDuplicateMediaLink } from '../server/utils/productMediaLinks'")
+    expect(guardTest).toContain("import { assertNoDuplicateMediaLink, assertMediaFileLinkable } from '../server/utils/productMediaLinks'")
     expect(guardTest).toContain('direct-repeat-POST case')
   })
 })
@@ -1424,7 +1424,7 @@ describe('PWS-03-R2 preserves every R1 dirty-state guarantee — this is a style
 
   it('the server-side duplicate guard is still wired into the POST endpoint', () => {
     const postSource = repoFile('server/api/admin/products/[id]/media/index.post.ts')
-    expect(postSource).toContain("import { assertNoDuplicateMediaLink } from '~/server/utils/productMediaLinks'")
+    expect(postSource).toContain("import { assertNoDuplicateMediaLink, assertMediaFileLinkable } from '~/server/utils/productMediaLinks'")
   })
 
   it('the presentational component still never issues a write request', () => {

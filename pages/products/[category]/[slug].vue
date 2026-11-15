@@ -66,6 +66,9 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
   manual: 'Manual',
   certificate: 'Certificate',
 }
+
+const heroImageError = ref(false)
+const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}`)
 </script>
 
 <template>
@@ -81,15 +84,28 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
             { label: loc(product.name) },
           ]"
         />
+        <div class="product-intro">
+        <div class="product-intro__copy">
         <h1 class="page-hero__title">{{ loc(product.name) }}</h1>
         <p v-if="product.modelSeries" class="page-hero__model">{{ product.modelSeries }}</p>
         <p class="page-hero__sub">{{ loc(product.summary) }}</p>
         <div class="page-hero__actions">
-          <NuxtLink :to="localePath('/contact')" class="btn btn--accent">{{ t('common.talkToEngineer') }}</NuxtLink>
+          <NuxtLink :to="localePath(inquiryPath)" class="btn btn--accent">{{ t('common.talkToEngineer') }}</NuxtLink>
           <NuxtLink :to="localePath('/find-a-distributor')" class="btn btn--outline-white">{{ t('common.findDistributor') }}</NuxtLink>
+        </div>
+        <p class="product-intro__note">{{ t('pages.productDetail.selectionNote') }}</p>
+        </div>
+        <div class="product-intro__media">
+          <img v-if="product.heroMedia.url && !heroImageError" :src="product.heroMedia.url" :alt="loc(product.heroMedia.alt) || loc(product.name)" loading="eager" fetchpriority="high" @error="heroImageError = true">
+          <div v-else class="product-intro__placeholder"><span class="product-intro__brand">LITUBO</span><span>{{ product.modelSeries || loc(product.name) }}</span><small>{{ t('pages.productDetail.imageOnRequest') }}</small></div>
+        </div>
         </div>
       </div>
     </section>
+
+    <nav class="product-jump" :aria-label="t('pages.productDetail.sectionsLabel')"><div class="container"><a href="#product-overview">{{ t('pages.productDetail.overview') }}</a><a v-if="hasSpecGroups || hasSpecsFlat" href="#product-specifications">{{ t('pages.productDetail.specifications') }}</a><a v-if="product.downloads?.length" href="#product-documents">{{ t('pages.productDetail.documents') }}</a><NuxtLink :to="localePath(inquiryPath)">{{ t('common.talkToEngineer') }} →</NuxtLink></div></nav>
+
+    <div id="product-overview" class="product-anchor" />
 
     <!-- Gallery -->
     <section v-if="product.gallery.length" class="section-gap">
@@ -164,7 +180,7 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
     </template>
 
     <!-- Structured spec groups (Directus mode) -->
-    <section v-if="hasSpecGroups" class="section-gap section-alt">
+    <section v-if="hasSpecGroups" id="product-specifications" class="section-gap section-alt">
       <div class="container">
         <SectionHeading>Technical Specifications</SectionHeading>
         <div
@@ -194,7 +210,7 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
     </section>
 
     <!-- Inline flat specifications (fixtures mode fallback) -->
-    <section v-else-if="hasSpecsFlat" class="section-gap section-alt">
+    <section v-else-if="hasSpecsFlat" id="product-specifications" class="section-gap section-alt">
       <div class="container">
         <SectionHeading>Technical Specifications</SectionHeading>
         <table class="spec-table">
@@ -237,7 +253,7 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
     </section>
 
     <!-- Downloads (Directus mode) -->
-    <section v-if="product.downloads?.length" class="section-gap section-alt">
+    <section v-if="product.downloads?.length" id="product-documents" class="section-gap section-alt">
       <div class="container">
         <SectionHeading>Documents & Downloads</SectionHeading>
         <ul class="download-list">
@@ -257,7 +273,7 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
     <CTABanner
       :title="t('common.talkToEngineer')"
       :primary-label="t('nav.contact')"
-      :primary-to="localePath('/contact')"
+      :primary-to="localePath(inquiryPath)"
       :secondary-label="t('common.findDistributor')"
       :secondary-to="localePath('/find-a-distributor')"
     />
@@ -265,6 +281,18 @@ const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
 </template>
 
 <style scoped>
+.product-intro { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: var(--space-16); padding-top: var(--space-6); }
+.product-intro__media { background: white; border-radius: var(--radius-sm); aspect-ratio: 4 / 3; padding: var(--space-8); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.product-intro__media img { width: 100%; height: 100%; object-fit: contain; }
+.product-intro__placeholder { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-4); color: var(--color-primary); }
+.product-intro__brand { font-size: 32px; font-weight: 700; letter-spacing: .12em; }
+.product-intro__placeholder small { color: var(--color-ink-muted); }
+.product-intro__note { color: rgba(255,255,255,.65); font-size: var(--text-xs); line-height: 1.7; margin-top: var(--space-5); max-width: 540px; }
+.product-jump { border-bottom: 1px solid var(--color-line); background: var(--color-white); }
+.product-jump .container { display: flex; align-items: center; gap: var(--space-8); overflow-x: auto; white-space: nowrap; padding-top: var(--space-4); padding-bottom: var(--space-4); font-size: var(--text-sm); }
+.product-jump a { color: var(--color-primary); text-decoration: none; } .product-jump a:last-child { margin-left: auto; font-weight: 600; }
+.product-anchor, #product-specifications, #product-documents { scroll-margin-top: 90px; }
+@media (max-width: 768px) { .product-intro { grid-template-columns: 1fr; gap: var(--space-8); } .product-intro__media { max-height: 380px; } .product-jump .container { gap: var(--space-6); } }
 .page-hero {
   background: var(--color-primary-deep);
   padding: var(--space-12) 0;

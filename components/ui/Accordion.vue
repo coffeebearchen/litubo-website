@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import { ref, useId } from 'vue'
+
 const props = defineProps<{
   title: string
   initialOpen?: boolean
 }>()
 
 const isOpen = ref(props.initialOpen ?? false)
-const contentId = `accordion-${Math.random().toString(36).slice(2, 9)}`
+const contentId = `accordion-${useId()}`
 const triggerId = `trigger-${contentId}`
 
 function toggle() {
@@ -17,6 +19,7 @@ function toggle() {
   <div class="accordion" :class="{ 'accordion--open': isOpen }">
     <button
       :id="triggerId"
+      type="button"
       class="accordion__trigger"
       :aria-expanded="isOpen"
       :aria-controls="contentId"

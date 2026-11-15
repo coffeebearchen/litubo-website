@@ -1,7 +1,7 @@
 import { getRouterParam, readBody, createError } from 'h3'
 import { adminFetch } from '~/server/utils/adminDirectusClient'
 import { assertProductDraftForMutation } from '~/server/utils/productLifecycle'
-import { assertNoDuplicateMediaLink } from '~/server/utils/productMediaLinks'
+import { assertNoDuplicateMediaLink, assertMediaFileLinkable } from '~/server/utils/productMediaLinks'
 import { FILE_ROLES } from '~/types/product-cms'
 import type { FileRole } from '~/types/product-cms'
 
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody(event)
 
-  if (!body.directus_files_id) {
+  if (!body || typeof body !== 'object' || !body.directus_files_id) {
     throw createError({ statusCode: 400, message: 'directus_files_id 为必填项' })
   }
 
@@ -50,6 +50,7 @@ export default defineEventHandler(async (event) => {
     file_date: body.file_date ?? null,
   }
 
+  await assertMediaFileLinkable(body.directus_files_id, fetch)
   const result = await adminFetch<{ data: unknown }>(event, '/items/products_files', {
     method: 'POST', body: payload,
   })

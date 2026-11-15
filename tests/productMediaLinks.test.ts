@@ -1,8 +1,38 @@
 import { describe, it, expect, vi } from 'vitest'
-import { assertNoDuplicateMediaLink } from '../server/utils/productMediaLinks'
+import { assertNoDuplicateMediaLink, assertMediaFileLinkable } from '../server/utils/productMediaLinks'
 
 const PRODUCT_ID = 3
 const FILE_UUID = '22222222-2222-2222-2222-222222222222'
+
+describe('media eligibility before creating a product association', () => {
+  it('allows an existing private file without publishing it', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce({ data: [{ id: FILE_UUID }] }).mockResolvedValueOnce({ data: [] })
+    await expect(assertMediaFileLinkable(FILE_UUID, fetch)).resolves.toBeUndefined()
+    expect(fetch.mock.calls.every(call => call.length === 1)).toBe(true)
+  })
+
+  it('rejects malformed ids without any request', async () => {
+    const fetch = vi.fn()
+    for (const id of [null, {}, '../files', 'not-a-uuid']) {
+      await expect(assertMediaFileLinkable(id, fetch)).rejects.toMatchObject({ statusCode: 400 })
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing files and archived files', async () => {
+    await expect(assertMediaFileLinkable(FILE_UUID, vi.fn().mockResolvedValue({ data: [] })))
+      .rejects.toMatchObject({ statusCode: 404 })
+    const fetch = vi.fn().mockResolvedValueOnce({ data: [{ id: FILE_UUID }] })
+      .mockResolvedValueOnce({ data: [{ id: 'lifecycle', archived: true }] })
+    await expect(assertMediaFileLinkable(FILE_UUID, fetch)).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('does not turn a failed lifecycle read into permission to link', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce({ data: [{ id: FILE_UUID }] })
+      .mockRejectedValueOnce(Object.assign(new Error('forbidden'), { statusCode: 403 }))
+    await expect(assertMediaFileLinkable(FILE_UUID, fetch)).rejects.toMatchObject({ statusCode: 403 })
+  })
+})
 
 describe('assertNoDuplicateMediaLink (server-side duplicate guard)', () => {
   it('resolves without throwing when no existing link is found', async () => {

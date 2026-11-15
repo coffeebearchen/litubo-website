@@ -57,7 +57,7 @@ const TEXT_FIELDS = [
   'tm_product_interest', 'tm_product_format', 'tm_line_speed',
   'tm_package_dimensions', 'tm_contaminant_concern', 'tm_existing_equipment',
   'utm_source', 'utm_medium', 'utm_campaign',
-  'urgency', 'concern',
+  'urgency', 'concern', 'support_request_type',
 ] as const
 
 export type InquiryTextField = typeof TEXT_FIELDS[number]
@@ -76,7 +76,7 @@ const RAW_FIELDS_WHITELIST: InquiryTextField[] = [
   'related_product_slug', 'related_application_slug',
   'tm_product_interest', 'tm_product_format', 'tm_line_speed',
   'tm_package_dimensions', 'tm_contaminant_concern', 'tm_existing_equipment',
-  'urgency', 'concern',
+  'urgency', 'concern', 'support_request_type',
 ]
 
 const LENGTH_LIMITS: Partial<Record<InquiryTextField, number>> = {
@@ -200,6 +200,7 @@ export async function handlePublicInquiry(event: H3Event, toInquiryFields: Inqui
   if (!validEmail(emailRaw)) badRequest('Invalid email format.')
   if (!VALID_INQUIRY_TYPES.includes(fields.inquiry_type as InquiryType)) badRequest('Invalid inquiry type.')
   if (fields.locale && !VALID_LOCALES.includes(fields.locale)) badRequest('Invalid locale.')
+  if (fields.support_request_type && (fields.inquiry_type !== 'support_request' || !['technical-support', 'manual-request', 'service-training'].includes(fields.support_request_type))) badRequest('Invalid support request type.')
 
   // Sanitize strings and enforce length limits
   const san: Partial<Record<InquiryTextField, string>> = {}

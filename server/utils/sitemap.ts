@@ -1,4 +1,5 @@
 import type { FetchFn } from './mediaLifecycle'
+import { INDUSTRY_GUIDES } from '../../content/industry-guides'
 import {
   contentPublicPath,
   isSitemapEligible,
@@ -36,6 +37,7 @@ export interface SitemapUrl {
 
 export interface SitemapOptions extends PublicContentOptions {
   siteUrl: string
+  includeStaticPages?: boolean
 }
 
 async function productUrls(fetch: FetchFn, siteUrl: string): Promise<SitemapUrl[]> {
@@ -72,7 +74,13 @@ export async function buildSitemapUrls(fetch: FetchFn, options: SitemapOptions):
     options.productsFromDirectus ? productUrls(fetch, siteUrl) : Promise.resolve([]),
     options.contentFromDirectus ? contentUrls(fetch, { ...options, siteUrl }) : Promise.resolve([]),
   ])
-  return [...products, ...content]
+  const staticPages: SitemapUrl[] = options.includeStaticPages ? [
+    '/', '/products', '/applications', '/resources', '/resources/downloads', '/resources/videos', '/support', '/support/faq',
+    '/contact', '/technical-matching', '/find-a-distributor',
+    '/company/about', '/company/quality-manufacturing', '/company/global-service', '/company/become-a-partner',
+    ...INDUSTRY_GUIDES.map(guide => `/applications/${guide.slug}`),
+  ].map(path => ({ loc: `${siteUrl}${path}`, lastmod: null })) : []
+  return [...staticPages, ...products, ...content]
 }
 
 const xmlEscape = (value: string) =>

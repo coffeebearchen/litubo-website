@@ -102,11 +102,33 @@ async function queryContentItemsFiles(fileUuid: string, fetch: FetchFn): Promise
   return res.data ?? []
 }
 
+/** Direct UUID columns also keep an asset in use, including drafts and archived records. */
+async function queryDirectReferenceCount(fileUuid: string, fetch: FetchFn): Promise<number> {
+  const targets = [
+    { collection: 'site_content', fields: ['hero_image'] },
+    { collection: 'product_categories', fields: ['hero_image', 'seo_image'] },
+    { collection: 'products', fields: ['hero_image', 'seo_image'] },
+    { collection: 'posts', fields: ['cover_image'] },
+  ]
+  let count = 0
+  for (const { collection, fields } of targets) {
+    const filter = encodeURIComponent(JSON.stringify({
+      _or: fields.map(field => ({ [field]: { _eq: fileUuid } })),
+    }))
+    const result = await fetch<{ data: { id: number }[]; meta?: { filter_count?: number } }>(
+      `/items/${collection}?filter=${filter}&fields=id&limit=1&meta=filter_count`,
+    )
+    count += result.meta?.filter_count ?? result.data?.length ?? 0
+  }
+  return count
+}
+
 export async function getFileReferences(fileUuid: string, fetch: FetchFn): Promise<ReferencesResult> {
   const junctionRows = await queryProductsFiles(fileUuid, fetch)
   const sectionCount = await querySectionCount(junctionRows.map(r => r.id), fetch)
   const sourceRows = await querySourceRecords(fileUuid, fetch)
   const contentRows = await queryContentItemsFiles(fileUuid, fetch)
+  const directReferenceCount = await queryDirectReferenceCount(fileUuid, fetch)
 
   const seenProducts = new Set<number>()
   const references: FileReference[] = []
@@ -144,13 +166,13 @@ export async function getFileReferences(fileUuid: string, fetch: FetchFn): Promi
   }
 
   const sourceCount = sourceRows.length
-  const total = junctionRows.length + sectionCount + sourceCount + contentRows.length
+  const total = junctionRows.length + sectionCount + sourceCount + contentRows.length + directReferenceCount
   return {
     product_count: seenProducts.size,
     section_count: sectionCount,
     source_count: sourceCount,
     content_count: new Set(contentReferences.map(r => r.content_item_id)).size,
-    other_count: 0,
+    other_count: directReferenceCount,
     total,
     can_archive: total === 0,
     references,

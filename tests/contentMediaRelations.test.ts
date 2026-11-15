@@ -468,7 +468,7 @@ describe('save safety', () => {
 
 describe('getFileReferences includes Content Center links (Blueprint §11 P1)', () => {
   it('a content-linked file cannot be archived and names the content item', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({ data: [] }) // products_files
       .mockResolvedValueOnce({ data: [] }) // product_source_records
       .mockResolvedValueOnce({ data: [{ id: 1, file_role: 'hero', content_items_id: { id: 6, locales: [{ locale: 'en', title: 'TEST ONLY — NOT FOR PUBLICATION' }] } }] })
@@ -479,7 +479,7 @@ describe('getFileReferences includes Content Center links (Blueprint §11 P1)', 
   })
 
   it('product and source references still count, and an unreferenced file stays archivable', async () => {
-    const product = vi.fn()
+    const product = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({ data: [{ id: 10, file_role: 'hero', products_id: { id: 3, name_en: 'P' } }] })
       .mockResolvedValueOnce({ data: [], meta: { filter_count: 0 } })
       .mockResolvedValueOnce({ data: [{ id: 7, product_id: { id: 3, name_en: 'P' } }] })
@@ -493,7 +493,7 @@ describe('getFileReferences includes Content Center links (Blueprint §11 P1)', 
   })
 
   it('a failed content lookup fails the check instead of allowing archive', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({ data: [] })
       .mockResolvedValueOnce({ data: [] })
       .mockRejectedValueOnce(Object.assign(new Error('forbidden'), { statusCode: 403 }))

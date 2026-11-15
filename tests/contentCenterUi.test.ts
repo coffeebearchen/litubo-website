@@ -224,13 +224,13 @@ describe('overview summaries use real draft fields only', () => {
 })
 
 describe('source evidence — scope and safety', () => {
-  it('enables the existing Content Center shell entry and adds no other menu', () => {
+  it('keeps Content Center and the authorized operator navigation available', () => {
     const layout = repoFile('layouts/admin.vue')
     expect(layout).toMatch(/<NuxtLink\s+to="\/admin\/content-center"/)
     expect(layout).not.toContain('Available after Phase 9A-2')
     expect(layout).not.toContain('nav-item--disabled"')
     const labels = [...layout.matchAll(/<\/svg>\s*([A-Za-z ]+?)\s*<\/(?:NuxtLink|span)>/g)].map(m => m[1])
-    expect(labels).toEqual(['Product Center', 'Content Center', 'Media Library', 'Settings'])
+    expect(labels).toEqual(['Product Center', 'Content Center', 'Media Library', 'Customer Inquiries', 'Settings'])
   })
 
   it('reads, creates and saves drafts only through the admin BFF; no publish, AI, media-write or Directus call', () => {

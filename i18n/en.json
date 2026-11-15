@@ -319,6 +319,14 @@
     "503": {
       "title": "Temporarily unavailable",
       "body": "This information cannot be loaded right now. Please try again in a few minutes."
+    },
+    "productDetail": {
+      "selectionNote": "Final configuration, inspection performance and suitability are confirmed with our team for your product and production line.",
+      "imageOnRequest": "Ask our team for product images and configuration details.",
+      "sectionsLabel": "Product information",
+      "overview": "Overview",
+      "specifications": "Specifications",
+      "documents": "Documents"
     }
   }
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import type { FetchFn } from '../server/utils/mediaLifecycle'
 import {
   getFileReferences,
   getLifecycleRecord,
@@ -8,11 +9,37 @@ import {
 
 const TEST_UUID = '11111111-1111-1111-1111-111111111111'
 
+describe('direct media references protect archive', () => {
+  for (const collection of ['site_content', 'product_categories', 'products', 'posts']) {
+    it(`blocks archive when ${collection} references the file directly`, async () => {
+      const fetch = vi.fn(async (path: string) => {
+        if (path.startsWith(`/items/${collection}?`)) {
+          const query = new URL(path, 'http://directus.local').searchParams
+          expect(query.get('filter')).toContain(TEST_UUID)
+          expect(query.get('filter')).not.toContain('published')
+          return { data: [{ id: 1 }], meta: { filter_count: 3 } }
+        }
+        return { data: [] }
+      })
+      const result = await getFileReferences(TEST_UUID, fetch as unknown as FetchFn)
+      expect(result).toMatchObject({ can_archive: false, total: 3, other_count: 3 })
+    })
+  }
+
+  it('rejects an archive check when a direct-reference lookup fails', async () => {
+    const fetch = vi.fn(async (path: string) => {
+      if (path.startsWith('/items/site_content?')) throw Object.assign(new Error('forbidden'), { statusCode: 403 })
+      return { data: [] }
+    })
+    await expect(getFileReferences(TEST_UUID, fetch as unknown as FetchFn)).rejects.toMatchObject({ statusCode: 403 })
+  })
+})
+
 // ── getFileReferences ─────────────────────────────────────────────────────────
 
 describe('getFileReferences', () => {
   it('returns can_archive:true and empty references when no junction rows', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({ data: [] }) // products_files
       .mockResolvedValueOnce({ data: [] }) // product_source_records
       .mockResolvedValueOnce({ data: [] }) // content_items_files (CC-IMP-04)
@@ -25,11 +52,11 @@ describe('getFileReferences', () => {
     expect(result.section_count).toBe(0)
     expect(result.source_count).toBe(0)
     // products_files + product_source_records + content_items_files; no section query when no junction rows
-    expect(fetch).toHaveBeenCalledTimes(3)
+    expect(fetch).toHaveBeenCalledTimes(7)
   })
 
   it('returns can_archive:false when products_files references exist', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({
         data: [
           { id: 10, file_role: 'hero', products_id: { id: 3, name_en: 'Product Alpha' } },
@@ -52,7 +79,7 @@ describe('getFileReferences', () => {
   })
 
   it('counts section references separately via junction IDs', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({
         data: [{ id: 42, file_role: 'brochure', products_id: { id: 5, name_en: 'Product Beta' } }],
       })
@@ -73,7 +100,7 @@ describe('getFileReferences', () => {
   })
 
   it('skips junction rows with null products_id', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({
         data: [{ id: 20, file_role: 'hero', products_id: null }],
       })
@@ -90,7 +117,7 @@ describe('getFileReferences', () => {
   })
 
   it('returns can_archive:false when only an active source record cites the file', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({ data: [] }) // products_files — no media association
       .mockResolvedValueOnce({
         data: [{ id: 7, product_id: { id: 9, name: 'LT-180C Free-Fall Metal Detector' } }],
@@ -108,7 +135,7 @@ describe('getFileReferences', () => {
   })
 
   it('queries product_source_records filtered to non-archived rows only', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({ data: [] })
       .mockResolvedValueOnce({ data: [] })
       .mockResolvedValueOnce({ data: [] }) // content_items_files
@@ -122,7 +149,7 @@ describe('getFileReferences', () => {
   })
 
   it('skips source rows with null product_id', async () => {
-    const fetch = vi.fn()
+    const fetch = vi.fn().mockResolvedValue({ data: [] })
       .mockResolvedValueOnce({ data: [] })
       .mockResolvedValueOnce({ data: [{ id: 8, product_id: null }] })
       .mockResolvedValueOnce({ data: [] }) // content_items_files

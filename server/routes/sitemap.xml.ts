@@ -7,7 +7,7 @@ import { buildSitemapUrls, renderSitemap, type SitemapUrl } from '~/server/utils
 /**
  * `/sitemap.xml` — published products plus eligible Content Center entries
  * (CC-IMP-10, RSG-02). An upstream failure answers 503 (not cached) instead of a
- * normal-looking empty sitemap. With no CMS mode enabled the sitemap is empty by design.
+ * normal-looking empty sitemap. Editorial/static pages are included independently of CMS records.
  */
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
 
   let urls: SitemapUrl[]
   try {
-    urls = await buildSitemapUrls(directusFetch, { ...publicContentOptionsFromConfig(config), siteUrl })
+    urls = await buildSitemapUrls(directusFetch, { ...publicContentOptionsFromConfig(config), siteUrl, includeStaticPages: true })
   }
   catch (err) {
     console.error('[sitemap.xml] Directus fetch failed:', err instanceof Error ? err.message : err)

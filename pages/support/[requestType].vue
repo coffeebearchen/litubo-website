@@ -10,11 +10,17 @@ const titles: Record<string, string> = {
   'service-training':  t('nav_support.serviceTraining'),
 }
 
+if (!Object.prototype.hasOwnProperty.call(titles, requestType.value)) {
+  throw createError({ statusCode: 404, fatal: true })
+}
+
 const pageTitle = computed(() => titles[requestType.value] ?? t('pages.serviceRequest.heroTitle'))
 
 useHead({ title: `${pageTitle.value} — LITUBO` })
 
-const form = reactive({ name: '', company: '', email: '', model: '', serial: '', country: '', issue: '', urgency: '', consent: false })
+const documentLabels: Record<string, string> = { datasheet: 'product datasheet', manual: 'operation manual', drawing: 'technical drawing', catalogue: 'product selection information' }
+const documentLabel = requestType.value === 'manual-request' && typeof route.query.document === 'string' && Object.hasOwn(documentLabels, route.query.document) ? documentLabels[route.query.document] : ''
+const form = reactive({ name: '', company: '', email: '', model: '', serial: '', country: '', issue: documentLabel ? `Please send the ${documentLabel} for the following product / application: ` : '', urgency: '', consent: false })
 const errors = reactive<Record<string, string>>({})
 const status = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
 
@@ -35,6 +41,7 @@ async function submit() {
       method: 'POST',
       body: {
         inquiry_type: 'support_request',
+        support_request_type: requestType.value,
         locale: locale.value,
         contact_name: form.name,
         contact_company: form.company,
