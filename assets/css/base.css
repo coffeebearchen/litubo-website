@@ -54,6 +54,13 @@ button {
   padding-inline: var(--container-pad);
 }
 
+/* ─── Hero — richer gradient + subtle accent glow (replaces flat solid) ── */
+.page-hero {
+  background-image:
+    radial-gradient(900px 380px at 88% -14%, rgba(208, 111, 27, 0.20), transparent 60%),
+    linear-gradient(135deg, #0e2f28 0%, var(--color-primary) 52%, #156d58 100%) !important;
+}
+
 /* ─── Focus visible ─────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--color-accent);
