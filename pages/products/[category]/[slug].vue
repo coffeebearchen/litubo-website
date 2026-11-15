@@ -265,6 +265,58 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
       </div>
     </section>
 
+    <!-- Product configurator (configuration is confirmed per project; no self-service options yet) -->
+    <section id="product-configurator" class="section-gap">
+      <div class="container">
+        <SectionHeading>Product Configurator</SectionHeading>
+        <p class="configurator__lead">
+          The configuration below is the standard reference for {{ product.modelSeries || loc(product.name) }}.
+          Reject method, conveyor height, aperture or channel size, communication options and product-specific
+          settings are confirmed with our team for your line.
+        </p>
+        <div class="configurator__table-wrap">
+          <table class="configurator__table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Standard configuration</th>
+                <th>Your requirement</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ product.modelSeries || '—' }}</td>
+                <td>As listed in the specifications above</td>
+                <td><span class="configurator__note">Confirmed per project</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="configurator__note-line">
+          Special requirements are subject to technical confirmation. Your request does not change the standard
+          product specifications.
+        </p>
+        <NuxtLink :to="localePath(inquiryPath)" class="btn btn--accent configurator__cta">
+          I am interested
+        </NuxtLink>
+      </div>
+    </section>
+
+    <!-- Company catalogue (honest empty state until an approved catalogue exists) -->
+    <section class="section-gap section-alt">
+      <div class="container catalogue">
+        <SectionHeading>Company catalogue</SectionHeading>
+        <p class="catalogue__text">
+          No approved company catalogue is currently available. You can request the documents for this model
+          through Technical Matching, and our team will send the correct files for your application.
+        </p>
+        <p class="catalogue__links">
+          <NuxtLink :to="localePath('/technical-matching')">Request a model-specific document →</NuxtLink>
+          <button type="button" class="catalogue__print" @click="printPage">Print / Save PDF</button>
+        </p>
+      </div>
+    </section>
+
     <!-- FAQ (Directus mode) — answer text is plain text, white-space: pre-line -->
     <section v-if="product.faqs?.length" class="section-gap">
       <div class="container">
@@ -526,6 +578,24 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 .spec-drawing__placeholder p { font-size: var(--text-xs); margin: 0; }
 .spec-drawing figcaption { font-size: var(--text-xs); color: var(--color-ink-muted); margin-top: var(--space-2); }
 @media (max-width: 900px) { .spec-cols { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); } }
+
+/* ─── Product configurator ─── */
+.configurator__lead { max-width: 820px; color: var(--color-ink-muted); line-height: var(--leading-normal); margin: 0 0 var(--space-6); }
+.configurator__table-wrap { overflow-x: auto; }
+.configurator__table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); background: var(--color-white); }
+.configurator__table th,
+.configurator__table td { padding: var(--space-3) var(--space-4); border: 1px solid var(--color-line); text-align: left; }
+.configurator__table th { background: var(--color-primary-deep); color: #fff; font-weight: 600; }
+.configurator__table td { color: var(--color-ink-muted); }
+.configurator__note-line { color: var(--color-ink-muted); font-size: var(--text-xs); margin: var(--space-4) 0 var(--space-6); }
+.configurator__cta { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; }
+
+/* ─── Company catalogue ─── */
+.catalogue { text-align: center; }
+.catalogue__text { max-width: 720px; margin: 0 auto var(--space-4); color: var(--color-ink-muted); line-height: var(--leading-normal); }
+.catalogue__links { display: flex; justify-content: center; gap: var(--space-6); flex-wrap: wrap; font-size: var(--text-sm); }
+.catalogue__links a { color: var(--color-primary); text-decoration: underline; }
+.catalogue__print { background: none; border: 0; padding: 0; color: var(--color-primary); text-decoration: underline; font: inherit; cursor: pointer; }
 .spec-unit { color: var(--color-ink-muted); }
 .spec-note {
   display: block;
