@@ -73,6 +73,7 @@ const navItems = computed<NavItem[]>(() => [
           { label: t('nav_applications.bakery'), to: localePath('/applications/bakery-snacks') },
           { label: t('nav_applications.nuts'), to: localePath('/applications/nuts-seeds-dried-food') },
           { label: t('nav_applications.powder'), to: localePath('/applications/powder-granules') },
+          { label: t('nav_applications.pharma'), to: localePath('/applications/pharmaceutical-daily-chemical') },
         ],
       },
     ],

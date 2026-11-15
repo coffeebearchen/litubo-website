@@ -99,6 +99,35 @@ button {
   box-shadow: 0 0 0 10px rgba(18, 60, 50, 0.03);
 }
 
+/* Warm variants — the site is green-dominant; these carry the amber/orange
+   side of the brand into the image slots so a page is not a wall of green. */
+.img-placeholder--warm {
+  background-color: #8a4512;
+  background-image:
+    radial-gradient(120% 120% at 82% 8%, rgba(255, 214, 150, 0.42), transparent 56%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px 14px),
+    linear-gradient(135deg, #7a3a0f 0%, #b8621f 58%, #d9822b 100%);
+}
+
+.img-placeholder--warm::before {
+  border-color: rgba(255, 236, 205, 0.45);
+  background: radial-gradient(circle at 38% 34%, rgba(255, 240, 210, 0.28), transparent 62%);
+  box-shadow: 0 0 0 10px rgba(255, 236, 205, 0.08);
+}
+
+.img-placeholder--warm-light {
+  background-color: #f7efe3;
+  background-image:
+    radial-gradient(110% 110% at 82% 10%, rgba(208, 111, 27, 0.22), transparent 58%),
+    repeating-linear-gradient(45deg, rgba(138, 69, 18, 0.05) 0 2px, transparent 2px 16px);
+}
+
+.img-placeholder--warm-light::before {
+  border-color: rgba(138, 69, 18, 0.28);
+  background: radial-gradient(circle at 38% 34%, rgba(208, 111, 27, 0.16), transparent 62%);
+  box-shadow: 0 0 0 10px rgba(208, 111, 27, 0.06);
+}
+
 /* ─── Focus visible ─────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--color-accent);

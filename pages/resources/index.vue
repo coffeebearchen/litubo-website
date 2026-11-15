@@ -251,7 +251,7 @@ const categories = [
                   loading="lazy"
                   @error="onImgError(card.key)"
                 >
-                <div v-else class="resource-card__photo-placeholder img-placeholder img-placeholder--light" aria-hidden="true" />
+                <div v-else class="resource-card__photo-placeholder img-placeholder img-placeholder--warm-light" aria-hidden="true" />
               </div>
               <div class="resource-card__body">
                 <p class="resource-card__type">{{ card.typeLabel }}</p>

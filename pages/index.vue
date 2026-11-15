@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { HomeContent, PostsResult } from '~/types/content'
+import { INDUSTRY_GUIDES } from '~/content/industry-guides'
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
+
+// Home "Inspection by application" — the same eight industries as /applications.
+const appCards = INDUSTRY_GUIDES.map(g => ({ slug: g.slug, title: g.title }))
 
 const { data: homeContent } = await useAsyncData<HomeContent>(
   'home-content',
@@ -167,12 +171,34 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
         <p class="home-cats__sub">Five proven technology lines, configurable for your production environment.</p>
         <div class="home-cats__grid">
           <NuxtLink v-for="c in catCards" :key="c.slug" :to="localePath(`/products/${c.slug}`)" class="home-cat-card">
-            <div class="home-cat-card__media img-placeholder img-placeholder--light" aria-hidden="true" />
+            <div class="home-cat-card__media img-placeholder img-placeholder--warm-light" aria-hidden="true" />
             <div class="home-cat-card__body">
               <h3 class="home-cat-card__title">{{ c.title }}</h3>
               <p class="home-cat-card__desc">{{ c.desc }}</p>
               <span class="home-cat-card__link">Explore systems →</span>
             </div>
+          </NuxtLink>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Inspection by application ─────────────────── -->
+    <section class="home-apps section-gap">
+      <div class="container">
+        <div class="home-cats__header">
+          <h2 class="home-section-title">Inspection by application</h2>
+          <NuxtLink :to="localePath('/applications')" class="home-all-link">Explore all applications →</NuxtLink>
+        </div>
+        <p class="home-cats__sub">Eight food and packaging industries, each with its own inspection considerations.</p>
+        <div class="home-apps__grid">
+          <NuxtLink
+            v-for="a in appCards"
+            :key="a.slug"
+            :to="localePath(`/applications/${a.slug}`)"
+            class="home-app-card"
+          >
+            <span class="home-app-card__title">{{ a.title }}</span>
+            <span class="home-app-card__link">Discuss your needs →</span>
           </NuxtLink>
         </div>
       </div>
@@ -193,7 +219,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
         <div class="home-latest__grid">
           <article v-for="item in latestResources" :key="item.title" class="resource-card">
             <NuxtLink :to="localePath(item.to)" class="resource-card__link">
-              <div class="resource-card__photo img-placeholder img-placeholder--light" aria-hidden="true" />
+              <div class="resource-card__photo img-placeholder img-placeholder--warm-light" aria-hidden="true" />
               <div class="resource-card__body">
                 <p class="resource-card__tag">{{ item.tag }}</p>
                 <h3 class="resource-card__title">{{ item.title }}</h3>
@@ -849,5 +875,23 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 .home-cat-card__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary); margin: 0; }
 .home-cat-card__desc { font-size: var(--text-sm); color: var(--color-ink-muted); line-height: var(--leading-normal); margin: 0; flex: 1; }
 .home-cat-card__link { font-size: var(--text-sm); font-weight: 600; color: var(--color-accent); }
+
+/* ─── Inspection by application ─── */
+.home-apps__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); }
+.home-app-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background: var(--color-white);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-normal);
+}
+.home-app-card:hover { border-color: var(--color-accent); box-shadow: 0 4px 16px rgba(208, 111, 27, 0.12); }
+.home-app-card__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary); line-height: var(--leading-snug); }
+.home-app-card__link { font-size: var(--text-sm); font-weight: 600; color: var(--color-accent); }
+
 @media (max-width: 900px) { .home-about__grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); } }
 </style>

@@ -125,10 +125,10 @@ watch(list, () => { if (active.value >= list.value.length) active.value = 0 })
 }
 
 .model-gallery__thumb {
-  flex: 0 0 72px;
-  width: 72px;
-  height: 72px;
-  padding: 4px;
+  flex: 0 0 130px;
+  width: 130px;
+  height: 130px;
+  padding: 6px;
   background: var(--color-white);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);

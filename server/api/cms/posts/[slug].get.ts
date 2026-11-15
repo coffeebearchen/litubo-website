@@ -61,7 +61,7 @@ function toPost(r: DirectusPostDetail, slug: string, files: ReadonlyMap<string, 
     faqGroup: (r.faq_group ?? null) as Post['faqGroup'],
     relatedProductSlugs: r.related_product_slugs ?? [],
     relatedApplicationSlugs: r.related_application_slugs ?? [],
-    coverImageUrl: coverFileId ? `/api/cms/media/${coverFileId}` : '',
+    coverImageUrl: coverFileId ? `/api/cms/media/${coverFileId}?v=2` : '',
     title: { en: r.title_en ?? '', es: r.title_es ?? '', pt: r.title_pt ?? '' },
     excerpt: { en: r.excerpt_en ?? '', es: r.excerpt_es ?? '', pt: r.excerpt_pt ?? '' },
     bodyHtml: {

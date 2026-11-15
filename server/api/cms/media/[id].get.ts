@@ -55,7 +55,9 @@ export default defineEventHandler(async (event) => {
       `attachment; filename="${media.filenameDownload}"`
     )
   } else if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
-    setResponseHeader(event, 'Cache-Control', 'public, max-age=31536000, immutable')
+    // Revalidated hourly: a file can be replaced in the Media Library under the same id, and a
+    // year-long immutable cache would keep serving the old bytes.
+    setResponseHeader(event, 'Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400')
   }
 
   return new Uint8Array(fileBytes)

@@ -37,7 +37,7 @@ function toListItem(r: DirectusPost, isFaq: boolean, files: ReadonlyMap<string, 
     publishDate: r.publish_date ?? null,
     author: r.author ?? null,
     topics: (r.topics ?? []) as PostListItem['topics'],
-    coverImageUrl: coverFileId ? `/api/cms/media/${coverFileId}` : '',
+    coverImageUrl: coverFileId ? `/api/cms/media/${coverFileId}?v=2` : '',
     title: { en: r.title_en ?? '', es: r.title_es ?? '', pt: r.title_pt ?? '' },
     excerpt: { en: r.excerpt_en ?? '', es: r.excerpt_es ?? '', pt: r.excerpt_pt ?? '' },
   }

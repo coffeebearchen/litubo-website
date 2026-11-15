@@ -92,9 +92,13 @@ const copyrightText = computed(() =>
           <p class="site-footer__col-title">{{ t('footer.links_applications') }}</p>
           <ul role="list">
             <li><NuxtLink :to="localePath('/applications/packaged-food')">{{ t('nav_applications.packaged') }}</NuxtLink></li>
+            <li><NuxtLink :to="localePath('/applications/bottled-canned-products')">{{ t('nav_applications.bottled') }}</NuxtLink></li>
             <li><NuxtLink :to="localePath('/applications/meat-seafood')">{{ t('nav_applications.meat') }}</NuxtLink></li>
             <li><NuxtLink :to="localePath('/applications/frozen-food')">{{ t('nav_applications.frozen') }}</NuxtLink></li>
             <li><NuxtLink :to="localePath('/applications/bakery-snacks')">{{ t('nav_applications.bakery') }}</NuxtLink></li>
+            <li><NuxtLink :to="localePath('/applications/nuts-seeds-dried-food')">{{ t('nav_applications.nuts') }}</NuxtLink></li>
+            <li><NuxtLink :to="localePath('/applications/powder-granules')">{{ t('nav_applications.powder') }}</NuxtLink></li>
+            <li><NuxtLink :to="localePath('/applications/pharmaceutical-daily-chemical')">{{ t('nav_applications.pharma') }}</NuxtLink></li>
             <li><NuxtLink :to="localePath('/applications')">{{ t('nav_applications.viewAll') }}</NuxtLink></li>
           </ul>
         </nav>
