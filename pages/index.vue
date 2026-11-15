@@ -50,9 +50,18 @@ useSeoHead({
   canonicalPath: '/',
 })
 
-// "Latest from LITUBO" lists real published resources only (D-014). No public source feeds the home page yet, so
-// the section is not rendered. The hard-coded demo cards and their DEMO notice were removed (D-020, FINAL-RELEASE-FIX-D).
-const latestResources: { tag: string; title: string; excerpt: string; to: string }[] = []
+// "Latest from LITUBO" — the three most recent published insights (real posts only).
+const { data: latestPosts } = await useAsyncData<PostsResult>(
+  'home-latest-posts',
+  () => $fetch<PostsResult>('/api/cms/posts?limit=3'),
+  { default: () => ({ posts: [] }) },
+)
+const latestResources = computed(() => (latestPosts.value?.posts ?? []).map(p => ({
+  tag: p.contentType === 'insight' ? 'Insight' : p.contentType === 'technical_guide' ? 'Technical Guide' : 'Article',
+  title: p.title[locale.value as 'en' | 'es' | 'pt'] || p.title.en,
+  excerpt: p.excerpt[locale.value as 'en' | 'es' | 'pt'] || p.excerpt.en,
+  to: `/resources/${p.contentType === 'insight' ? 'insights' : p.contentType === 'technical_guide' ? 'technical-guides' : 'news'}/${p.slug}`,
+})))
 
 // PUBLIC-CLAIMS-CLEANUP-01 (D-036): the FAQ teaser lists real published FAQ questions in the current locale only
 // (RSG-05, no fallback). With none published the whole section is not rendered; no question is hard-coded.
@@ -184,7 +193,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
         <div class="home-latest__grid">
           <article v-for="item in latestResources" :key="item.title" class="resource-card">
             <NuxtLink :to="localePath(item.to)" class="resource-card__link">
-              <div class="resource-card__photo" aria-hidden="true" />
+              <div class="resource-card__photo img-placeholder img-placeholder--light" aria-hidden="true" />
               <div class="resource-card__body">
                 <p class="resource-card__tag">{{ item.tag }}</p>
                 <h3 class="resource-card__title">{{ item.title }}</h3>

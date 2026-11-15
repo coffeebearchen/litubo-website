@@ -10,7 +10,7 @@
 import sanitizeHtml from 'sanitize-html'
 import { publicFileId, publicMediaUrl, type PublicFile } from './contentPublic'
 
-export const LEGACY_PUBLIC_POST_TYPES = ['technical_guide', 'faq'] as const
+export const LEGACY_PUBLIC_POST_TYPES = ['technical_guide', 'insight', 'faq'] as const
 
 export type LegacyPublicPostType = (typeof LEGACY_PUBLIC_POST_TYPES)[number]
 

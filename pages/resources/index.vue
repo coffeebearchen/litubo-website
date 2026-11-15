@@ -43,10 +43,11 @@ const { data: hub } = await useAsyncData(
   `resources-hub-${locale.value}`,
   async () => {
     const query = { locale: locale.value }
-    const [articles, caseStudies, guides] = await Promise.allSettled([
+    const [articles, caseStudies, guides, insights] = await Promise.allSettled([
       $fetch<PublicContentList>('/api/cms/content/technical_article', { query }),
       $fetch<PublicContentList>('/api/cms/content/case_study', { query }),
       $fetch<PostsResult>('/api/cms/posts?content_type=technical_guide'),
+      $fetch<PostsResult>('/api/cms/posts?content_type=insight&limit=50'),
     ])
     let unavailable = false
     const cards: HubCard[] = []
@@ -86,6 +87,23 @@ const { data: hub } = await useAsyncData(
           summary: post.excerpt[lang] ?? '',
           date: post.publishDate,
           href: localePath(`/resources/technical-guides/${post.slug}`),
+          imageUrl: post.coverImageUrl,
+          imageAlt: title,
+        })
+      }
+    }
+    if (insights.status === 'fulfilled' && !insights.value.cmsError && isPublishedLocale(locale.value, publishedLocales)) {
+      const lang = locale.value as 'en' | 'es' | 'pt'
+      for (const post of insights.value.posts.filter(p => p.contentType === 'insight' && p.title[lang])) {
+        const title = post.title[lang]
+        cards.push({
+          key: `insight:${post.slug}`,
+          kind: 'technical_article',
+          typeLabel: 'Insight',
+          title,
+          summary: post.excerpt[lang] ?? '',
+          date: post.publishDate,
+          href: localePath(`/resources/insights/${post.slug}`),
           imageUrl: post.coverImageUrl,
           imageAlt: title,
         })
@@ -233,7 +251,7 @@ const categories = [
                   loading="lazy"
                   @error="onImgError(card.key)"
                 >
-                <div v-else class="resource-card__photo-placeholder" aria-hidden="true" />
+                <div v-else class="resource-card__photo-placeholder img-placeholder img-placeholder--light" aria-hidden="true" />
               </div>
               <div class="resource-card__body">
                 <p class="resource-card__type">{{ card.typeLabel }}</p>
@@ -406,7 +424,6 @@ const categories = [
 .resource-card__photo-placeholder {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
 }
 .resource-card__body {
   padding: var(--space-5);
