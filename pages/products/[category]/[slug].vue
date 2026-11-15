@@ -53,6 +53,11 @@ useSeoHead({
 const hasSpecGroups = computed(() => (product.value?.specGroups?.length ?? 0) > 0)
 const hasSpecsFlat = computed(() => !hasSpecGroups.value && (product.value?.specifications?.length ?? 0) > 0)
 
+// Same-category products as "Related products" (exclude the current one)
+const relatedProducts = computed(() =>
+  (categoryData.value?.products ?? []).filter(p => p.slug !== slug).slice(0, 4)
+)
+
 // FAQ open/close state
 const openFaq = ref<number | null>(null)
 function toggleFaq(i: number) {
@@ -270,6 +275,24 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
       </div>
     </section>
 
+    <!-- Related products (same category) -->
+    <section v-if="relatedProducts.length" class="section-gap section-alt">
+      <div class="container">
+        <SectionHeading>Related Products</SectionHeading>
+        <div class="related-grid">
+          <MediaCard
+            v-for="p in relatedProducts"
+            :key="p.slug"
+            :title="loc(p.name)"
+            :subtitle="loc(p.summary)"
+            :to="localePath(`/products/${categorySlug}/${p.slug}`)"
+            :image-src="p.heroMedia.url"
+            :image-alt="loc(p.heroMedia.alt)"
+          />
+        </div>
+      </div>
+    </section>
+
     <CTABanner
       :title="t('common.talkToEngineer')"
       :primary-label="t('nav.contact')"
@@ -378,6 +401,14 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--space-3);
+}
+
+/* Related products */
+.related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-5);
+  margin-top: var(--space-8);
 }
 
 .gallery-img {
