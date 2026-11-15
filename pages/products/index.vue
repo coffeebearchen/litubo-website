@@ -59,7 +59,7 @@ useSeoHead({
                 loading="lazy"
                 @error="($event.target as HTMLImageElement).style.display = 'none'"
               >
-              <div class="category-card__image-placeholder" aria-hidden="true" />
+              <div class="category-card__image-placeholder img-placeholder" aria-hidden="true" />
             </div>
             <div class="category-card__body">
               <h2 class="category-card__title">{{ loc(cat.title) }}</h2>
@@ -163,7 +163,6 @@ useSeoHead({
 .category-card__image-placeholder {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
 }
 
 .category-card__body {

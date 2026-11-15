@@ -39,7 +39,7 @@ useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'
             <p class="body-text">LITUBO operates under Shanghai NingPin Industrial Dev. Co., Ltd. in Kunshan, Jiangsu Province, China, and welcomes international enquiries from distributors and end users.</p>
           </div>
           <div class="two-col__photo" aria-hidden="true">
-            <div class="two-col__img-placeholder" aria-hidden="true" />
+            <div class="two-col__img-placeholder img-placeholder" aria-hidden="true" />
           </div>
         </div>
       </div>
@@ -201,7 +201,6 @@ useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'
   aspect-ratio: 3 / 2;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
 }
 
 .two-col__img {
@@ -213,7 +212,6 @@ useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'
 .two-col__img-placeholder {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
 }
 
 /* ── Pillars ───────────────────────────────────────────────────── */

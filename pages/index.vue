@@ -115,7 +115,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 
           <!-- Card 1: Looking for equipment -->
           <div class="home-path__card">
-            <div class="home-path__card-photo" aria-hidden="true" />
+            <div class="home-path__card-photo img-placeholder" aria-hidden="true" />
             <div class="home-path__card-body">
               <h3 class="home-path__card-title">{{ t('pages.home.pathCard1Title') }}</h3>
               <div class="home-path__card-actions">
@@ -137,7 +137,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 
           <!-- Card 2: Already working with LITUBO -->
           <div class="home-path__card">
-            <div class="home-path__card-photo home-path__card-photo--alt" aria-hidden="true" />
+            <div class="home-path__card-photo home-path__card-photo--alt img-placeholder" aria-hidden="true" />
             <div class="home-path__card-body">
               <h3 class="home-path__card-title">{{ t('pages.home.pathCard2Title') }}</h3>
               <div class="home-path__card-actions">
@@ -269,7 +269,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 .home-hero {
   position: relative;
   background: var(--color-primary-deep);
-  min-height: calc(100vh - var(--header-height));
+  min-height: clamp(540px, 68vh, 720px);
   display: flex;
   flex-direction: column;
 }
@@ -458,33 +458,10 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 
 .home-path__card-photo {
   height: 200px;
-  background: linear-gradient(
-    160deg,
-    rgba(15, 92, 75, 0.4) 0%,
-    rgba(18, 60, 50, 0.95) 100%
-  ),
-  repeating-linear-gradient(
-    -45deg,
-    rgba(255, 255, 255, 0.02) 0px,
-    rgba(255, 255, 255, 0.02) 1px,
-    transparent 1px,
-    transparent 10px
-  );
 }
 
 .home-path__card-photo--alt {
-  background: linear-gradient(
-    160deg,
-    rgba(208, 111, 27, 0.15) 0%,
-    rgba(18, 60, 50, 0.95) 100%
-  ),
-  repeating-linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.02) 0px,
-    rgba(255, 255, 255, 0.02) 1px,
-    transparent 1px,
-    transparent 10px
-  );
+  height: 200px;
 }
 
 .home-path__card-body {

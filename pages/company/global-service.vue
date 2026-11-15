@@ -56,7 +56,7 @@ const serviceItems = [
             </div>
           </div>
           <div class="two-col__photo" aria-hidden="true">
-            <div class="two-col__img-placeholder" />
+            <div class="two-col__img-placeholder img-placeholder" />
           </div>
         </div>
       </div>
@@ -157,7 +157,6 @@ const serviceItems = [
   aspect-ratio: 3 / 2;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
 }
 
 .two-col__img {
@@ -169,7 +168,6 @@ const serviceItems = [
 .two-col__img-placeholder {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
 }
 
 .btn {
