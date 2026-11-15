@@ -247,10 +247,13 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
           </NuxtLink>
         </div>
         <div class="home-cta-banner__media" aria-hidden="true">
-          <div class="home-cta-banner__photo" />
+          <div class="home-cta-banner__photo img-placeholder" />
         </div>
       </div>
     </section>
+
+    <!-- ─── Connect with an Expert ─────────────────────── -->
+    <ExpertContactForm />
 
   </div>
 </template>

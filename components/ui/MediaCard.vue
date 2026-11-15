@@ -67,18 +67,19 @@ const imgError = ref(false)
 .media-card__image-wrap {
   aspect-ratio: 4 / 3;
   overflow: hidden;
-  background: var(--color-surface-alt);
+  background: var(--color-white);
 }
 
 .media-card__image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  transform: scale(1.4);
   transition: transform var(--transition-normal);
 }
 
 .media-card:hover .media-card__image {
-  transform: scale(1.03);
+  transform: scale(1.46);
 }
 
 .media-card__image-placeholder {
@@ -115,6 +116,11 @@ const imgError = ref(false)
   color: var(--color-ink-muted);
   line-height: var(--leading-normal);
   flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .media-card__arrow {

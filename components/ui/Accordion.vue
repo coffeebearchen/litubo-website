@@ -85,17 +85,16 @@ function toggle() {
 }
 
 .accordion__content {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--transition-normal);
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.35s ease;
 }
 
 .accordion--open .accordion__content {
-  grid-template-rows: 1fr;
+  max-height: 1200px;
 }
 
 .accordion__body {
-  overflow: hidden;
   padding-bottom: var(--space-5);
   font-size: var(--text-sm);
   color: var(--color-ink-muted);
