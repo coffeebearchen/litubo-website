@@ -360,10 +360,10 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 
 /* ─── Two-column intro: image left, copy right ─── */
 .product-intro { background: var(--color-white); padding: var(--space-10) 0 var(--space-12); }
-.product-intro__grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: start; gap: var(--space-12); }
-.product-intro__media { background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); aspect-ratio: 1 / 1; padding: var(--space-6); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.product-intro__media img { width: 100%; height: 100%; object-fit: contain; }
-.product-intro__placeholder { width: 100%; height: 100%; border-radius: var(--radius-sm); }
+.product-intro__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); align-items: start; gap: var(--space-12); }
+/* The gallery owns its own frame (stage + thumbnails); no fixed ratio or clipping here,
+   otherwise the thumbnail row is cut off. */
+.product-intro__media { min-width: 0; }
 .product-intro__summary { font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--color-ink); margin: 0 0 var(--space-6); }
 .product-keys { margin: 0 0 var(--space-6); }
 .product-keys__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary-deep); margin: 0 0 var(--space-3); }

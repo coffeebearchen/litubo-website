@@ -6,7 +6,7 @@ interface GalleryImage { id: string; url: string; alt: string }
 const props = withDefaults(defineProps<{
   images: GalleryImage[]
   ratio?: string
-}>(), { ratio: '1 / 1' })
+}>(), { ratio: '4 / 3' })
 
 const active = ref(0)
 const zoomed = ref(false)
