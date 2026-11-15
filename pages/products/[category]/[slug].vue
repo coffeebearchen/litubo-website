@@ -77,6 +77,11 @@ function toggleFaq(i: number) {
   openFaq.value = openFaq.value === i ? null : i
 }
 
+// "Print / Save PDF" — uses the browser dialog; no form or document required.
+function printPage() {
+  if (typeof window !== 'undefined') window.print()
+}
+
 const DOWNLOAD_ROLE_LABELS: Record<string, string> = {
   brochure: 'Brochure',
   datasheet: 'Datasheet',
@@ -126,6 +131,7 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
           <div class="product-intro__actions">
             <NuxtLink :to="localePath(inquiryPath)" class="btn btn--accent">{{ t('common.talkToEngineer') }}</NuxtLink>
             <NuxtLink :to="localePath('/find-a-distributor')" class="btn btn--outline">{{ t('common.findDistributor') }}</NuxtLink>
+            <button type="button" class="btn btn--ghost" @click="printPage">Print / Save PDF</button>
           </div>
           <p class="product-intro__note">{{ t('pages.productDetail.selectionNote') }}</p>
         </div>
@@ -390,6 +396,8 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 :deep(.btn--accent:hover)  { background: #B87A00; border-color: #B87A00; }
 :deep(.btn--outline)       { background: transparent; color: var(--color-primary); border-color: var(--color-primary); }
 :deep(.btn--outline:hover) { background: var(--color-primary); color: #fff; }
+:deep(.btn--ghost)         { background: transparent; color: var(--color-primary); border-color: transparent; text-decoration: underline; text-underline-offset: 3px; padding-inline: var(--space-2); }
+:deep(.btn--ghost:hover)   { color: var(--color-accent); }
 
 /* ─── Jump nav ─── */
 .product-jump { border-bottom: 1px solid var(--color-line); background: var(--color-white); }

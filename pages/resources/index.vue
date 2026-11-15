@@ -167,6 +167,18 @@ const categories = [
     body: 'Product demonstrations, installation guides and operation tutorials.',
     to: localePath('/resources/videos'),
   },
+  {
+    key: 'certifications',
+    title: 'Certifications',
+    body: 'Certificates as issued, each shown with its own name and scope.',
+    to: localePath('/resources/downloads'),
+  },
+  {
+    key: 'selection-guide',
+    title: 'Selection guide',
+    body: 'The practical facts that decide which inspection system fits your line.',
+    to: localePath('/technical-matching'),
+  },
 ]
 </script>
 

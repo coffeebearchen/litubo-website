@@ -160,3 +160,27 @@ button {
   }
 }
 
+/* ─── Print (product "Print / Save PDF") ────────────────────────────── */
+@media print {
+  .site-header,
+  .cat-strip,
+  .site-footer,
+  .mobile-conversion-bar,
+  .product-jump,
+  .product-intro__actions,
+  .product-anchor,
+  .cta-banner,
+  .back-to-top {
+    display: none !important;
+  }
+
+  body { background: #fff; }
+
+  .page-content {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  a[href]::after { content: ''; }
+}
+

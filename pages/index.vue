@@ -57,15 +57,29 @@ useSeoHead({
 // "Latest from LITUBO" — the three most recent published insights (real posts only).
 const { data: latestPosts } = await useAsyncData<PostsResult>(
   'home-latest-posts',
-  () => $fetch<PostsResult>('/api/cms/posts?limit=3'),
+  () => $fetch<PostsResult>('/api/cms/posts?limit=12'),
   { default: () => ({ posts: [] }) },
 )
-const latestResources = computed(() => (latestPosts.value?.posts ?? []).map(p => ({
+const latestAll = computed(() => (latestPosts.value?.posts ?? []).map(p => ({
+  type: p.contentType,
   tag: p.contentType === 'insight' ? 'Insight' : p.contentType === 'technical_guide' ? 'Technical Guide' : 'Article',
   title: p.title[locale.value as 'en' | 'es' | 'pt'] || p.title.en,
   excerpt: p.excerpt[locale.value as 'en' | 'es' | 'pt'] || p.excerpt.en,
   to: `/resources/${p.contentType === 'insight' ? 'insights' : p.contentType === 'technical_guide' ? 'technical-guides' : 'news'}/${p.slug}`,
 })))
+
+// ANYI-style tabs on the home "Latest" section.
+const latestTab = ref<'all' | 'insight' | 'technical_guide' | 'case_study'>('all')
+const latestTabs: { key: typeof latestTab.value; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'insight', label: 'Insights' },
+  { key: 'technical_guide', label: 'Technical Guides' },
+  { key: 'case_study', label: 'Case Studies' },
+]
+const latestResources = computed(() => {
+  const rows = latestTab.value === 'all' ? latestAll.value : latestAll.value.filter(p => p.type === latestTab.value)
+  return rows.slice(0, 3)
+})
 
 // PUBLIC-CLAIMS-CLEANUP-01 (D-036): the FAQ teaser lists real published FAQ questions in the current locale only
 // (RSG-05, no fallback). With none published the whole section is not rendered; no question is hard-coded.
@@ -205,7 +219,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
     </section>
 
     <!-- ─── Latest from LITUBO ────────────────────────── -->
-    <section v-if="latestResources.length" class="home-latest section-gap section-alt" aria-label="Latest resources">
+    <section v-if="latestAll.length" class="home-latest section-gap section-alt" aria-label="Latest resources">
       <div class="container">
         <div class="home-latest__header">
           <h2 class="home-section-title">{{ t('pages.home.latestTitle') }}</h2>
@@ -215,6 +229,20 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
               <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </NuxtLink>
+        </div>
+        <div class="home-latest__tabs" role="tablist" aria-label="Article types">
+          <button
+            v-for="tab in latestTabs"
+            :key="tab.key"
+            type="button"
+            role="tab"
+            class="home-latest__tab"
+            :class="{ 'is-active': latestTab === tab.key }"
+            :aria-selected="latestTab === tab.key"
+            @click="latestTab = tab.key"
+          >
+            {{ tab.label }}
+          </button>
         </div>
         <div class="home-latest__grid">
           <article v-for="item in latestResources" :key="item.title" class="resource-card">
@@ -560,6 +588,32 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
   gap: var(--space-4);
   margin-bottom: var(--space-4);
   flex-wrap: wrap;
+}
+
+/* ANYI-style filter tabs */
+.home-latest__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+.home-latest__tab {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.home-latest__tab:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.home-latest__tab.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-white);
+  font-weight: 600;
 }
 
 .home-latest__grid {
