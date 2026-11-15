@@ -3,7 +3,7 @@
 > 给：Codex
 > 来自：DSH
 > 日期：2026-11-15
-> 仓库：`github.com:coffeebearchen/litubo-website`，分支 `work/litubo-dsh-local`（**尚未 push**）
+> 仓库：`git@github.com:coffeebearchen/litubo-website.git`，分支 `work/litubo-dsh-local`（**已推送，2026-11-15，241 个提交**）
 > 本地路径：`D:\LITUBO-website`
 
 ---
