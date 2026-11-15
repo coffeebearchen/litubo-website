@@ -18,7 +18,7 @@ defineProps<{
 }>()
 
 const { t } = useI18n()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; hover: []; leave: [] }>()
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') emit('close')
@@ -32,6 +32,8 @@ function handleKeydown(e: KeyboardEvent) {
       class="mega-menu"
       role="region"
       @keydown="handleKeydown"
+      @mouseenter="emit('hover')"
+      @mouseleave="emit('leave')"
     >
       <div class="mega-menu__inner container">
 
@@ -190,7 +192,7 @@ function handleKeydown(e: KeyboardEvent) {
   left: 0;
   right: 0;
   z-index: 95;
-  background: var(--color-white);
+  background-color: #fff;
   border-top: 2px solid var(--color-accent);
   box-shadow: var(--shadow-menu);
   padding: var(--space-8) 0 var(--space-6);
@@ -413,14 +415,16 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 /* ── Transition ───────────────────────────────── */
+/* Kept instant on purpose: a fading overlay could be captured mid-transition
+   and read as a see-through menu. The panel is always fully opaque. */
 .mega-menu-enter-active,
 .mega-menu-leave-active {
-  transition: opacity var(--transition-normal), transform var(--transition-normal);
+  transition: none;
 }
 
 .mega-menu-enter-from,
 .mega-menu-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
+  opacity: 1;
+  transform: none;
 }
 </style>

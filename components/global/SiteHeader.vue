@@ -150,8 +150,24 @@ const navItems = computed<NavItem[]>(() => [
   },
 ])
 
-function openMenu(id: string) { activeMenu.value = id }
-function closeMenu() { activeMenu.value = null }
+// The mega menu is `position: fixed`, so it sits outside the <li> box. Without a small grace
+// period the <li> mouseleave fires the moment the pointer moves from the nav item into the panel.
+let closeTimer: ReturnType<typeof setTimeout> | null = null
+function cancelClose() {
+  if (closeTimer) { clearTimeout(closeTimer); closeTimer = null }
+}
+function openMenu(id: string) {
+  cancelClose()
+  activeMenu.value = id
+}
+function scheduleClose() {
+  cancelClose()
+  closeTimer = setTimeout(() => { activeMenu.value = null; closeTimer = null }, 220)
+}
+function closeMenu() {
+  cancelClose()
+  activeMenu.value = null
+}
 function toggleMenu(id: string) { activeMenu.value = activeMenu.value === id ? null : id }
 
 function handleKeydown(e: KeyboardEvent, id: string) {
@@ -190,7 +206,7 @@ onUnmounted(() => { document.removeEventListener('click', handleOutsideClick) })
             :key="item.id"
             class="site-header__nav-item"
             @mouseenter="openMenu(item.id)"
-            @mouseleave="closeMenu"
+            @mouseleave="scheduleClose"
           >
             <button
               class="site-header__nav-link"
@@ -209,6 +225,8 @@ onUnmounted(() => { document.removeEventListener('click', handleOutsideClick) })
             <MegaMenu
               :item="item"
               :is-open="activeMenu === item.id"
+              @hover="openMenu(item.id)"
+              @leave="scheduleClose"
               @close="closeMenu"
             />
           </li>
