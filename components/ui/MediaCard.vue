@@ -70,16 +70,18 @@ const imgError = ref(false)
   background: var(--color-white);
 }
 
+/* Contain, never scale: product photos are framed differently (some tight close-ups,
+   some full machines), and any zoom crops the tight ones. Size comes from the card width. */
 .media-card__image {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  transform: scale(1.4);
+  padding: var(--space-2);
   transition: transform var(--transition-normal);
 }
 
 .media-card:hover .media-card__image {
-  transform: scale(1.46);
+  transform: scale(1.03);
 }
 
 .media-card__image-placeholder {
