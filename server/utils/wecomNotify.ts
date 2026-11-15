@@ -88,3 +88,50 @@ export async function sendWecomInquiry(payload: WecomInquiryPayload): Promise<vo
     clearTimeout(timer)
   }
 }
+
+export interface WecomVisitPayload {
+  path: string
+  source: string
+  country: string
+  sessionId: string
+  referrer?: string
+}
+
+/**
+ * Live page-view notification. Internal navigation is skipped so the channel only carries
+ * visitors who arrived from outside the site. Notifies on every page view — adjust here if it
+ * becomes too noisy.
+ */
+export async function sendWecomVisit(payload: WecomVisitPayload): Promise<void> {
+  const webhook = process.env.WECOM_WEBHOOK_URL?.trim()
+  if (!webhook) return
+  if (payload.source === 'Internal') return
+
+  const country = payload.country && payload.country !== 'XX' ? payload.country : 'unknown'
+  const rows = [
+    '### 👀 Visitor on the site',
+    `> **Page:** ${clip(payload.path, 200)}`,
+    `> **Country:** ${country}`,
+    `> **Source:** ${payload.source}`,
+    `> **Time:** ${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Shanghai' })}`,
+  ]
+
+  const body = { msgtype: 'markdown', markdown: { content: rows.join('\n') } }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5000)
+  try {
+    await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  }
+  catch {
+    console.error('[wecom] visit notification failed')
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}

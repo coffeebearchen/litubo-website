@@ -136,6 +136,10 @@ function closeMenu() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 6 9 7 9-7" /></svg>
           Customer Inquiries
         </NuxtLink>
+        <NuxtLink to="/admin/visitors" class="nav-item" active-class="nav-item--active" @click="closeMenu">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+          Live Visitors
+        </NuxtLink>
         <NuxtLink to="/admin/settings" class="nav-item" active-class="nav-item--active" @click="closeMenu">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3" />
