@@ -17,16 +17,16 @@
   --font-display: 'Source Serif 4', Georgia, serif;
   --font-body:    'Inter', system-ui, sans-serif;
 
-  --text-xs:   0.75rem;    /* 12px */
-  --text-sm:   0.875rem;   /* 14px */
-  --text-base: 1rem;       /* 16px */
-  --text-lg:   1.125rem;   /* 18px */
-  --text-xl:   1.25rem;    /* 20px */
-  --text-2xl:  1.5rem;     /* 24px */
-  --text-3xl:  1.875rem;   /* 30px */
-  --text-4xl:  2.25rem;    /* 36px */
-  --text-5xl:  3rem;       /* 48px */
-  --text-6xl:  3.75rem;    /* 60px */
+  --text-xs:   1.125rem;   /* 18px  +50% */
+  --text-sm:   1.3125rem;  /* 21px  +50% */
+  --text-base: 1.5rem;     /* 24px  +50% */
+  --text-lg:   1.6875rem;  /* 27px  +50% */
+  --text-xl:   1.875rem;   /* 30px  +50% */
+  --text-2xl:  2.25rem;    /* 36px  +50% */
+  --text-3xl:  2.8125rem;  /* 45px  +50% */
+  --text-4xl:  3.375rem;   /* 54px  +50% */
+  --text-5xl:  4.5rem;     /* 72px  +50% */
+  --text-6xl:  5.625rem;   /* 90px  +50% */
 
   --leading-tight:  1.15;
   --leading-snug:   1.35;
