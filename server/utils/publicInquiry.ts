@@ -7,6 +7,7 @@ import { readHubspotAccessToken, readSubmissionIpSecret } from '~/server/utils/s
 import { readJsonBodyWithByteLimit } from '~/server/utils/requestBodyLimit'
 import { writeInquiry } from '~/server/utils/writeInquiry'
 import { sendInquiryEmail } from '~/server/utils/sendInquiryEmail'
+import { sendWecomInquiry } from '~/server/utils/wecomNotify'
 import { syncHubspot } from '~/server/utils/syncHubspot'
 import type { InquiryType, HubspotSyncStatus } from '~/types/content'
 
@@ -263,6 +264,22 @@ export async function handlePublicInquiry(event: H3Event, toInquiryFields: Inqui
   // Email notification (best-effort; log only the record ID, no PII)
   sendInquiryEmail(result.id, san.inquiry_type as InquiryType).catch(() => {
     console.error('[inquiry] email notification failed', { id: result.id })
+  })
+
+  // WeCom group robot (best-effort; only when WECOM_WEBHOOK_URL is set). The full inquiry content
+  // goes to the owner's group so a new lead is visible without opening the admin.
+  sendWecomInquiry({
+    id: result.id,
+    type: String(san.inquiry_type),
+    name: san.contact_name || null,
+    company: san.contact_company || null,
+    email: String(san.contact_email),
+    country: san.contact_country || null,
+    phone: san.contact_phone || null,
+    message: san.message || null,
+    sourceUrl: sourceUrl || null,
+  }).catch(() => {
+    console.error('[inquiry] wecom notification failed', { id: result.id })
   })
 
   // HubSpot Contact sync (controlled await, bounded by HUBSPOT_REQUEST_TIMEOUT_MS).
