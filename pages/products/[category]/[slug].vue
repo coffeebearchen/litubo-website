@@ -191,33 +191,56 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
       </section>
     </template>
 
-    <!-- Structured spec groups (Directus mode) -->
+    <!-- Structured spec groups (Directus mode) — ANYI-style: specs left, technical illustration right -->
     <section v-if="hasSpecGroups" id="product-specifications" class="section-gap section-alt">
-      <div class="container">
-        <SectionHeading>Technical Specifications</SectionHeading>
-        <div
-          v-for="(group, gi) in product.specGroups"
-          :key="gi"
-          class="spec-group"
-        >
-          <h3 v-if="loc(group.title)" class="spec-group__title">
-            {{ loc(group.title) }}
-          </h3>
-          <p v-if="loc(group.description)" class="spec-group__desc">
-            {{ loc(group.description) }}
-          </p>
-          <table class="spec-table">
-            <tbody>
-              <tr v-for="(row, ri) in group.items" :key="ri">
-                <th>{{ loc(row.label) }}</th>
-                <td>
-                  {{ loc(row.value) }}<span v-if="row.unit" class="spec-unit"> {{ row.unit }}</span>
-                  <span v-if="row.note" class="spec-note">{{ row.note }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <div class="container spec-cols">
+        <div class="spec-cols__main">
+          <SectionHeading>Technical Specifications</SectionHeading>
+          <div
+            v-for="(group, gi) in product.specGroups"
+            :key="gi"
+            class="spec-group"
+          >
+            <h3 v-if="loc(group.title)" class="spec-group__title">
+              {{ loc(group.title) }}
+            </h3>
+            <p v-if="loc(group.description)" class="spec-group__desc">
+              {{ loc(group.description) }}
+            </p>
+            <table class="spec-table">
+              <tbody>
+                <tr v-for="(row, ri) in group.items" :key="ri">
+                  <th>{{ loc(row.label) }}</th>
+                  <td>
+                    {{ loc(row.value) }}<span v-if="row.unit" class="spec-unit"> {{ row.unit }}</span>
+                    <span v-if="row.note" class="spec-note">{{ row.note }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
+        <aside class="spec-cols__drawing">
+          <h2 class="spec-drawing__title">Technical Illustration</h2>
+          <figure class="spec-drawing">
+            <img
+              v-if="product.illustration?.url"
+              :src="product.illustration.url"
+              :alt="loc(product.illustration.alt) || 'Technical drawing'"
+              class="spec-drawing__img"
+              loading="lazy"
+            >
+            <div v-else class="spec-drawing__placeholder">
+              <svg width="86" height="86" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                <rect x="6" y="10" width="36" height="28" rx="2" stroke="currentColor" stroke-width="1.2" />
+                <path d="M6 24h36M24 10v28" stroke="currentColor" stroke-width="0.8" stroke-dasharray="3 3" />
+                <path d="M14 38v4M34 38v4" stroke="currentColor" stroke-width="1.2" />
+              </svg>
+              <p>Technical drawing to be supplied</p>
+            </div>
+            <figcaption>For reference. Not to scale.</figcaption>
+          </figure>
+        </aside>
       </div>
     </section>
 
@@ -470,6 +493,31 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 /* Zebra striping — ANYI-style alternating rows */
 .spec-table tbody tr:nth-child(odd) { background: var(--color-canvas); }
 .spec-table tbody tr:nth-child(even) { background: var(--color-white); }
+
+/* ─── Specs + technical illustration (2-col, ANYI-style) ─── */
+.spec-cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: var(--space-12); align-items: start; }
+.spec-cols__main, .spec-cols__drawing { min-width: 0; }
+.spec-drawing__title { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 600; color: var(--color-primary-deep); margin: 0 0 var(--space-4); }
+.spec-drawing { margin: 0; }
+.spec-drawing__img { width: 100%; background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: var(--space-4); }
+.spec-drawing__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  aspect-ratio: 4 / 3;
+  background: var(--color-white);
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-muted);
+  text-align: center;
+  padding: var(--space-6);
+}
+.spec-drawing__placeholder svg { color: var(--color-primary); opacity: .45; }
+.spec-drawing__placeholder p { font-size: var(--text-xs); margin: 0; }
+.spec-drawing figcaption { font-size: var(--text-xs); color: var(--color-ink-muted); margin-top: var(--space-2); }
+@media (max-width: 900px) { .spec-cols { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); } }
 .spec-unit { color: var(--color-ink-muted); }
 .spec-note {
   display: block;

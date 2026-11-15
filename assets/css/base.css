@@ -84,6 +84,21 @@ button {
   box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.05);
 }
 
+/* Light variant — pale surface with a green mark (matches ANYI's icon tiles).
+   Use where a large dark-green block would make a page too heavy. */
+.img-placeholder--light {
+  background-color: #eef2ec;
+  background-image:
+    radial-gradient(110% 110% at 85% 10%, rgba(208, 111, 27, 0.10), transparent 55%),
+    repeating-linear-gradient(45deg, rgba(18, 60, 50, 0.035) 0 2px, transparent 2px 16px);
+}
+
+.img-placeholder--light::before {
+  border-color: rgba(18, 60, 50, 0.22);
+  background: radial-gradient(circle at 38% 34%, rgba(18, 60, 50, 0.10), transparent 62%);
+  box-shadow: 0 0 0 10px rgba(18, 60, 50, 0.03);
+}
+
 /* ─── Focus visible ─────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--color-accent);

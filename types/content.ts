@@ -179,6 +179,8 @@ export interface Product {
   modelSeries?: string
   heroMedia: MediaAsset
   gallery: MediaAsset[]
+  /** Technical line drawing (`products_files.file_role = illustration`); null until supplied. */
+  illustration?: MediaAsset | null
   highlights: ProductHighlight[]
   specifications: ProductSpecRow[]
   /** Structured spec groups — populated in Directus mode; empty in fixtures mode. */

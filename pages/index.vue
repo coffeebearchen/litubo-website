@@ -158,7 +158,7 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
         <p class="home-cats__sub">Five proven technology lines, configurable for your production environment.</p>
         <div class="home-cats__grid">
           <NuxtLink v-for="c in catCards" :key="c.slug" :to="localePath(`/products/${c.slug}`)" class="home-cat-card">
-            <div class="home-cat-card__media img-placeholder" aria-hidden="true" />
+            <div class="home-cat-card__media img-placeholder img-placeholder--light" aria-hidden="true" />
             <div class="home-cat-card__body">
               <h3 class="home-cat-card__title">{{ c.title }}</h3>
               <p class="home-cat-card__desc">{{ c.desc }}</p>
@@ -302,13 +302,13 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 .home-hero__bg-overlay {
   position: absolute;
   inset: 0;
-  /* Desktop: strong left (text legibility), lighter right (image visible) */
+  /* Desktop: readable left, the photograph shows through on the right */
   background: linear-gradient(
     90deg,
-    rgba(18, 60, 50, 0.94) 0%,
-    rgba(18, 60, 50, 0.90) 38%,
-    rgba(18, 60, 50, 0.55) 62%,
-    rgba(18, 60, 50, 0.28) 100%
+    rgba(18, 60, 50, 0.86) 0%,
+    rgba(18, 60, 50, 0.76) 38%,
+    rgba(18, 60, 50, 0.40) 62%,
+    rgba(18, 60, 50, 0.16) 100%
   );
 }
 

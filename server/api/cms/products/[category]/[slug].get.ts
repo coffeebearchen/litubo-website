@@ -370,6 +370,17 @@ export default defineEventHandler(async (event) => {
     return id ? [{ id, url: mediaUrl(id), alt: ls(m.alt_en, m.alt_es, m.alt_pt) }] : []
   })
 
+  // Technical illustration (line drawing) — its own role, rendered as a drawing, never as a download
+  const illustrationMedia = rawMedia.find(m => m.file_role === 'illustration' && m.enabled)
+  const illustrationId = illustrationMedia ? publicFileId(publicFiles, illustrationMedia.directus_files_id) : null
+  const illustration: MediaAsset | null = illustrationId
+    ? {
+        id: illustrationId,
+        url: mediaUrl(illustrationId),
+        alt: illustrationMedia ? ls(illustrationMedia.alt_en, illustrationMedia.alt_es, illustrationMedia.alt_pt) : '',
+      }
+    : null
+
   // Downloads (in link order; a file RSG-06 does not allow is left out)
   const downloads: PublicDownload[] = rawMedia.flatMap((m) => {
     const uuid = m.file_role && DOWNLOAD_ROLES.has(m.file_role) ? publicFileId(publicFiles, m.directus_files_id) : null
@@ -418,6 +429,7 @@ export default defineEventHandler(async (event) => {
     ...(p.model_or_series ? { modelSeries: p.model_or_series } : {}),
     heroMedia,
     gallery,
+    illustration,
     highlights,
     specifications,
     specGroups,
