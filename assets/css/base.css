@@ -149,9 +149,11 @@ button {
 }
 
 /* ─── Page layout ───────────────────────────────────────────────────── */
+/* Sticky footer comes from `.layout { min-height: 100vh }` + `.page-content { flex: 1 }`
+   in the layout component. An extra `min-height: 100vh` here pushed the footer a full
+   viewport down on short pages. */
 .page-content {
   padding-top: var(--header-height);
-  min-height: 100vh;
 }
 
 @media (max-width: 1023px) {

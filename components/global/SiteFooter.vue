@@ -38,106 +38,127 @@ const legalName = computed(() => siteSettings.value?.legal_company_name || t('fo
 const copyrightText = computed(() =>
   (siteSettings.value?.copyright_text || t('footer.copyright')).replace('{year}', String(year))
 )
+
+const productLinks = [
+  { label: 'X-Ray Inspection', to: '/products/x-ray-inspection' },
+  { label: 'Metal Detection', to: '/products/metal-detection' },
+  { label: 'Checkweighers', to: '/products/checkweighers' },
+  { label: 'Combination Inspection', to: '/products/combination-inspection' },
+  { label: 'Conveyors & Reject Systems', to: '/products/conveyors-reject-systems' },
+]
+
+const applicationLinks = [
+  { label: 'Packaged Food', to: '/applications/packaged-food' },
+  { label: 'Bottled & Canned', to: '/applications/bottled-canned-products' },
+  { label: 'Meat & Seafood', to: '/applications/meat-seafood' },
+  { label: 'Frozen Food', to: '/applications/frozen-food' },
+  { label: 'Bakery & Snacks', to: '/applications/bakery-snacks' },
+  { label: 'Nuts, Seeds & Dried', to: '/applications/nuts-seeds-dried-food' },
+  { label: 'Powder & Granules', to: '/applications/powder-granules' },
+  { label: 'Pharma & Daily Chemical', to: '/applications/pharmaceutical-daily-chemical' },
+]
+
+const supportLinks = [
+  { label: 'Support overview', to: '/support' },
+  { label: 'Find a distributor', to: '/find-a-distributor' },
+  { label: 'Request spare parts', to: '/support/request-spare-parts' },
+  { label: 'Send product for test', to: '/support/send-product-test' },
+  { label: 'FAQ', to: '/support/faq' },
+]
+
+const resourceLinks = [
+  { label: 'LITUBO Insights', to: '/resources' },
+  { label: 'Case Studies', to: '/resources' },
+  { label: 'Downloads', to: '/resources/downloads' },
+  { label: 'Videos', to: '/resources/videos' },
+]
+
+const companyLinks = [
+  { label: 'About LITUBO', to: '/company/about' },
+  { label: 'Quality & Manufacturing', to: '/company/quality-manufacturing' },
+  { label: 'Global Service Capability', to: '/company/global-service' },
+  { label: 'Become a Partner', to: '/company/become-a-partner' },
+]
 </script>
 
 <template>
-  <footer class="site-footer" role="contentinfo">
+  <footer id="site-footer" class="site-footer" role="contentinfo">
     <div class="site-footer__main">
-      <div class="container site-footer__grid">
+      <div class="container">
 
-        <!-- Brand column -->
-        <div class="site-footer__brand">
-          <p class="site-footer__logo">LITUBO</p>
-          <p class="site-footer__tagline">{{ t('footer.tagline') }}</p>
-          <p class="site-footer__description">{{ t('footer.description') }}</p>
-          <address class="site-footer__contact">
-            <p>
-              <a :href="phoneHref">{{ phone }}</a>
-            </p>
-            <p>
-              <a :href="`mailto:${email}`">{{ email }}</a>
-            </p>
-          </address>
-          <!-- Social icons from CMS -->
-          <div class="site-footer__social" aria-label="Social media">
-            <a
-              v-for="link in socialLinks"
-              :key="link.platform"
-              :href="link.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              :aria-label="`LITUBO on ${link.platform}`"
-            >
-              <svg v-if="SOCIAL_ICONS[link.platform]" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path :d="SOCIAL_ICONS[link.platform]" />
-              </svg>
-            </a>
+        <!-- Brand + contact -->
+        <div class="site-footer__top">
+          <div class="site-footer__brand">
+            <p class="site-footer__logo">LITUBO</p>
+            <p class="site-footer__tagline">{{ t('footer.tagline') }}</p>
+            <p class="site-footer__description">{{ t('footer.description') }}</p>
+          </div>
+
+          <div class="site-footer__actions">
+            <address class="site-footer__contact">
+              <a :href="phoneHref" class="site-footer__contact-link">{{ phone }}</a>
+              <a :href="`mailto:${email}`" class="site-footer__contact-link">{{ email }}</a>
+              <span class="site-footer__address">Kunshan, Jiangsu Province, China</span>
+            </address>
+            <div class="site-footer__social" aria-label="Social media">
+              <a
+                v-for="link in socialLinks"
+                :key="link.platform"
+                :href="link.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                :aria-label="`LITUBO on ${link.platform}`"
+              >
+                <svg v-if="SOCIAL_ICONS[link.platform]" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path :d="SOCIAL_ICONS[link.platform]" />
+                </svg>
+              </a>
+            </div>
+            <NuxtLink :to="localePath('/contact')" class="site-footer__cta">
+              {{ t('nav.contact') }}
+              <span aria-hidden="true">→</span>
+            </NuxtLink>
           </div>
         </div>
 
-        <!-- Products column -->
-        <nav class="site-footer__col" aria-label="Products">
-          <p class="site-footer__col-title">{{ t('footer.links_products') }}</p>
-          <ul role="list">
-            <li><NuxtLink :to="localePath('/products/x-ray-inspection')">{{ t('nav_products.xray') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/products/metal-detection')">{{ t('nav_products.metal') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/products/checkweighers')">{{ t('nav_products.checkweighers') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/products/combination-inspection')">{{ t('nav_products.combination') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/products/conveyors-reject-systems')">{{ t('nav_products.conveyors') }}</NuxtLink></li>
-          </ul>
-        </nav>
+        <!-- Link columns -->
+        <div class="site-footer__grid">
+          <nav class="site-footer__col" aria-label="Products">
+            <p class="site-footer__col-title">{{ t('footer.links_products') }}</p>
+            <ul role="list">
+              <li v-for="l in productLinks" :key="l.to"><NuxtLink :to="localePath(l.to)">{{ l.label }}</NuxtLink></li>
+            </ul>
+          </nav>
 
-        <!-- Applications column -->
-        <nav class="site-footer__col" aria-label="Applications">
-          <p class="site-footer__col-title">{{ t('footer.links_applications') }}</p>
-          <ul role="list">
-            <li><NuxtLink :to="localePath('/applications/packaged-food')">{{ t('nav_applications.packaged') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/applications/bottled-canned-products')">{{ t('nav_applications.bottled') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/applications/meat-seafood')">{{ t('nav_applications.meat') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/applications/frozen-food')">{{ t('nav_applications.frozen') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/applications/bakery-snacks')">{{ t('nav_applications.bakery') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/applications/nuts-seeds-dried-food')">{{ t('nav_applications.nuts') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/applications/powder-granules')">{{ t('nav_applications.powder') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/applications/pharmaceutical-daily-chemical')">{{ t('nav_applications.pharma') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/applications')">{{ t('nav_applications.viewAll') }}</NuxtLink></li>
-          </ul>
-        </nav>
+          <nav class="site-footer__col site-footer__col--apps" aria-label="Applications">
+            <p class="site-footer__col-title">{{ t('footer.links_applications') }}</p>
+            <ul role="list">
+              <li v-for="l in applicationLinks" :key="l.to"><NuxtLink :to="localePath(l.to)">{{ l.label }}</NuxtLink></li>
+              <li><NuxtLink :to="localePath('/applications')" class="site-footer__view-all">{{ t('nav_applications.viewAll') }}</NuxtLink></li>
+            </ul>
+          </nav>
 
-        <!-- Support column -->
-        <nav class="site-footer__col" aria-label="Support">
-          <p class="site-footer__col-title">{{ t('footer.links_support') }}</p>
-          <ul role="list">
-            <li><NuxtLink :to="localePath('/support')">{{ t('nav_support.overview') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/technical-matching')">{{ t('nav.findDistributor') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/support/request-spare-parts')">{{ t('nav_support.spareParts') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/support/send-product-test')">{{ t('nav_support.productTest') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/support/faq')">{{ t('nav_support.faq') }}</NuxtLink></li>
-          </ul>
-        </nav>
+          <nav class="site-footer__col" aria-label="Support">
+            <p class="site-footer__col-title">{{ t('footer.links_support') }}</p>
+            <ul role="list">
+              <li v-for="l in supportLinks" :key="l.to"><NuxtLink :to="localePath(l.to)">{{ l.label }}</NuxtLink></li>
+            </ul>
+          </nav>
 
-        <!-- Resources column -->
-        <nav class="site-footer__col" aria-label="Resources">
-          <p class="site-footer__col-title">{{ t('footer.links_resources') }}</p>
-          <ul role="list">
-            <li><NuxtLink :to="localePath('/resources')">{{ t('nav_resources.insights') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/resources')">{{ t('nav_resources.caseStudies') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/resources/downloads')">{{ t('nav_resources.downloads') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/resources/videos')">{{ t('nav_resources.videos') }}</NuxtLink></li>
-          </ul>
-        </nav>
+          <nav class="site-footer__col" aria-label="Resources">
+            <p class="site-footer__col-title">{{ t('footer.links_resources') }}</p>
+            <ul role="list">
+              <li v-for="l in resourceLinks" :key="l.to + l.label"><NuxtLink :to="localePath(l.to)">{{ l.label }}</NuxtLink></li>
+            </ul>
+          </nav>
 
-        <!-- Company column -->
-        <nav class="site-footer__col" aria-label="Company">
-          <p class="site-footer__col-title">{{ t('footer.links_company') }}</p>
-          <ul role="list">
-            <li><NuxtLink :to="localePath('/company/about')">{{ t('nav_company.about') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/company/quality-manufacturing')">{{ t('nav_company.quality') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/company/global-service')">{{ t('nav_company.globalService') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/company/become-a-partner')">{{ t('nav_company.partner') }}</NuxtLink></li>
-            <li><NuxtLink :to="localePath('/contact')" class="site-footer__contact-cta">{{ t('nav.contact') }}</NuxtLink></li>
-          </ul>
-        </nav>
-
+          <nav class="site-footer__col" aria-label="Company">
+            <p class="site-footer__col-title">{{ t('footer.links_company') }}</p>
+            <ul role="list">
+              <li v-for="l in companyLinks" :key="l.to"><NuxtLink :to="localePath(l.to)">{{ l.label }}</NuxtLink></li>
+            </ul>
+          </nav>
+        </div>
       </div>
     </div>
 
@@ -158,191 +179,180 @@ const copyrightText = computed(() =>
 <style scoped>
 .site-footer {
   background: var(--color-primary-deep);
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .site-footer__main {
-  padding: var(--space-16) 0 var(--space-10);
+  padding: var(--space-12) 0 var(--space-8);
 }
 
-.site-footer__grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
-  gap: var(--space-8);
+/* ── Brand + contact ─────────────────────────────── */
+.site-footer__top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-10);
+  padding-bottom: var(--space-8);
+  margin-bottom: var(--space-8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  flex-wrap: wrap;
 }
 
-/* ── Brand column ──────────────────────────────────── */
+.site-footer__brand { max-width: 560px; }
+
 .site-footer__logo {
   font-family: var(--font-display);
   font-size: var(--text-2xl);
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--color-white);
   text-transform: uppercase;
-  margin-bottom: var(--space-2);
+  margin: 0 0 var(--space-2);
 }
 
 .site-footer__tagline {
   font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.45);
-  margin-bottom: var(--space-4);
+  letter-spacing: 0.12em;
+  color: var(--color-accent);
+  margin: 0 0 var(--space-4);
 }
 
 .site-footer__description {
   font-size: var(--text-sm);
-  color: rgba(255, 255, 255, 0.55);
   line-height: var(--leading-normal);
-  margin-bottom: var(--space-5);
+  margin: 0;
+  color: rgba(255, 255, 255, 0.7);
 }
 
-.site-footer__contact {
-  font-style: normal;
-  font-size: var(--text-sm);
+.site-footer__actions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  margin-bottom: var(--space-5);
+  align-items: flex-end;
+  gap: var(--space-4);
+  text-align: right;
 }
 
-.site-footer__contact a {
-  color: rgba(255, 255, 255, 0.6);
-  transition: color var(--transition-fast);
-}
+.site-footer__contact { display: flex; flex-direction: column; gap: var(--space-1); font-style: normal; }
 
-.site-footer__contact a:hover {
-  color: var(--color-accent);
+.site-footer__contact-link {
+  color: var(--color-white);
+  text-decoration: none;
+  font-size: var(--text-sm);
 }
+.site-footer__contact-link:hover { color: var(--color-accent); }
 
-/* ── Social ─────────────────────────────────────────── */
-.site-footer__social {
-  display: flex;
-  gap: var(--space-3);
-}
+.site-footer__address { font-size: var(--text-xs); color: rgba(255, 255, 255, 0.55); }
+
+.site-footer__social { display: flex; gap: var(--space-2); }
 
 .site-footer__social a {
-  display: flex;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.8);
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.site-footer__social a:hover { color: var(--color-accent); border-color: var(--color-accent); }
+
+.site-footer__cta {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-sm);
-  color: rgba(255, 255, 255, 0.6);
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.site-footer__social a:hover {
+  gap: var(--space-2);
+  padding: 10px 18px;
   background: var(--color-accent);
-  color: var(--color-white);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+.site-footer__cta:hover { background: var(--color-accent-hover); }
+
+/* ── Link columns ────────────────────────────────── */
+.site-footer__grid {
+  display: grid;
+  grid-template-columns: 1fr 1.9fr 1fr 1fr 1fr;
+  gap: var(--space-8);
+  align-items: start;
 }
 
-/* ── Nav columns ─────────────────────────────────────── */
 .site-footer__col-title {
-  font-size: var(--text-xs);
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.35);
-  margin-bottom: var(--space-4);
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0 0 var(--space-4);
 }
 
 .site-footer__col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 2px;
 }
+
+/* Applications runs in two sub-columns so no single column doubles the footer height. */
+.site-footer__col--apps ul {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px var(--space-5);
+}
+.site-footer__col--apps ul li:last-child { grid-column: 1 / -1; }
 
 .site-footer__col a {
-  font-size: var(--text-sm);
-  color: rgba(255, 255, 255, 0.65);
-  transition: color var(--transition-fast);
+  display: inline-block;
+  padding: 5px 0;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.72);
   text-decoration: none;
+  transition: color var(--transition-fast);
 }
+.site-footer__col a:hover { color: var(--color-white); }
 
-.site-footer__col a:hover {
-  color: var(--color-white);
-}
+.site-footer__view-all { color: var(--color-accent) !important; font-weight: 600; }
+.site-footer__view-all:hover { color: #fff !important; }
 
-.site-footer__contact-cta {
-  color: var(--color-accent) !important;
-  font-weight: 600;
-}
-
-.site-footer__contact-cta:hover {
-  color: #e88430 !important;
-}
-
-/* ── Bottom bar ──────────────────────────────────────── */
+/* ── Bottom bar ──────────────────────────────────── */
 .site-footer__bottom {
-  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
   padding: var(--space-4) 0;
 }
 
 .site-footer__bottom-inner {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  justify-content: space-between;
+  gap: var(--space-4);
   flex-wrap: wrap;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .site-footer__legal-name,
-.site-footer__copyright {
-  font-size: var(--text-xs);
-  color: rgba(255, 255, 255, 0.3);
+.site-footer__copyright { margin: 0; }
+
+.site-footer__legal-links { display: flex; gap: var(--space-4); }
+.site-footer__legal-links a { color: rgba(255, 255, 255, 0.6); text-decoration: none; }
+.site-footer__legal-links a:hover { color: var(--color-white); }
+
+@media (max-width: 1100px) {
+  .site-footer__grid { grid-template-columns: 1fr 1fr 1fr; gap: var(--space-6); }
+  .site-footer__col--apps ul { grid-template-columns: 1fr; }
+  .site-footer__col--apps ul li:last-child { grid-column: auto; }
 }
 
-.site-footer__copyright {
-  flex: 1;
-}
-
-.site-footer__legal-links {
-  display: flex;
-  gap: var(--space-5);
-}
-
-.site-footer__legal-links a {
-  font-size: var(--text-xs);
-  color: rgba(255, 255, 255, 0.4);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-}
-
-.site-footer__legal-links a:hover {
-  color: var(--color-white);
-}
-
-/* ── Responsive ──────────────────────────────────────── */
-@media (max-width: 1279px) {
-  .site-footer__grid {
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: var(--space-8);
-  }
-  .site-footer__brand {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 767px) {
-  .site-footer__grid {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-6);
-  }
-  .site-footer__brand {
-    grid-column: 1 / -1;
-  }
-  .site-footer__bottom-inner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-  }
-}
-
-@media (max-width: 479px) {
-  .site-footer__grid {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 720px) {
+  .site-footer__top { flex-direction: column; }
+  .site-footer__actions { align-items: flex-start; text-align: left; }
+  .site-footer__grid { grid-template-columns: 1fr 1fr; }
 }
 </style>
