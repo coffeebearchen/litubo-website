@@ -78,8 +78,8 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 
 <template>
   <div v-if="product && category">
-    <!-- Hero -->
-    <section class="page-hero">
+    <!-- Editorial header (white, centered title — ANYI-style) -->
+    <section class="product-header">
       <div class="container">
         <Breadcrumb
           :items="[
@@ -89,21 +89,33 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
             { label: loc(product.name) },
           ]"
         />
-        <div class="product-intro">
-        <div class="product-intro__copy">
-        <h1 class="page-hero__title">{{ loc(product.name) }}</h1>
-        <p v-if="product.modelSeries" class="page-hero__model">{{ product.modelSeries }}</p>
-        <p class="page-hero__sub">{{ loc(product.summary) }}</p>
-        <div class="page-hero__actions">
-          <NuxtLink :to="localePath(inquiryPath)" class="btn btn--accent">{{ t('common.talkToEngineer') }}</NuxtLink>
-          <NuxtLink :to="localePath('/find-a-distributor')" class="btn btn--outline-white">{{ t('common.findDistributor') }}</NuxtLink>
-        </div>
-        <p class="product-intro__note">{{ t('pages.productDetail.selectionNote') }}</p>
-        </div>
+        <h1 class="product-header__title">{{ loc(product.name) }}</h1>
+        <p v-if="product.modelSeries" class="product-header__model">{{ product.modelSeries }}</p>
+      </div>
+    </section>
+
+    <!-- Two-column intro: image left, copy right -->
+    <section class="product-intro">
+      <div class="container product-intro__grid">
         <div class="product-intro__media">
           <img v-if="product.heroMedia.url && !heroImageError" :src="product.heroMedia.url" :alt="loc(product.heroMedia.alt) || loc(product.name)" loading="eager" fetchpriority="high" @error="heroImageError = true">
-          <div v-else class="product-intro__placeholder"><span class="product-intro__brand">LITUBO</span><span>{{ product.modelSeries || loc(product.name) }}</span><small>{{ t('pages.productDetail.imageOnRequest') }}</small></div>
+          <div v-else class="product-intro__placeholder" aria-hidden="true" />
         </div>
+        <div class="product-intro__copy">
+          <p class="product-intro__summary">{{ loc(product.summary) }}</p>
+          <div v-if="product.highlights.length" class="product-keys">
+            <h3 class="product-keys__title">Key advantages</h3>
+            <ul class="product-keys__list">
+              <li v-for="(h, i) in product.highlights" :key="i">
+                <strong>{{ loc(h.title) }}</strong>{{ loc(h.body) ? ' — ' + loc(h.body) : '' }}
+              </li>
+            </ul>
+          </div>
+          <div class="product-intro__actions">
+            <NuxtLink :to="localePath(inquiryPath)" class="btn btn--accent">{{ t('common.talkToEngineer') }}</NuxtLink>
+            <NuxtLink :to="localePath('/find-a-distributor')" class="btn btn--outline">{{ t('common.findDistributor') }}</NuxtLink>
+          </div>
+          <p class="product-intro__note">{{ t('pages.productDetail.selectionNote') }}</p>
         </div>
       </div>
     </section>
@@ -304,54 +316,47 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 </template>
 
 <style scoped>
-.product-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); align-items: center; gap: var(--space-12); padding-top: var(--space-6); }
-.product-intro__media { background: white; border-radius: var(--radius-sm); aspect-ratio: 1 / 1; padding: var(--space-6); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.product-intro__media img { width: 100%; height: 100%; object-fit: contain; }
-.product-intro__placeholder { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-4); color: var(--color-primary); }
-.product-intro__brand { font-size: 32px; font-weight: 700; letter-spacing: .12em; }
-.product-intro__placeholder small { color: var(--color-ink-muted); }
-.product-intro__note { color: rgba(255,255,255,.65); font-size: var(--text-xs); line-height: 1.7; margin-top: var(--space-5); max-width: 540px; }
-.product-jump { border-bottom: 1px solid var(--color-line); background: var(--color-white); }
-.product-jump .container { display: flex; align-items: center; gap: var(--space-8); overflow-x: auto; white-space: nowrap; padding-top: var(--space-4); padding-bottom: var(--space-4); font-size: var(--text-sm); }
-.product-jump a { color: var(--color-primary); text-decoration: none; } .product-jump a:last-child { margin-left: auto; font-weight: 600; }
-.product-anchor, #product-specifications, #product-documents { scroll-margin-top: 90px; }
-@media (max-width: 768px) { .product-intro { grid-template-columns: 1fr; gap: var(--space-8); } .product-intro__media { max-height: 380px; } .product-jump .container { gap: var(--space-6); } }
-.page-hero {
-  background: var(--color-primary-deep);
-  padding: var(--space-12) 0;
-  color: var(--color-white);
+/* ─── Editorial header (white, centered — ANYI-style) ─── */
+.product-header {
+  background: var(--color-white);
+  padding: var(--space-8) 0 var(--space-6);
+  border-bottom: 1px solid var(--color-line);
 }
-
-.page-hero__title {
+.product-header__title {
   font-family: var(--font-display);
-  font-size: clamp(var(--text-3xl), 4vw, var(--text-5xl));
+  font-size: clamp(var(--text-2xl), 3vw, var(--text-4xl));
   font-weight: 600;
   line-height: var(--leading-tight);
+  text-align: center;
+  color: var(--color-primary-deep);
   margin: var(--space-4) 0 var(--space-2);
 }
-
-.page-hero__model {
+.product-header__model {
+  text-align: center;
   font-size: var(--text-sm);
-  color: rgba(255, 255, 255, 0.65);
-  margin: 0 0 var(--space-3);
-  font-family: var(--font-mono, monospace);
-  letter-spacing: 0.03em;
+  color: var(--color-ink-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0;
 }
 
-.page-hero__sub {
-  font-size: var(--text-lg);
-  color: rgba(255, 255, 255, 0.75);
-  max-width: 560px;
-  line-height: var(--leading-normal);
-  margin-bottom: var(--space-8);
-}
+/* ─── Two-column intro: image left, copy right ─── */
+.product-intro { background: var(--color-white); padding: var(--space-10) 0 var(--space-12); }
+.product-intro__grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: start; gap: var(--space-12); }
+.product-intro__media { background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); aspect-ratio: 1 / 1; padding: var(--space-6); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.product-intro__media img { width: 100%; height: 100%; object-fit: contain; }
+.product-intro__placeholder { width: 100%; height: 100%; border-radius: var(--radius-sm); }
+.product-intro__summary { font-size: var(--text-lg); line-height: var(--leading-normal); color: var(--color-ink); margin: 0 0 var(--space-6); }
+.product-keys { margin: 0 0 var(--space-6); }
+.product-keys__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary-deep); margin: 0 0 var(--space-3); }
+.product-keys__list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.product-keys__list li { font-size: var(--text-base); line-height: var(--leading-normal); color: var(--color-ink-muted); padding-left: var(--space-4); position: relative; }
+.product-keys__list li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }
+.product-keys__list li strong { color: var(--color-ink); font-weight: 600; }
+.product-intro__actions { display: flex; gap: var(--space-3); flex-wrap: wrap; margin: 0 0 var(--space-4); }
+.product-intro__note { color: var(--color-ink-muted); font-size: var(--text-xs); line-height: 1.7; margin: 0; max-width: 540px; }
 
-.page-hero__actions {
-  display: flex;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
+/* ─── Buttons ─── */
 :deep(.btn) {
   display: inline-flex;
   align-items: center;
@@ -365,8 +370,15 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 }
 :deep(.btn--accent)        { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
 :deep(.btn--accent:hover)  { background: #b85f15; border-color: #b85f15; }
-:deep(.btn--outline-white) { background: transparent; color: #fff; border-color: rgba(255,255,255,0.5); }
-:deep(.btn--outline-white:hover) { background: rgba(255,255,255,0.1); border-color: #fff; }
+:deep(.btn--outline)       { background: transparent; color: var(--color-primary); border-color: var(--color-primary); }
+:deep(.btn--outline:hover) { background: var(--color-primary); color: #fff; }
+
+/* ─── Jump nav ─── */
+.product-jump { border-bottom: 1px solid var(--color-line); background: var(--color-white); }
+.product-jump .container { display: flex; align-items: center; gap: var(--space-8); overflow-x: auto; white-space: nowrap; padding-top: var(--space-4); padding-bottom: var(--space-4); font-size: var(--text-sm); }
+.product-jump a { color: var(--color-primary); text-decoration: none; } .product-jump a:last-child { margin-left: auto; font-weight: 600; }
+.product-anchor, #product-specifications, #product-documents { scroll-margin-top: 90px; }
+@media (max-width: 768px) { .product-intro__grid { grid-template-columns: 1fr; gap: var(--space-8); } .product-intro__media { max-height: 380px; } .product-jump .container { gap: var(--space-6); } }
 
 .section-gap { padding: var(--space-16) 0; }
 .section-alt  { background: var(--color-canvas); }
@@ -456,11 +468,13 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 }
 .spec-table th {
   width: 40%;
-  background: var(--color-canvas);
   font-weight: 600;
   color: var(--color-ink);
 }
 .spec-table td { color: var(--color-ink-muted); }
+/* Zebra striping — ANYI-style alternating rows */
+.spec-table tbody tr:nth-child(odd) { background: var(--color-canvas); }
+.spec-table tbody tr:nth-child(even) { background: var(--color-white); }
 .spec-unit { color: var(--color-ink-muted); }
 .spec-note {
   display: block;
