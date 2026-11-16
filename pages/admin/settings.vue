@@ -238,7 +238,7 @@ async function loadHomeBlocks() {
     const data = await $fetch<{ blocks: HomeBlockRow[] }>('/api/admin/home-content')
     homeBlocks.value = data.blocks
   } catch {
-    homeBlocksError.value = 'Could not load home page content.'
+    homeBlocksError.value = '首页内容加载失败。'
   } finally {
     homeBlocksLoading.value = false
   }
@@ -258,9 +258,9 @@ async function persistHomeBlock(block: HomeBlockRow, extra: Record<string, unkno
         ...extra,
       },
     })
-    homeBlocksNotice.value = `${block.content_key} saved.`
+    homeBlocksNotice.value = `${block.content_key} 已保存。`
   } catch {
-    homeBlocksNotice.value = `${block.content_key} could not be saved.`
+    homeBlocksNotice.value = `${block.content_key} 保存失败。`
   } finally {
     homeBlockSaving.value = null
     await loadHomeBlocks()
@@ -467,39 +467,41 @@ onMounted(loadHomeBlocks)
             This is a read-only status panel. Credentials are managed directly on the server's .env file, never in this interface.
           </p>
         </div>
-        <!-- Section 4: Home page content (fixed blocks) -->
+        <!-- Section 4：首页内容（固定区块） -->
         <div class="content-card">
-          <h2 class="card-title">Home page content</h2>
+          <h2 class="card-title">首页内容</h2>
           <p class="form-hint">
-            Fixed blocks that drive the home page sections. A draft block is not shown on the public site.
+            驱动首页各区块的固定内容。状态为“草稿”的区块不会显示在前台。
           </p>
           <p v-if="homeBlocksNotice" class="form-hint" role="status">{{ homeBlocksNotice }}</p>
           <p v-if="homeBlocksError" class="form-hint" role="alert">{{ homeBlocksError }}</p>
-          <p v-else-if="homeBlocksLoading" class="form-hint">Loading…</p>
+          <p v-else-if="homeBlocksLoading" class="form-hint">加载中…</p>
           <div v-else class="home-blocks">
             <div v-for="b in homeBlocks" :key="b.id" class="home-block">
               <div class="home-block__head">
                 <code class="home-block__key">{{ b.content_key }}</code>
-                <span class="home-block__status" :class="`home-block__status--${b.status}`">{{ b.status }}</span>
+                <span class="home-block__status" :class="`home-block__status--${b.status}`">
+                  {{ b.status === 'published' ? '已发布' : '草稿' }}
+                </span>
               </div>
               <div class="form-group">
-                <label class="form-label" :for="`hb-eyebrow-${b.id}`">Eyebrow</label>
+                <label class="form-label" :for="`hb-eyebrow-${b.id}`">小标题</label>
                 <input :id="`hb-eyebrow-${b.id}`" v-model="b.eyebrow_en" type="text" class="form-input" maxlength="200">
               </div>
               <div class="form-group">
-                <label class="form-label" :for="`hb-title-${b.id}`">Title</label>
+                <label class="form-label" :for="`hb-title-${b.id}`">标题</label>
                 <input :id="`hb-title-${b.id}`" v-model="b.title_en" type="text" class="form-input" maxlength="400">
               </div>
               <div class="form-group">
-                <label class="form-label" :for="`hb-body-${b.id}`">Body</label>
+                <label class="form-label" :for="`hb-body-${b.id}`">正文</label>
                 <textarea :id="`hb-body-${b.id}`" v-model="b.body_en" class="form-textarea" rows="2" maxlength="2000" />
               </div>
               <div class="form-actions">
                 <button type="button" class="btn btn-primary btn-sm" :disabled="homeBlockSaving === b.id" @click="persistHomeBlock(b)">
-                  Save
+                  {{ homeBlockSaving === b.id ? '保存中…' : '保存' }}
                 </button>
                 <button type="button" class="btn btn-sm" :disabled="homeBlockSaving === b.id" @click="toggleHomeBlock(b)">
-                  {{ b.status === 'published' ? 'Unpublish' : 'Publish' }}
+                  {{ b.status === 'published' ? '改为草稿' : '发布' }}
                 </button>
               </div>
             </div>
