@@ -44,7 +44,6 @@ const productLinks = [
   { label: 'Metal Detection', to: '/products/metal-detection' },
   { label: 'Checkweighers', to: '/products/checkweighers' },
   { label: 'Combination Inspection', to: '/products/combination-inspection' },
-  { label: 'Conveyors & Reject Systems', to: '/products/conveyors-reject-systems' },
 ]
 
 const applicationLinks = [
