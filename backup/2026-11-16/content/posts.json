@@ -213,7 +213,7 @@
     "faq_group": null,
     "related_product_slugs": null,
     "related_application_slugs": null,
-    "cover_image": "dfc39fd9-aac6-456a-87b4-48802e318599",
+    "cover_image": "48abc396-4545-436f-9e43-93cc7a212b99",
     "seo_og_image": null,
     "title_en": "What to prepare before requesting an inspection quotation",
     "title_es": null,
@@ -231,7 +231,7 @@
     "seo_description_es": null,
     "seo_description_pt": null,
     "created_at": "2026-11-15T13:04:17.280Z",
-    "updated_at": "2026-11-16T08:48:56.650Z"
+    "updated_at": "2026-11-16T16:25:37.010Z"
   },
   {
     "id": 4,
@@ -277,7 +277,7 @@
     "faq_group": null,
     "related_product_slugs": null,
     "related_application_slugs": null,
-    "cover_image": "a7702883-58a2-401f-8222-eeb1b86bf88a",
+    "cover_image": "ee164aee-527c-4663-8bf4-6a07de851f96",
     "seo_og_image": null,
     "title_en": "Fitting inspection equipment into an existing line",
     "title_es": null,
@@ -295,7 +295,7 @@
     "seo_description_es": null,
     "seo_description_pt": null,
     "created_at": "2026-11-15T13:04:17.252Z",
-    "updated_at": "2026-11-16T08:48:56.677Z"
+    "updated_at": "2026-11-16T16:25:36.783Z"
   },
   {
     "id": 19,
@@ -432,7 +432,7 @@
     "faq_group": null,
     "related_product_slugs": null,
     "related_application_slugs": null,
-    "cover_image": "30a9a1f1-7a92-45b7-9092-b624ac42a757",
+    "cover_image": "2757dcfa-49fe-44da-a94d-95e05870ff34",
     "seo_og_image": null,
     "title_en": "Preparing a product sample for inspection testing",
     "title_es": null,
@@ -450,7 +450,7 @@
     "seo_description_es": null,
     "seo_description_pt": null,
     "created_at": "2026-11-15T13:04:17.168Z",
-    "updated_at": "2026-11-16T08:48:56.606Z"
+    "updated_at": "2026-11-16T16:25:36.738Z"
   },
   {
     "id": 33,
@@ -868,15 +868,15 @@
       "lt-js220-metal-detector-checkweigher-combo"
     ],
     "related_application_slugs": null,
-    "cover_image": "a7702883-58a2-401f-8222-eeb1b86bf88a",
+    "cover_image": "77add968-6cc5-4982-a37c-2cad080b1757",
     "seo_og_image": null,
-    "title_en": "Combination inspection: three technologies on one line",
+    "title_en": "Combining inspection technologies on your line",
     "title_es": null,
     "title_pt": null,
     "excerpt_en": "Combination systems put X-ray, metal detection and checkweighing in one frame with a single reject, saving floor space and operator time.",
     "excerpt_es": null,
     "excerpt_pt": null,
-    "body_en": "<p>A combination system integrates several inspection technologies on one conveyor. A single reject station removes any pack that fails any check.</p><h2>Typical combinations</h2><ul><li>Metal detection + checkweighing</li><li>X-ray + checkweighing</li><li>X-ray + metal detection + checkweighing</li></ul><h2>What to plan for</h2><ul><li>Available line length and the reject position</li><li>How each technology&rsquo;s test routine is scheduled</li><li>Data and records from all technologies in one place</li></ul>",
+    "body_en": "<p>A combination system integrates more than one inspection technology on a single conveyor. Depending on the configuration, a reject station removes a pack that fails a check.</p><h2>Typical combinations</h2><ul><li>Metal detection + checkweighing</li><li>X-ray + checkweighing</li><li>X-ray + metal detection + checkweighing</li></ul><h2>What to plan for</h2><ul><li>Available line length and the reject position</li><li>How each technology&rsquo;s test routine is scheduled</li><li>Data and records from all technologies in one place</li></ul>",
     "body_es": null,
     "body_pt": null,
     "seo_title_en": null,
@@ -886,7 +886,7 @@
     "seo_description_es": null,
     "seo_description_pt": null,
     "created_at": "2026-11-15T13:04:17.060Z",
-    "updated_at": "2026-11-16T08:48:56.727Z"
+    "updated_at": "2026-11-16T16:27:04.550Z"
   },
   {
     "id": 15,
@@ -968,7 +968,7 @@
       "lt-m-digital-all-metal-detector-series"
     ],
     "related_application_slugs": null,
-    "cover_image": "d3eb45ab-2b32-4661-919e-d41b3c8bca1e",
+    "cover_image": "8667aa78-3555-475f-9ace-bfcae53e37bf",
     "seo_og_image": null,
     "title_en": "X-ray or metal detection: which system fits your product?",
     "title_es": null,
@@ -976,7 +976,7 @@
     "excerpt_en": "The choice between X-ray and metal detection usually comes down to what you need to find, what the product is packed in, and how much space the line has.",
     "excerpt_es": null,
     "excerpt_pt": null,
-    "body_en": "<p>Metal detection reacts to metal contaminants. X-ray inspection reacts to density differences, so it can also find stone, glass, bone and some plastics.</p><h2>When metal detection is a good fit</h2><ul><li>The main risk is ferrous, non-ferrous or stainless metal</li><li>The product is dry, homogeneous and low in salt or moisture variation</li><li>You need a simple, compact installation</li></ul><h2>When X-ray is a good fit</h2><ul><li>You need to find non-metal contaminants</li><li>The product is in aluminium trays, foil or metalised film</li><li>You also want fill-level or structural checks</li></ul><p>Many lines use both technologies. Combination systems run them on one frame with a shared reject.</p>",
+    "body_en": "<p>Metal detection reacts to metal contaminants. X-ray inspection reacts to density differences, so it may also find stone, glass, bone and some plastics; what is detectable depends on the product and the test.</p><h2>When metal detection is a good fit</h2><ul><li>The main risk is ferrous, non-ferrous or stainless metal</li><li>The product is dry, homogeneous and low in salt or moisture variation</li><li>You need a simple, compact installation</li></ul><h2>When X-ray is a good fit</h2><ul><li>You need to find non-metal contaminants</li><li>The product is in aluminium trays, foil or metalised film</li><li>You also want fill-level or structural checks</li></ul><p>Many lines use both technologies. Combination systems run them on one frame with a shared reject.</p>",
     "body_es": null,
     "body_pt": null,
     "seo_title_en": null,
@@ -986,7 +986,7 @@
     "seo_description_es": null,
     "seo_description_pt": null,
     "created_at": "2026-11-15T13:04:16.904Z",
-    "updated_at": "2026-11-16T08:48:56.535Z"
+    "updated_at": "2026-11-16T16:27:04.600Z"
   },
   {
     "id": 12,

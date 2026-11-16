@@ -1,0 +1,176 @@
+[
+  {
+    "field": "id",
+    "type": "integer",
+    "nullable": false,
+    "interface": "numeric"
+  },
+  {
+    "field": "status",
+    "type": "string",
+    "nullable": false,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "content_type",
+    "type": "string",
+    "nullable": false,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "slug",
+    "type": "string",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "publish_date",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "author",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "topics",
+    "type": "json",
+    "nullable": true,
+    "interface": "select-multiple-checkbox"
+  },
+  {
+    "field": "faq_group",
+    "type": "string",
+    "nullable": true,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "related_product_slugs",
+    "type": "json",
+    "nullable": true,
+    "interface": "tags"
+  },
+  {
+    "field": "related_application_slugs",
+    "type": "json",
+    "nullable": true,
+    "interface": "tags"
+  },
+  {
+    "field": "cover_image",
+    "type": "uuid",
+    "nullable": true,
+    "interface": "file-image"
+  },
+  {
+    "field": "seo_og_image",
+    "type": "uuid",
+    "nullable": true,
+    "interface": "file-image"
+  },
+  {
+    "field": "title_en",
+    "type": "string",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "title_es",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "title_pt",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "excerpt_en",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "excerpt_es",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "excerpt_pt",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "body_en",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-rich-text-html"
+  },
+  {
+    "field": "body_es",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-rich-text-html"
+  },
+  {
+    "field": "body_pt",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-rich-text-html"
+  },
+  {
+    "field": "seo_title_en",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "seo_title_es",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "seo_title_pt",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "seo_description_en",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "seo_description_es",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "seo_description_pt",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "created_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "updated_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  }
+]

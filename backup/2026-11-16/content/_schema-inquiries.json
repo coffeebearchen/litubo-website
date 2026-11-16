@@ -1,0 +1,278 @@
+[
+  {
+    "field": "id",
+    "type": "integer",
+    "nullable": false,
+    "interface": "numeric"
+  },
+  {
+    "field": "inquiry_type",
+    "type": "string",
+    "nullable": false,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "status",
+    "type": "string",
+    "nullable": false,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "locale",
+    "type": "string",
+    "nullable": false,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "submitted_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "consent_given",
+    "type": "boolean",
+    "nullable": false,
+    "interface": "toggle"
+  },
+  {
+    "field": "consented_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "privacy_policy_version",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "contact_name",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "contact_email",
+    "type": "string",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "contact_phone",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "contact_company",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "contact_country",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "contact_title",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "message",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "related_product_slug",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "related_application_slug",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "model_number",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "serial_number",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "tm_product_interest",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "tm_product_format",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "tm_line_speed",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "tm_package_dimensions",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "tm_contaminant_concern",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "tm_existing_equipment",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "source_url",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "referrer",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "utm_source",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "utm_medium",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "utm_campaign",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "raw_fields",
+    "type": "json",
+    "nullable": true,
+    "interface": "input-code"
+  },
+  {
+    "field": "note",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "assigned_to",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "first_handled_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "updated_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "ai_summary",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "ai_intent",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "ai_recommended_products",
+    "type": "json",
+    "nullable": true,
+    "interface": "input-code"
+  },
+  {
+    "field": "ai_draft_reply",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "ai_processed_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "ai_confidence",
+    "type": "float",
+    "nullable": true,
+    "interface": "slider"
+  },
+  {
+    "field": "ai_reviewed",
+    "type": "boolean",
+    "nullable": false,
+    "interface": "toggle"
+  },
+  {
+    "field": "hubspot_sync_status",
+    "type": "string",
+    "nullable": true,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "hubspot_contact_id",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "hubspot_synced_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "hubspot_error_summary",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  }
+]

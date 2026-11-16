@@ -1,44 +1,68 @@
-# 内容备份 / Content backup
+# 内容与结构备份 / Content and schema backup
 
-日期：2026-11-16（**修订 2**，含 Checkweighers 系列字段）。仓库是**公开**的，所以这里只放**不含个人信息和凭据**的内容数据。
+日期：2026-11-16（**修订 3** —— 封面替换、文章措辞修正之后）
+仓库是**公开**的，所以这里只放**不含个人信息和凭据**的内容与结构。
 
-> 修订 1 是在给 `products` 增加称重系列字段**之前**导出的。修订 2 重新导出，包含新字段与 12 个型号的系列归属。
+> 修订 1：加称重字段之前
+> 修订 2：加称重字段之后
+> 修订 3（本版）：Blog 封面替换 + post16/post13 措辞修正之后 —— **与当前数据库一致**
 
 ---
 
-## 这里有什么
+## 备份内容
+
+### 内容数据
 
 | 文件 | 条数 | 说明 |
 |---|---|---|
-| `products.json` | 41 | 产品，**含 `checkweigher_series` / `checkweigher_configuration` / `checkweigher_l_series`** 及西语字段 |
-| `product_categories.json` | 5 | 分类（含 Conveyors & Reject Systems） |
-| `product_sections.json` | 373 | 产品详情页分段内容 |
+| `products.json` | 41 | 产品，含 `checkweigher_series` / `checkweigher_configuration` / `checkweigher_l_series` |
+| `product_categories.json` | 5 | 分类 |
+| `product_sections.json` | 373 | 产品详情分段 |
 | `product_spec_groups.json` | 52 | 规格组 |
-| `products_files.json` | 67 | 产品与媒体的关联（只有 ID，不含文件） |
-| `posts.json` | 33 | 文章（正文、SEO、封面引用） |
+| `products_files.json` | 67 | 产品-媒体关联（仅 ID） |
+| `posts.json` | 33 | 文章（**已含新封面 ID 与新标题**） |
 | `site_content.json` | 9 | 首页固定块 |
 | `site_settings.json` | 8 | 站点设置 |
 | `site_social_links.json` | 2 | 社交链接 |
-| `_schema-products.json` | 34 字段 | `products` 表结构，便于恢复字段定义 |
-| `_summary.json` | — | 每集合条数 |
 
-全部为 Directus REST 导出（`/items/<collection>?limit=-1`）。
+### 表结构（供后端审查）
+
+```
+_schema-products.json           34 字段
+_schema-inquiries.json          46 字段  ← 含 7 个 AI 字段
+_schema-posts.json              29 字段
+_schema-product_categories.json 21 字段
+_schema-site_content.json       24 字段
+_schema-site_settings.json       8 字段
+```
+
+**这些文件只含字段名/类型/是否可空/界面类型，不含任何真实数据。** 已核查：`@` 符号 0 处，无默认值泄漏。
 
 ---
 
-## 称重系列的当前归属
+## 当前数据库状态（本版对应）
 
-对应 `products.json` 里 12 个 Checkweighers：
-
-| 系列 | 型号 |
+| 项 | 值 |
 |---|---|
-| `compact` | LT-150 / LT-150L / LT-150LR / LT-150LRH |
-| `standard` | LT-220 / LT-220L / LT-220LR |
-| `medium-range` | LT-300 / LT-300L |
-| `extra-large` | LT-400 / LT-450 / LT-600 |
-| `pharmaceutical` | 暂无型号（咨询入口） |
+| 称重系列字段 | ✅ 3 个 |
+| 已归类称重型号 | ✅ 12 / 12 |
+| 10 篇 Insights 封面 | ✅ 10 张，**零重复** |
+| post16 标题 | `Combining inspection technologies on your line` |
 
-`LT-300L` 与 `LT-400` 的归属由业主在 2026-11-16 明确确认。
+### 10 篇文章的封面归属
+
+| slug | 封面文件 ID |
+|---|---|
+| how-x-ray-inspection-works | `d3eb45ab…` |
+| x-ray-or-metal-detection | `8667aa78…` （复用真实 X-ray 照片） |
+| how-metal-detection-works | `f4899fc4…` |
+| checkweighing-basics | `a6d701d1…` |
+| combination-inspection | `77add968…` （复用真实组合照片） |
+| conveyors-and-reject-systems | `a7702883…` |
+| preparing-a-product-sample | `2757dcfa…` （新图，AI editorial） |
+| inspection-sensitivity-and-product-effect | `dfc39fd9…` |
+| fitting-inspection-into-a-line | `ee164aee…` （新图，AI editorial） |
+| what-to-prepare-for-a-quotation | `48abc396…` （新图，AI editorial） |
 
 ---
 
@@ -46,58 +70,24 @@
 
 | 排除项 | 原因 |
 |---|---|
-| `inquiries`（22 条） | **真实客户姓名、邮箱、电话、留言**。公开仓库不能放。 |
-| `visitor_events`（372 条） | 访客追踪，含 IP 派生信息。 |
-| `litubo_cms.sql` | 含 `directus_users` **密码哈希**、`directus_sessions`。提交等于公开凭据。 |
-| `uploads/`（273 个文件，28 MB） | 媒体可重新上传；体积会让仓库膨胀。 |
-| `directus_users` / `roles` / `policies` | 身份与权限结构。 |
+| `inquiries.json`（22 条） | **真实客户姓名、邮箱、电话、留言** |
+| `visitor_events.json` | 访客追踪，含 IP 派生信息 |
+| `litubo_cms.sql` | 含 `directus_users` 密码哈希、sessions |
+| `uploads/`（276 个文件） | 媒体可重新上传；体积过大 |
+| `directus_users` / `roles` / `policies` | 身份与权限结构 |
 
-**需要这些时，从本地 `D:\LITUBO-backup-20261116.zip` 恢复，不要入库。**
-
----
-
-## 本地完整备份
-
-```
-D:\LITUBO-backup-20261116.zip        28.3 MB
-├── litubo_cms.sql                   数据库全量（含用户表）
-├── content/                         13 个集合（含 inquiries、visitor_events）
-└── uploads/                         273 个媒体文件
-```
-
-⚠️ **这个 zip 只应放在本机或私有存储**，不要上传到任何公开位置。
-
-**注意**：该 zip 是修订 1 时生成的，**不含**称重系列字段。需要完整快照时请重新执行导出。
+**需要这些时用本机 `D:\LITUBO-backup-20261116r2.zip`，不要入库。**
 
 ---
 
-## 如何恢复
+## 恢复
 
-**恢复内容：**
 ```bash
-curl -X POST http://127.0.0.1:8055/items/products \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d @products.json
+curl -X POST http://127.0.0.1:8055/items/posts \\
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \\
+  -H "Content-Type: application/json" \\
+  -d @posts.json
 ```
 
-**恢复字段定义**（新环境需要先有 `checkweigher_*` 三列）：
-```bash
-# 参考 _schema-products.json，三个字段均为 nullable
-# checkweigher_series        string  select: compact|standard|medium-range|extra-large|pharmaceutical
-# checkweigher_configuration string  select: online|left-right
-# checkweigher_l_series      boolean
+**注意**：恢复内容后媒体文件需单独上传，否则 `cover_image` 引用会断。
 ```
-
-**完整恢复（含用户与询盘）：**
-```bash
-docker exec -i litubo-cms-postgres-1 psql -U litubo -d litubo_cms < litubo_cms.sql
-```
-
----
-
-## 注意
-
-- 备份是**时间点快照**，不含此后新增内容
-- 媒体文件不在仓库里，恢复内容后需单独上传图片，否则图片引用会断
-- 这份数据**未加密**，因为它只包含公开网站上本来就展示的内容

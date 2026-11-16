@@ -1,0 +1,146 @@
+[
+  {
+    "field": "id",
+    "type": "integer",
+    "nullable": false,
+    "interface": null
+  },
+  {
+    "field": "content_key",
+    "type": "string",
+    "nullable": false,
+    "interface": null
+  },
+  {
+    "field": "page_key",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "section_key",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "status",
+    "type": "string",
+    "nullable": true,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "hero_image",
+    "type": "uuid",
+    "nullable": true,
+    "interface": "file-image"
+  },
+  {
+    "field": "eyebrow_en",
+    "type": "string",
+    "nullable": false,
+    "interface": null
+  },
+  {
+    "field": "eyebrow_es",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "eyebrow_pt",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "title_en",
+    "type": "text",
+    "nullable": false,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "title_es",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "title_pt",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "body_en",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "body_es",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "body_pt",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "cta_primary_label_en",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "cta_primary_label_es",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "cta_primary_label_pt",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "cta_primary_path",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "cta_secondary_label_en",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "cta_secondary_label_es",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "cta_secondary_label_pt",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "cta_secondary_path",
+    "type": "string",
+    "nullable": true,
+    "interface": null
+  },
+  {
+    "field": "updated_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": null
+  }
+]

@@ -1,0 +1,128 @@
+[
+  {
+    "field": "id",
+    "type": "integer",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "status",
+    "type": "string",
+    "nullable": false,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "sort",
+    "type": "integer",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "date_created",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "date_updated",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "slug",
+    "type": "string",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "name_en",
+    "type": "string",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "name_es",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "name_pt",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "intro_en",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "intro_es",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "intro_pt",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "hero_image",
+    "type": "uuid",
+    "nullable": true,
+    "interface": "file-image"
+  },
+  {
+    "field": "seo_title_en",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "seo_title_es",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "seo_title_pt",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "seo_description_en",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "seo_description_es",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "seo_description_pt",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "seo_image",
+    "type": "uuid",
+    "nullable": true,
+    "interface": "file-image"
+  },
+  {
+    "field": "seo_noindex",
+    "type": "boolean",
+    "nullable": true,
+    "interface": "boolean"
+  }
+]

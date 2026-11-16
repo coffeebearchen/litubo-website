@@ -1,0 +1,50 @@
+[
+  {
+    "field": "id",
+    "type": "integer",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "brand_name",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "legal_company_name",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "public_email",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "public_phone",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "public_whatsapp_url",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "public_address",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "copyright_text",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  }
+]
