@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Product, ProductCategory, LocalizedString, PostsResult } from '~/types/content'
+import type { PublicSiteSettings } from '~/types/settings'
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
@@ -79,6 +80,26 @@ useSeoHead({
   noIndex: computed(() => product.value?.seo.noIndex),
   ogType: 'website',
   jsonLd: productJsonLd,
+})
+
+// ─── Print / Save PDF ───────────────────────────────────────────────
+// Printing produces a single-page product datasheet, not a dump of the web page: brand header,
+// model, image, summary and the specification table, closed by a contact block.
+const { data: printSettings } = await useAsyncData<PublicSiteSettings | null>(
+  'print-site-settings',
+  () => $fetch<PublicSiteSettings>('/api/cms/site-settings'),
+  { default: () => null },
+)
+const printDate = computed(() => new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }))
+const printContact = computed(() => {
+  const s = printSettings.value
+  const parts = [
+    'litubo.com',
+    s?.public_email || 'sales@litubo.com',
+    s?.public_phone || '',
+    s?.public_whatsapp_url ? `WhatsApp ${s.public_whatsapp_url.replace(/^https?:\/\/wa\.me\//, '+')}` : '',
+  ].filter(Boolean)
+  return parts.join('  ·  ')
 })
 
 // Prefer structured spec groups; fall back to inline specifications array
@@ -166,6 +187,18 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 
 <template>
   <div v-if="product && category">
+    <!-- Print-only datasheet header (hidden on screen) -->
+    <header class="print-sheet print-sheet--head" aria-hidden="true">
+      <div class="print-sheet__brand">
+        <span class="print-sheet__wordmark">LITUBO</span>
+        <span class="print-sheet__kind">Product datasheet</span>
+      </div>
+      <div class="print-sheet__meta">
+        <span>{{ printDate }}</span>
+        <span>litubo.com</span>
+      </div>
+    </header>
+
     <!-- Editorial header (white, centered title — ANYI-style) -->
     <section class="product-header">
       <div class="container">
@@ -422,7 +455,7 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
     </section>
 
     <!-- FAQ (Directus mode) — answer text is plain text, white-space: pre-line -->
-    <section v-if="product.faqs?.length" class="section-gap">
+    <section v-if="product.faqs?.length" class="section-gap faq-block">
       <div class="container">
         <SectionHeading>Frequently Asked Questions</SectionHeading>
         <dl class="faq-list">
@@ -468,7 +501,7 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
     </section>
 
     <!-- Related products (same category) -->
-    <section v-if="relatedProducts.length" class="section-gap section-alt">
+    <section v-if="relatedProducts.length" class="section-gap section-alt related-products">
       <div class="container">
         <SectionHeading>Related Products</SectionHeading>
         <div class="related-grid">
@@ -492,6 +525,16 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
       :secondary-label="t('common.findDistributor')"
       :secondary-to="localePath('/find-a-distributor')"
     />
+
+    <!-- Print-only datasheet footer (hidden on screen) -->
+    <footer class="print-sheet print-sheet--foot" aria-hidden="true">
+      <p class="print-sheet__contact">{{ printContact }}</p>
+      <p class="print-sheet__note">
+        Specifications describe the standard reference for {{ product.modelSeries || loc(product.name) }}.
+        Reject method, aperture or channel size, communication options and product-specific settings are
+        confirmed with our technical team for each application.
+      </p>
+    </footer>
   </div>
 </template>
 
@@ -854,4 +897,132 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 .download-role { font-weight: 500; }
 .download-version { color: var(--color-ink-muted); }
 .download-icon { flex-shrink: 0; }
+
+/* ─── Print datasheet ──────────────────────────────────────────────────
+   Printing produces a formal one-product sheet: brand header, model, image, summary and the
+   specification table, closed by a contact block. Navigation, gallery controls, the configurator,
+   catalogue, related content and every floating control are removed — a printed page should not
+   contain things that cannot be used on paper. ------------------------------------------------ */
+
+/* On screen the sheet is not rendered at all. */
+.print-sheet { display: none; }
+
+@media print {
+  @page { size: A4; margin: 14mm 12mm; }
+
+  /* Global chrome: the layout, menu, strip, footer and floating widgets. */
+  :global(.site-header),
+  :global(.cat-strip),
+  :global(.site-footer),
+  :global(.mobile-conversion-bar),
+  :global(.back-to-top),
+  :global(.visitor-assistant),
+  :global(.product-assistant) { display: none !important; }
+
+  /* Page chrome that only makes sense on screen. */
+  .product-header .breadcrumb,
+  .product-header :deep(.breadcrumb),
+  .product-intro__actions,
+  .product-anchor,
+  .product-keys,
+  .jump,
+  #product-configurator,
+  .catalogue,
+  #product-related-reading,
+  #product-documents,
+  :deep(.cta-banner),
+  :deep(.model-gallery__thumbs),
+  :deep(.model-gallery__nav),
+  :deep(.model-gallery__zoom) { display: none !important; }
+
+  /* Product FAQ and related products are web affordances, not datasheet content. */
+  .faq-block,
+  .related-products { display: none !important; }
+
+  /* The drawing block is empty until a real illustration exists — never print an empty box. */
+  .spec-cols__drawing:has(.spec-drawing__placeholder) { display: none !important; }
+
+  /* Show the sheet. */
+  .print-sheet { display: block !important; }
+  .print-sheet--head {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16pt;
+    padding-bottom: 6pt;
+    margin-bottom: 14pt;
+    border-bottom: 1.5pt solid #1B4224;
+  }
+  .print-sheet__brand { display: flex; align-items: baseline; gap: 10pt; }
+  .print-sheet__wordmark {
+    font-family: var(--font-display);
+    font-size: 20pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #1B4224;
+  }
+  .print-sheet__kind {
+    font-size: 9pt;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #526158;
+  }
+  .print-sheet__meta {
+    display: flex;
+    gap: 14pt;
+    font-size: 9pt;
+    color: #526158;
+  }
+  .print-sheet--foot {
+    margin-top: 14pt;
+    padding-top: 8pt;
+    border-top: 0.75pt solid #D9DDD6;
+  }
+  .print-sheet__contact {
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: #18332B;
+    margin: 0 0 4pt;
+  }
+  .print-sheet__note {
+    font-size: 8pt;
+    line-height: 1.45;
+    color: #526158;
+    margin: 0;
+  }
+
+  /* Compact the sheet: no screen spacing, no tinted section bands. */
+  :global(.page-content) { padding-top: 0 !important; }
+  .product-header { padding: 0 0 8pt !important; border: 0 !important; }
+  .product-header__title { font-size: 20pt !important; line-height: 1.2 !important; }
+  .product-header__model { font-size: 12pt !important; margin-top: 4pt !important; color: #805300 !important; }
+  .product-intro { padding: 0 0 10pt !important; gap: 14pt !important; grid-template-columns: 1fr 1fr !important; }
+  .product-intro__summary { font-size: 10pt !important; line-height: 1.5 !important; }
+  .product-intro__note { font-size: 8pt !important; }
+
+  /* Product image stays contain-fitted and never enlarged. */
+  :deep(.model-gallery__stage) { aspect-ratio: auto !important; height: 70mm !important; border: 0 !important; }
+  :deep(.model-gallery__img) { object-fit: contain !important; }
+
+  .spec-cols { display: block !important; }
+  .spec-table { width: 100% !important; font-size: 9pt !important; }
+  .spec-table th, .spec-table td { padding: 4pt 6pt !important; }
+  .spec-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .spec-group__title, .spec-cols h2, .spec-cols h3 { font-size: 12pt !important; margin: 10pt 0 4pt !important; }
+  .section-gap { padding: 0 !important; }
+
+  /* Section bands print as plain paper. */
+  :global(.section-alt) { background: transparent !important; }
+  body { background: #fff !important; font-size: 10pt !important; }
+  a { text-decoration: none !important; color: inherit !important; }
+
+  /* Dense datasheet typography: the web keeps its 22px body, paper is a compact reference. */
+  p, li, dd, dt, td, th { font-size: 9pt !important; line-height: 1.42 !important; }
+  h1 { font-size: 20pt !important; }
+  h2 { font-size: 12pt !important; margin: 8pt 0 4pt !important; }
+  h3 { font-size: 10pt !important; margin: 6pt 0 3pt !important; }
+  section { padding-block: 0 !important; margin-block: 0 7pt !important; }
+  .section-gap { padding-block: 0 !important; }
+  ul, ol { margin: 3pt 0 5pt !important; padding-left: 12pt !important; }
+}
 </style>
