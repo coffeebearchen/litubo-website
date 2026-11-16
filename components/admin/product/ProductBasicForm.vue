@@ -15,6 +15,10 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
+const isCheckweighersCategory = computed(() =>
+  props.categories.some(c => c.slug === 'checkweighers' && c.id === props.modelValue.category_id),
+)
+
 const emit = defineEmits<{
   'update:modelValue': [value: Partial<AdminProduct>]
   save: []
@@ -95,6 +99,39 @@ function update(field: keyof AdminProduct, value: unknown) {
         <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name_en }}</option>
       </select>
     </div>
+
+    <!-- Checkweigher series metadata: only meaningful on the Checkweighers category. Null stays
+         null, and an unclassified model still appears under "All series" on the public page. -->
+    <template v-if="isCheckweighersCategory">
+      <h3 class="form-subtitle">Checkweigher series</h3>
+      <div class="form-row">
+        <label class="form-label">Series</label>
+        <select class="form-select" :value="modelValue.checkweigher_series ?? ''" @change="update('checkweigher_series', ($event.target as HTMLSelectElement).value || null)">
+          <option value="">— Not classified —</option>
+          <option value="compact">Compact</option>
+          <option value="standard">Standard</option>
+          <option value="medium-range">Medium-range</option>
+          <option value="extra-large">Extra-large</option>
+          <option value="pharmaceutical">Pharmaceutical</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Configuration</label>
+        <select class="form-select" :value="modelValue.checkweigher_configuration ?? ''" @change="update('checkweigher_configuration', ($event.target as HTMLSelectElement).value || null)">
+          <option value="">— Not set —</option>
+          <option value="online">Online weighing</option>
+          <option value="left-right">Left-right sorting</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">L-series variant</label>
+        <select class="form-select" :value="modelValue.checkweigher_l_series === null || modelValue.checkweigher_l_series === undefined ? '' : String(modelValue.checkweigher_l_series)" @change="update('checkweigher_l_series', ($event.target as HTMLSelectElement).value === '' ? null : ($event.target as HTMLSelectElement).value === 'true')">
+          <option value="">— Not reviewed —</option>
+          <option value="true">Yes, L-series</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+    </template>
 
     <div class="form-row">
       <label class="form-label">Page Preset</label>

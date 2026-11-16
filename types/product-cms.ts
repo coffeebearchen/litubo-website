@@ -48,6 +48,10 @@ export interface AdminProduct {
   name_pt: string | null
   product_code: string | null
   model_or_series: string | null
+  /** Checkweigher series metadata. Nullable; only meaningful on the Checkweighers category. */
+  checkweigher_series?: 'compact' | 'standard' | 'medium-range' | 'extra-large' | 'pharmaceutical' | null
+  checkweigher_configuration?: 'online' | 'left-right' | null
+  checkweigher_l_series?: boolean | null
   summary_en: string | null
   summary_es: string | null
   summary_pt: string | null

@@ -14,6 +14,8 @@ import {
 const ALLOWED = [
   'name_en', 'name_es', 'name_pt',
   'slug', 'model_or_series',
+  // Checkweigher series metadata. Nullable, and only meaningful on That category.
+  'checkweigher_series', 'checkweigher_configuration', 'checkweigher_l_series',
   'summary_en', 'summary_es', 'summary_pt',
   'category_id', 'page_preset_id', 'review_notes',
 ]
