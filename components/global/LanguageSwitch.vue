@@ -14,17 +14,23 @@ const switchLocalePath = useSwitchLocalePath()
 const runtimeConfig = useRuntimeConfig()
 
 const publishedLocales = (runtimeConfig.public.publishedLocales as string[] | undefined) ?? ['en']
+/** Development-only preview list; empty in a production build. */
+const previewLocales = (runtimeConfig.public.previewLocales as string[] | undefined) ?? []
 
 const current = computed(() => locales.value.find(l => l.code === locale.value))
 const currentCode = computed(() => locale.value.toUpperCase())
 
 const entries = computed(() => locales.value.map((l) => {
   const code = l.code
-  const available = publishedLocales.includes(code)
+  const published = publishedLocales.includes(code)
+  // A preview locale opens only in a development build; it is never a published target.
+  const preview = !published && previewLocales.includes(code)
+  const available = published || preview
   return {
     code,
     name: l.name ?? code,
     available,
+    preview,
     current: code === locale.value,
     to: available ? switchLocalePath(code) : '',
   }
@@ -96,6 +102,7 @@ onBeforeUnmount(() => {
           @click="close()"
         >
           <span class="lang-select__name">{{ entry.name }}</span>
+          <span v-if="entry.preview" class="lang-select__pending">Preview</span>
           <svg v-if="entry.current" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M3 8.5l3.2 3.2L13 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
           </svg>

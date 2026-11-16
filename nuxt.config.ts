@@ -128,7 +128,17 @@ export default defineNuxtConfig({
     productAiApplyEnabled: process.env.PRODUCT_AI_APPLY_ENABLED ?? '',
     public: {
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? 'https://litubo.com',
+      /**
+       * Locales the public site actually publishes. Only these are indexable and only these resolve
+       * for a visitor — the locale gate answers 404 for everything else.
+       */
       publishedLocales: ['en'],
+      /**
+       * Locales that may be opened in a development build so a translation draft can be reviewed.
+       * Empty in production, so a preview locale can never be reached on the live site; publishing a
+       * locale stays a deliberate edit to `publishedLocales` after review.
+       */
+      previewLocales: process.env.NODE_ENV === 'production' ? [] : ['es', 'pt', 'zh', 'ar', 'ja'],
     },
   },
 

@@ -1,17 +1,21 @@
 /**
- * Keep every locale the site does not publish closed, across static and dynamic routes.
+ * Locale gate for public routes.
  *
- * English is the only published locale in this phase. A prefix such as `/es`, `/pt`, `/zh` or `/ar`
- * answers 404 rather than rendering an English fallback under a translated URL, which would tell a
- * visitor (and a crawler) that the page is translated when it is not.
+ * A locale is reachable only when it is either published, or listed in `previewLocales` — and
+ * `previewLocales` is empty in a production build, so a translation draft can be reviewed in a
+ * development build without ever being reachable on the live site.
  *
- * The locale list is derived from the configured locales, so adding a language later does not need
- * this file to change — only `public.publishedLocales`.
+ * A prefixed locale that is not reachable answers 404. It must never render the English fallback
+ * under a translated URL: that would tell a visitor, and a crawler, that the page is translated when
+ * it is not.
  */
 const KNOWN_LOCALES = ['en', 'es', 'pt', 'zh', 'ar', 'ja'] as const
 
 export default defineNuxtRouteMiddleware((to) => {
-  const published = useRuntimeConfig().public.publishedLocales
+  const config = useRuntimeConfig()
+  const published = config.public.publishedLocales
+  const preview = (config.public.previewLocales as string[] | undefined) ?? []
+
   const match = to.path.match(/^\/([a-z]{2}(?:-[A-Za-z]{2,4})?)(?:\/|$)/)
   if (!match) return
 
@@ -19,6 +23,7 @@ export default defineNuxtRouteMiddleware((to) => {
   if (!(KNOWN_LOCALES as readonly string[]).includes(candidate)) return
   if (candidate === 'en') return
   if (isPublishedLocale(candidate, published)) return
+  if (preview.includes(candidate)) return
 
   throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
 })
