@@ -49,6 +49,18 @@ function formatDate(iso: string | null): string {
 
     <section class="section-gap">
       <div class="container post-body">
+        <!-- Cover: the same record field the list and home cards read, so one edit updates all three.
+             Device photographs are contained so no machine is cropped; scenes fill the frame. -->
+        <figure v-if="post.coverImageUrl" class="post-cover">
+          <img
+            :src="post.coverImageUrl"
+            alt=""
+            class="post-cover__img"
+            loading="eager"
+            decoding="async"
+          >
+        </figure>
+
         <!-- bodyHtml is sanitized server-side by legacyPostHtml (allow-list, file gate). -->
         <div v-html="post.bodyHtml[l] || post.bodyHtml.en" />
       </div>
@@ -82,6 +94,24 @@ function formatDate(iso: string | null): string {
 .post-page :deep(.breadcrumb a),
 .post-page :deep(.breadcrumb span) {
   color: rgba(255, 255, 255, 0.72);
+}
+
+.post-cover {
+  margin: 0 0 var(--space-8);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #F2F8F4;
+}
+.post-cover__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 460px;
+  object-fit: cover;
+}
+.post-cover__img--contain {
+  object-fit: contain;
+  max-height: 520px;
 }
 
 .post-body {
