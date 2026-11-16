@@ -173,160 +173,160 @@
   },
   "pages": {
     "home": {
-      "heroEyebrow": "FOOD & PACKAGING INSPECTION",
-      "heroTitle": "Built for safer production.",
-      "heroSubtitle": "Reliable inspection systems and expert support help food and packaging producers deliver safe, high-quality products.",
-      "heroCta": "Explore solutions",
-      "heroCtaSecondary": "Talk to an engineer",
-      "pathTitle": "Find the right path for you",
-      "pathCard1Title": "Looking for inspection equipment?",
-      "pathCard1Cta1": "Explore by product",
-      "pathCard1Cta2": "Explore by application",
-      "pathCard2Title": "Already working with LITUBO?",
-      "pathCard2Cta1": "Technical matching",
-      "pathCard2Cta2": "Talk to an engineer",
-      "latestTitle": "Latest from LITUBO",
-      "latestCta": "All resources",
-      "faqTitle": "Questions about your line?",
-      "faqSubtitle": "Find quick answers to common questions about our systems and solutions.",
-      "faqCta": "View all FAQs",
-      "ctaTitle": "Talk to the team who understands your line.",
-      "ctaBody": "From product selection to integration and ongoing support, our engineers are ready to help.",
-      "ctaCta": "Start a conversation"
+      "heroEyebrow": "INSPECCIÓN DE ALIMENTOS Y ENVASES",
+      "heroTitle": "Diseñado para una producción más segura.",
+      "heroSubtitle": "Sistemas de inspección fiables y un soporte experto ayudan a los fabricantes de alimentos y envases a ofrecer productos seguros y de alta calidad.",
+      "heroCta": "Explorar soluciones",
+      "heroCtaSecondary": "Hablar con un ingeniero",
+      "pathTitle": "Encuentre el camino adecuado para usted",
+      "pathCard1Title": "¿Busca equipos de inspección?",
+      "pathCard1Cta1": "Explorar por producto",
+      "pathCard1Cta2": "Explorar por aplicación",
+      "pathCard2Title": "¿Ya trabaja con LITUBO?",
+      "pathCard2Cta1": "Selección técnica",
+      "pathCard2Cta2": "Hablar con un ingeniero",
+      "latestTitle": "Novedades de LITUBO",
+      "latestCta": "Todos los recursos",
+      "faqTitle": "¿Preguntas sobre su línea?",
+      "faqSubtitle": "Encuentre respuestas rápidas a las preguntas habituales sobre nuestros sistemas y soluciones.",
+      "faqCta": "Ver todas las preguntas frecuentes",
+      "ctaTitle": "Hable con el equipo que entiende su línea.",
+      "ctaBody": "Desde la selección del producto hasta la integración y el soporte continuo, nuestros ingenieros están listos para ayudarle.",
+      "ctaCta": "Iniciar una conversación"
     },
     "products": {
-      "heroTitle": "Inspection Systems",
-      "heroSubtitle": "Five proven technology lines, configurable for your production environment.",
-      "empty": "Product information is being prepared."
+      "heroTitle": "Sistemas de inspección",
+      "heroSubtitle": "Cinco líneas tecnológicas probadas, configurables para su entorno de producción.",
+      "empty": "La información del producto está en preparación."
     },
     "applications": {
-      "heroTitle": "Applications",
-      "heroSubtitle": "Inspection solutions across eight core food and packaging industries."
+      "heroTitle": "Aplicaciones",
+      "heroSubtitle": "Soluciones de inspección para ocho sectores clave de alimentación y envasado."
     },
     "resources": {
-      "heroTitle": "Resources",
-      "heroSubtitle": "Insights, case studies, downloads and video demonstrations."
+      "heroTitle": "Recursos",
+      "heroSubtitle": "Análisis, casos de éxito, descargas y demostraciones en vídeo."
     },
     "contact": {
-      "heroTitle": "Contact Us",
-      "heroSubtitle": "Tell us about your requirements. We will respond promptly.",
-      "nameLabel": "Full name",
-      "companyLabel": "Company",
-      "emailLabel": "Email address",
-      "countryLabel": "Country / Region",
-      "phoneLabel": "Phone (optional)",
-      "messageLabel": "Message",
-      "messagePlaceholder": "Describe your inspection challenge or question.",
-      "submitLabel": "Send message"
+      "heroTitle": "Contacto",
+      "heroSubtitle": "Cuéntenos sus necesidades. Le responderemos con rapidez.",
+      "nameLabel": "Nombre completo",
+      "companyLabel": "Empresa",
+      "emailLabel": "Correo electrónico",
+      "countryLabel": "País / Región",
+      "phoneLabel": "Teléfono (opcional)",
+      "messageLabel": "Mensaje",
+      "messagePlaceholder": "Describa su reto o consulta de inspección.",
+      "submitLabel": "Enviar mensaje"
     },
     "technicalMatching": {
-      "heroTitle": "Technical Matching",
-      "heroSubtitle": "Describe your line requirements for a tailored product recommendation.",
-      "productLabel": "Product / application of interest",
-      "formatLabel": "Product format",
-      "speedLabel": "Line speed (ppm or kg/hr)",
-      "dimensionsLabel": "Package dimensions",
-      "contaminantLabel": "Contaminant concern",
-      "existingEquipLabel": "Existing equipment on the line",
-      "messageLabel": "Additional notes",
-      "submitLabel": "Request recommendation"
+      "heroTitle": "Selección técnica",
+      "heroSubtitle": "Describa los requisitos de su línea para recibir una recomendación de producto a medida.",
+      "productLabel": "Producto / aplicación de interés",
+      "formatLabel": "Formato del producto",
+      "speedLabel": "Velocidad de línea (ppm o kg/h)",
+      "dimensionsLabel": "Dimensiones del envase",
+      "contaminantLabel": "Preocupación por contaminantes",
+      "existingEquipLabel": "Equipos existentes en la línea",
+      "messageLabel": "Notas adicionales",
+      "submitLabel": "Solicitar recomendación"
     },
     "findDistributor": {
-      "heroTitle": "Find a Distributor",
-      "heroSubtitle": "Tell us your location and requirements and our team will review your distributor enquiry.",
-      "nameLabel": "Full name",
-      "companyLabel": "Company",
-      "emailLabel": "Email address",
-      "countryLabel": "Country / Region",
-      "phoneLabel": "Phone (optional)",
-      "messageLabel": "How can we help?",
-      "submitLabel": "Request distributor contact"
+      "heroTitle": "Encontrar un distribuidor",
+      "heroSubtitle": "Indíquenos su ubicación y sus necesidades y nuestro equipo revisará su consulta de distribuidor.",
+      "nameLabel": "Nombre completo",
+      "companyLabel": "Empresa",
+      "emailLabel": "Correo electrónico",
+      "countryLabel": "País / Región",
+      "phoneLabel": "Teléfono (opcional)",
+      "messageLabel": "¿Cómo podemos ayudarle?",
+      "submitLabel": "Solicitar contacto de distribuidor"
     },
     "support": {
-      "heroTitle": "Support",
-      "heroSubtitle": "Spare parts, technical support, service requests and manuals."
+      "heroTitle": "Soporte",
+      "heroSubtitle": "Repuestos, soporte técnico, solicitudes de servicio y manuales."
     },
     "faq": {
-      "heroTitle": "Frequently Asked Questions",
-      "heroSubtitle": "Common questions about LITUBO inspection systems."
+      "heroTitle": "Preguntas frecuentes",
+      "heroSubtitle": "Preguntas habituales sobre los sistemas de inspección LITUBO."
     },
     "spareParts": {
-      "heroTitle": "Request Spare Parts",
-      "heroSubtitle": "Send a spare-parts request with your machine model and serial number. Our team will reply.",
-      "modelLabel": "Machine model",
-      "serialLabel": "Serial number",
-      "partsLabel": "Parts required",
-      "countryLabel": "Installation country",
-      "emailLabel": "Email address",
-      "messageLabel": "Additional notes",
-      "submitLabel": "Submit inquiry"
+      "heroTitle": "Solicitar repuestos",
+      "heroSubtitle": "Envíe una solicitud de repuestos con el modelo y el número de serie de su máquina. Nuestro equipo le responderá.",
+      "modelLabel": "Modelo de máquina",
+      "serialLabel": "Número de serie",
+      "partsLabel": "Piezas necesarias",
+      "countryLabel": "País de instalación",
+      "emailLabel": "Correo electrónico",
+      "messageLabel": "Notas adicionales",
+      "submitLabel": "Enviar consulta"
     },
     "productTest": {
-      "heroTitle": "Send Product for Test",
-      "heroSubtitle": "Submit your product details and testing requirements for technical review.",
-      "nameLabel": "Full name",
-      "companyLabel": "Company",
-      "emailLabel": "Email address",
-      "productLabel": "Product description",
-      "concernLabel": "Contaminant or issue",
-      "countryLabel": "Country",
-      "messageLabel": "Additional notes",
-      "submitLabel": "Request test"
+      "heroTitle": "Enviar producto para prueba",
+      "heroSubtitle": "Envíe los datos de su producto y sus requisitos de prueba para revisión técnica.",
+      "nameLabel": "Nombre completo",
+      "companyLabel": "Empresa",
+      "emailLabel": "Correo electrónico",
+      "productLabel": "Descripción del producto",
+      "concernLabel": "Contaminante o problema",
+      "countryLabel": "País",
+      "messageLabel": "Notas adicionales",
+      "submitLabel": "Solicitar prueba"
     },
     "serviceRequest": {
-      "heroTitle": "Service Request",
-      "heroSubtitle": "Submit a service or technical support request.",
-      "nameLabel": "Full name",
-      "companyLabel": "Company",
-      "emailLabel": "Email address",
-      "modelLabel": "Machine model",
-      "serialLabel": "Serial number",
-      "countryLabel": "Installation country",
-      "issueLabel": "Issue description",
-      "urgencyLabel": "Urgency",
-      "submitLabel": "Submit request"
+      "heroTitle": "Solicitud de servicio",
+      "heroSubtitle": "Envíe una solicitud de servicio o soporte técnico.",
+      "nameLabel": "Nombre completo",
+      "companyLabel": "Empresa",
+      "emailLabel": "Correo electrónico",
+      "modelLabel": "Modelo de máquina",
+      "serialLabel": "Número de serie",
+      "countryLabel": "País de instalación",
+      "issueLabel": "Descripción del problema",
+      "urgencyLabel": "Urgencia",
+      "submitLabel": "Enviar solicitud"
     },
     "about": {
-      "heroTitle": "About LITUBO"
+      "heroTitle": "Sobre LITUBO"
     },
     "quality": {
-      "heroTitle": "Quality & Manufacturing"
+      "heroTitle": "Calidad y fabricación"
     },
     "globalService": {
-      "heroTitle": "Global Service Capability"
+      "heroTitle": "Servicio global"
     },
     "partner": {
-      "heroTitle": "Become a Partner",
-      "heroSubtitle": "Submit a distributor or business partnership enquiry.",
-      "nameLabel": "Full name",
-      "companyLabel": "Company name",
-      "emailLabel": "Email address",
-      "countryLabel": "Country / Region",
-      "messageLabel": "Tell us about your market and experience",
-      "submitLabel": "Submit application"
+      "heroTitle": "Ser socio",
+      "heroSubtitle": "Envíe una consulta de distribución o de colaboración empresarial.",
+      "nameLabel": "Nombre completo",
+      "companyLabel": "Nombre de la empresa",
+      "emailLabel": "Correo electrónico",
+      "countryLabel": "País / Región",
+      "messageLabel": "Cuéntenos sobre su mercado y su experiencia",
+      "submitLabel": "Enviar solicitud"
     },
     "privacy": {
-      "heroTitle": "Privacy Policy"
+      "heroTitle": "Política de privacidad"
     },
     "terms": {
-      "heroTitle": "Terms of Use"
+      "heroTitle": "Condiciones de uso"
     },
     "404": {
-      "title": "Page not found",
-      "body": "The page you are looking for may have moved or no longer exists.",
-      "cta": "Return to home"
+      "title": "Página no encontrada",
+      "body": "La página que busca puede haberse movido o ya no existe.",
+      "cta": "Volver al inicio"
     },
     "503": {
-      "title": "Temporarily unavailable",
-      "body": "This information cannot be loaded right now. Please try again in a few minutes."
+      "title": "Temporalmente no disponible",
+      "body": "Esta información no se puede cargar ahora mismo. Inténtelo de nuevo en unos minutos."
     },
     "productDetail": {
-      "selectionNote": "Final configuration, inspection performance and suitability are confirmed with our team for your product and production line.",
-      "imageOnRequest": "Ask our team for product images and configuration details.",
-      "sectionsLabel": "Product information",
-      "overview": "Overview",
-      "specifications": "Specifications",
-      "documents": "Documents"
+      "selectionNote": "La configuración final, el rendimiento de inspección y la idoneidad se confirman con nuestro equipo para su producto y su línea de producción.",
+      "imageOnRequest": "Solicite a nuestro equipo imágenes del producto y detalles de configuración.",
+      "sectionsLabel": "Información del producto",
+      "overview": "Descripción general",
+      "specifications": "Especificaciones",
+      "documents": "Documentos"
     }
   }
 }

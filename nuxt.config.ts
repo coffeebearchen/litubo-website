@@ -140,7 +140,7 @@ export default defineNuxtConfig({
        * Empty in production, so a preview locale can never be reached on the live site; publishing a
        * locale stays a deliberate edit to `publishedLocales` after review.
        */
-      previewLocales: process.env.NODE_ENV === 'production' ? [] : ['es', 'pt', 'zh', 'ar', 'ja', 'ru', 'fr'],
+      previewLocales: process.env.NODE_ENV === 'production' ? [] : ['es', 'ar'],
     },
   },
 

@@ -20,7 +20,15 @@ const previewLocales = (runtimeConfig.public.previewLocales as string[] | undefi
 const current = computed(() => locales.value.find(l => l.code === locale.value))
 const currentCode = computed(() => locale.value.toUpperCase())
 
-const entries = computed(() => locales.value.map((l) => {
+/**
+ * Only languages the site actually offers are listed: published ones plus development previews.
+ * A translation draft can be opened locally without appearing to a visitor as a dead option.
+ */
+const selectable = computed(() => locales.value.filter((l: { code: string, name?: string }) =>
+  publishedLocales.includes(l.code) || previewLocales.includes(l.code),
+))
+
+const entries = computed(() => selectable.value.map((l: { code: string, name?: string }) => {
   const code = l.code
   const published = publishedLocales.includes(code)
   // A preview locale opens only in a development build; it is never a published target.
@@ -32,7 +40,7 @@ const entries = computed(() => locales.value.map((l) => {
     available,
     preview,
     current: code === locale.value,
-    to: available ? switchLocalePath(code) : '',
+    to: available ? switchLocalePath(code as never) : '',
   }
 }))
 
