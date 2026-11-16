@@ -1,328 +1,300 @@
 <script setup lang="ts">
+/**
+ * About LITUBO — who we are, what we make, and where a conversation starts.
+ *
+ * Statements stay inside what the project can support: the product families, the legal entity and the
+ * enquiry routes. No company history, factory size, team count, customer case or country coverage is
+ * asserted here.
+ *
+ * The three equipment photographs are real products, shown as product photographs — not as a factory
+ * scene. They remain visible on narrow screens; the previous version hid the whole visual below
+ * 1023px, which removed the only company imagery on a phone.
+ */
 const { t } = useI18n()
 const localePath = useLocalePath()
 useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'), canonicalPath: '/company/about' })
 
-// PUBLIC-CLAIMS-CLEANUP-01 (D-036): this page states only what the project has confirmed — the product lines,
-// the legal entity and address, and the enquiry routes. Unverified positioning, coverage, certification and
-// service-network claims were removed, together with photo slots whose files do not exist.
+const families = [
+  { label: 'X-Ray Inspection', body: 'Dense contaminant detection and fill or count checks.', to: '/products/x-ray-inspection', image: '/images/devices/xray-real.webp' },
+  { label: 'Metal Detection', body: 'Ferrous, non-ferrous and stainless contamination.', to: '/products/metal-detection', image: '/images/devices/metal-real.webp' },
+  { label: 'Checkweighers', body: 'Inline weight control and left-right sorting.', to: '/products/checkweighers', image: '/images/devices/weigher-real.webp' },
+  { label: 'Combination Inspection', body: 'More than one technology on a single line.', to: '/products/combination-inspection', image: '/images/devices/combination-real.webp' },
+  { label: 'Conveyors & Reject Systems', body: 'Transfer and rejection around the inspection point.', to: '/products/conveyors-reject-systems', image: '' },
+]
+
+const nextSteps = [
+  { title: 'Technical discussion', body: 'Describe the product, the pack and the line.', to: '/technical-matching' },
+  { title: 'Documents', body: 'Request a datasheet, manual or drawing for a model.', to: '/resources/downloads' },
+  { title: 'Equipment support', body: 'Parts, guidance and training for equipment in service.', to: '/company/global-service' },
+]
+
+const company = {
+  legalName: 'Shanghai NingPin Industrial Dev. Co., Ltd.',
+  city: 'Kunshan, Jiangsu Province, China',
+  email: 'sales@litubo.com',
+}
 </script>
 
 <template>
-  <div>
-    <!-- Hero -->
-    <section class="about-hero">
-      <div class="about-hero__media">
-        <img
-          class="about-hero__img"
-          src="/images/home/home-hero-inspection-line.png"
-          alt=""
-          width="1600"
-          height="900"
-          loading="eager"
-          decoding="async"
-        >
-        <div class="about-hero__overlay" aria-hidden="true" />
-      </div>
-      <div class="about-hero__content container">
-        <Breadcrumb
-          :items="[
-            { label: 'Home', to: localePath('/') },
-            { label: t('nav.company') },
-            { label: t('nav_company.about') },
-          ]"
-          class="about-hero__breadcrumb"
-        />
-        <h1 class="about-hero__title">{{ t('pages.about.heroTitle') }}</h1>
-        <p class="about-hero__sub">LITUBO provides food and packaging inspection solutions: X-ray inspection, metal detection, checkweighing, combination inspection, and conveyors & reject systems.</p>
-      </div>
-    </section>
-
-    <!-- Mission -->
-    <section class="section-gap">
+  <div class="ab-page">
+    <!-- 1. Hero: three real equipment photographs instead of an unverified factory scene -->
+    <section class="page-hero">
       <div class="container">
-        <div class="two-col">
-          <div class="two-col__text">
-            <SectionHeading>Our Mission</SectionHeading>
-            <p class="body-text">We help food and packaging manufacturers protect consumers and brands with inspection systems for physical contaminant detection, weight compliance and combination inspection.</p>
-            <p class="body-text">LITUBO operates under Shanghai NingPin Industrial Dev. Co., Ltd. in Kunshan, Jiangsu Province, China, and welcomes international enquiries from distributors and end users.</p>
+        <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.company') }, { label: t('nav_company.about') }]" />
+        <div class="ab-hero">
+          <div class="ab-hero__text">
+            <p class="eyebrow">About LITUBO</p>
+            <h1 class="ab-hero__title">Food &amp; packaging inspection solutions.</h1>
+            <p class="ab-hero__intro">
+              LITUBO builds inspection equipment for food and packaging producers: X-ray inspection, metal
+              detection, checkweighing, combination inspection, and conveyors and reject systems.
+            </p>
+            <p class="ab-hero__actions">
+              <NuxtLink :to="localePath('/products')" class="ab-cta">Explore the equipment</NuxtLink>
+              <NuxtLink :to="localePath('/contact')" class="ab-link">Talk to an engineer →</NuxtLink>
+            </p>
           </div>
-          <div class="two-col__photo">
-            <img
-              class="two-col__img"
-              src="/images/company/loose-material.webp"
-              alt=""
-              width="1200"
-              height="900"
-              loading="lazy"
-              decoding="async"
-            >
+          <div class="ab-hero__media">
+            <img class="ab-hero__main" src="/images/home/home-hero-inspection-line.png" alt="" width="1600" height="900" loading="eager" decoding="async">
+            <div class="ab-hero__pair">
+              <img src="/images/devices/xray-real.webp" alt="LITUBO X-ray inspection system" width="800" height="481" loading="lazy" decoding="async">
+              <img src="/images/devices/combination-real.webp" alt="LITUBO combination inspection system" width="800" height="481" loading="lazy" decoding="async">
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Key pillars -->
-    <section class="section-gap section-alt">
-      <div class="container">
-        <SectionHeading>What LITUBO Provides</SectionHeading>
-        <div class="pillars">
-          <div class="pillar">
-            <div class="pillar__icon" aria-hidden="true">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <path d="M14 4l2.5 7h7l-5.7 4.1 2.2 6.9L14 18l-6 4 2.2-6.9L4.5 11H12L14 4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-              </svg>
-            </div>
-            <h3 class="pillar__title">Inspection Technologies</h3>
-            <p class="pillar__body">X-ray inspection, metal detection, checkweighing, combination inspection, and conveyors & reject systems.</p>
-          </div>
-          <div class="pillar">
-            <div class="pillar__icon" aria-hidden="true">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <circle cx="14" cy="14" r="10" stroke="currentColor" stroke-width="1.5" />
-                <path d="M9 14l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </div>
-            <h3 class="pillar__title">Applications</h3>
-            <p class="pillar__body">Eight food and packaging industries are listed in the Applications section.</p>
-          </div>
-          <div class="pillar">
-            <div class="pillar__icon" aria-hidden="true">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <path d="M4 20l8-8 4 4 8-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-            </div>
-            <h3 class="pillar__title">Technical Consultation</h3>
-            <p class="pillar__body">Send your product, line speed and packaging details through Technical Matching and our team will review them.</p>
-          </div>
-          <div class="pillar">
-            <div class="pillar__icon" aria-hidden="true">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <rect x="4" y="8" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.5" />
-                <path d="M9 8V6a5 5 0 0110 0v2" stroke="currentColor" stroke-width="1.5" />
-              </svg>
-            </div>
-            <h3 class="pillar__title">Support Requests</h3>
-            <p class="pillar__body">Technical support, manual, spare-parts, service and product-test requests are handled through the Support section.</p>
-          </div>
+    <!-- 2. Company identity -->
+    <section class="ab-band">
+      <div class="container ab-identity">
+        <div>
+          <p class="eyebrow">How a discussion starts</p>
+          <h2 class="ab-h2">Every inspection decision starts with the product and the pack.</h2>
+          <p class="ab-body">
+            Throughput, pack format and the available space decide as much as the technology does. We
+            review those conditions with you before recommending a configuration — there is no automatic
+            matching.
+          </p>
         </div>
+        <aside class="ab-identity__card">
+          <p class="eyebrow">Company</p>
+          <dl>
+            <div><dt>Legal entity</dt><dd>{{ company.legalName }}</dd></div>
+            <div><dt>Location</dt><dd>{{ company.city }}</dd></div>
+            <div><dt>Email</dt><dd dir="ltr"><a :href="`mailto:${company.email}`">{{ company.email }}</a></dd></div>
+          </dl>
+        </aside>
       </div>
     </section>
 
-    <!-- Contact block -->
-    <section class="section-gap">
+    <!-- 3. Five equipment families as real row entries -->
+    <section class="ab-band ab-band--tint">
       <div class="container">
-        <div class="contact-block">
-          <div class="contact-block__text">
-            <SectionHeading>Contact & Address</SectionHeading>
-            <address class="contact-block__address">
-              <p><strong>Shanghai NingPin Industrial Dev. Co., Ltd.</strong></p>
-              <p>No. 23, Huangtu Rd., Huaqiao Town</p>
-              <p>Kunshan, Jiangsu Province, China</p>
-            </address>
-          </div>
-          <div class="contact-block__actions">
-            <NuxtLink :to="localePath('/contact')" class="btn btn--primary">{{ t('common.contactUs') }}</NuxtLink>
-            <NuxtLink :to="localePath('/find-a-distributor')" class="btn btn--outline">{{ t('common.findDistributor') }}</NuxtLink>
-          </div>
-        </div>
+        <p class="eyebrow">Equipment families</p>
+        <h2 class="ab-h2">Five families, one starting point.</h2>
+        <ul class="ab-families" role="list">
+          <li v-for="f in families" :key="f.to">
+            <NuxtLink :to="localePath(f.to)" class="ab-family">
+              <span class="ab-family__name">{{ f.label }}</span>
+              <span class="ab-family__body">{{ f.body }}</span>
+              <span class="ab-family__link">Explore →</span>
+            </NuxtLink>
+          </li>
+        </ul>
       </div>
     </section>
 
-    <CTABanner
-      :title="t('common.talkToEngineer')"
-      :primary-label="t('nav.contact')"
-      :primary-to="localePath('/contact')"
-    />
+    <!-- 4. Three next steps -->
+    <section class="ab-band">
+      <div class="container">
+        <p class="eyebrow">Next steps</p>
+        <h2 class="ab-h2">Three ways to take this further.</h2>
+        <ul class="ab-steps" role="list">
+          <li v-for="(s, i) in nextSteps" :key="s.to">
+            <NuxtLink :to="localePath(s.to)" class="ab-step">
+              <span class="ab-step__n">{{ String(i + 1).padStart(2, '0') }}</span>
+              <span class="ab-step__title">{{ s.title }}</span>
+              <span class="ab-step__body">{{ s.body }}</span>
+            </NuxtLink>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 5. Compact contact strip -->
+    <section class="ab-contact">
+      <div class="container ab-contact__inner">
+        <div>
+          <p class="ab-contact__name">{{ company.legalName }}</p>
+          <p class="ab-contact__meta">{{ company.city }} · <a :href="`mailto:${company.email}`">{{ company.email }}</a></p>
+        </div>
+        <div class="ab-contact__actions">
+          <NuxtLink :to="localePath('/contact')" class="ab-cta">Contact the team</NuxtLink>
+          <NuxtLink :to="localePath('/company/become-a-partner')" class="ab-link">Partnership enquiry →</NuxtLink>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
 <style scoped>
-/* ── Hero ──────────────────────────────────────────────────────── */
-.about-hero {
-  position: relative;
-  min-height: 480px;
-  display: flex;
-  align-items: flex-end;
-  color: var(--color-white);
+.ab-band { padding: var(--space-16) 0; }
+.ab-band--tint { background: #F3F7F0; }
+
+.eyebrow {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+.ab-h2 {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: clamp(var(--text-2xl), 3vw, 41px);
+  line-height: 1.15;
+  color: var(--color-ink);
+}
+.ab-body {
+  margin: 0;
+  max-width: 620px;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--color-ink-muted);
 }
 
-.about-hero__media {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
-  overflow: hidden;
+/* Hero */
+.ab-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.14fr) minmax(0, 1fr);
+  gap: 62px;
+  align-items: center;
+  padding-block: var(--space-5) 44px;
 }
+.ab-hero__title {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: clamp(var(--text-3xl), 4vw, 61px);
+  line-height: 1.08;
+  color: var(--color-ink);
+}
+.ab-hero__intro {
+  margin: 0 0 var(--space-5);
+  max-width: 600px;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+}
+.ab-hero__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin: 0; }
 
-.about-hero__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.ab-hero__media { display: flex; flex-direction: column; gap: 10px; }
+.ab-hero__main {
   display: block;
-}
-
-.about-hero__overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to right, rgba(27, 66, 36,0.85) 0%, rgba(27, 66, 36,0.45) 70%, rgba(27, 66, 36,0.15) 100%);
-}
-
-.about-hero__content {
-  position: relative;
-  z-index: 1;
-  padding-top: var(--space-16);
-  padding-bottom: var(--space-12);
-}
-
-.about-hero__breadcrumb { margin-bottom: var(--space-4); }
-
-.about-hero__title {
-  font-family: var(--font-display);
-  font-size: clamp(var(--text-3xl), 4vw, var(--text-5xl));
-  font-weight: 600;
-  line-height: var(--leading-tight);
-  margin-bottom: var(--space-4);
-}
-
-.about-hero__sub {
-  font-size: var(--text-lg);
-  color: rgba(255,255,255,0.82);
-  max-width: 540px;
-  line-height: var(--leading-normal);
-}
-
-/* ── Two-col ───────────────────────────────────────────────────── */
-.section-gap  { padding: var(--space-16) 0; }
-.section-alt  { background: var(--color-canvas); }
-
-.two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-12);
-  align-items: center;
-}
-
-.two-col__text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.body-text {
-  font-size: var(--text-base);
-  color: var(--color-ink-muted);
-  line-height: var(--leading-normal);
-}
-
-.two-col__photo {
-  aspect-ratio: 3 / 2;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.two-col__img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: 198px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid #D2DFD0;
+  border-radius: 6px;
 }
-
-.two-col__img-placeholder {
+.ab-hero__pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ab-hero__pair img {
+  display: block;
   width: 100%;
-  height: 100%;
+  height: 100px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid #D2DFD0;
+  border-radius: 6px;
 }
 
-/* ── Pillars ───────────────────────────────────────────────────── */
-.pillars {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-5);
-  margin-top: var(--space-10);
-}
-
-.pillar {
-  padding: var(--space-6);
-  background: var(--color-white);
-  border: 1px solid var(--color-line);
+.ab-cta {
+  display: inline-block;
+  padding: 13px 24px;
   border-radius: var(--radius-sm);
-}
-
-.pillar__icon {
-  color: var(--color-primary);
-  margin-bottom: var(--space-4);
-}
-
-.pillar__title {
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--color-primary);
-  margin-bottom: var(--space-2);
-}
-
-.pillar__body {
+  background: var(--color-primary);
+  color: #fff;
   font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  line-height: var(--leading-normal);
-}
-
-/* ── Contact block ─────────────────────────────────────────────── */
-.contact-block {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-8);
-  padding: var(--space-8);
-  background: var(--color-white);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-sm);
-}
-
-.contact-block__address {
-  font-style: normal;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--text-base);
-  color: var(--color-ink-muted);
-  margin-top: var(--space-4);
-  line-height: var(--leading-normal);
-}
-
-.contact-block__actions {
-  display: flex;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  align-items: center;
-  flex-shrink: 0;
-  padding-top: var(--space-8);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
   font-weight: 600;
-  border-radius: var(--radius-sm);
-  border: 2px solid transparent;
-  padding: var(--space-3) var(--space-6);
-  font-size: var(--text-sm);
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
   text-decoration: none;
 }
-.btn--primary       { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
-.btn--primary:hover { background: var(--color-primary-deep); border-color: var(--color-primary-deep); }
-.btn--outline       { background: transparent; color: var(--color-primary); border-color: var(--color-primary); }
-.btn--outline:hover { background: var(--color-primary); color: #fff; }
+.ab-cta:hover { background: var(--color-primary-deep); }
+.ab-link { font-size: var(--text-sm); color: var(--color-link-on-light); text-decoration: none; }
+.ab-link:hover { text-decoration: underline; }
 
-/* ── Responsive ────────────────────────────────────────────────── */
+/* Identity */
+.ab-identity { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr); gap: 70px; align-items: start; }
+.ab-identity__card { padding: 30px; border: 1px solid #D2DFD0; border-radius: 6px; background: #F3F7EF; }
+.ab-identity__card dl { margin: 0; }
+.ab-identity__card dl div { padding: var(--space-3) 0; border-bottom: 1px solid #E3EBE4; }
+.ab-identity__card dl div:last-child { border-bottom: 0; }
+.ab-identity__card dt { font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-ink-muted); margin-bottom: 4px; }
+.ab-identity__card dd { margin: 0; font-size: 20px; line-height: 1.5; color: var(--color-ink); }
+.ab-identity__card a { color: var(--color-link-on-light); }
+
+/* Families */
+.ab-families { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.ab-family {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  height: 100%;
+  padding: 27px;
+  border: 1px solid #D2DFD0;
+  border-radius: 6px;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.ab-family:hover { border-color: var(--color-primary); box-shadow: 0 4px 16px rgba(27, 66, 36, 0.08); }
+.ab-family__name { font-family: var(--font-display); font-size: 29px; color: var(--color-ink); }
+.ab-family__body { font-size: 20px; line-height: 1.5; color: var(--color-ink-muted); flex: 1; }
+.ab-family__link { font-size: var(--text-sm); color: var(--color-link-on-light); }
+
+/* Steps */
+.ab-steps { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.ab-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-top: 2px solid var(--color-primary);
+  text-decoration: none;
+  color: inherit;
+}
+.ab-step__n { font-family: var(--font-display); font-size: var(--text-xl); color: var(--color-primary); }
+.ab-step__title { font-size: var(--text-base); font-weight: 600; color: var(--color-ink); }
+.ab-step__body { font-size: var(--text-sm); line-height: 1.6; color: var(--color-ink-muted); }
+
+/* Contact strip */
+.ab-contact { border-top: 1px solid #DAE3DD; background: #FAFAF5; }
+.ab-contact__inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4); padding-block: var(--space-8); }
+.ab-contact__name { margin: 0 0 4px; font-size: var(--text-base); font-weight: 600; color: var(--color-ink); }
+.ab-contact__meta { margin: 0; font-size: var(--text-sm); color: var(--color-ink-muted); }
+.ab-contact__meta a { color: var(--color-link-on-light); }
+.ab-contact__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+
 @media (max-width: 1023px) {
-  .two-col { grid-template-columns: 1fr; }
-  .two-col__photo { display: none; }
-  .pillars { grid-template-columns: repeat(2, 1fr); }
-  .contact-block { flex-direction: column; }
+  .ab-hero, .ab-identity { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  /* The photographs stay on narrow screens: they are the only company visual on a phone. */
+  .ab-hero__main { height: 180px; }
+  .ab-hero__pair img { height: 90px; }
+  .ab-steps { grid-template-columns: minmax(0, 1fr); gap: 17px; }
 }
 
-@media (max-width: 639px) {
-  .about-hero { min-height: 360px; }
-  .pillars { grid-template-columns: 1fr; }
+@media (max-width: 700px) {
+  .ab-band { padding: var(--space-10) 0; }
+  .ab-hero__title { font-size: 45px; }
+  .ab-families { grid-template-columns: minmax(0, 1fr); gap: 13px; }
+  .ab-family { padding: 26px; }
+  .ab-family__name { font-size: 30px; }
+  .ab-family__body { font-size: 22px; }
+  .ab-contact__inner { flex-direction: column; align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ab-family { transition: none; }
 }
 </style>
