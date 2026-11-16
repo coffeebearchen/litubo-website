@@ -339,15 +339,17 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
               class="spec-drawing__img"
               loading="lazy"
             >
-            <div v-else class="spec-drawing__placeholder">
-              <svg width="86" height="86" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-                <rect x="6" y="10" width="36" height="28" rx="2" stroke="currentColor" stroke-width="1.2" />
-                <path d="M6 24h36M24 10v28" stroke="currentColor" stroke-width="0.8" stroke-dasharray="3 3" />
-                <path d="M14 38v4M34 38v4" stroke="currentColor" stroke-width="1.2" />
-              </svg>
-              <p>Technical drawing to be supplied</p>
-            </div>
-            <figcaption>For reference. Not to scale.</figcaption>
+          <!-- No drawing on file: offer the request instead of a large empty frame. -->
+          <div v-else class="spec-drawing__request">
+            <p class="spec-drawing__request-text">
+              A dimensioned drawing is prepared for each configuration. Request the one that matches
+              your line and we will send it together with the model details.
+            </p>
+            <NuxtLink :to="localePath('/technical-matching')" class="spec-drawing__request-link">
+              Request the drawing for this model →
+            </NuxtLink>
+          </div>
+          <figcaption v-if="product.illustration?.url">For reference. Not to scale.</figcaption>
           </figure>
         </aside>
       </div>
@@ -707,6 +709,28 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 .spec-drawing__title { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 600; color: var(--color-primary-deep); margin: 0 0 var(--space-4); }
 .spec-drawing { margin: 0; }
 .spec-drawing__img { width: 100%; background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: var(--space-4); }
+.spec-drawing__request {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid #DAE3DD;
+  border-radius: 6px;
+  background: #F2F8F4;
+}
+.spec-drawing__request-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+}
+.spec-drawing__request-link {
+  font-size: var(--text-sm);
+  color: var(--color-link-on-light);
+  text-decoration: none;
+}
+.spec-drawing__request-link:hover { text-decoration: underline; }
+
 .spec-drawing__placeholder {
   display: flex;
   flex-direction: column;
