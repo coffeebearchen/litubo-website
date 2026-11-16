@@ -45,7 +45,9 @@ const VALID_INQUIRY_TYPES: InquiryType[] = [
   'spare_parts', 'support_request', 'send_product_test',
 ]
 
-const VALID_LOCALES = ['en', 'es', 'pt']
+/** Every locale the front end can render a form in. `ar` was missing, so an Arabic submission
+ *  was rejected outright; the site ships Arabic UI and RTL, so it must be accepted here too. */
+const VALID_LOCALES = ['en', 'es', 'pt', 'ar', 'zh', 'ja', 'ru', 'fr']
 
 /** The canonical text fields a submission may carry; `consent` is the only other field read. */
 const TEXT_FIELDS = [
