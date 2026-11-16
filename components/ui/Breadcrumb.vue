@@ -42,7 +42,9 @@ defineProps<{
 }
 
 .breadcrumb__link {
-  color: currentColor;
+  /* Explicit ink, not currentColor: on the warm page hero the inherited colour is white and the
+     breadcrumb becomes unreadable. */
+  color: var(--color-ink-muted);
   opacity: 0.72;
   transition: opacity var(--transition-fast);
 }
@@ -52,13 +54,13 @@ defineProps<{
 }
 
 .breadcrumb__current {
-  color: currentColor;
+  color: var(--color-ink);
   opacity: 0.92;
   font-weight: 500;
 }
 
 .breadcrumb__sep {
-  color: currentColor;
+  color: var(--color-ink-muted);
   opacity: 0.45;
 }
 </style>

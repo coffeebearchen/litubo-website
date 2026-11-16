@@ -77,24 +77,20 @@ function formatDate(iso: string | null): string {
 <style scoped>
 .post-meta {
   font-size: var(--text-sm);
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--color-ink-muted);
   margin: var(--space-3) 0 var(--space-2);
   letter-spacing: 0.02em;
 }
 
 .page-hero__title {
-  color: var(--color-white);
+  color: var(--color-ink);
 }
 
 .page-hero__sub {
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--color-ink-muted);
 }
 
-.post-page :deep(.breadcrumb),
-.post-page :deep(.breadcrumb a),
-.post-page :deep(.breadcrumb span) {
-  color: rgba(255, 255, 255, 0.72);
-}
+/* The hero is light now, so the breadcrumb keeps the shared dark styling. No page-level override. */
 
 .post-cover {
   margin: 0 0 var(--space-8);
