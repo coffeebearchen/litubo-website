@@ -9,7 +9,7 @@
  * support_request contract: `support_request_type = manual-request`, and the chosen document type is
  * written into the message as a readable prefix so the back office sees what was requested.
  */
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const localePath = useLocalePath()
 
 useSeoHead({
@@ -65,49 +65,11 @@ const faqs = [
   },
 ]
 
-const form = reactive({ name: '', company: '', email: '', model: '', serial: '', country: '', message: '', consent: false })
-const errors = reactive<Record<string, string>>({})
-const status = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
 
 /** The document type is a readable prefix; the visitor's own words are never replaced. */
 const messagePrefix = computed(() => `Document request: ${activeType.value.title.slice(0, -1)}`)
 
-function validate(): boolean {
-  for (const k in errors) errors[k] = ''
-  if (!form.name.trim()) errors.name = 'Required'
-  if (!form.email.trim()) errors.email = 'Required'
-  if (!form.message.trim()) errors.message = 'Required'
-  if (!form.consent) errors.consent = 'Please agree to continue'
-  return Object.values(errors).every(v => !v)
-}
 
-async function submit() {
-  if (!validate()) return
-  status.value = 'loading'
-  try {
-    await $fetch('/api/inquiries', {
-      method: 'POST',
-      body: {
-        inquiry_type: 'support_request',
-        support_request_type: 'manual-request',
-        locale: locale.value,
-        contact_name: form.name,
-        contact_company: form.company,
-        contact_email: form.email,
-        model_number: form.model,
-        serial_number: selected.value === 'manual' ? form.serial : '',
-        contact_country: form.country,
-        message: `${messagePrefix.value}\n\n${form.message}`,
-        consent: form.consent,
-        website: '',
-      },
-    })
-    status.value = 'success'
-  }
-  catch {
-    status.value = 'error'
-  }
-}
 </script>
 
 <template>
@@ -190,63 +152,12 @@ async function submit() {
             <p class="dl-form__context">Selected: {{ activeType.title }}</p>
             <h2 class="dl-form__title">Request this document</h2>
 
-            <div v-if="status === 'success'" class="dl-state">
-              <p class="dl-state__title">Thank you — your request has been received.</p>
-              <p class="dl-state__body">Our team will locate the correct document and reply by email.</p>
-            </div>
-
-            <template v-else>
-              <div v-if="status === 'error'" class="dl-alert" role="alert">
-                <p>We could not send your request. Your details are still here — please try again.</p>
-              </div>
-
-              <form novalidate @submit.prevent="submit">
-                <div class="dl-grid">
-                  <label class="dl-field">
-                    <span>Full name <em>*</em></span>
-                    <input v-model="form.name" type="text" autocomplete="name" :class="{ 'is-error': errors.name }">
-                  </label>
-                  <label class="dl-field">
-                    <span>Company</span>
-                    <input v-model="form.company" type="text" autocomplete="organization">
-                  </label>
-                  <label class="dl-field">
-                    <span>Work email <em>*</em></span>
-                    <input v-model="form.email" type="email" autocomplete="email" :class="{ 'is-error': errors.email }">
-                  </label>
-                  <label class="dl-field">
-                    <span>Model or series</span>
-                    <input v-model="form.model" type="text" placeholder="If known">
-                  </label>
-                  <label v-if="selected === 'manual'" class="dl-field">
-                    <span>Serial number</span>
-                    <input v-model="form.serial" type="text" placeholder="If available">
-                  </label>
-                  <label class="dl-field">
-                    <span>Country / region</span>
-                    <input v-model="form.country" type="text" autocomplete="country-name">
-                  </label>
-                </div>
-
-                <label class="dl-field dl-field--full">
-                  <span>What do you need? <em>*</em></span>
-                  <textarea v-model="form.message" rows="4" :class="{ 'is-error': errors.message }" placeholder="Describe the product, the model or the application." />
-                </label>
-
-                <label class="dl-consent">
-                  <input v-model="form.consent" type="checkbox">
-                  <span>
-                    I agree to the processing of my personal data in accordance with the
-                    <NuxtLink :to="localePath('/privacy-policy')">Privacy Policy</NuxtLink>.
-                  </span>
-                </label>
-                <p v-if="errors.consent" class="dl-error">{{ errors.consent }}</p>
-
-                <button type="submit" class="dl-submit" :disabled="status === 'loading'">
-                  {{ status === 'loading' ? 'Sending…' : 'Send document request' }}
-                </button>
-              </form>
-            </template>
+            <SupportRequestForm
+              request-type="manual-request"
+              :message-prefix="messagePrefix"
+              :show-serial="selected === 'manual'"
+              submit-label="Send document request"
+            />
           </div>
         </div>
       </div>

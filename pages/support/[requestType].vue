@@ -21,45 +21,8 @@ useHead({ title: `${pageTitle.value} — LITUBO` })
 const documentLabels: Record<string, string> = { datasheet: 'product datasheet', manual: 'operation manual', drawing: 'technical drawing', catalogue: 'product selection information' }
 const documentLabel = requestType.value === 'manual-request' && typeof route.query.document === 'string' && Object.hasOwn(documentLabels, route.query.document) ? documentLabels[route.query.document] : ''
 const form = reactive({ name: '', company: '', email: '', model: '', serial: '', country: '', issue: documentLabel ? `Please send the ${documentLabel} for the following product / application: ` : '', urgency: '', consent: false })
-const errors = reactive<Record<string, string>>({})
-const status = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
 
-function validate() {
-  for (const k in errors) errors[k] = ''
-  if (!form.name.trim())  errors.name  = 'Required'
-  if (!form.email.trim()) errors.email = 'Required'
-  if (!form.issue.trim()) errors.issue = 'Required'
-  if (!form.consent)      errors.consent = 'You must agree to continue'
-  return Object.values(errors).every(v => !v)
-}
 
-async function submit() {
-  if (!validate()) return
-  status.value = 'loading'
-  try {
-    await $fetch('/api/inquiries', {
-      method: 'POST',
-      body: {
-        inquiry_type: 'support_request',
-        support_request_type: requestType.value,
-        locale: locale.value,
-        contact_name: form.name,
-        contact_company: form.company,
-        contact_email: form.email,
-        model_number: form.model,
-        serial_number: form.serial,
-        contact_country: form.country,
-        message: form.issue,
-        urgency: form.urgency,
-        consent: form.consent,
-        website: '',
-      },
-    })
-    status.value = 'success'
-  } catch {
-    status.value = 'error'
-  }
-}
 </script>
 
 <template>
@@ -73,28 +36,10 @@ async function submit() {
     </section>
     <section class="section-gap">
       <div class="container">
-        <div v-if="status === 'success'" class="form-success" role="alert">
-          <h2>{{ t('common.successTitle') }}</h2><p>{{ t('common.successBody') }}</p>
-        </div>
-        <form v-else class="form-panel" novalidate @submit.prevent="submit">
-          <div class="form-grid">
-            <FormField id="name" :label="t('pages.serviceRequest.nameLabel')" required :model-value="form.name" :error="errors.name" @update:model-value="form.name = $event" />
-            <FormField id="company" :label="t('pages.serviceRequest.companyLabel')" :model-value="form.company" @update:model-value="form.company = $event" />
-            <FormField id="email" type="email" :label="t('pages.serviceRequest.emailLabel')" required :model-value="form.email" :error="errors.email" @update:model-value="form.email = $event" />
-            <FormField id="model" :label="t('pages.serviceRequest.modelLabel')" :model-value="form.model" @update:model-value="form.model = $event" />
-            <FormField id="serial" :label="t('pages.serviceRequest.serialLabel')" :model-value="form.serial" @update:model-value="form.serial = $event" />
-            <FormField id="country" :label="t('pages.serviceRequest.countryLabel')" :model-value="form.country" @update:model-value="form.country = $event" />
-          </div>
-          <FormField id="issue" type="textarea" :label="t('pages.serviceRequest.issueLabel')" required :model-value="form.issue" :error="errors.issue" class="form-message" @update:model-value="form.issue = $event" />
-          <label class="consent-label">
-            <input v-model="form.consent" type="checkbox" class="consent-checkbox" >
-            <span>I agree to the processing of my personal data in accordance with the <NuxtLink :to="localePath('/privacy-policy')">Privacy Policy</NuxtLink>.</span>
-          </label>
-          <p v-if="errors.consent" class="consent-error" role="alert">{{ errors.consent }}</p>
-          <BaseButton type="submit" variant="primary" size="lg" :disabled="status === 'loading'" class="submit-btn">
-            {{ status === 'loading' ? t('common.loading') : t('pages.serviceRequest.submitLabel') }}
-          </BaseButton>
-        </form>
+        <SupportRequestForm
+          :request-type="requestType"
+          :show-serial="true"
+        />
       </div>
     </section>
   </div>
