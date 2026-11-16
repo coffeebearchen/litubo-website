@@ -15,6 +15,10 @@
   /* ─── Derived surfaces ─────────────────────────────────────────── */
   --color-surface:      #FFFFFF;
   --color-surface-alt:  #F2EFE8;
+  /* Scheme-C warm band: hero, configurator, enquiry areas. Used sparingly. */
+  --color-surface-warm: #F4E5C8;
+  /* Readable link on light surfaces: keeps the gold relationship, raises contrast. */
+  --color-link-on-light: #805300;
 
   /* ─── Typography ───────────────────────────────────────────────── */
   --font-display: 'Source Serif 4', Georgia, serif;
@@ -63,6 +67,9 @@
   /* ─── Transitions ──────────────────────────────────────────────── */
   --transition-fast:   120ms ease;
   --transition-normal: 200ms ease;
+  /* Scheme-C family card reveal: image/text swap timing, fixed in code (no per-card CMS config). */
+  --reveal-duration: 420ms;
+  --reveal-easing: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* ─── Shadows ──────────────────────────────────────────────────── */
   --shadow-card: 0 1px 3px rgba(27, 66, 36, 0.08);

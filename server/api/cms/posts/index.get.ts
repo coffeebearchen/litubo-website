@@ -16,6 +16,7 @@ interface DirectusPost {
   topics: string[] | null
   faq_group: string | null
   cover_image: string | null
+  related_product_slugs?: string[] | null
   title_en: string | null
   title_es: string | null
   title_pt: string | null
@@ -52,6 +53,15 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
   const query = getQuery(event)
   const type = query.content_type as string | undefined
   const excludeType = query.exclude_type as string | undefined
+  /**
+   * Related reading on a product page: only posts whose `related_product_slugs` names this exact
+   * product. Filtering happens on the server against the published set — the client never guesses
+   * a relationship from "most recent" articles.
+   *
+   * `related_product_slugs` is a JSON field and Directus does not support array-subset operators on
+   * it, so the filter is applied after the fetch (same approach as the existing topics filter).
+   */
+  const relatedProductSlug = typeof query.related_product_slug === 'string' ? query.related_product_slug.trim() : ''
 
   // CC-IMP-10 (D-035): legacy posts serve only Technical Guides and FAQ. Insights and
   // Case Studies are Content Center only; News is not public in Phase 1.
@@ -95,12 +105,14 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
     'id', 'content_type', 'status', 'slug', 'publish_date', 'author', 'topics',
     'faq_group', 'cover_image', 'title_en', 'title_es', 'title_pt',
     'excerpt_en', 'excerpt_es', 'excerpt_pt',
+    ...(relatedProductSlug ? ['related_product_slugs'] : []),
     ...(isFaqQuery ? ['body_en', 'body_es', 'body_pt'] : []),
   ].join(',')
 
-  // When topics filter is active, fetch all (up to 500) then filter server-side
-  const effectiveLimit = (topics && topics.length > 0) ? 500 : limit
-  const effectiveOffset = (topics && topics.length > 0) ? 0 : offset
+  // When topics or a related product filter is active, fetch all (up to 500) then filter server-side
+  const needsServerFilter = (topics && topics.length > 0) || Boolean(relatedProductSlug)
+  const effectiveLimit = needsServerFilter ? 500 : limit
+  const effectiveOffset = needsServerFilter ? 0 : offset
 
   const qs = [
     ...filters,
@@ -121,10 +133,17 @@ export default defineEventHandler(async (event): Promise<PostsResult> => {
       ...(isFaqQuery ? rows.flatMap(r => legacyBodyFileIds(r.body_en, r.body_es, r.body_pt)) : []),
     ])
     let items = rows.map(r => toListItem(r, isFaqQuery, files))
+    if (relatedProductSlug) {
+      // Keep only posts that explicitly name this product; the relation is never inferred.
+      const relatedIds = new Set(rows
+        .filter(r => (r.related_product_slugs ?? []).includes(relatedProductSlug))
+        .map(r => String(r.id)))
+      items = items.filter(p => relatedIds.has(p.id))
+    }
     if (topics && topics.length > 0) {
       items = items.filter(p => topics.some(t => p.topics.includes(t as PostListItem['topics'][number])))
-      items = items.slice(offset, offset + limit)
     }
+    if (needsServerFilter) items = items.slice(offset, offset + limit)
     return { posts: items }
   }
   catch (err) {

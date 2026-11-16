@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HomeContent, PostsResult } from '~/types/content'
+import type { HomeContent, PostsResult, ProductCategory } from '~/types/content'
 import { INDUSTRY_GUIDES } from '~/content/industry-guides'
 
 const { t, locale } = useI18n()
@@ -26,11 +26,6 @@ function cmsText(
 
 const hero = computed(() => homeContent.value?.hero ?? null)
 
-const heroImgSrc = computed(() =>
-  hero.value?.imageUrl || '/images/home/home-hero-inspection-line.png'
-)
-const heroImgError = ref(false)
-
 const heroEyebrow = computed(() => cmsText(hero.value?.eyebrow, 'pages.home.heroEyebrow'))
 const heroTitle = computed(() => cmsText(hero.value?.title, 'pages.home.heroTitle'))
 const heroBody = computed(() => cmsText(hero.value?.body, 'pages.home.heroSubtitle'))
@@ -39,14 +34,75 @@ const heroPrimaryPath = computed(() => hero.value?.ctaPrimary.path || '/products
 const heroSecondaryLabel = computed(() => cmsText(hero.value?.ctaSecondary.label, 'pages.home.heroCtaSecondary'))
 const heroSecondaryPath = computed(() => hero.value?.ctaSecondary.path || '/contact')
 
-// Home category grid — the five stable product lines
-const catCards = [
-  { slug: 'x-ray-inspection', title: t('nav_products.xray'), desc: 'Advanced X-ray inspection for packaged food and packaging.' },
-  { slug: 'metal-detection', title: t('nav_products.metal'), desc: 'High-sensitivity metal detection for food processing lines.' },
-  { slug: 'checkweighers', title: t('nav_products.checkweighers'), desc: 'Dynamic checkweighing for accurate fill weights.' },
-  { slug: 'combination-inspection', title: t('nav_products.combination'), desc: 'Integrated multi-technology inspection systems.' },
-  { slug: 'conveyors-reject-systems', title: t('nav_products.conveyors'), desc: 'Conveyors and reject systems for LITUBO equipment.' },
-]
+// ─── Scheme C: five product families ────────────────────────────────
+// Titles, intros and order come from the published categories. The card photograph and the
+// "family example" label come from one named, published product per family, so a single photo is
+// never presented as if every model in the family looks like it. Conveyors & reject systems have
+// no published product in the source data, so that card keeps an honest branded placeholder.
+const FAMILY_SOURCE: Readonly<Record<string, { slug: string; label: string }>> = {
+  'x-ray-inspection': { slug: 'xr-200d-compact-food-x-ray-inspection-system', label: 'XR-200D' },
+  'metal-detection': { slug: 'lt-m-digital-all-metal-detector-series', label: 'LT-M Series' },
+  'checkweighers': { slug: 'lt-150-compact-online-checkweigher', label: 'LT-150' },
+  'combination-inspection': { slug: 'lt-js220-metal-detector-checkweigher-combo', label: 'LT-JS220' },
+}
+
+interface FamilyProduct {
+  slug: string
+  name: { en: string }
+  heroMedia?: { url: string; alt?: { en: string } }
+}
+
+const { data: categories } = await useAsyncData<ProductCategory[]>(
+  'home-categories',
+  () => $fetch<ProductCategory[]>('/api/cms/products/categories'),
+  { default: () => [] },
+)
+
+const { data: familyProducts } = await useAsyncData<Record<string, FamilyProduct>>(
+  'home-family-products',
+  async () => {
+    const keys = Object.keys(FAMILY_SOURCE)
+    const lists = await Promise.all(keys.map(key => $fetch<{ products: FamilyProduct[] }>(`/api/cms/products/${key}`)
+      .catch(() => ({ products: [] as FamilyProduct[] }))))
+    const map: Record<string, FamilyProduct> = {}
+    keys.forEach((key, i) => {
+      const hit = (lists[i]?.products ?? []).find(p => p.slug === FAMILY_SOURCE[key]!.slug)
+      if (hit) map[key] = hit
+    })
+    return map
+  },
+  { default: () => ({}) },
+)
+
+const familyCards = computed(() => (categories.value ?? []).map((c, i) => {
+  const source = FAMILY_SOURCE[c.slug]
+  const product = familyProducts.value?.[c.slug]
+  return {
+    key: c.slug,
+    index: i,
+    title: c.title[locale.value as 'en' | 'es' | 'pt'] || c.title.en,
+    description: c.intro[locale.value as 'en' | 'es' | 'pt'] || c.intro.en,
+    imageSrc: product?.heroMedia?.url || c.heroMedia?.url || '',
+    imageAlt: product?.heroMedia?.alt?.en || product?.name.en || c.title.en,
+    modelLabel: source?.label ? `${source.label} · family example` : '',
+    to: localePath(`/products/${c.slug}`),
+  }
+}))
+
+// Hero showroom: the XR-200D photo, fetched from the real published product.
+const { data: xrayList } = await useAsyncData<{ products: Array<{ slug: string; name: { en: string }; heroMedia?: { url: string; alt?: { en: string } } }> }>(
+  'home-showroom-product',
+  () => $fetch('/api/cms/products/x-ray-inspection'),
+  { default: () => ({ products: [] }) },
+)
+const showroom = computed(() => {
+  const rows = xrayList.value?.products ?? []
+  const hit = rows.find(p => p.slug.startsWith('xr-200d'))
+  return hit ?? rows[0] ?? null
+})
+
+// Full-bleed production band uses the approved production-line photograph.
+const bandImage = '/images/home/home-hero-inspection-line.png'
 
 useSeoHead({
   title: t('seo.home.title'),
@@ -54,32 +110,41 @@ useSeoHead({
   canonicalPath: '/',
 })
 
-// "Latest from LITUBO" — the three most recent published insights (real posts only).
+// ─── Blog & Insights: real published English articles only ──────────
 const { data: latestPosts } = await useAsyncData<PostsResult>(
-  'home-latest-posts',
+  'home-blog-posts',
   () => $fetch<PostsResult>('/api/cms/posts?limit=12'),
   { default: () => ({ posts: [] }) },
 )
-const latestAll = computed(() => (latestPosts.value?.posts ?? []).map(p => ({
-  type: p.contentType,
-  tag: p.contentType === 'insight' ? 'Insight' : p.contentType === 'technical_guide' ? 'Technical Guide' : 'Article',
-  title: p.title[locale.value as 'en' | 'es' | 'pt'] || p.title.en,
-  excerpt: p.excerpt[locale.value as 'en' | 'es' | 'pt'] || p.excerpt.en,
-  to: `/resources/${p.contentType === 'insight' ? 'insights' : p.contentType === 'technical_guide' ? 'technical-guides' : 'news'}/${p.slug}`,
-})))
 
-// ANYI-style tabs on the home "Latest" section.
-const latestTab = ref<'all' | 'insight' | 'technical_guide' | 'case_study'>('all')
-const latestTabs: { key: typeof latestTab.value; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'insight', label: 'Insights' },
-  { key: 'technical_guide', label: 'Technical Guides' },
-  { key: 'case_study', label: 'Case Studies' },
-]
-const latestResources = computed(() => {
-  const rows = latestTab.value === 'all' ? latestAll.value : latestAll.value.filter(p => p.type === latestTab.value)
-  return rows.slice(0, 3)
-})
+/** Route prefix per content type, so an article never lands in the wrong detail path. */
+const BLOG_ROUTE: Readonly<Record<string, string>> = {
+  insight: '/resources/insights',
+  technical_guide: '/resources/technical-guides',
+  case_study: '/resources/case-studies',
+  news: '/resources/news',
+}
+
+const BLOG_TAG: Readonly<Record<string, string>> = {
+  insight: 'Insight',
+  technical_guide: 'Technical guide',
+  case_study: 'Case study',
+  news: 'News',
+}
+
+// FAQ posts are a support format, not blog articles, so they are excluded here.
+const blogPosts = computed(() => (latestPosts.value?.posts ?? [])
+  .filter(p => p.contentType !== 'faq' && (p.title[locale.value as 'en' | 'es' | 'pt'] || p.title.en))
+  .slice(0, 3)
+  .map((p, i) => ({
+    key: p.slug,
+    order: String(i + 1).padStart(2, '0'),
+    tag: BLOG_TAG[p.contentType] ?? 'Article',
+    title: p.title[locale.value as 'en' | 'es' | 'pt'] || p.title.en,
+    excerpt: p.excerpt[locale.value as 'en' | 'es' | 'pt'] || p.excerpt.en,
+    cover: p.coverImageUrl || '',
+    to: localePath(`${BLOG_ROUTE[p.contentType] ?? '/resources/insights'}/${p.slug}`),
+  })))
 
 // PUBLIC-CLAIMS-CLEANUP-01 (D-036): the FAQ teaser lists real published FAQ questions in the current locale only
 // (RSG-05, no fallback). With none published the whole section is not rendered; no question is hard-coded.
@@ -92,179 +157,229 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
   .map(post => post.title[locale.value as 'en' | 'es' | 'pt'])
   .filter(Boolean)
   .slice(0, 6))
+
+// ─── Three-step conversation ────────────────────────────────────────
+// Describes our process only; it makes no claim about products or results.
+const steps = [
+  {
+    n: '01',
+    title: 'Describe the product and pack',
+    body: 'Product form, packaging material and the point on the line where inspection would sit.',
+  },
+  {
+    n: '02',
+    title: 'Review the inspection task',
+    body: 'The foreign material or weight check you need to discuss, and the conditions around it.',
+  },
+  {
+    n: '03',
+    title: 'Agree the configuration',
+    body: 'Model, aperture, reject method and installation details are confirmed with our technical team.',
+  },
+]
 </script>
 
 <template>
   <div class="page-home">
 
-    <!-- ─── Hero ──────────────────────────────────────── -->
+    <!-- ─── Hero (scheme C: warm band + product showroom) ─────────── -->
     <section class="home-hero" aria-label="Hero">
-      <!-- Full-bleed background image; falls back to dark-green CSS when missing -->
-      <div class="home-hero__bg" aria-hidden="true">
-        <img
-          v-if="!heroImgError"
-          :src="heroImgSrc"
-          alt=""
-          class="home-hero__bg-img"
-          loading="eager"
-          fetchpriority="high"
-          @error="heroImgError = true"
-        >
-        <div class="home-hero__bg-overlay" />
-      </div>
-      <div class="home-hero__inner">
-        <!-- Text side -->
-        <div class="home-hero__content">
+      <div class="container home-hero__split">
+        <div class="home-hero__copy">
           <p class="home-hero__eyebrow">{{ heroEyebrow }}</p>
           <h1 class="home-hero__title">{{ heroTitle }}</h1>
           <p class="home-hero__subtitle">{{ heroBody }}</p>
           <div class="home-hero__actions">
-            <NuxtLink :to="localePath(heroPrimaryPath)" class="hero-btn hero-btn--primary">
+            <NuxtLink :to="localePath(heroPrimaryPath)" class="home-btn home-btn--primary">
               {{ heroPrimaryLabel }}
               <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
                 <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </NuxtLink>
-            <NuxtLink :to="localePath(heroSecondaryPath)" class="hero-btn hero-btn--outline">
+            <NuxtLink :to="localePath(heroSecondaryPath)" class="home-btn home-btn--outline">
               {{ heroSecondaryLabel }}
             </NuxtLink>
           </div>
         </div>
-        <!-- Image side (photo pending) -->
-        <div class="home-hero__media" aria-hidden="true">
-          <div class="home-hero__photo-area" />
-        </div>
-      </div>
-      <!-- Slider dots decoration -->
-      <div class="home-hero__dots" aria-hidden="true">
-        <span class="home-hero__dot home-hero__dot--active" />
-        <span class="home-hero__dot" />
-        <span class="home-hero__dot" />
+
+        <figure class="home-hero__figure">
+          <div class="home-hero__showroom">
+            <img
+              v-if="showroom?.heroMedia?.url"
+              :src="showroom.heroMedia.url"
+              :alt="showroom.name.en"
+              loading="eager"
+              fetchpriority="high"
+            >
+            <div v-else class="home-hero__showroom-placeholder img-placeholder img-placeholder--warm-light" aria-hidden="true" />
+            <span v-if="showroom" class="home-hero__showroom-label">
+              {{ showroom.name.en }} · X-ray inspection
+            </span>
+          </div>
+          <figcaption class="home-hero__caption">
+            Product image shown as supplied; the exact configuration is confirmed with your team.
+          </figcaption>
+        </figure>
       </div>
     </section>
 
-    <!-- ─── About LITUBO (ANYI-style two-column) ───────── -->
-    <section class="home-about section-gap">
-      <div class="container home-about__grid">
-        <div class="home-about__copy">
-          <p class="home-about__eyebrow">ABOUT LITUBO</p>
-          <h2 class="home-about__title">A clear route to the right inspection system.</h2>
-          <p class="home-about__body">LITUBO supplies food and packaging inspection equipment — X-ray, metal detection, checkweighing and combination systems — with application clarification, product selection and configuration support.</p>
-          <p class="home-about__body">Tell us your product, packaging and line conditions. We discuss the exact model with your team.</p>
-          <ul class="home-about__features">
-            <li>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20V8l8-4 8 4v12M4 20h16M9 20v-6h6v6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              <strong>Application-specific selection</strong>
-            </li>
-            <li>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-              <strong>Exact-model specifications</strong>
-            </li>
-            <li>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v11H9l-4 4V5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 9h8M8 12h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-              <strong>Technical enquiry support</strong>
-            </li>
-          </ul>
-          <NuxtLink :to="localePath('/company/about')" class="home-about__link">About LITUBO →</NuxtLink>
-        </div>
-        <div class="home-about__media">
-          <img v-if="heroImgSrc && !heroImgError" :src="heroImgSrc" alt="LITUBO inspection systems in production" loading="lazy">
-          <div v-else class="home-about__media-placeholder img-placeholder" aria-hidden="true" />
-          <p class="home-about__caption">Production line inspection — illustrative image</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ─── Find inspection systems (category grid) ───── -->
-    <section class="home-cats section-gap section-alt">
+    <!-- ─── Five product families (image ↔ description reveal) ────── -->
+    <section id="systems" class="section-pad" aria-labelledby="families-heading">
       <div class="container">
-        <div class="home-cats__header">
-          <h2 class="home-section-title">Find inspection systems</h2>
-          <NuxtLink :to="localePath('/products')" class="home-all-link">Explore all categories →</NuxtLink>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">The product families</p>
+            <h2 id="families-heading">Find your starting point.</h2>
+          </div>
+          <p>Five inspection families. Final model selection is discussed for your application.</p>
         </div>
-        <p class="home-cats__sub">Five proven technology lines, configurable for your production environment.</p>
-        <div class="home-cats__grid">
-          <NuxtLink v-for="c in catCards" :key="c.slug" :to="localePath(`/products/${c.slug}`)" class="home-cat-card">
-            <div class="home-cat-card__media img-placeholder img-placeholder--warm-light" aria-hidden="true" />
-            <div class="home-cat-card__body">
-              <h3 class="home-cat-card__title">{{ c.title }}</h3>
-              <p class="home-cat-card__desc">{{ c.desc }}</p>
-              <span class="home-cat-card__link">Explore systems →</span>
-            </div>
-          </NuxtLink>
+
+        <div v-if="familyCards.length" class="family-reveal-grid">
+          <FamilyRevealCard
+            v-for="card in familyCards"
+            :key="card.key"
+            :index="card.index"
+            :title="card.title"
+            :description="card.description"
+            :image-src="card.imageSrc"
+            :image-alt="card.imageAlt"
+            :model-label="card.modelLabel"
+            :to="card.to"
+          />
         </div>
+        <p v-else class="home-empty">
+          Product families are being prepared.
+          <NuxtLink :to="localePath('/products')">Browse all products →</NuxtLink>
+        </p>
       </div>
     </section>
 
-    <!-- ─── Inspection by application ─────────────────── -->
-    <section class="home-apps section-gap">
+    <!-- ─── Production line band ──────────────────────────────────── -->
+    <section class="home-band" aria-labelledby="band-heading">
+      <img :src="bandImage" alt="" class="home-band__img" loading="lazy" aria-hidden="true">
+      <div class="container home-band__inner">
+        <p class="home-band__eyebrow">On the line</p>
+        <h2 id="band-heading">Every inspection decision starts with the product and the pack.</h2>
+        <p class="home-band__body">
+          Throughput, pack format and the available space decide as much as the technology does.
+          We review those conditions with you before recommending a configuration.
+        </p>
+      </div>
+    </section>
+
+    <!-- ─── Inspection by application (illustrated) ───────────────── -->
+    <section class="section-pad" aria-labelledby="applications-heading">
       <div class="container">
-        <div class="home-cats__header">
-          <h2 class="home-section-title">Inspection by application</h2>
-          <NuxtLink :to="localePath('/applications')" class="home-all-link">Explore all applications →</NuxtLink>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Inspection by application</p>
+            <h2 id="applications-heading">Your product.<br>Your inspection questions.</h2>
+          </div>
+          <p>Start with an application. Final suitability depends on the product, packaging and line conditions.</p>
         </div>
-        <p class="home-cats__sub">Eight food and packaging industries, each with its own inspection considerations.</p>
-        <div class="home-apps__grid">
+
+        <div class="application-grid illustrated-apps">
           <NuxtLink
             v-for="a in appCards"
             :key="a.slug"
             :to="localePath(`/applications/${a.slug}`)"
-            class="home-app-card"
           >
-            <span class="home-app-card__title">{{ a.title }}</span>
-            <span class="home-app-card__link">Discuss your needs →</span>
+            <span class="application-name">
+              <ApplicationIcon :slug="a.slug" />
+              <h3>{{ a.title }}</h3>
+            </span>
+            <span class="app-explore">
+              Explore application
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                <path d="M5 19L19 5M5 5h14v14" />
+              </svg>
+            </span>
           </NuxtLink>
         </div>
       </div>
     </section>
 
-    <!-- ─── Latest from LITUBO ────────────────────────── -->
-    <section v-if="latestAll.length" class="home-latest section-gap section-alt" aria-label="Latest resources">
+    <!-- ─── Three-step conversation ───────────────────────────────── -->
+    <section class="section-pad home-steps-band" aria-labelledby="steps-heading">
       <div class="container">
-        <div class="home-latest__header">
-          <h2 class="home-section-title">{{ t('pages.home.latestTitle') }}</h2>
-          <NuxtLink :to="localePath('/resources')" class="home-all-link">
-            {{ t('pages.home.latestCta') }}
-            <svg width="12" height="9" viewBox="0 0 14 10" fill="none" aria-hidden="true">
-              <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </NuxtLink>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">How we work</p>
+            <h2 id="steps-heading">Three steps to a useful answer.</h2>
+          </div>
+          <p>No automatic matching. Each enquiry is reviewed by our technical team.</p>
         </div>
-        <div class="home-latest__tabs" role="tablist" aria-label="Article types">
-          <button
-            v-for="tab in latestTabs"
-            :key="tab.key"
-            type="button"
-            role="tab"
-            class="home-latest__tab"
-            :class="{ 'is-active': latestTab === tab.key }"
-            :aria-selected="latestTab === tab.key"
-            @click="latestTab = tab.key"
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-        <div class="home-latest__grid">
-          <article v-for="item in latestResources" :key="item.title" class="resource-card">
-            <NuxtLink :to="localePath(item.to)" class="resource-card__link">
-              <div class="resource-card__photo img-placeholder img-placeholder--warm-light" aria-hidden="true" />
-              <div class="resource-card__body">
-                <p class="resource-card__tag">{{ item.tag }}</p>
-                <h3 class="resource-card__title">{{ item.title }}</h3>
-                <p class="resource-card__excerpt">{{ item.excerpt }}</p>
-                <span class="resource-card__read" aria-hidden="true">Read more →</span>
-              </div>
-            </NuxtLink>
+        <div class="home-steps">
+          <article v-for="s in steps" :key="s.n">
+            <p class="home-steps__number">{{ s.n }}</p>
+            <h3>{{ s.title }}</h3>
+            <p>{{ s.body }}</p>
           </article>
         </div>
       </div>
     </section>
 
-    <!-- ─── FAQ teaser ────────────────────────────────── -->
-    <section v-if="faqQuestions.length" class="home-faq section-gap" aria-labelledby="faq-heading">
+    <!-- ─── Blog & Insights ───────────────────────────────────────── -->
+    <section id="blog" class="section-pad home-blog" aria-labelledby="blog-heading">
       <div class="container">
-        <h2 id="faq-heading" class="home-faq__title">{{ t('pages.home.faqTitle') }}</h2>
-        <p class="home-faq__subtitle">{{ t('pages.home.faqSubtitle') }}</p>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Blog &amp; Insights</p>
+            <h2 id="blog-heading">Practical ideas.<br>A clearer conversation.</h2>
+          </div>
+          <NuxtLink :to="localePath('/resources')" class="text-link">
+            View the blog
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+              <path d="M5 19L19 5M5 5h14v14" />
+            </svg>
+          </NuxtLink>
+        </div>
+
+        <div v-if="blogPosts.length" class="home-blog__grid">
+          <article v-for="p in blogPosts" :key="p.key" class="home-blog__card">
+            <NuxtLink :to="p.to" class="home-blog__cover">
+              <img v-if="p.cover" :src="p.cover" :alt="p.title" loading="lazy">
+              <span v-else class="home-blog__cover-fallback" aria-hidden="true">
+                <span class="home-blog__cover-icon">
+                  <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z" />
+                  </svg>
+                </span>
+                <span>LITUBO INSIGHTS</span>
+              </span>
+              <span class="home-blog__order">{{ p.order }}</span>
+            </NuxtLink>
+            <div class="home-blog__body">
+              <p class="eyebrow">{{ p.tag }}</p>
+              <h3><NuxtLink :to="p.to">{{ p.title }}</NuxtLink></h3>
+              <p>{{ p.excerpt }}</p>
+              <NuxtLink :to="p.to" class="family-link">
+                Read more
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <path d="M5 19L19 5M5 5h14v14" />
+                </svg>
+              </NuxtLink>
+            </div>
+          </article>
+        </div>
+
+        <p v-else class="home-empty">
+          No articles published yet.
+          <NuxtLink :to="localePath('/resources')">Explore resources →</NuxtLink>
+        </p>
+      </div>
+    </section>
+
+    <!-- ─── FAQ teaser ────────────────────────────────────────────── -->
+    <section v-if="faqQuestions.length" class="section-pad" aria-labelledby="faq-heading">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Common questions</p>
+            <h2 id="faq-heading">{{ t('pages.home.faqTitle') }}</h2>
+          </div>
+          <p>{{ t('pages.home.faqSubtitle') }}</p>
+        </div>
         <ul class="home-faq__questions" role="list">
           <li v-for="q in faqQuestions" :key="q">
             <NuxtLink :to="localePath('/support/faq')" class="home-faq__question-link">
@@ -277,675 +392,454 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
           </li>
         </ul>
         <div class="home-faq__footer">
-          <NuxtLink :to="localePath('/support/faq')" class="home-all-link">
+          <NuxtLink :to="localePath('/support/faq')" class="text-link">
             {{ t('pages.home.faqCta') }}
-            <svg width="12" height="9" viewBox="0 0 14 10" fill="none" aria-hidden="true">
-              <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+              <path d="M5 19L19 5M5 5h14v14" />
             </svg>
           </NuxtLink>
         </div>
       </div>
     </section>
 
-    <!-- ─── CTA banner ────────────────────────────────── -->
-    <section class="home-cta-banner" aria-label="Contact CTA">
-      <div class="container home-cta-banner__inner">
-        <div class="home-cta-banner__content">
-          <h2 class="home-cta-banner__title">{{ t('pages.home.ctaTitle') }}</h2>
-          <p class="home-cta-banner__body">{{ t('pages.home.ctaBody') }}</p>
-          <NuxtLink :to="localePath('/contact')" class="cta-banner-btn">
-            {{ t('pages.home.ctaCta') }}
-            <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
-              <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </NuxtLink>
-        </div>
-        <div class="home-cta-banner__media" aria-hidden="true">
-          <div class="home-cta-banner__photo img-placeholder" />
-        </div>
-      </div>
-    </section>
-
-    <!-- ─── Connect with an Expert ─────────────────────── -->
+    <!-- ─── Connect with an Expert ────────────────────────────────── -->
     <ExpertContactForm />
 
   </div>
 </template>
 
 <style scoped>
-/* ─── Shared section utilities ─────────────────────────── */
-.section-gap { padding: var(--space-20) 0; }
-.section-alt { background: var(--color-canvas); }
+/* ─── Shared section utilities ─────────────────────────────── */
+.section-pad { padding-block: var(--space-20); }
 
-.home-section-title {
-  font-family: var(--font-display);
-  font-size: clamp(var(--text-2xl), 3vw, var(--text-4xl));
-  font-weight: 600;
-  color: var(--color-primary);
-  line-height: var(--leading-snug);
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: var(--space-12);
+  margin-bottom: var(--space-10);
 }
+.section-head h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+  margin: 0;
+}
+.section-head > p { max-width: 460px; color: var(--color-ink-muted); margin: 0; }
 
-.home-all-link {
+.eyebrow {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin: 0 0 var(--space-3);
+}
+.section-head .eyebrow { color: var(--color-ink-muted); }
+
+.text-link {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--color-accent);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: color var(--transition-fast);
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
 }
+.text-link svg { flex: none; }
 
-.home-all-link:hover { color: #B87A00; }
+.home-empty {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  padding-block: var(--space-8);
+}
+.home-empty a { color: var(--color-link-on-light); text-decoration: underline; }
 
-/* ─── Hero ─────────────────────────────────────────────── */
+/* ─── Hero (scheme C) ──────────────────────────────────────── */
 .home-hero {
-  position: relative;
-  background: var(--color-primary-deep);
-  min-height: clamp(540px, 68vh, 720px);
+  background: var(--color-surface-warm);
+  padding-block: var(--space-16);
+}
+.home-hero__split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-12);
+  align-items: center;
+}
+.home-hero__eyebrow {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin: 0 0 var(--space-4);
+}
+.home-hero__title {
+  font-family: var(--font-display);
+  font-size: var(--text-5xl);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  color: var(--color-ink);
+  margin: 0;
+}
+.home-hero__subtitle {
+  max-width: 520px;
+  margin: var(--space-6) 0 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+.home-hero__actions {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-3) var(--space-6);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.home-btn--primary { background: var(--color-accent); color: #152A1B; }
+.home-btn--primary:hover { background: #E6A626; }
+.home-btn--outline { background: transparent; border-color: #798F79; color: var(--color-primary-deep); }
+.home-btn--outline:hover { border-color: var(--color-primary-deep); }
+
+.home-hero__figure { margin: 0; }
+.home-hero__showroom {
+  position: relative;
+  height: 490px;
+  display: grid;
+  place-items: center;
+  padding: var(--space-8);
+  background: #FFFCF5;
+  border: 1px solid #D8BD86;
+}
+/* Contain only: the product photo is never scaled or cropped. */
+.home-hero__showroom img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  min-height: 0;
+}
+.home-hero__showroom-placeholder { width: 100%; height: 100%; }
+.home-hero__showroom-label {
+  position: absolute;
+  bottom: var(--space-4);
+  left: var(--space-6);
+  font-size: var(--text-xs);
+  color: #6C5E46;
+}
+.home-hero__caption {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
 }
 
-/* ─── Hero background image layer ─────────────────────── */
-.home-hero__bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
+/* ─── Family grid ──────────────────────────────────────────── */
+.family-reveal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+/* ─── Production band ──────────────────────────────────────── */
+.home-band {
+  position: relative;
+  isolation: isolate;
+  min-height: 420px;
+  display: flex;
+  align-items: center;
+  color: #fff;
   overflow: hidden;
 }
-
-.home-hero__bg-img {
+.home-band__img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center center;
+  z-index: -2;
 }
-
-.home-hero__bg-overlay {
+.home-band::after {
+  content: '';
   position: absolute;
   inset: 0;
-  /* Desktop: readable left, the photograph shows through on the right */
-  background: linear-gradient(
-    90deg,
-    rgba(27, 66, 36, 0.86) 0%,
-    rgba(27, 66, 36, 0.76) 38%,
-    rgba(27, 66, 36, 0.40) 62%,
-    rgba(27, 66, 36, 0.16) 100%
-  );
+  background: linear-gradient(90deg, #1B4224EA, #1B422433);
+  z-index: -1;
 }
-
-.home-hero__inner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  flex: 1;
-  max-width: var(--container-max);
-  margin: 0 auto;
-  width: 100%;
-  padding-inline: var(--container-pad);
-  position: relative;
-  z-index: 1;
-}
-
-.home-hero__content {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: var(--space-20) var(--space-10) var(--space-20) 0;
-}
-
-.home-hero__eyebrow {
+.home-band__inner { padding-block: var(--space-16); }
+.home-band__eyebrow {
   font-size: var(--text-xs);
   font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--color-accent);
-  margin-bottom: var(--space-4);
+  color: #F0C16A;
+  margin: 0 0 var(--space-4);
 }
-
-.home-hero__title {
+.home-band h2 {
   font-family: var(--font-display);
-  font-size: clamp(2rem, 4.5vw, var(--text-6xl));
-  font-weight: 700;
+  font-size: var(--text-4xl);
   line-height: var(--leading-tight);
-  color: var(--color-white);
-  margin-bottom: var(--space-5);
+  font-weight: 400;
+  max-width: 700px;
+  margin: 0;
+}
+.home-band__body {
+  max-width: 600px;
+  margin: var(--space-6) 0 0;
+  color: #E1E9DB;
+  font-size: var(--text-base);
 }
 
-.home-hero__subtitle {
-  font-size: var(--text-lg);
-  color: rgba(255, 255, 255, 0.7);
-  line-height: var(--leading-normal);
-  margin-bottom: var(--space-8);
-  max-width: 440px;
-}
-
-.home-hero__actions {
-  display: flex;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.hero-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 13px var(--space-6);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  border: 2px solid transparent;
-  text-decoration: none;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
-  white-space: nowrap;
-}
-
-.hero-btn--primary {
-  background: var(--color-accent);
-  color: var(--color-white);
-  border-color: var(--color-accent);
-}
-
-.hero-btn--primary:hover {
-  background: #B87A00;
-  border-color: #B87A00;
-}
-
-.hero-btn--outline {
-  background: transparent;
-  color: var(--color-white);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.hero-btn--outline:hover {
-  border-color: var(--color-white);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.home-hero__media {
-  display: flex;
-  align-items: stretch;
-  overflow: hidden;
-}
-
-.home-hero__photo-area {
-  /* Transparent — image visible via .home-hero__bg-img background layer.
-     Fallback: .home-hero { background: var(--color-primary-deep) } takes effect. */
-  width: 100%;
-  height: 100%;
-  min-height: 400px;
-  background: transparent;
-}
-
-.home-hero__dots {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-6) var(--container-pad) var(--space-5);
-  max-width: var(--container-max);
-  margin: 0 auto;
-  width: 100%;
-  position: relative;
-  z-index: 1;
-}
-
-.home-hero__dot {
-  display: block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.home-hero__dot--active {
-  background: var(--color-accent);
-  width: 18px;
-  border-radius: 3px;
-}
-
-/* ─── Path section ─────────────────────────────────────── */
-.home-path__title {
-  font-family: var(--font-display);
-  font-size: clamp(var(--text-2xl), 3vw, var(--text-4xl));
-  font-weight: 600;
-  color: var(--color-primary);
-  margin-bottom: var(--space-8);
-  line-height: var(--leading-snug);
-}
-
-.home-path__cards {
+/* ─── Applications (illustrated) ───────────────────────────── */
+.application-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-12);
+}
+.application-grid a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-6) 0;
+  border-top: 1px solid #C4C8BA;
+  text-decoration: none;
+  color: var(--color-ink);
+}
+.application-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.application-name h3 {
+  font-size: var(--text-lg);
+  line-height: var(--leading-snug);
+  font-weight: 600;
+  margin: 0;
+}
+.app-explore {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-link-on-light);
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-underline-offset: 5px;
+}
+.app-explore svg { flex: none; transition: transform 180ms var(--reveal-easing); }
+.application-grid a:hover .app-explore svg { transform: translate(2px, -2px); }
+.application-grid a:hover :deep(.app-icon) { background: #F5E8CD; border-color: #CFAE6D; }
+.application-grid a:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 4px; }
+
+/* ─── Steps ────────────────────────────────────────────────── */
+.home-steps-band { background: var(--color-canvas); }
+.home-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+.home-steps article {
+  background: var(--color-white);
+  border: 1px solid var(--color-line);
+  border-top: 3px solid var(--color-accent);
+  padding: var(--space-6);
+}
+.home-steps__number {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: #AC7B25;
+  margin: 0 0 var(--space-3);
+}
+.home-steps h3 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+}
+.home-steps article p:last-child {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* ─── Blog & Insights ──────────────────────────────────────── */
+.home-blog { background: var(--color-canvas); }
+.home-blog__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-6);
 }
-
-.home-path__card {
-  background: var(--color-primary-deep);
+.home-blog__card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-white);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
-
-.home-path__card-photo {
-  height: 200px;
-}
-
-.home-path__card-photo--alt {
-  height: 200px;
-}
-
-.home-path__card-body {
+.home-blog__cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
   padding: var(--space-6);
+  background: #F3E4C8;
+  color: var(--color-link-on-light);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  overflow: hidden;
+}
+.home-blog__cover img { width: 100%; height: 100%; object-fit: cover; }
+.home-blog__cover-fallback {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  height: 100%;
 }
-
-.home-path__card-title {
+.home-blog__cover-icon {
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  border: 1px solid #CCAE72;
+  border-radius: 50%;
+  background: #FFFFFF50;
+}
+.home-blog__order {
+  position: absolute;
+  left: var(--space-5);
+  top: var(--space-4);
   font-family: var(--font-display);
   font-size: var(--text-xl);
-  font-weight: 600;
-  color: var(--color-white);
-  line-height: var(--leading-snug);
+  letter-spacing: 0;
 }
-
-.home-path__card-actions {
+.home-blog__card:nth-child(2) .home-blog__cover { background: #F6F0E4; }
+.home-blog__card:nth-child(3) .home-blog__cover { background: #EDEFE5; }
+.home-blog__body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
+  flex: 1;
+  padding: var(--space-6);
 }
-
-.path-card-btn {
+.home-blog__body .eyebrow { margin: 0; color: var(--color-link-on-light); font-size: var(--text-xs); }
+.home-blog__body h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  line-height: 1.3;
+  font-weight: 400;
+  margin: 0;
+}
+.home-blog__body h3 a { text-decoration: none; color: inherit; }
+.home-blog__body h3 a:hover { text-decoration: underline; text-decoration-color: var(--color-accent); }
+.home-blog__body > p:not(.eyebrow) {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-ink-muted);
+}
+.home-blog__body .family-link {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 9px var(--space-4);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-white);
-  border: 1.5px solid rgba(255, 255, 255, 0.35);
-  border-radius: var(--radius-sm);
-  text-decoration: none;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
   width: fit-content;
-}
-
-.path-card-btn:hover {
-  border-color: var(--color-white);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-/* ─── Latest resources ─────────────────────────────────── */
-.home-latest__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-  flex-wrap: wrap;
-}
-
-/* ANYI-style filter tabs */
-.home-latest__tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-6);
-}
-.home-latest__tab {
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-sm);
-  color: var(--color-ink-muted);
-  font: inherit;
+  margin-top: auto;
   font-size: var(--text-sm);
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
-}
-.home-latest__tab:hover { border-color: var(--color-primary); color: var(--color-primary); }
-.home-latest__tab.is-active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-white);
-  font-weight: 600;
-}
-
-.home-latest__grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-6);
-}
-
-.resource-card {
-  background: var(--color-white);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  transition: box-shadow var(--transition-fast);
-}
-
-.resource-card:hover {
-  box-shadow: 0 4px 20px rgba(27, 66, 36, 0.1);
-}
-
-.resource-card__link {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  text-decoration: none;
-  color: inherit;
-}
-
-.resource-card__photo {
-  aspect-ratio: 16 / 9;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
-}
-
-.resource-card__body {
-  padding: var(--space-5);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.resource-card__tag {
-  font-size: var(--text-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-accent);
-}
-
-.resource-card__title {
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--color-ink);
-  line-height: var(--leading-snug);
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
 }
 
-.resource-card__excerpt {
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  line-height: var(--leading-normal);
-  flex: 1;
-}
-
-.resource-card__read {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-accent);
-  margin-top: var(--space-3);
-}
-
-/* ─── FAQ teaser ───────────────────────────────────────── */
-.home-faq {
-  background: var(--color-surface-alt);
-}
-
-.home-faq__title {
-  font-family: var(--font-display);
-  font-size: clamp(var(--text-2xl), 3vw, var(--text-4xl));
-  font-weight: 600;
-  color: var(--color-primary);
-  text-align: center;
-  margin-bottom: var(--space-3);
-  line-height: var(--leading-snug);
-}
-
-.home-faq__subtitle {
-  font-size: var(--text-base);
-  color: var(--color-ink-muted);
-  text-align: center;
-  max-width: 480px;
-  margin: 0 auto var(--space-8);
-  line-height: var(--leading-normal);
-}
-
+/* ─── FAQ ──────────────────────────────────────────────────── */
 .home-faq__questions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3) var(--space-8);
-  max-width: 840px;
-  margin: 0 auto var(--space-8);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-10);
 }
-
 .home-faq__question-link {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--color-ink);
-  text-decoration: none;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-line);
-  transition: color var(--transition-fast);
-  line-height: var(--leading-snug);
-}
-
-.home-faq__question-link:hover { color: var(--color-primary); }
-
-.home-faq__q-icon {
-  flex-shrink: 0;
-  margin-top: 1px;
-  color: var(--color-accent);
-}
-
-.home-faq__footer {
-  text-align: center;
-}
-
-/* ─── CTA banner ───────────────────────────────────────── */
-.home-cta-banner {
-  background: var(--color-primary-deep);
-  overflow: hidden;
-}
-
-.home-cta-banner__inner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  min-height: 360px;
-}
-
-.home-cta-banner__content {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: var(--space-16) var(--space-10) var(--space-16) 0;
-  gap: var(--space-5);
-}
-
-.home-cta-banner__title {
-  font-family: var(--font-display);
-  font-size: clamp(var(--text-2xl), 3vw, var(--text-4xl));
-  font-weight: 600;
-  color: var(--color-white);
-  line-height: var(--leading-snug);
-}
-
-.home-cta-banner__body {
-  font-size: var(--text-base);
-  color: rgba(255, 255, 255, 0.65);
-  line-height: var(--leading-normal);
-  max-width: 420px;
-}
-
-.cta-banner-btn {
-  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 13px var(--space-6);
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: 1px solid #C5CCBE;
+  color: var(--color-ink);
   font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-white);
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  border-radius: var(--radius-sm);
   text-decoration: none;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
-  width: fit-content;
+}
+.home-faq__question-link:hover { color: var(--color-primary); }
+.home-faq__q-icon { flex: none; color: var(--color-primary); }
+.home-faq__footer { margin-top: var(--space-6); }
+
+/* ─── Responsive ───────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .home-hero__split { gap: var(--space-8); }
+  .home-hero__title { font-size: var(--text-4xl); }
+  .home-hero__showroom { height: 420px; }
+  .family-reveal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-band h2 { font-size: var(--text-3xl); }
+  .home-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-blog__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .application-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .application-grid a { flex-direction: column; align-items: start; gap: var(--space-3); }
+  .app-explore { padding-left: 60px; }
 }
 
-.cta-banner-btn:hover {
-  border-color: var(--color-white);
-  background: rgba(255, 255, 255, 0.08);
+@media (max-width: 760px) {
+  .section-pad { padding-block: var(--space-12); }
+  .section-head { display: block; margin-bottom: var(--space-8); }
+  .section-head > p { margin-top: var(--space-4); }
+  .section-head h2 { font-size: var(--text-2xl); }
+
+  .home-hero { padding-block: var(--space-10); }
+  .home-hero__split { grid-template-columns: minmax(0, 1fr); }
+  .home-hero__title { font-size: var(--text-3xl); }
+  .home-hero__subtitle { font-size: var(--text-base); }
+  .home-hero__showroom { height: 380px; padding: var(--space-5); }
+
+  .family-reveal-grid,
+  .home-blog__grid,
+  .home-steps,
+  .application-grid,
+  .home-faq__questions { grid-template-columns: minmax(0, 1fr); }
+
+  .home-band { min-height: 380px; }
+  .home-band h2 { font-size: var(--text-2xl); }
+
+  .application-grid a { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+  .app-explore { padding-left: 60px; font-size: var(--text-xs); }
 }
 
-.home-cta-banner__media {
-  overflow: hidden;
+@media (prefers-reduced-motion: reduce) {
+  .home-btn,
+  .app-explore svg { transition: none !important; }
 }
-
-.home-cta-banner__photo {
-  width: 100%;
-  height: 100%;
-  min-height: 360px;
-  background: linear-gradient(
-    90deg,
-    var(--color-primary-deep) 0%,
-    rgba(47, 107, 58, 0.5) 40%,
-    rgba(47, 107, 58, 0.3) 100%
-  ),
-  repeating-linear-gradient(
-    -45deg,
-    rgba(255, 255, 255, 0.02) 0px,
-    rgba(255, 255, 255, 0.02) 1px,
-    transparent 1px,
-    transparent 8px
-  );
-}
-
-/* ─── Responsive ───────────────────────────────────────── */
-@media (max-width: 1023px) {
-  .home-latest__grid {
-    grid-template-columns: 1fr 1fr;
-  }
-  .home-latest__grid > *:last-child {
-    display: none;
-  }
-}
-
-@media (max-width: 767px) {
-  /* Hero: stack vertically, image visible as full-bleed bg behind text */
-  .home-hero__bg-overlay {
-    /* Uniform strong overlay — text spans full width on mobile */
-    background: rgba(27, 66, 36, 0.87);
-  }
-  .home-hero__bg-img {
-    /* Crop to mid-conveyor / device area */
-    object-position: center 40%;
-  }
-  .home-hero__inner {
-    grid-template-columns: 1fr;
-    padding-inline: var(--space-5);
-  }
-  .home-hero__content {
-    padding: var(--space-10) 0 var(--space-6);
-  }
-  .home-hero__subtitle {
-    max-width: 100%;
-  }
-  .home-hero__media {
-    display: none;
-  }
-  .home-hero__actions {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .hero-btn {
-    width: 100%;
-    justify-content: center;
-  }
-  /* Path: stack cards */
-  .home-path__cards {
-    grid-template-columns: 1fr;
-  }
-  /* Latest: 1 col */
-  .home-latest__grid {
-    grid-template-columns: 1fr;
-  }
-  .home-latest__grid > *:last-child {
-    display: block;
-  }
-  /* FAQ: 1 col */
-  .home-faq__questions {
-    grid-template-columns: 1fr;
-  }
-  /* CTA banner: stack */
-  .home-cta-banner__inner {
-    grid-template-columns: 1fr;
-  }
-  .home-cta-banner__content {
-    padding: var(--space-10) 0;
-  }
-  .home-cta-banner__media {
-    display: none;
-  }
-}
-
-@media (max-width: 479px) {
-  .section-gap { padding: var(--space-12) 0; }
-  .home-hero__title {
-    font-size: var(--text-3xl);
-  }
-  .hero-btn {
-    padding: 11px var(--space-4);
-    font-size: var(--text-sm);
-  }
-  .home-path__card-photo {
-    height: 140px;
-  }
-}
-
-/* ─── About LITUBO (ANYI-style) ─── */
-.home-about { background: var(--color-white); }
-.home-about__grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: var(--space-16); align-items: center; }
-.home-about__eyebrow { color: var(--color-primary); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 var(--space-3); }
-.home-about__title { font-family: var(--font-display); font-size: clamp(var(--text-2xl), 3vw, var(--text-4xl)); font-weight: 600; line-height: var(--leading-tight); color: var(--color-primary-deep); margin: 0 0 var(--space-5); }
-.home-about__body { font-size: var(--text-base); line-height: var(--leading-normal); color: var(--color-ink-muted); margin: 0 0 var(--space-4); max-width: 560px; }
-.home-about__features { list-style: none; padding: 0; margin: var(--space-6) 0; display: flex; flex-direction: column; gap: var(--space-3); }
-.home-about__features li { display: flex; align-items: center; gap: var(--space-3); color: var(--color-ink); font-size: var(--text-sm); }
-.home-about__features svg { color: var(--color-primary); flex: 0 0 auto; }
-.home-about__link { color: var(--color-primary); font-weight: 600; font-size: var(--text-sm); text-decoration: none; }
-.home-about__link:hover { text-decoration: underline; }
-.home-about__media { position: relative; }
-.home-about__media img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-sm); }
-.home-about__media-placeholder { width: 100%; aspect-ratio: 4 / 3; border-radius: var(--radius-sm); }
-.home-about__caption { font-size: var(--text-xs); color: var(--color-ink-muted); margin: var(--space-2) 0 0; text-align: right; }
-
-/* ─── Find inspection systems (category grid) ─── */
-.home-cats__header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
-.home-cats__sub { color: var(--color-ink-muted); font-size: var(--text-base); margin: var(--space-2) 0 var(--space-8); }
-.home-cats__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-6); }
-.home-cat-card { display: flex; flex-direction: column; background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); overflow: hidden; text-decoration: none; color: inherit; transition: box-shadow var(--transition-normal); }
-.home-cat-card:hover { box-shadow: 0 4px 20px rgba(27, 66, 36,.14); }
-.home-cat-card__media { aspect-ratio: 4 / 3; }
-.home-cat-card__body { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); flex: 1; }
-.home-cat-card__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary); margin: 0; }
-.home-cat-card__desc { font-size: var(--text-sm); color: var(--color-ink-muted); line-height: var(--leading-normal); margin: 0; flex: 1; }
-.home-cat-card__link { font-size: var(--text-sm); font-weight: 600; color: var(--color-accent); }
-
-/* ─── Inspection by application ─── */
-.home-apps__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); }
-.home-app-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-5);
-  background: var(--color-white);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-sm);
-  text-decoration: none;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-normal);
-}
-.home-app-card:hover { border-color: var(--color-accent); box-shadow: 0 4px 16px rgba(217, 146, 0, 0.12); }
-.home-app-card__title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; color: var(--color-primary); line-height: var(--leading-snug); }
-.home-app-card__link { font-size: var(--text-sm); font-weight: 600; color: var(--color-accent); }
-
-@media (max-width: 900px) { .home-about__grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-8); } }
 </style>

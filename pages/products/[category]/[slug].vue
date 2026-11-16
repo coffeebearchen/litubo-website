@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Product, ProductCategory, LocalizedString } from '~/types/content'
+import type { Product, ProductCategory, LocalizedString, PostsResult } from '~/types/content'
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
@@ -57,6 +57,44 @@ const hasSpecsFlat = computed(() => !hasSpecGroups.value && (product.value?.spec
 const relatedProducts = computed(() =>
   (categoryData.value?.products ?? []).filter(p => p.slug !== slug).slice(0, 4)
 )
+
+// ─── Related reading (Blog) ─────────────────────────────────────────
+// Only posts whose `related_product_slugs` names this exact product. The filter runs server-side
+// against published posts, so nothing is inferred from "most recent" articles. An empty result
+// hides the section instead of padding it.
+const { data: relatedReading } = await useAsyncData<PostsResult>(
+  `product-related-reading-${slug}`,
+  () => $fetch<PostsResult>(`/api/cms/posts?related_product_slug=${encodeURIComponent(slug)}&limit=2`),
+  { default: () => ({ posts: [] }) },
+)
+
+const READING_ROUTE: Readonly<Record<string, string>> = {
+  insight: '/resources/insights',
+  technical_guide: '/resources/technical-guides',
+  case_study: '/resources/case-studies',
+  news: '/resources/news',
+}
+const READING_TAG: Readonly<Record<string, string>> = {
+  insight: 'Insight',
+  technical_guide: 'Technical guide',
+  case_study: 'Case study',
+  news: 'News',
+}
+
+const relatedArticles = computed(() => (relatedReading.value?.posts ?? [])
+  .filter(p => p.contentType !== 'faq')
+  .slice(0, 2)
+  .map((p, i) => ({
+    key: p.slug,
+    order: String(i + 1).padStart(2, '0'),
+    tag: READING_TAG[p.contentType] ?? 'Article',
+    title: loc(p.title),
+    excerpt: loc(p.excerpt),
+    cover: p.coverImageUrl || '',
+    to: localePath(`${READING_ROUTE[p.contentType] ?? '/resources/insights'}/${p.slug}`),
+  }))
+  .filter(a => a.title))
+
 
 // Gallery: hero image first, then the product's gallery images
 const galleryImages = computed(() => {
@@ -314,6 +352,40 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
           <NuxtLink :to="localePath('/technical-matching')">Request a model-specific document →</NuxtLink>
           <button type="button" class="catalogue__print" @click="printPage">Print / Save PDF</button>
         </p>
+      </div>
+    </section>
+
+    <!-- Related reading: only posts that name this product in related_product_slugs -->
+    <section v-if="relatedArticles.length" id="product-related-reading" class="section-gap">
+      <div class="container">
+        <div class="reading-head">
+          <div>
+            <p class="reading-eyebrow">Related reading</p>
+            <SectionHeading>A little context for the next conversation.</SectionHeading>
+          </div>
+          <NuxtLink :to="localePath('/resources')" class="reading-all">
+            Explore the blog →
+          </NuxtLink>
+        </div>
+        <div class="reading-grid" :class="{ 'reading-grid--single': relatedArticles.length === 1 }">
+          <article v-for="a in relatedArticles" :key="a.key" class="reading-card">
+            <NuxtLink :to="a.to" class="reading-card__cover">
+              <img v-if="a.cover" :src="a.cover" :alt="a.title" loading="lazy">
+              <span v-else class="reading-card__cover-fallback" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 3h12a1 1 0 011 1v17l-7-4-7 4V4a1 1 0 011-1z" />
+                </svg>
+              </span>
+              <span class="reading-card__order">{{ a.order }}</span>
+            </NuxtLink>
+            <div class="reading-card__body">
+              <p class="reading-card__tag">{{ a.tag }}</p>
+              <h3><NuxtLink :to="a.to">{{ a.title }}</NuxtLink></h3>
+              <p v-if="a.excerpt">{{ a.excerpt }}</p>
+              <NuxtLink :to="a.to" class="reading-card__link">Read more →</NuxtLink>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -591,11 +663,90 @@ const inquiryPath = computed(() => `/contact?product=${encodeURIComponent(slug)}
 .configurator__cta { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; }
 
 /* ─── Company catalogue ─── */
-.catalogue { text-align: center; }
-.catalogue__text { max-width: 720px; margin: 0 auto var(--space-4); color: var(--color-ink-muted); line-height: var(--leading-normal); }
+.catalogue { text-align: center; }.catalogue__text { max-width: 720px; margin: 0 auto var(--space-4); color: var(--color-ink-muted); line-height: var(--leading-normal); }
 .catalogue__links { display: flex; justify-content: center; gap: var(--space-6); flex-wrap: wrap; font-size: var(--text-sm); }
 .catalogue__links a { color: var(--color-primary); text-decoration: underline; }
 .catalogue__print { background: none; border: 0; padding: 0; color: var(--color-primary); text-decoration: underline; font: inherit; cursor: pointer; }
+
+/* ─── Related reading ─── */
+.reading-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-8);
+  margin-bottom: var(--space-8);
+}
+.reading-eyebrow {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  margin: 0 0 var(--space-2);
+}
+.reading-all {
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+}
+.reading-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+.reading-grid--single { grid-template-columns: minmax(0, 1fr); }
+.reading-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-white);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.reading-card__cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  background: #F3E4C8;
+  color: var(--color-link-on-light);
+  overflow: hidden;
+}
+.reading-card__cover img { width: 100%; height: 100%; object-fit: cover; }
+.reading-card__cover-fallback { display: grid; place-items: center; width: 70px; height: 70px; border: 1px solid #CCAE72; border-radius: 50%; background: #FFFFFF50; }
+.reading-card__order {
+  position: absolute;
+  left: var(--space-5);
+  top: var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+.reading-card__body { display: flex; flex-direction: column; gap: var(--space-3); flex: 1; padding: var(--space-6); }
+.reading-card__tag { margin: 0; font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-link-on-light); }
+.reading-card h3 { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 400; line-height: 1.3; margin: 0; }
+.reading-card h3 a { color: inherit; text-decoration: none; }
+.reading-card h3 a:hover { text-decoration: underline; text-decoration-color: var(--color-accent); }
+.reading-card__body > p:not(.reading-card__tag) { margin: 0; font-size: var(--text-sm); color: var(--color-ink-muted); line-height: var(--leading-normal); }
+.reading-card__link {
+  margin-top: auto;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-thickness: 2px;
+  text-underline-offset: 5px;
+}
+@media (max-width: 760px) {
+  .reading-head { display: block; }
+  .reading-all { display: inline-block; margin-top: var(--space-4); }
+  .reading-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .spec-unit { color: var(--color-ink-muted); }
 .spec-note {
   display: block;
