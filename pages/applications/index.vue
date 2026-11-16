@@ -49,7 +49,7 @@ useSeoHead({
               -->
               <img
                 class="app-card__image"
-                :src="`/images/applications/${INDUSTRY_GUIDES[index].slug}.webp`"
+                :src="applicationArtPath(INDUSTRY_GUIDES[index].slug)"
                 alt=""
                 width="800"
                 height="600"

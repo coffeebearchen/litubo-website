@@ -79,7 +79,18 @@ function handleKeydown(e: KeyboardEvent) {
               class="mega-menu__app-card"
               @click="emit('close')"
             >
-              <div class="mega-menu__app-card-photo" aria-hidden="true" />
+              <div class="mega-menu__app-card-photo">
+                <!-- Same mapping as /applications: category name is real text, so the art is decorative.
+                     Eager, not lazy: the cards scroll horizontally, so a lazy image would stay blank
+                     until it was scrolled into view. Eight files of ~30–50 KB make eager safe. -->
+                <img
+                  :src="applicationArtPath(applicationSlugFromPath(card.to))"
+                  alt=""
+                  width="800"
+                  height="600"
+                  loading="eager"
+                >
+              </div>
               <div class="mega-menu__app-card-body">
                 <span class="mega-menu__app-card-label">{{ card.label }}</span>
                 <span class="mega-menu__app-card-view" aria-hidden="true">
@@ -296,7 +307,19 @@ function handleKeydown(e: KeyboardEvent) {
 
 .mega-menu__app-card-photo {
   height: 96px;
-  background: linear-gradient(135deg, var(--color-primary-deep) 0%, var(--color-primary) 100%);
+  /* Cool white ground from the 冷绿光 spec; the artwork itself carries the pale green light. */
+  background: #F2F8F4;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+/* Contain, never cover: the illustration must show its whole subject inside the fixed height. */
+.mega-menu__app-card-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .mega-menu__app-card-body {
