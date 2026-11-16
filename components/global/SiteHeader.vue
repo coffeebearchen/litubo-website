@@ -89,16 +89,18 @@ const navItems = computed<NavItem[]>(() => [
         title: t('nav_resources.heading'),
         items: [
           { label: t('nav_resources.overview'), to: localePath('/resources') },
-          { label: t('nav_resources.insights'), to: localePath('/resources') },
+          { label: t('nav_resources.insights'), to: localePath('/resources/insights') },
           { label: t('nav_resources.caseStudies'), to: localePath('/resources') },
           { label: t('nav_resources.downloads'), to: localePath('/resources/downloads') },
           { label: t('nav_resources.videos'), to: localePath('/resources/videos') },
         ],
       },
     ],
+    // A section link, not a hard-coded article title: the old label named an article that does not
+    // exist, which is exactly the "recommendation card without an article" the spec rules out.
     featured: {
-      title: t('nav_resources.featuredTitle'),
-      to: localePath('/resources'),
+      title: t('nav_resources.insights'),
+      to: localePath('/resources/insights'),
     },
   },
   {
