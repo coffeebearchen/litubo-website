@@ -171,6 +171,9 @@ button {
    viewport down on short pages. */
 .page-content {
   padding-top: var(--header-height);
+  /* A single wide child (a horizontal scroller, a long unbroken token) must not widen the whole
+     document on a narrow screen. `clip` rather than `hidden` so sticky keeps working. */
+  overflow-x: clip;
 }
 
 @media (max-width: 1023px) {

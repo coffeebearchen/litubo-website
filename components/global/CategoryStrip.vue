@@ -75,9 +75,13 @@ const cats: Cat[] = [
 .cat-strip {
   background: var(--color-white);
   border-bottom: 1px solid var(--color-line);
+  /* The strip scrolls inside itself; it must never widen the document. */
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .cat-strip__inner {
+  max-width: 100%;
   display: flex;
   justify-content: space-between;
   gap: var(--space-4);
