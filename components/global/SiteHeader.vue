@@ -34,6 +34,7 @@ const navItems = computed<NavItem[]>(() => [
           { label: t('nav_products.metal'), to: localePath('/products/metal-detection') },
           { label: t('nav_products.checkweighers'), to: localePath('/products/checkweighers') },
           { label: t('nav_products.combination'), to: localePath('/products/combination-inspection') },
+          { label: t('nav_products.conveyors'), to: localePath('/products/conveyors-reject-systems') },
         ],
       },
       {

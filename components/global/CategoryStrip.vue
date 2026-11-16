@@ -38,6 +38,12 @@ const cats: Cat[] = [
     path: '/products/combination-inspection',
     icon: 'combination-inspection.svg',
   },
+  {
+    slug: 'conveyor',
+    label: t('nav_products.conveyors'),
+    path: '/products/conveyors-reject-systems',
+    icon: 'conveyors-reject-systems.svg',
+  },
 ]
 </script>
 
