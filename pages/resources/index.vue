@@ -146,38 +146,22 @@ const categories = [
   {
     key: 'insights',
     title: t('nav_resources.insights'),
-    body: 'Technical articles, application guides and industry whitepapers.',
-    to: localePath('/resources') + '#latest',
-  },
-  {
-    key: 'case-studies',
-    title: t('nav_resources.caseStudies'),
-    body: 'Real-world results from food manufacturers using LITUBO systems.',
-    to: localePath('/resources') + '#latest',
+    body: 'Technical articles and application guides written by our engineering team.',
+    to: localePath('/resources/insights'),
   },
   {
     key: 'downloads',
     title: t('nav_resources.downloads'),
-    body: 'Datasheets, manuals, certificates and product specifications.',
+    body: 'Datasheets, manuals and product specifications, requested by model.',
     to: localePath('/resources/downloads'),
   },
   {
+    // Three entries only. Case studies and certificates have no published content, so a card for
+    // them would describe a library that does not exist.
     key: 'videos',
     title: t('nav_resources.videos'),
-    body: 'Product demonstrations, installation guides and operation tutorials.',
+    body: 'Request a demonstration of a system running your own product type.',
     to: localePath('/resources/videos'),
-  },
-  {
-    key: 'certifications',
-    title: 'Certifications',
-    body: 'Certificates as issued, each shown with its own name and scope.',
-    to: localePath('/resources/downloads'),
-  },
-  {
-    key: 'selection-guide',
-    title: 'Selection guide',
-    body: 'The practical facts that decide which inspection system fits your line.',
-    to: localePath('/technical-matching'),
   },
 ]
 </script>
