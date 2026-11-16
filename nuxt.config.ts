@@ -31,6 +31,7 @@ export default defineNuxtConfig({
       { code: 'ar', name: 'العربية', file: 'ar.json', language: 'ar', dir: 'rtl' },
       { code: 'ja', name: '日本語', file: 'ja.json', language: 'ja' },
       { code: 'ru', name: 'Русский', file: 'ru.json', language: 'ru' },
+      { code: 'fr', name: 'Français', file: 'fr.json', language: 'fr' },
     ],
     /**
      * A locale that is not translated yet must not render raw keys: vue-i18n falls back to
@@ -139,7 +140,7 @@ export default defineNuxtConfig({
        * Empty in production, so a preview locale can never be reached on the live site; publishing a
        * locale stays a deliberate edit to `publishedLocales` after review.
        */
-      previewLocales: process.env.NODE_ENV === 'production' ? [] : ['es', 'pt', 'zh', 'ar', 'ja', 'ru'],
+      previewLocales: process.env.NODE_ENV === 'production' ? [] : ['es', 'pt', 'zh', 'ar', 'ja', 'ru', 'fr'],
     },
   },
 
