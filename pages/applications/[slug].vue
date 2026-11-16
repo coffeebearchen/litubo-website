@@ -31,6 +31,27 @@ const inquiryPath = `/contact?application=${encodeURIComponent(guide.slug)}`
 
 const headlineLines = computed(() => guide.headline.split('\n').filter(Boolean))
 
+const approaches = [
+  {
+    title: 'X-ray inspection',
+    body: 'Finds dense contaminants and checks fill or count where the pack allows a beam to pass.',
+    image: '/images/devices/xray-real.webp',
+    to: '/products/x-ray-inspection',
+  },
+  {
+    title: 'Metal detection',
+    body: 'Detects ferrous, non-ferrous and stainless contamination, including through many pack formats.',
+    image: '/images/devices/metal-real.webp',
+    to: '/products/metal-detection',
+  },
+  {
+    title: 'Checkweighing',
+    body: 'Verifies that each pack carries the weight it should, independent of the product itself.',
+    image: '/images/devices/weigher-real.webp',
+    to: '/products/checkweighers',
+  },
+]
+
 const steps = [
   { id: 'product', label: 'Product & pack' },
   { id: 'line', label: 'Production line' },
@@ -151,6 +172,28 @@ const steps = [
       </div>
     </section>
 
+    <!-- 5. Inspection approaches — real device photographs, each linking to a real category -->
+    <section class="section-gap section-alt">
+      <div class="container">
+        <p class="eyebrow">Inspection approaches to discuss</p>
+        <h2 class="app-h2">Which technology is worth discussing</h2>
+        <p class="app-body app-body--wide">
+          The right approach follows from what has to be found and how the product is presented. These
+          are the families the discussion usually starts from.
+        </p>
+        <ul class="app-approaches" role="list">
+          <li v-for="item in approaches" :key="item.to" class="app-approach">
+            <div class="app-approach__media">
+              <img :src="item.image" alt="" width="800" height="481" loading="lazy" decoding="async">
+            </div>
+            <h3 class="app-approach__title">{{ item.title }}</h3>
+            <p class="app-approach__body">{{ item.body }}</p>
+            <NuxtLink :to="localePath(item.to)" class="app-approach__link">Explore the family →</NuxtLink>
+          </li>
+        </ul>
+      </div>
+    </section>
+
     <!-- 5. What to prepare, then the enquiry -->
     <section class="section-gap">
       <div class="container app-prep">
@@ -173,15 +216,31 @@ const steps = [
       <div class="container">
         <div class="app-inquiry">
           <div class="app-inquiry__text">
-            <h2 class="app-h2">Discuss {{ guide.title.toLowerCase() }} inspection</h2>
+            <h2 class="app-h2">A useful enquiry starts with a few details</h2>
             <p class="app-body">
-              Tell us about the product and the line. Your enquiry arrives already marked with this
-              application, so the team knows where the question came from.
+              We do not match products automatically. A short description of the product, the pack and
+              the line is enough for our team to reply with a considered answer.
+            </p>
+            <ul class="app-inquiry__points" role="list">
+              <li>Thoughtful answers from people who know the equipment</li>
+              <li>The configuration is confirmed for your product, not assumed</li>
+            </ul>
+          </div>
+          <div class="app-inquiry__card">
+            <p class="app-aside-label">What would you like to inspect?</p>
+            <ul class="app-inquiry__fields" role="list">
+              <li>Product category</li>
+              <li>Pack format</li>
+              <li>Your inspection objective</li>
+              <li>Additional notes</li>
+            </ul>
+            <NuxtLink :to="localePath(inquiryPath)" class="app-cta app-cta--block">
+              Continue with these details →
+            </NuxtLink>
+            <p class="app-inquiry__note">
+              This is a preview of the model. The live enquiry form is the LITUBO contact form.
             </p>
           </div>
-          <NuxtLink :to="localePath(inquiryPath)" class="app-cta">
-            Start the conversation →
-          </NuxtLink>
         </div>
       </div>
     </section>
@@ -381,6 +440,53 @@ const steps = [
   color: var(--color-ink-muted);
 }
 
+/* ── Inspection approaches ─────────────────────────────── */
+.app-body--wide { max-width: 720px; }
+
+.app-approaches {
+  list-style: none;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.app-approach {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #DAE3DD;
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+}
+.app-approach__media { background: #F2F8F4; }
+.app-approach__media img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+}
+.app-approach__title {
+  margin: var(--space-4) var(--space-4) var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-ink);
+}
+.app-approach__body {
+  margin: 0 var(--space-4) var(--space-4);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--color-ink-muted);
+  flex: 1;
+}
+.app-approach__link {
+  margin: 0 var(--space-4) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-link-on-light);
+  text-decoration: none;
+}
+.app-approach__link:hover { text-decoration: underline; }
+
 /* ── Preparation ──────────────────────────────────── */
 .app-prep__list { list-style: none; margin: var(--space-5) 0 0; padding: 0; }
 .app-prep__list li {
@@ -408,16 +514,51 @@ const steps = [
 
 /* ── Enquiry card ─────────────────────────────────── */
 .app-inquiry {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-  padding: var(--space-8);
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 56px;
+  align-items: start;
+}
+.app-inquiry__points { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+.app-inquiry__points li {
+  position: relative;
+  padding-inline-start: var(--space-5);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+}
+.app-inquiry__points li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.6em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+.app-inquiry__card {
+  padding: var(--space-6);
   border: 1px solid #DAE3DD;
   border-radius: 6px;
   background: #fff;
 }
+.app-inquiry__fields { list-style: none; margin: var(--space-3) 0 var(--space-5); padding: 0; }
+.app-inquiry__fields li {
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  border: 1px solid #E7EDE8;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+}
+.app-cta--block { display: block; text-align: center; }
+.app-inquiry__note {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
+.app-inquiry__text .app-body { max-width: none; }
 
 @media (max-width: 1023px) {
   .app-hero,
@@ -428,12 +569,14 @@ const steps = [
   .app-split--reverse .app-split__text { order: 1; }
   .app-split--reverse .app-split__aside { order: 2; }
   .app-steps__inner { gap: var(--space-3); }
+  .app-approaches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-inquiry { grid-template-columns: minmax(0, 1fr); gap: 28px; }
 }
 
 @media (max-width: 700px) {
   .app-h2 { font-size: var(--text-xl); }
   .app-hero__headline { font-size: var(--text-2xl); }
-  .app-inquiry { padding: var(--space-6); }
+  .app-approaches { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .app-split { padding-bottom: var(--space-8); margin-bottom: var(--space-8); }
 }
 </style>
