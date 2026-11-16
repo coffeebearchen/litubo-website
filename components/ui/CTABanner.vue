@@ -92,7 +92,9 @@ defineProps<{
 
 :deep(.btn--accent) {
   background: var(--color-accent);
-  color: var(--color-white);
+  /* A12 - white on the brand gold measured 2.60:1, under the 3:1 large-text floor. The gold
+     itself is a confirmed brand colour, so the foreground moves to a deep green at 5.21:1. */
+  color: #18332B;
   border-color: var(--color-accent);
 }
 

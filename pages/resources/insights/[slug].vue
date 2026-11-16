@@ -26,6 +26,24 @@ useSeoHead({
   canonicalPath: `/resources/insights/${slug}`,
 })
 
+/**
+ * A08 - a device photograph must not be cropped, so it is contained; a scene fills the frame.
+ * The API carries no per-image fit field, so this is a controlled list for the ten published
+ * Insights rather than a guess at render time. Unknown slugs fall back to cover.
+ */
+const CONTAIN_SLUGS = new Set([
+  'how-x-ray-inspection-works',
+  'x-ray-or-metal-detection',
+  'how-metal-detection-works',
+  'checkweighing-basics',
+  'combination-inspection',
+])
+
+const coverFit = computed(() => (CONTAIN_SLUGS.has(slug) ? 'post-cover__img--contain' : ''))
+
+/** A08 - the cover carried no alt text at all. The article title describes it truthfully. */
+const coverAlt = computed(() => (resolved?.title[l] || resolved?.title.en || ''))
+
 function formatDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
 }
@@ -57,8 +75,9 @@ function formatDate(iso: string | null): string {
         <figure v-if="post.coverImageUrl" class="post-cover">
           <img
             :src="post.coverImageUrl"
-            alt=""
+            :alt="coverAlt"
             class="post-cover__img"
+            :class="coverFit"
             loading="eager"
             decoding="async"
           >
