@@ -76,7 +76,6 @@ const blogTitle = computed(() => blockText('home.blog', 'title', 'Practical idea
 
 // ─── Scheme C: five product families ────────────────────────────────
 // Titles, intros and order come from the published categories. The card photograph and the
-// "family example" label come from one named, published product per family, so a single photo is
 // never presented as if every model in the family looks like it. Conveyors & reject systems have
 // no published product in the source data, so that card keeps an honest branded placeholder.
 const FAMILY_SOURCE: Readonly<Record<string, { slug: string; label: string }>> = {
@@ -124,7 +123,8 @@ const familyCards = computed(() => (categories.value ?? []).map((c, i) => {
     description: c.intro[locale.value as 'en' | 'es' | 'pt'] || c.intro.en,
     imageSrc: product?.heroMedia?.url || c.heroMedia?.url || '',
     imageAlt: product?.heroMedia?.alt?.en || product?.name.en || c.title.en,
-    modelLabel: source?.label ? `${source.label} · family example` : '',
+    // No model caption on the family card: it reads as a recommendation and the card is a family entry.
+    modelLabel: '',
     to: localePath(`/products/${c.slug}`),
   }
 }))

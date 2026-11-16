@@ -95,7 +95,6 @@ function onKeydown(event: KeyboardEvent) {
       </span>
 
       <span class="reveal-symbol" aria-hidden="true">{{ expanded ? '−' : '+' }}</span>
-      <span class="reveal-hint" aria-hidden="true">{{ expanded ? 'Tap again to view image' : 'Hover or tap to explore' }}</span>
     </button>
 
     <div class="family-footer">
