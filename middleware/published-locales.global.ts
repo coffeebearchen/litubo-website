@@ -9,7 +9,7 @@
  * under a translated URL: that would tell a visitor, and a crawler, that the page is translated when
  * it is not.
  */
-const KNOWN_LOCALES = ['en', 'es', 'pt', 'zh', 'ar', 'ja'] as const
+const KNOWN_LOCALES = ['en', 'es', 'pt', 'zh', 'ar', 'ja', 'ru'] as const
 
 export default defineNuxtRouteMiddleware((to) => {
   const config = useRuntimeConfig()
