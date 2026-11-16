@@ -198,9 +198,6 @@ export async function handlePublicInquiry(event: H3Event, toInquiryFields: Inqui
 
   // Consent is an explicit `true` from the client; only then does the server record consented_at.
   if (fields.consent !== true) badRequest('Consent is required.')
-  const emailRaw = fields.contact_email ?? ''
-  if (!emailRaw) badRequest('Email is required.')
-  if (!validEmail(emailRaw)) badRequest('Invalid email format.')
   if (!VALID_INQUIRY_TYPES.includes(fields.inquiry_type as InquiryType)) badRequest('Invalid inquiry type.')
   if (fields.locale && !VALID_LOCALES.includes(fields.locale)) badRequest('Invalid locale.')
   if (fields.support_request_type && (fields.inquiry_type !== 'support_request' || !['technical-support', 'manual-request', 'service-training'].includes(fields.support_request_type))) badRequest('Invalid support request type.')
@@ -210,6 +207,28 @@ export async function handlePublicInquiry(event: H3Event, toInquiryFields: Inqui
   for (const key of TEXT_FIELDS) {
     const value = fields[key]
     if (value !== undefined && value !== '') san[key] = clean(value, LENGTH_LIMITS[key] ?? 500)
+
+  }
+
+  // A03 — validate the value that will be stored, not the raw input. Validating first let
+  // `<b></b>@example.invalid` pass and stored the cleaned, invalid `@example.invalid`.
+  const email = san.contact_email ?? ''
+  if (!email) badRequest('Email is required.')
+  if (!validEmail(email)) badRequest('Invalid email format.')
+
+  // A04 — each form legitimately requires a different minimum. `spare_parts` has never asked for
+  // a name and must not start; a product test has no sensible free-text message.
+  const REQUIRED_BY_TYPE: Record<string, InquiryTextField[]> = {
+    contact: ['contact_name', 'contact_email', 'message'],
+    technical_matching: ['contact_name', 'contact_email', 'contact_country', 'tm_product_interest'],
+    distributor: ['contact_name', 'contact_email', 'contact_country', 'message'],
+    spare_parts: ['contact_email', 'model_number', 'message'],
+    support_request: ['contact_name', 'contact_email', 'message'],
+    send_product_test: ['contact_name', 'contact_email', 'tm_product_interest'],
+  }
+  const required = REQUIRED_BY_TYPE[fields.inquiry_type as string] ?? ['contact_email']
+  for (const key of required) {
+    if (!san[key]) badRequest(`${key} is required for this request type.`)
   }
 
   // Derive source_url from Referer header (not from request body)
