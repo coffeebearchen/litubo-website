@@ -210,6 +210,69 @@ const configuredAiProvidersLabel = computed(() =>
 
 onMounted(loadSettings)
 onMounted(loadAiProviders)
+
+// ─── Home page content (fixed blocks stored in site_content) ─────────
+// These records drive the home page sections. Editing here changes the public page; a draft block
+// is not returned by /api/cms/home, so unpublishing hides the section rather than showing stale text.
+interface HomeBlockRow {
+  id: number
+  content_key: string
+  section_key: string | null
+  status: string
+  eyebrow_en: string
+  title_en: string
+  body_en: string
+  updated_at: string | null
+}
+
+const homeBlocks = ref<HomeBlockRow[]>([])
+const homeBlocksLoading = ref(true)
+const homeBlocksError = ref('')
+const homeBlockSaving = ref<number | null>(null)
+const homeBlocksNotice = ref('')
+
+async function loadHomeBlocks() {
+  homeBlocksLoading.value = true
+  homeBlocksError.value = ''
+  try {
+    const data = await $fetch<{ blocks: HomeBlockRow[] }>('/api/admin/home-content')
+    homeBlocks.value = data.blocks
+  } catch {
+    homeBlocksError.value = 'Could not load home page content.'
+  } finally {
+    homeBlocksLoading.value = false
+  }
+}
+
+async function persistHomeBlock(block: HomeBlockRow, extra: Record<string, unknown> = {}) {
+  homeBlockSaving.value = block.id
+  homeBlocksNotice.value = ''
+  try {
+    await $fetch('/api/admin/home-content', {
+      method: 'PATCH',
+      body: {
+        id: block.id,
+        eyebrow_en: block.eyebrow_en,
+        title_en: block.title_en,
+        body_en: block.body_en,
+        ...extra,
+      },
+    })
+    homeBlocksNotice.value = `${block.content_key} saved.`
+  } catch {
+    homeBlocksNotice.value = `${block.content_key} could not be saved.`
+  } finally {
+    homeBlockSaving.value = null
+    await loadHomeBlocks()
+  }
+}
+
+function toggleHomeBlock(block: HomeBlockRow) {
+  const next = block.status === 'published' ? 'draft' : 'published'
+  void persistHomeBlock({ ...block, status: next }, { status: next })
+}
+
+onMounted(loadHomeBlocks)
 </script>
 
 <template>
@@ -404,6 +467,44 @@ onMounted(loadAiProviders)
             This is a read-only status panel. Credentials are managed directly on the server's .env file, never in this interface.
           </p>
         </div>
+        <!-- Section 4: Home page content (fixed blocks) -->
+        <div class="content-card">
+          <h2 class="card-title">Home page content</h2>
+          <p class="form-hint">
+            Fixed blocks that drive the home page sections. A draft block is not shown on the public site.
+          </p>
+          <p v-if="homeBlocksNotice" class="form-hint" role="status">{{ homeBlocksNotice }}</p>
+          <p v-if="homeBlocksError" class="form-hint" role="alert">{{ homeBlocksError }}</p>
+          <p v-else-if="homeBlocksLoading" class="form-hint">Loading…</p>
+          <div v-else class="home-blocks">
+            <div v-for="b in homeBlocks" :key="b.id" class="home-block">
+              <div class="home-block__head">
+                <code class="home-block__key">{{ b.content_key }}</code>
+                <span class="home-block__status" :class="`home-block__status--${b.status}`">{{ b.status }}</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label" :for="`hb-eyebrow-${b.id}`">Eyebrow</label>
+                <input :id="`hb-eyebrow-${b.id}`" v-model="b.eyebrow_en" type="text" class="form-input" maxlength="200">
+              </div>
+              <div class="form-group">
+                <label class="form-label" :for="`hb-title-${b.id}`">Title</label>
+                <input :id="`hb-title-${b.id}`" v-model="b.title_en" type="text" class="form-input" maxlength="400">
+              </div>
+              <div class="form-group">
+                <label class="form-label" :for="`hb-body-${b.id}`">Body</label>
+                <textarea :id="`hb-body-${b.id}`" v-model="b.body_en" class="form-textarea" rows="2" maxlength="2000" />
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-primary btn-sm" :disabled="homeBlockSaving === b.id" @click="persistHomeBlock(b)">
+                  Save
+                </button>
+                <button type="button" class="btn btn-sm" :disabled="homeBlockSaving === b.id" @click="toggleHomeBlock(b)">
+                  {{ b.status === 'published' ? 'Unpublish' : 'Publish' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </template>
     </template>
   </div>
@@ -487,4 +588,36 @@ onMounted(loadAiProviders)
   .btn { min-height: 44px; }
   .form-input, .form-textarea { min-height: 44px; }
 }
+
+/* ─── Home page content blocks ─── */
+.home-blocks { display: flex; flex-direction: column; gap: var(--space-5); margin-top: var(--space-4); }
+.home-block {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  background: #FCFCFA;
+}
+.home-block__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.home-block__key {
+  font-family: ui-monospace, monospace;
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
+.home-block__status {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+}
+.home-block__status--published { color: #0c6e4e; border-color: #B7D8C8; background: #EDF7F1; }
+.home-block__status--draft { color: #8a6d1f; border-color: #E4D3AF; background: #FBF5E9; }
+.home-block .form-group { margin-bottom: var(--space-3); }
+.home-block .form-actions { margin-top: var(--space-2); }
 </style>

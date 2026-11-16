@@ -54,11 +54,28 @@ button {
   padding-inline: var(--container-pad);
 }
 
-/* ─── Hero — richer gradient + subtle accent glow (replaces flat solid) ── */
+/* ─── Hero — Scheme-C warm band (04-COLOR-SYSTEM) ──────────────────────
+   The shared page hero is a light warm surface, not a full-bleed green block.
+   Page-level scoped styles still paint white text for the old band, so the colours
+   are reasserted here; layout and spacing stay with each page. ───────────── */
 .page-hero {
   background-image:
-    radial-gradient(900px 380px at 88% -14%, rgba(217, 146, 0, 0.20), transparent 60%),
-    linear-gradient(135deg, #1B4224 0%, var(--color-primary) 52%, #3D7F49 100%) !important;
+    radial-gradient(900px 380px at 88% -14%, rgba(217, 146, 0, 0.14), transparent 60%),
+    linear-gradient(180deg, #F4E5C8 0%, #FAF8F3 100%) !important;
+  color: var(--color-ink) !important;
+  border-bottom: 1px solid var(--color-line);
+}
+.page-hero h1,
+.page-hero h2,
+.page-hero .page-hero__title {
+  color: var(--color-ink) !important;
+}
+.page-hero p,
+.page-hero .page-hero__sub {
+  color: var(--color-ink-muted) !important;
+}
+.page-hero a {
+  color: inherit;
 }
 
 /* ─── Branded media placeholder — used wherever a photo slot has no image yet.

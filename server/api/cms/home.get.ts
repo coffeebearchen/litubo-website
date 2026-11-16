@@ -1,8 +1,8 @@
 import { defineEventHandler } from 'h3'
 import { directusFetch } from '~/server/utils/directus'
 import { requireCmsSource } from '~/server/utils/cmsSource'
-import { publicFileId, resolvePublicFiles } from '~/server/utils/contentPublic'
-import type { HomeContent } from '~/types/content'
+import { publicFileId, resolvePublicFiles, type PublicFile } from '~/server/utils/contentPublic'
+import type { HomeBlock, HomeContent } from '~/types/content'
 
 interface DirectusSiteContent {
   id: number
@@ -31,30 +31,26 @@ interface DirectusSiteContent {
 export default defineEventHandler(async (): Promise<HomeContent> => {
   // fixtures 模式（仅限非生产）：返回 null，前台使用 i18n 回退；生产环境未配置 Directus 时返回 503
   if (requireCmsSource('cmsMode') === 'fixtures') {
-    return { hero: null }
+    return { hero: null, blocks: {} }
   }
 
-  let record: DirectusSiteContent | null = null
-  let heroImageId: string | null = null
+  let rows: DirectusSiteContent[] = []
   try {
+    // All published site_content rows, filtered to the `home.` namespace below. The read-only
+    // service policy exposes `content_key`/`status` but not `page_key`, so the namespace check runs
+    // in code rather than as a Directus filter.
     const res = await directusFetch<{ data: DirectusSiteContent[] }>(
-      '/items/site_content?filter[content_key][_eq]=home.hero&filter[status][_eq]=published&limit=1'
+      '/items/site_content?filter[status][_eq]=published&limit=100'
     )
-    record = res.data[0] ?? null
-    // RSG-06 (LITUBO-PUBLIC-MEDIA-CLOSEOUT-01)：主图文件须 is_public 且未在 Media Library 归档才输出；
-    // 判定读取失败与上面的读取失败一样回退，不输出未经判定的图片
-    if (record?.hero_image) {
-      heroImageId = publicFileId(await resolvePublicFiles(directusFetch, [record.hero_image]), record.hero_image)
-    }
+    rows = (res.data ?? []).filter(r => r.content_key.startsWith('home.'))
   }
   catch {
     // Directus 不可达时静默回退，不使整页崩溃
-    return { hero: null }
+    return { hero: null, blocks: {} }
   }
 
-  if (!record) {
-    return { hero: null }
-  }
+  const record = rows.find(r => r.content_key === 'home.hero') ?? null
+  const blockRows = rows.filter(r => r.content_key !== 'home.hero')
 
   const ls = (en: string | null, es: string | null, pt: string | null) => ({
     en: en ?? '',
@@ -62,9 +58,39 @@ export default defineEventHandler(async (): Promise<HomeContent> => {
     pt: pt ?? '',
   })
 
+  // RSG-06: every output image must be is_public and not archived; resolve once for all records.
+  let imageMap: ReadonlyMap<string, PublicFile> = new Map()
+  const imageIds = [...(record?.hero_image ? [record.hero_image] : []), ...blockRows.flatMap(r => (r.hero_image ? [r.hero_image] : []))]
+  if (imageIds.length) {
+    try {
+      imageMap = await resolvePublicFiles(directusFetch, imageIds)
+    }
+    catch {
+      imageMap = new Map()
+    }
+  }
+  const mediaUrl = (fileId: string | null): string => {
+    const id = fileId ? publicFileId(imageMap, fileId) : null
+    return id ? `/api/cms/media/${id}` : ''
+  }
+
+  const blocks: Record<string, HomeBlock> = {}
+  for (const row of blockRows) {
+    blocks[row.content_key] = {
+      eyebrow: ls(row.eyebrow_en, row.eyebrow_es, row.eyebrow_pt),
+      title: ls(row.title_en, row.title_es, row.title_pt),
+      body: ls(row.body_en, row.body_es, row.body_pt),
+      imageUrl: mediaUrl(row.hero_image),
+    }
+  }
+
+  if (!record) {
+    return { hero: null, blocks }
+  }
+
   return {
     hero: {
-      imageUrl: heroImageId ? `/api/cms/media/${heroImageId}` : '',
+      imageUrl: mediaUrl(record.hero_image),
       eyebrow: ls(record.eyebrow_en, record.eyebrow_es, record.eyebrow_pt),
       title: ls(record.title_en, record.title_es, record.title_pt),
       body: ls(record.body_en, record.body_es, record.body_pt),
@@ -77,5 +103,6 @@ export default defineEventHandler(async (): Promise<HomeContent> => {
         path: record.cta_secondary_path ?? '/contact',
       },
     },
+    blocks,
   }
 })

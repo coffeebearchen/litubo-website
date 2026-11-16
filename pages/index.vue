@@ -34,6 +34,37 @@ const heroPrimaryPath = computed(() => hero.value?.ctaPrimary.path || '/products
 const heroSecondaryLabel = computed(() => cmsText(hero.value?.ctaSecondary.label, 'pages.home.heroCtaSecondary'))
 const heroSecondaryPath = computed(() => hero.value?.ctaSecondary.path || '/contact')
 
+// ─── Fixed home blocks (editable in the admin, stored in site_content) ───
+// Each block falls back to the approved copy only when the admin record is missing or empty, so a
+// draft/unpublished record never blanks the section.
+function blockText(key: string, field: 'eyebrow' | 'title' | 'body', fallback: string): string {
+  const block = homeContent.value?.blocks?.[key]
+  const value = block?.[field]
+  if (!value) return fallback
+  const l = locale.value as 'en' | 'es' | 'pt'
+  return value[l] || value.en || fallback
+}
+
+const familiesEyebrow = computed(() => blockText('home.families', 'eyebrow', 'The product families'))
+const familiesTitle = computed(() => blockText('home.families', 'title', 'Find your starting point.'))
+const familiesBody = computed(() => blockText('home.families', 'body', 'Five inspection families. Final model selection is discussed for your application.'))
+
+const productionEyebrow = computed(() => blockText('home.production', 'eyebrow', 'On the line'))
+const productionTitle = computed(() => blockText('home.production', 'title', 'Every inspection decision starts with the product and the pack.'))
+const productionBody = computed(() => blockText('home.production', 'body', ''))
+const productionImage = computed(() => homeContent.value?.blocks?.['home.production']?.imageUrl || '/images/home/home-hero-inspection-line.png')
+
+const applicationsEyebrow = computed(() => blockText('home.applications', 'eyebrow', 'Inspection by application'))
+const applicationsTitle = computed(() => blockText('home.applications', 'title', 'Your product. Your inspection questions.'))
+const applicationsBody = computed(() => blockText('home.applications', 'body', 'Start with an application. Final suitability depends on the product, packaging and line conditions.'))
+
+const processEyebrow = computed(() => blockText('home.process', 'eyebrow', 'How we work'))
+const processTitle = computed(() => blockText('home.process', 'title', 'Three steps to a useful answer.'))
+const processBody = computed(() => blockText('home.process', 'body', 'No automatic matching. Each enquiry is reviewed by our technical team.'))
+
+const blogEyebrow = computed(() => blockText('home.blog', 'eyebrow', 'Blog & Insights'))
+const blogTitle = computed(() => blockText('home.blog', 'title', 'Practical ideas. A clearer conversation.'))
+
 // ─── Scheme C: five product families ────────────────────────────────
 // Titles, intros and order come from the published categories. The card photograph and the
 // "family example" label come from one named, published product per family, so a single photo is
@@ -90,9 +121,14 @@ const familyCards = computed(() => (categories.value ?? []).map((c, i) => {
 }))
 
 // Hero showroom: the XR-200D photo, fetched from the real published product.
-const { data: xrayList } = await useAsyncData<{ products: Array<{ slug: string; name: { en: string }; heroMedia?: { url: string; alt?: { en: string } } }> }>(
+interface ShowroomProduct {
+  slug: string
+  name: { en: string }
+  heroMedia?: { url: string; alt?: { en: string } }
+}
+const { data: xrayList } = await useAsyncData<{ products: ShowroomProduct[] }>(
   'home-showroom-product',
-  () => $fetch('/api/cms/products/x-ray-inspection'),
+  () => $fetch<{ products: ShowroomProduct[] }>('/api/cms/products/x-ray-inspection'),
   { default: () => ({ products: [] }) },
 )
 const showroom = computed(() => {
@@ -100,9 +136,6 @@ const showroom = computed(() => {
   const hit = rows.find(p => p.slug.startsWith('xr-200d'))
   return hit ?? rows[0] ?? null
 })
-
-// Full-bleed production band uses the approved production-line photograph.
-const bandImage = '/images/home/home-hero-inspection-line.png'
 
 useSeoHead({
   title: t('seo.home.title'),
@@ -160,23 +193,11 @@ const faqQuestions = computed(() => (faqTeaser.value?.posts ?? [])
 
 // ─── Three-step conversation ────────────────────────────────────────
 // Describes our process only; it makes no claim about products or results.
-const steps = [
-  {
-    n: '01',
-    title: 'Describe the product and pack',
-    body: 'Product form, packaging material and the point on the line where inspection would sit.',
-  },
-  {
-    n: '02',
-    title: 'Review the inspection task',
-    body: 'The foreign material or weight check you need to discuss, and the conditions around it.',
-  },
-  {
-    n: '03',
-    title: 'Agree the configuration',
-    body: 'Model, aperture, reject method and installation details are confirmed with our technical team.',
-  },
-]
+const steps = computed(() => [1, 2, 3].map(n => ({
+  n: String(n).padStart(2, '0'),
+  title: blockText(`home.process.step${n}`, 'title', ['Describe the product and pack', 'Review the inspection task', 'Agree the configuration'][n - 1]!),
+  body: blockText(`home.process.step${n}`, 'body', ''),
+})))
 </script>
 
 <template>
@@ -228,10 +249,10 @@ const steps = [
       <div class="container">
         <div class="section-head">
           <div>
-            <p class="eyebrow">The product families</p>
-            <h2 id="families-heading">Find your starting point.</h2>
+            <p class="eyebrow">{{ familiesEyebrow }}</p>
+            <h2 id="families-heading">{{ familiesTitle }}</h2>
           </div>
-          <p>Five inspection families. Final model selection is discussed for your application.</p>
+          <p>{{ familiesBody }}</p>
         </div>
 
         <div v-if="familyCards.length" class="family-reveal-grid">
@@ -256,14 +277,11 @@ const steps = [
 
     <!-- ─── Production line band ──────────────────────────────────── -->
     <section class="home-band" aria-labelledby="band-heading">
-      <img :src="bandImage" alt="" class="home-band__img" loading="lazy" aria-hidden="true">
+      <img :src="productionImage" alt="" class="home-band__img" loading="lazy" aria-hidden="true">
       <div class="container home-band__inner">
-        <p class="home-band__eyebrow">On the line</p>
-        <h2 id="band-heading">Every inspection decision starts with the product and the pack.</h2>
-        <p class="home-band__body">
-          Throughput, pack format and the available space decide as much as the technology does.
-          We review those conditions with you before recommending a configuration.
-        </p>
+        <p class="home-band__eyebrow">{{ productionEyebrow }}</p>
+        <h2 id="band-heading">{{ productionTitle }}</h2>
+        <p v-if="productionBody" class="home-band__body">{{ productionBody }}</p>
       </div>
     </section>
 
@@ -272,10 +290,10 @@ const steps = [
       <div class="container">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Inspection by application</p>
-            <h2 id="applications-heading">Your product.<br>Your inspection questions.</h2>
+            <p class="eyebrow">{{ applicationsEyebrow }}</p>
+            <h2 id="applications-heading">{{ applicationsTitle }}</h2>
           </div>
-          <p>Start with an application. Final suitability depends on the product, packaging and line conditions.</p>
+          <p>{{ applicationsBody }}</p>
         </div>
 
         <div class="application-grid illustrated-apps">
@@ -304,10 +322,10 @@ const steps = [
       <div class="container">
         <div class="section-head">
           <div>
-            <p class="eyebrow">How we work</p>
-            <h2 id="steps-heading">Three steps to a useful answer.</h2>
+            <p class="eyebrow">{{ processEyebrow }}</p>
+            <h2 id="steps-heading">{{ processTitle }}</h2>
           </div>
-          <p>No automatic matching. Each enquiry is reviewed by our technical team.</p>
+          <p>{{ processBody }}</p>
         </div>
         <div class="home-steps">
           <article v-for="s in steps" :key="s.n">
@@ -324,8 +342,8 @@ const steps = [
       <div class="container">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Blog &amp; Insights</p>
-            <h2 id="blog-heading">Practical ideas.<br>A clearer conversation.</h2>
+            <p class="eyebrow">{{ blogEyebrow }}</p>
+            <h2 id="blog-heading">{{ blogTitle }}</h2>
           </div>
           <NuxtLink :to="localePath('/resources')" class="text-link">
             View the blog

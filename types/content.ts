@@ -30,8 +30,21 @@ export interface HomeHeroContent {
   ctaSecondary: HomeHeroCta
 }
 
+/**
+ * A fixed home block stored in `site_content` and editable in the admin.
+ * `content_key` is the stable identity (e.g. `home.production`).
+ */
+export interface HomeBlock {
+  eyebrow: LocalizedString
+  title: LocalizedString
+  body: LocalizedString
+  imageUrl: string
+}
+
 export interface HomeContent {
   hero: HomeHeroContent | null
+  /** Published fixed blocks keyed by `content_key` (hero excluded). */
+  blocks: Record<string, HomeBlock>
 }
 
 export interface SEOMeta {
