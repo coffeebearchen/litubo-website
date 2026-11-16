@@ -55,8 +55,16 @@ const serviceItems = [
               <NuxtLink :to="localePath('/contact')" class="btn btn--outline">Contact Us</NuxtLink>
             </div>
           </div>
-          <div class="two-col__photo" aria-hidden="true">
-            <div class="two-col__img-placeholder img-placeholder" />
+          <div class="two-col__photo">
+            <img
+              class="two-col__img"
+              src="/images/company/equipment-lineup-green.webp"
+              alt=""
+              width="2160"
+              height="400"
+              loading="lazy"
+              decoding="async"
+            >
           </div>
         </div>
       </div>
