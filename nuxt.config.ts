@@ -27,7 +27,15 @@ export default defineNuxtConfig({
       { code: 'en', name: 'English', file: 'en.json', language: 'en-US' },
       { code: 'es', name: 'Español', file: 'es.json', language: 'es' },
       { code: 'pt', name: 'Português', file: 'pt.json', language: 'pt' },
+      { code: 'zh', name: '简体中文', file: 'zh.json', language: 'zh-Hans' },
+      { code: 'ar', name: 'العربية', file: 'ar.json', language: 'ar', dir: 'rtl' },
+      { code: 'ja', name: '日本語', file: 'ja.json', language: 'ja' },
     ],
+    /**
+     * A locale that is not translated yet must not render raw keys: vue-i18n falls back to
+     * `defaultLocale` (English) while the locale stays outside `publishedLocales`, so the public
+     * site still answers 404 for it.
+     */
     detectBrowserLanguage: false,
     bundle: {
       optimizeTranslationDirective: false,

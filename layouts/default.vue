@@ -1,6 +1,18 @@
 <script setup lang="ts">
 const { locale } = useI18n()
-useHead(computed(() => ({ htmlAttrs: { lang: locale.value } })))
+
+/**
+ * `lang` and `dir` are set during SSR so an Arabic page never flashes LTR before hydration.
+ * Arabic is the only RTL locale in this phase.
+ */
+const RTL_LOCALES = new Set(['ar'])
+
+useHead(computed(() => ({
+  htmlAttrs: {
+    lang: locale.value === 'zh' ? 'zh-Hans' : locale.value,
+    dir: RTL_LOCALES.has(locale.value) ? 'rtl' : 'ltr',
+  },
+})))
 </script>
 
 <template>

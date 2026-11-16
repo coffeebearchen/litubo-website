@@ -234,15 +234,14 @@ onUnmounted(() => { document.removeEventListener('click', handleOutsideClick) })
         </ul>
       </nav>
 
-      <!-- Actions -->
+      <!-- Actions — UI spec order: distributor CTA → search → language (physical rightmost).
+           The Contact link lives in the main nav, so it is not repeated here. -->
       <div class="site-header__actions">
-        <NuxtLink :to="localePath('/contact')" class="site-header__contact-link">
-          {{ t('nav.contact') }}
-        </NuxtLink>
-        <LanguageSwitch />
         <NuxtLink :to="localePath('/find-a-distributor')" class="site-header__cta-btn">
           {{ t('nav.findDistributor') }}
         </NuxtLink>
+        <SiteSearch />
+        <LanguageSwitch />
       </div>
 
       <!-- Mobile hamburger -->
@@ -444,6 +443,15 @@ onUnmounted(() => { document.removeEventListener('click', handleOutsideClick) })
 }
 
 /* ── Responsive ───────────────────────────────────── */
+/* The header now carries two extra controls (search, language). The UI spec says to drop the
+   optional brand subtitle first rather than shrink approved body text or clip the CTA. */
+@media (max-width: 1560px) {
+  .logo-divider,
+  .logo-tagline {
+    display: none;
+  }
+}
+
 @media (max-width: 1023px) {
   .site-header__nav,
   .site-header__actions {
