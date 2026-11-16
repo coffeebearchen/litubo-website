@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:#2F6B3A" role="img" aria-labelledby="title">
+  <title id="title">Metal detection — detector arch and metal particle</title>
+  <path d="M12 32V20a12 12 0 0 1 24 0v12M17 32V20a7 7 0 0 1 14 0v12M5 35h38M12 35v5m24-5v5"/>
+  <circle cx="24" cy="26" r="2.5" stroke="#D99200"/>
+  <path d="m6 13-2-2m3 10H3m39-8 2-2m-3 10h4" stroke="#D99200"/>
+</svg>

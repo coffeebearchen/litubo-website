@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:#2F6B3A" role="img" aria-labelledby="title">
+  <title id="title">X-ray inspection — enclosed scanner and product</title>
+  <path d="M9 32V12a3 3 0 0 1 3-3h24a3 3 0 0 1 3 3v20M15 32V18h18v14M5 35h38M12 35v5m24-5v5"/>
+  <rect x="20" y="24" width="8" height="8" rx="1"/>
+  <path d="M15 14h6"/>
+  <path d="M24 18v17" stroke="#D99200" stroke-dasharray="2 3"/>
+</svg>

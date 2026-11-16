@@ -4,37 +4,45 @@ import { useI18n, useLocalePath } from '#imports'
 const { t } = useI18n()
 const localePath = useLocalePath()
 
-interface Cat { slug: string; label: string; path: string; d: string }
+/**
+ * Top product-category strip.
+ *
+ * The five icons are the owner-approved category V1 set (two-colour SVG, viewBox 0 0 48 48),
+ * served as static files from /public/images/product-categories. They are category hints, not
+ * model drawings or certification marks. Because the category name is always visible inside the
+ * link, every icon carries an empty alt so assistive technology announces the name only once.
+ */
+interface Cat { slug: string; label: string; path: string; icon: string }
 const cats: Cat[] = [
   {
     slug: 'xray',
     label: t('nav_products.xray'),
     path: '/products/x-ray-inspection',
-    d: 'M12 3a9 9 0 100 18 9 9 0 000-18zm0 5a4 4 0 100 8 4 4 0 000-8z',
+    icon: 'x-ray-inspection.svg',
   },
   {
     slug: 'metal',
     label: t('nav_products.metal'),
     path: '/products/metal-detection',
-    d: 'M5 15a5 5 0 0110 0v3H9v-3a5 5 0 0110 0',
+    icon: 'metal-detection.svg',
   },
   {
     slug: 'check',
     label: t('nav_products.checkweighers'),
     path: '/products/checkweighers',
-    d: 'M12 4v16M5 20h14M7 9l5-5 5 5',
+    icon: 'checkweighers.svg',
   },
   {
     slug: 'combo',
     label: t('nav_products.combination'),
     path: '/products/combination-inspection',
-    d: 'M9 7a5 5 0 100 10 5 5 0 000-10zm6 0a5 5 0 100 10 5 5 0 000-10z',
+    icon: 'combination-inspection.svg',
   },
   {
     slug: 'conveyor',
     label: t('nav_products.conveyors'),
     path: '/products/conveyors-reject-systems',
-    d: 'M3 9h13l3 3-3 3H3zM3 15h3',
+    icon: 'conveyors-reject-systems.svg',
   }
 ]
 </script>
@@ -48,9 +56,15 @@ const cats: Cat[] = [
         :to="localePath(c.path)"
         class="cat-strip__item"
       >
-        <svg class="cat-strip__icon" width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path :d="c.d" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
+        <img
+          class="cat-strip__icon"
+          :src="`/icons/product-categories/${c.icon}`"
+          alt=""
+          width="26"
+          height="26"
+          loading="lazy"
+          decoding="async"
+        >
         <span class="cat-strip__label">{{ c.label }}</span>
       </NuxtLink>
     </div>
@@ -94,7 +108,17 @@ const cats: Cat[] = [
 }
 
 .cat-strip__icon {
-  color: var(--color-primary);
+  display: block;
+  width: 26px;
+  height: 26px;
+  /* Fixed box keeps the strip height identical to the previous inline-SVG version. */
+  object-fit: contain;
+  transition: transform 160ms ease;
+}
+
+/* Hover lifts the glyph 1px only — no scale, no rotation, no looping animation. */
+.cat-strip__item:hover .cat-strip__icon {
+  transform: translateY(-1px);
 }
 
 .cat-strip__label {
@@ -106,5 +130,10 @@ const cats: Cat[] = [
 @media (max-width: 640px) {
   .cat-strip__inner { justify-content: flex-start; }
   .cat-strip__item { min-width: 92px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-strip__icon { transition: none !important; }
+  .cat-strip__item:hover .cat-strip__icon { transform: none; }
 }
 </style>

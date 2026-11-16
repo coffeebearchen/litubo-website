@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:#2F6B3A" role="img" aria-labelledby="title">
+  <title id="title">Conveyors and reject systems — product transfer and diversion</title>
+  <rect x="9" y="10" width="10" height="10" rx="1.5"/>
+  <path d="M4 23h38M7 28h19M10 28v9m14-9v9M32 17h10m-4-4 4 4-4 4"/>
+  <path d="m27 27 8 8m-7 0h7v-7" stroke="#D99200"/>
+  <rect x="37" y="35" width="7" height="7" rx="1" stroke="#D99200"/>
+</svg>
