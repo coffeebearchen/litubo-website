@@ -63,6 +63,8 @@ const steps = [
       </div>
     </section>
 
+    <CompanyNav />
+
     <!-- 2. Four clickable service entries -->
     <section class="gs-band">
       <div class="container">

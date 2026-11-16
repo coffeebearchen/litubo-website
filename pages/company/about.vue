@@ -55,15 +55,17 @@ const company = {
             </p>
           </div>
           <div class="ab-hero__media">
-            <img class="ab-hero__main" src="/images/home/home-hero-inspection-line.png" alt="" width="1600" height="900" loading="eager" decoding="async">
+            <img class="ab-hero__main" src="/images/devices/combination-real.webp" alt="LITUBO combination inspection system with metal detection and checkweighing" width="800" height="481" loading="eager" decoding="async">
             <div class="ab-hero__pair">
-              <img src="/images/devices/xray-real.webp" alt="LITUBO X-ray inspection system" width="800" height="481" loading="lazy" decoding="async">
-              <img src="/images/devices/combination-real.webp" alt="LITUBO combination inspection system" width="800" height="481" loading="lazy" decoding="async">
+              <img src="/images/devices/metal-real.webp" alt="LITUBO metal detection head on a conveyor" width="800" height="533" loading="lazy" decoding="async">
+              <img src="/images/devices/weigher-real.webp" alt="LITUBO checkweigher on a production line" width="800" height="533" loading="lazy" decoding="async">
             </div>
           </div>
         </div>
       </div>
     </section>
+
+    <CompanyNav />
 
     <!-- 2. Company identity -->
     <section class="ab-band">

@@ -55,6 +55,8 @@ const requirements = [
       </div>
     </section>
 
+    <CompanyNav />
+
     <!-- 2. Three checks, kept as one compact list -->
     <section class="qm-band">
       <div class="container">

@@ -117,6 +117,8 @@ async function submit() {
       </div>
     </section>
 
+    <CompanyNav />
+
     <!-- 2. Cooperation topics -->
     <section class="pt-band">
       <div class="container">
