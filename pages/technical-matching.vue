@@ -14,6 +14,55 @@ const form = reactive({
   consent: false,
 })
 
+const route = useRoute()
+
+/**
+ * Context carried in from another page. The Checkweighers catalogue sends `series`, the Videos page
+ * sends `topic` / `equipment` / `focus`, and About or the applications pages send `application`.
+ *
+ * Only whitelisted values are accepted, and a whitelisted value is turned into a readable first line
+ * of the message so the back office sees where the enquiry came from. Anything unrecognised is
+ * ignored — a query string never becomes a business type.
+ */
+const SERIES_LABELS: Record<string, string> = {
+  compact: 'Compact',
+  standard: 'Standard',
+  'medium-range': 'Medium-range',
+  'extra-large': 'Extra-large',
+  pharmaceutical: 'Pharmaceutical',
+}
+
+const EQUIPMENT_LABELS: Record<string, string> = {
+  'metal-detection': 'Metal detection',
+  checkweighers: 'Checkweighing',
+  'combination-inspection': 'Combination inspection',
+  'x-ray-inspection': 'X-ray inspection',
+  'conveyors-reject-systems': 'Conveyors and reject systems',
+}
+
+function readParam(key: string): string {
+  const v = route.query[key]
+  return typeof v === 'string' ? v.trim().toLowerCase() : ''
+}
+
+const incoming = computed(() => {
+  const lines: string[] = []
+  const series = readParam('series')
+  if (series && SERIES_LABELS[series]) lines.push(`Equipment series: ${SERIES_LABELS[series]}`)
+  const equipment = readParam('equipment')
+  if (equipment && EQUIPMENT_LABELS[equipment]) lines.push(`Equipment family: ${EQUIPMENT_LABELS[equipment]}`)
+  const topic = readParam('topic')
+  if (topic === 'demonstration') lines.push('Enquiry context: Demonstration request')
+  const application = readParam('application')
+  if (application) lines.push(`Application: ${application.replace(/-/g, ' ')}`)
+  // Free text is capped and never used as a type.
+  const focus = typeof route.query.focus === 'string' ? route.query.focus.trim().slice(0, 200) : ''
+  if (focus) lines.push(`Focus: ${focus}`)
+  return lines
+})
+
+const contextSummary = computed(() => incoming.value.length ? incoming.value.join('\n') : '')
+
 const errors = reactive<Record<string, string>>({})
 const status = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
 
@@ -46,7 +95,9 @@ async function submit() {
         tm_package_dimensions: form.dimensions,
         tm_contaminant_concern: form.contaminant,
         tm_existing_equipment: form.existingEquip,
-        message: form.message,
+        message: contextSummary.value
+          ? `${contextSummary.value}\n\n${form.message}`.trim()
+          : form.message,
         consent: form.consent,
         website: '',
       },
@@ -64,6 +115,9 @@ async function submit() {
       <div class="container">
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('pages.technicalMatching.heroTitle') }]" />
         <h1 class="page-hero__title">{{ t('pages.technicalMatching.heroTitle') }}</h1>
+      <p v-if="incoming.length" class="tm-context">
+        <span v-for="line in incoming" :key="line">{{ line }}</span>
+      </p>
         <p class="page-hero__sub">{{ t('pages.technicalMatching.heroSubtitle') }}</p>
       </div>
     </section>
@@ -106,6 +160,18 @@ async function submit() {
 </template>
 
 <style scoped>
+.tm-context {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: 3px solid var(--color-primary);
+  background: #F3F7EF;
+  border-radius: 4px;
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+}
 .page-hero { background: linear-gradient(180deg, #F4E5C8 0%, #FAF8F3 100%); padding: var(--space-12) 0; color: var(--color-ink); }
 .page-hero__title { font-family: var(--font-display); font-size: clamp(var(--text-3xl), 4vw, var(--text-5xl)); font-weight: 600; line-height: var(--leading-tight); margin: var(--space-4) 0; }
 .page-hero__sub { font-size: var(--text-lg); color: var(--color-ink-muted); max-width: 560px; line-height: var(--leading-normal); }
