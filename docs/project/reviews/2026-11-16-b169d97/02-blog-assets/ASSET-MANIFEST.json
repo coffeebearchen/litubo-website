@@ -1,0 +1,38 @@
+[
+  {
+    "file": "blog-images/ASSET-MANIFEST.json",
+    "bytes": 1103,
+    "sha256": "35260cdca718e499cbcfa0b6ec7c7f1a5f320872fad12b2dff56656af4329742",
+    "origin": "Existing real equipment photograph"
+  },
+  {
+    "file": "blog-images/insights-fitting-inspection-into-a-line.webp",
+    "bytes": 100034,
+    "sha256": "7c383abb4a44fff67baac0f63ff34925edcbc65d3efc7dccd86d340b5a7f4cda",
+    "origin": "AI editorial image"
+  },
+  {
+    "file": "blog-images/insights-preparing-a-product-sample.webp",
+    "bytes": 141904,
+    "sha256": "2e5420966f9934704830681f1dc9f9aa1ed732889f34488bce33b28f12c6f640",
+    "origin": "AI editorial image"
+  },
+  {
+    "file": "blog-images/insights-what-to-prepare-for-a-quotation.webp",
+    "bytes": 167482,
+    "sha256": "8616101af75195ca040003444ab261169266d99f447c25f7873dad51ac56b5f0",
+    "origin": "AI editorial image"
+  },
+  {
+    "file": "blog-images/real-metal-detector-checkweigher-combo.webp",
+    "bytes": 42078,
+    "sha256": "b79c1f3d4d8a58b0a326d27c48f3f5d772b717a5c8bb5687ab4154530e4b77e0",
+    "origin": "Existing real equipment photograph"
+  },
+  {
+    "file": "blog-images/real-xr-300d-source.png",
+    "bytes": 329535,
+    "sha256": "ffc1f876229e4d9f687bc8a9e37fd7e45e4dfe747b2f78bc540d9b9210b09e56",
+    "origin": "Existing real equipment photograph"
+  }
+]

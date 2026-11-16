@@ -17,12 +17,16 @@ import type { Product, ProductCategory } from '~/types/content'
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 
-const { data, pending } = await useAsyncData(
+const { data, pending, error, refresh } = await useAsyncData(
   `checkweighers-${locale.value}`,
   () => $fetch<{ category: ProductCategory, products: Product[] }>('/api/cms/products/checkweighers', {
     query: { locale: locale.value },
   }),
 )
+
+// A02: a failed product read must not render as "All series · 0 models".
+const status = publicPageStatus(error.value, Boolean(data.value?.products))
+if (status && import.meta.server) throw createError({ statusCode: status, fatal: true })
 
 const category = computed(() => data.value?.category ?? null)
 const products = computed<Product[]>(() => data.value?.products ?? [])
@@ -226,6 +230,12 @@ const enquiryPath = computed(() => {
 
           <p v-if="pending" class="cw-state">Loading models…</p>
 
+          <div v-else-if="error" class="cw-state cw-state--error" role="alert">
+            <p class="cw-state__title">The model list could not be loaded.</p>
+            <p class="cw-state__body">This is a temporary problem on our side. Your filters are kept.</p>
+            <button type="button" class="cw-clear" @click="refresh()">Try again</button>
+          </div>
+
           <div v-else-if="!visible.length" class="cw-state">
             <p class="cw-state__title">No models match these filters.</p>
             <button type="button" class="cw-clear" @click="clearFilters">Clear filters</button>
@@ -423,6 +433,9 @@ const enquiryPath = computed(() => {
 
 .cw-state { padding: var(--space-8) 0; text-align: center; color: var(--color-ink-muted); }
 .cw-state__title { margin: 0 0 var(--space-3); font-size: var(--text-base); }
+.cw-state--error { border: 1px solid #E5B4A0; background: #FDF0EA; border-radius: 6px; padding: var(--space-6); }
+.cw-state--error .cw-state__title { color: #8A3A1A; font-weight: 600; }
+.cw-state__body { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: #8A3A1A; }
 .cw-clear {
   padding: 10px 18px;
   border: 1px solid #D5DFD4;

@@ -1,0 +1,17 @@
+﻿file,line,decision,alt_or_reason
+pages/admin/media/index.vue,1902,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+pages/admin/media/index.vue,1952,建议补文件名,"selectedFile.title || selectedFile.filename_download || ""Media preview""；这是管理端预览，不是SEO阻塞项"
+pages/applications/[slug].vue,191,补描述,`${item.title} equipment example`；若有已核实型号用真实产品名
+pages/applications/index.vue,50,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+pages/index.vue,293,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+pages/products/checkweighers.vue,238,建议补描述（设备图）,loc(p.name)；与标题重复并不自动构成无障碍失败
+pages/resources/downloads.vue,95,补描述,Online checkweigher shown as an equipment example
+pages/resources/insights/[slug].vue,55,补描述,按03映射的 alt_en；不得把图片写成真实安装或测试结果
+pages/resources/insights/index.vue,92,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+pages/resources/insights/index.vue,113,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+components/admin/content/ContentSeoLocales.vue,570,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+components/admin/content/ContentSeoLocales.vue,614,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+components/admin/media/MediaLibraryPicker.vue,238,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+components/global/CategoryStrip.vue,59,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+components/global/MegaMenu.vue,86,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息
+components/ui/ApplicationIcon.vue,31,保持空,相邻HTML已命名同一入口/文件，或纯背景/图标；无新增独有信息

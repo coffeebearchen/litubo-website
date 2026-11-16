@@ -13,13 +13,16 @@ const { data: post, error } = await useAsyncData<Post>(
   () => $fetch<Post>(`/api/cms/posts/${encodeURIComponent(slug)}`),
 )
 
-if (error.value || !post.value || post.value.contentType !== 'insight') {
-  throw createError({ statusCode: 404, fatal: true })
-}
+// A01: an upstream failure is 503, not 404. Only a genuine "not this post" is 404.
+const status = publicPageStatus(error.value, Boolean(post.value))
+if (status) throw createError({ statusCode: status, fatal: true })
+const resolved = post.value
+if (!resolved) throw createError({ statusCode: 404, fatal: true })
+if (resolved.contentType !== 'insight') throw createError({ statusCode: 404, fatal: true })
 
 useSeoHead({
-  title: post.value.title[l] || post.value.title.en,
-  description: post.value.excerpt[l] || post.value.excerpt.en,
+  title: resolved.title[l] || resolved.title.en,
+  description: resolved.excerpt[l] || resolved.excerpt.en,
   canonicalPath: `/resources/insights/${slug}`,
 })
 
