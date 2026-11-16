@@ -1,100 +1,19 @@
 <script setup lang="ts">
-const { t, locale } = useI18n()
-const localePath = useLocalePath()
-useHead({ title: `${t('pages.productTest.heroTitle')} — LITUBO` })
+/**
+ * /support/send-product-test — the product-test request.
+ *
+ * Layout and behaviour live in SupportRequestPage; this file only selects the mode, so the three
+ * support requests cannot drift apart.
+ */
+const { t } = useI18n()
 
-const form = reactive({ name: '', company: '', email: '', country: '', product: '', concern: '', message: '', consent: false })
-const errors = reactive<Record<string, string>>({})
-const status = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
-
-function validate() {
-  for (const k in errors) errors[k] = ''
-  if (!form.name.trim())    errors.name    = 'Required'
-  if (!form.email.trim())   errors.email   = 'Required'
-  if (!form.product.trim()) errors.product = 'Required'
-  if (!form.consent)        errors.consent = 'You must agree to continue'
-  return Object.values(errors).every(v => !v)
-}
-
-async function submit() {
-  if (!validate()) return
-  status.value = 'loading'
-  try {
-    await $fetch('/api/inquiries', {
-      method: 'POST',
-      body: {
-        inquiry_type: 'send_product_test',
-        locale: locale.value,
-        contact_name: form.name,
-        contact_company: form.company,
-        contact_email: form.email,
-        contact_country: form.country,
-        tm_product_interest: form.product,
-        concern: form.concern,
-        message: form.message,
-        consent: form.consent,
-        website: '',
-      },
-    })
-    status.value = 'success'
-  } catch {
-    status.value = 'error'
-  }
-}
+useSeoHead({
+  title: 'Send Product Test — LITUBO',
+  description: 'Submit a product test request to the LITUBO support team.',
+  canonicalPath: '/support/send-product-test',
+})
 </script>
 
 <template>
-  <div>
-    <section class="page-hero">
-      <div class="container">
-        <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.support'), to: localePath('/support') }, { label: t('pages.productTest.heroTitle') }]" />
-        <h1 class="page-hero__title">{{ t('pages.productTest.heroTitle') }}</h1>
-        <p class="page-hero__sub">{{ t('pages.productTest.heroSubtitle') }}</p>
-      </div>
-    </section>
-    <section class="section-gap">
-      <div class="container">
-        <div v-if="status === 'success'" class="form-success" role="alert">
-          <h2>{{ t('common.successTitle') }}</h2><p>{{ t('common.successBody') }}</p>
-        </div>
-        <form v-else class="form-panel" novalidate @submit.prevent="submit">
-          <div class="form-grid">
-            <FormField id="name" :label="t('pages.productTest.nameLabel')" required :model-value="form.name" :error="errors.name" @update:model-value="form.name = $event" />
-            <FormField id="company" :label="t('pages.productTest.companyLabel')" :model-value="form.company" @update:model-value="form.company = $event" />
-            <FormField id="email" type="email" :label="t('pages.productTest.emailLabel')" required :model-value="form.email" :error="errors.email" @update:model-value="form.email = $event" />
-            <FormField id="country" :label="t('pages.productTest.countryLabel')" :model-value="form.country" @update:model-value="form.country = $event" />
-            <FormField id="product" :label="t('pages.productTest.productLabel')" required :model-value="form.product" :error="errors.product" @update:model-value="form.product = $event" />
-            <FormField id="concern" :label="t('pages.productTest.concernLabel')" :model-value="form.concern" @update:model-value="form.concern = $event" />
-          </div>
-          <FormField id="message" type="textarea" :label="t('pages.productTest.messageLabel')" :model-value="form.message" class="form-message" @update:model-value="form.message = $event" />
-          <label class="consent-label">
-            <input v-model="form.consent" type="checkbox" class="consent-checkbox" >
-            <span>I agree to the processing of my personal data in accordance with the <NuxtLink :to="localePath('/privacy-policy')">Privacy Policy</NuxtLink>.</span>
-          </label>
-          <p v-if="errors.consent" class="consent-error" role="alert">{{ errors.consent }}</p>
-          <BaseButton type="submit" variant="primary" size="lg" :disabled="status === 'loading'" class="submit-btn">
-            {{ status === 'loading' ? t('common.loading') : t('pages.productTest.submitLabel') }}
-          </BaseButton>
-        </form>
-      </div>
-    </section>
-  </div>
+  <SupportRequestPage mode="product-test" />
 </template>
-
-<style scoped>
-.page-hero { background: linear-gradient(180deg, #F4E5C8 0%, #FAF8F3 100%); padding: var(--space-12) 0; color: var(--color-ink); }
-.page-hero__title { font-family: var(--font-display); font-size: clamp(var(--text-3xl), 4vw, var(--text-5xl)); font-weight: 600; line-height: var(--leading-tight); margin: var(--space-4) 0; }
-.page-hero__sub { font-size: var(--text-lg); color: var(--color-ink-muted); max-width: 560px; line-height: var(--leading-normal); }
-.section-gap { padding: var(--space-16) 0; }
-.form-panel { max-width: 640px; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); margin-bottom: var(--space-5); }
-.form-message { margin-bottom: var(--space-5); }
-.consent-label { display: flex; align-items: flex-start; gap: var(--space-3); font-size: var(--text-sm); color: var(--color-ink-muted); cursor: pointer; margin-bottom: var(--space-2); }
-.consent-checkbox { margin-top: 3px; flex-shrink: 0; accent-color: var(--color-primary); }
-.consent-label a { color: var(--color-primary); text-decoration: underline; }
-.consent-error { font-size: var(--text-xs); color: #c0392b; margin-bottom: var(--space-4); }
-.submit-btn { margin-top: var(--space-5); }
-.form-success { padding: var(--space-8); background: var(--color-canvas); border: 1px solid var(--color-line); border-radius: var(--radius-sm); }
-.form-success h2 { font-family: var(--font-display); font-size: var(--text-2xl); color: var(--color-primary); margin-bottom: var(--space-3); }
-@media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
-</style>

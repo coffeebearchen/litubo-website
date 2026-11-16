@@ -23,10 +23,17 @@ const documentLabel = requestType.value === 'manual-request' && typeof route.que
 const form = reactive({ name: '', company: '', email: '', model: '', serial: '', country: '', issue: documentLabel ? `Please send the ${documentLabel} for the following product / application: ` : '', urgency: '', consent: false })
 
 
-</script>
 
+/**
+ * service-training has its own V2 layout; technical-support and manual-request keep the generic
+ * request form untouched, so the Downloads document flow that reuses it cannot break.
+ */
+const isServiceTraining = computed(() => requestType.value === 'service-training')
+
+</script>
 <template>
-  <div>
+  <SupportRequestPage v-if="isServiceTraining" mode="service" />
+  <div v-else>
     <section class="page-hero">
       <div class="container">
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.support'), to: localePath('/support') }, { label: pageTitle }]" />
