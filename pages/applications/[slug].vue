@@ -52,10 +52,11 @@ const approaches = [
   },
 ]
 
+// Labels and subtitles are copied verbatim from the V3 design; do not paraphrase them.
 const steps = [
-  { id: 'product', label: 'Product & pack' },
-  { id: 'line', label: 'Production line' },
-  { id: 'discuss', label: 'Technical discussion' },
+  { id: 'product', label: 'Product & packaging', sub: 'Define the inspection question' },
+  { id: 'line', label: 'Your production line', sub: 'Bring the process into view' },
+  { id: 'discuss', label: 'Prepare the discussion', sub: 'Share a few useful details' },
 ]
 </script>
 
@@ -101,7 +102,10 @@ const steps = [
       <div class="container app-steps__inner">
         <a v-for="(step, index) in steps" :key="step.id" :href="`#${step.id}`" class="app-steps__item">
           <span class="app-steps__index">{{ String(index + 1).padStart(2, '0') }}</span>
-          <span>{{ step.label }}</span>
+          <span class="app-steps__text">
+            <span class="app-steps__label">{{ step.label }}</span>
+            <span class="app-steps__sub">{{ step.sub }}</span>
+          </span>
         </a>
       </div>
     </nav>
@@ -337,28 +341,41 @@ const steps = [
 
 /* ── Three steps ──────────────────────────────────── */
 .app-steps {
-  border-block: 1px solid #DAE3DD;
-  background: #fff;
+  background: #FAF8F3;
+  padding-block: var(--space-4);
 }
 .app-steps__inner {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-5);
-  padding-block: var(--space-3);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid #DAE3DD;
+  border-radius: 6px;
+  background: #fff;
 }
 .app-steps__item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
   text-decoration: none;
+  color: var(--color-ink);
 }
-.app-steps__item:hover { color: var(--color-primary); }
+.app-steps__item:hover .app-steps__label { color: var(--color-primary); }
 .app-steps__index {
-  font-size: var(--text-xs);
-  letter-spacing: 0.12em;
+  font-size: var(--text-lg);
+  font-weight: 600;
   color: var(--color-primary);
+  line-height: 1.1;
+}
+.app-steps__text { display: flex; flex-direction: column; gap: 2px; }
+.app-steps__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.app-steps__sub {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
 }
 
 /* ── Questions beside the production scene ────────── */
@@ -568,7 +585,7 @@ const steps = [
   .app-hero__media { order: 2; }
   .app-split--reverse .app-split__text { order: 1; }
   .app-split--reverse .app-split__aside { order: 2; }
-  .app-steps__inner { gap: var(--space-3); }
+  .app-steps__inner { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
   .app-approaches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .app-inquiry { grid-template-columns: minmax(0, 1fr); gap: 28px; }
 }
