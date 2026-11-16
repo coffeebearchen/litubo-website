@@ -15,6 +15,11 @@ interface PatchBody {
   eyebrow_en?: unknown
   title_en?: unknown
   body_en?: unknown
+  /** Homepage buttons. Without these the owner cannot change CTA copy from the admin at all. */
+  cta_primary_label_en?: unknown
+  cta_primary_path?: unknown
+  cta_secondary_label_en?: unknown
+  cta_secondary_path?: unknown
   status?: unknown
 }
 
@@ -40,6 +45,22 @@ export default defineEventHandler(async (event: H3Event) => {
   if (eyebrow !== undefined) patch.eyebrow_en = eyebrow
   if (title !== undefined) patch.title_en = title
   if (content !== undefined) patch.body_en = content
+
+  // CTA copy and destinations. Paths must stay site-relative so a typo cannot point a button at
+  // another origin.
+  const cta1Label = text(body.cta_primary_label_en, 60)
+  const cta1Path = text(body.cta_primary_path, 300)
+  const cta2Label = text(body.cta_secondary_label_en, 60)
+  const cta2Path = text(body.cta_secondary_path, 300)
+  if (cta1Label !== undefined) patch.cta_primary_label_en = cta1Label
+  if (cta2Label !== undefined) patch.cta_secondary_label_en = cta2Label
+  for (const [key, value] of [['cta_primary_path', cta1Path], ['cta_secondary_path', cta2Path]] as const) {
+    if (value === undefined) continue
+    if (value !== '' && !value.startsWith('/')) {
+      throw createError({ statusCode: 400, message: `${key} must be a site-relative path` })
+    }
+    patch[key] = value
+  }
   if (body.status !== undefined) {
     if (typeof body.status !== 'string' || !STATUSES.has(body.status)) {
       throw createError({ statusCode: 400, message: 'status must be published or draft' })

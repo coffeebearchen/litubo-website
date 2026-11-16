@@ -1,0 +1,50 @@
+[
+  {
+    "id": 19,
+    "slug": "xr-700-industrial-x-ray-inspection-system-for-shoes-bags-toys-and-components",
+    "model_or_series": "XR-700",
+    "name_en": "Industrial X-Ray Inspection System for Shoes, Bags, Toys and Components"
+  },
+  {
+    "id": 20,
+    "slug": "xr-800-industrial-x-ray-screening-system-for-quality-and-safety-inspection",
+    "model_or_series": "XR-800",
+    "name_en": "Industrial X-Ray Screening System for Quality and Safety Inspection"
+  },
+  {
+    "id": 21,
+    "slug": "xr-900-large-industrial-x-ray-inspection-system-for-foreign-object-screening",
+    "model_or_series": "XR-900",
+    "name_en": "Large Industrial X-Ray Inspection System for Foreign Object Screening"
+  },
+  {
+    "id": 22,
+    "slug": "xr-50c-compact-portable-x-ray-fluoroscopy-instrument",
+    "model_or_series": "XR-50C",
+    "name_en": "Compact Portable X-Ray Fluoroscopy Instrument"
+  },
+  {
+    "id": 23,
+    "slug": "xr-100c-portable-x-ray-fluoroscopy-instrument",
+    "model_or_series": "XR-100C",
+    "name_en": "Portable X-Ray Fluoroscopy Instrument"
+  },
+  {
+    "id": 24,
+    "slug": "xr-100c-1-rechargeable-portable-x-ray-fluoroscopy-instrument",
+    "model_or_series": "XR-100C-1",
+    "name_en": "Rechargeable Portable X-Ray Fluoroscopy Instrument"
+  },
+  {
+    "id": 25,
+    "slug": "xr-100c-2-portable-x-ray-fluoroscopy-system-for-special-imaging-applications",
+    "model_or_series": "XR-100C-2",
+    "name_en": "Portable X-Ray Fluoroscopy System for Special Imaging Applications"
+  },
+  {
+    "id": 26,
+    "slug": "xr-1000d-handheld-backscatter-x-ray-inspection-system",
+    "model_or_series": "XR-1000D",
+    "name_en": "Handheld Backscatter X-Ray Inspection System"
+  }
+]

@@ -222,6 +222,10 @@ interface HomeBlockRow {
   eyebrow_en: string
   title_en: string
   body_en: string
+  cta_primary_label_en: string
+  cta_primary_path: string
+  cta_secondary_label_en: string
+  cta_secondary_path: string
   updated_at: string | null
 }
 
@@ -495,6 +499,23 @@ onMounted(loadHomeBlocks)
               <div class="form-group">
                 <label class="form-label" :for="`hb-body-${b.id}`">正文</label>
                 <textarea :id="`hb-body-${b.id}`" v-model="b.body_en" class="form-textarea" rows="2" maxlength="2000" />
+              <!-- 首页按钮：此前只能改标题/正文，按钮文案必须进 Directus 才能改。 -->
+              <div class="form-group">
+                <label class="form-label" :for="`hb-cta1-${b.id}`">主按钮文案</label>
+                <input :id="`hb-cta1-${b.id}`" v-model="b.cta_primary_label_en" type="text" class="form-input" maxlength="60">
+              </div>
+              <div class="form-group">
+                <label class="form-label" :for="`hb-cta1p-${b.id}`">主按钮链接</label>
+                <input :id="`hb-cta1p-${b.id}`" v-model="b.cta_primary_path" type="text" class="form-input" maxlength="300" placeholder="/products">
+              </div>
+              <div class="form-group">
+                <label class="form-label" :for="`hb-cta2-${b.id}`">次按钮文案</label>
+                <input :id="`hb-cta2-${b.id}`" v-model="b.cta_secondary_label_en" type="text" class="form-input" maxlength="60">
+              </div>
+              <div class="form-group">
+                <label class="form-label" :for="`hb-cta2p-${b.id}`">次按钮链接</label>
+                <input :id="`hb-cta2p-${b.id}`" v-model="b.cta_secondary_path" type="text" class="form-input" maxlength="300" placeholder="/contact">
+              </div>
               </div>
               <div class="form-actions">
                 <button type="button" class="btn btn-primary btn-sm" :disabled="homeBlockSaving === b.id" @click="persistHomeBlock(b)">
