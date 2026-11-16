@@ -68,7 +68,6 @@ const supportLinks = [
 
 const resourceLinks = [
   { label: 'LITUBO Insights', to: '/resources' },
-  { label: 'Case Studies', to: '/resources' },
   { label: 'Downloads', to: '/resources/downloads' },
   { label: 'Videos', to: '/resources/videos' },
 ]

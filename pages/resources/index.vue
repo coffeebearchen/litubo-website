@@ -121,11 +121,11 @@ const unavailable = computed<boolean>(() => hub.value?.unavailable ?? false)
 type FilterType = 'all' | HubKind
 const activeFilter = ref<FilterType>('all')
 
+// Only types that actually have published content. A tab for an empty type filters to nothing and
+// reads as a broken section, so it is not offered until a post of that type is published.
 const filterTabs: { key: FilterType; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'technical_article', label: 'Insights' },
-  { key: 'technical_guide', label: 'Technical Guides' },
-  { key: 'case_study', label: 'Case Studies' },
 ]
 
 const filteredCards = computed<HubCard[]>(() =>
