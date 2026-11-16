@@ -1,0 +1,21 @@
+{
+  "scope": "Static UI only",
+  "checks": [
+    {
+      "page": "Header language",
+      "locales": [
+        "en",
+        "es",
+        "ar"
+      ]
+    },
+    {
+      "page": "Admin content language",
+      "locales": [
+        "en",
+        "es",
+        "ar"
+      ]
+    }
+  ]
+}
