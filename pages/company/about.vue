@@ -13,6 +13,15 @@ useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'
     <!-- Hero -->
     <section class="about-hero">
       <div class="about-hero__media">
+        <img
+          class="about-hero__img"
+          src="/images/home/home-hero-inspection-line.png"
+          alt=""
+          width="1600"
+          height="900"
+          loading="eager"
+          decoding="async"
+        >
         <div class="about-hero__overlay" aria-hidden="true" />
       </div>
       <div class="about-hero__content container">
@@ -38,8 +47,16 @@ useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'
             <p class="body-text">We help food and packaging manufacturers protect consumers and brands with inspection systems for physical contaminant detection, weight compliance and combination inspection.</p>
             <p class="body-text">LITUBO operates under Shanghai NingPin Industrial Dev. Co., Ltd. in Kunshan, Jiangsu Province, China, and welcomes international enquiries from distributors and end users.</p>
           </div>
-          <div class="two-col__photo" aria-hidden="true">
-            <div class="two-col__img-placeholder img-placeholder" aria-hidden="true" />
+          <div class="two-col__photo">
+            <img
+              class="two-col__img"
+              src="/images/company/loose-material.webp"
+              alt=""
+              width="1200"
+              height="900"
+              loading="lazy"
+              decoding="async"
+            >
           </div>
         </div>
       </div>
