@@ -51,8 +51,8 @@ useSeoHead({
                 class="app-card__image"
                 :src="`/images/applications/${INDUSTRY_GUIDES[index].slug}.webp`"
                 alt=""
-                width="275"
-                height="206"
+                width="800"
+                height="600"
                 loading="lazy"
                 decoding="async"
               >
