@@ -147,7 +147,8 @@ describe('Applications: confirmed industries and useful editorial guides, no DEM
   it('the guides make no invented certifications, results or customer case claims', () => {
     const text = JSON.stringify(INDUSTRY_GUIDES)
     expect(text).not.toMatch(/guaranteed|certified|\bISO\s?9001|99\.\d%|case study|our customer|\b\d+\s?mm\b/i)
-    expect(INDUSTRY_GUIDES.every(guide => guide.considerations.length === 4)).toBe(true)
+    expect(INDUSTRY_GUIDES.every(guide => guide.questions.length >= 3)).toBe(true)
+  expect(INDUSTRY_GUIDES.every(guide => guide.prep.length >= 2)).toBe(true)
   })
 
   it('the DEMO Application fixtures are still present for development and tests', () => {

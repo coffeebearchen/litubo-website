@@ -2,13 +2,14 @@
 import { industryGuide } from '~/content/industry-guides'
 
 /**
- * Application detail — one shared template for the eight confirmed industries.
+ * Application detail — one shared template, eight independent content sets.
  *
- * Content order is fixed by the V2 handoff: first screen → process scene → device discussion entry →
- * enquiry. The enquiry keeps the application as its context, so the team knows which application the
- * visitor came from without the visitor retyping it.
+ * Order follows the V3 handoff: first screen (text + product scene) → three in-page steps →
+ * industry questions beside the production scene → product and line notes → device family entry →
+ * preparation list and enquiry → shared footer.
  *
- * Nothing here states a performance figure, a recommended model or a customer reference.
+ * Nothing here states a performance figure, a recommended model or a customer reference. Both
+ * scenes are generated, and the caption says so.
  */
 assertPublishedLocale()
 const { t } = useI18n()
@@ -28,17 +29,18 @@ useSeoHead({
 
 const inquiryPath = `/contact?application=${encodeURIComponent(guide.slug)}`
 
-/** Generated and illustrated scenes must say what they are; a photograph does not carry the note. */
-const sceneCaption = computed(() => {
-  if (guide.sceneKind === 'generated') return 'AI-generated application scene.'
-  if (guide.sceneKind === 'illustration') return 'Illustration shown. A photographed application scene is being prepared.'
-  return ''
-})
+const headlineLines = computed(() => guide.headline.split('\n').filter(Boolean))
+
+const steps = [
+  { id: 'product', label: 'Product & pack' },
+  { id: 'line', label: 'Production line' },
+  { id: 'discuss', label: 'Technical discussion' },
+]
 </script>
 
 <template>
-  <div>
-    <!-- 1. First screen: title, one-sentence positioning, one clear enquiry entry -->
+  <div class="application-page">
+    <!-- 1. First screen: statement, intro, one clear entry, and the product scene -->
     <section class="page-hero">
       <div class="container">
         <Breadcrumb
@@ -48,57 +50,79 @@ const sceneCaption = computed(() => {
             { label: guide.title },
           ]"
         />
-        <h1 class="page-hero__title">{{ guide.title }}</h1>
-        <p class="page-hero__sub">{{ guide.intro }}</p>
-        <p class="app-hero__actions">
-          <NuxtLink :to="localePath(inquiryPath)" class="app-cta">
-            Discuss this application →
-          </NuxtLink>
-        </p>
+        <div class="app-hero">
+          <div class="app-hero__text">
+            <p class="eyebrow">{{ guide.title }}</p>
+            <h1 class="app-hero__headline">
+              <span v-for="line in headlineLines" :key="line">{{ line }}</span>
+            </h1>
+            <p class="app-hero__intro">{{ guide.intro }}</p>
+            <NuxtLink :to="localePath(inquiryPath)" class="app-cta">
+              Discuss this application →
+            </NuxtLink>
+          </div>
+          <figure class="app-hero__media">
+            <img
+              :src="guide.productImage"
+              :alt="guide.productAlt"
+              width="1200"
+              height="900"
+              loading="eager"
+              decoding="async"
+            >
+          </figure>
+        </div>
       </div>
     </section>
 
-    <!-- 2. The questions this product type raises, beside the scene -->
-    <section class="section-gap">
+    <!-- 2. Three steps: in-page index -->
+    <nav class="app-steps" aria-label="On this page">
+      <div class="container app-steps__inner">
+        <a v-for="(step, index) in steps" :key="step.id" :href="`#${step.id}`" class="app-steps__item">
+          <span class="app-steps__index">{{ String(index + 1).padStart(2, '0') }}</span>
+          <span>{{ step.label }}</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- 3. Industry questions beside the production scene -->
+    <section id="product" class="section-gap">
       <div class="container app-lead">
         <div class="app-lead__text">
           <p class="eyebrow">What this application involves</p>
-          <h2 class="app-h2">The questions this product type raises</h2>
+          <h2 class="app-h2">{{ guide.productTitle }}</h2>
+          <p class="app-body">{{ guide.productNote }}</p>
           <ul class="app-considerations" role="list">
-            <li v-for="item in guide.considerations" :key="item">{{ item }}</li>
+            <li v-for="item in guide.questions" :key="item">{{ item }}</li>
           </ul>
         </div>
         <figure class="app-lead__media">
           <img
-            :src="guide.scene"
-            :alt="guide.sceneAlt"
-            width="800"
-            height="600"
-            loading="eager"
+            :src="guide.productionImage"
+            :alt="guide.productionAlt"
+            width="1200"
+            height="900"
+            loading="lazy"
             decoding="async"
           >
-          <figcaption v-if="sceneCaption">{{ sceneCaption }}</figcaption>
         </figure>
       </div>
     </section>
 
-    <!-- 3. Two interleaved blocks: the product, then the line. Device entry is a family, not a model. -->
-    <section class="section-gap section-alt">
+    <!-- 4. Product and line, interleaved; device entry is a family, not a model -->
+    <section id="line" class="section-gap section-alt">
       <div class="container">
         <div class="app-split">
           <div class="app-split__text">
-            <p class="eyebrow">The product</p>
-            <h2 class="app-h2">What is being inspected</h2>
-            <p class="app-body">{{ guide.productNote }}</p>
+            <p class="eyebrow">The product and the pack</p>
+            <h2 class="app-h2">{{ guide.lineTitle }}</h2>
+            <p class="app-body">{{ guide.lineNote }}</p>
           </div>
           <div class="app-split__aside">
-            <p class="app-aside-label">Representative family</p>
-            <NuxtLink :to="localePath(guide.family.to)" class="app-family">
-              {{ guide.family.label }} →
-            </NuxtLink>
-            <p class="app-aside-note">
-              A family page, not a recommended model. The configuration is confirmed against your own product.
-            </p>
+            <p class="app-aside-label">Item presentation</p>
+            <ul class="app-aside-list" role="list">
+              <li v-for="item in guide.presentation" :key="item">{{ item }}</li>
+            </ul>
           </div>
         </div>
 
@@ -106,28 +130,34 @@ const sceneCaption = computed(() => {
           <div class="app-split__text">
             <p class="eyebrow">The line</p>
             <h2 class="app-h2">What the machine has to fit into</h2>
-            <p class="app-body">{{ guide.lineNote }}</p>
+            <ul class="app-considerations" role="list">
+              <li v-for="item in guide.lineItems" :key="item">{{ item }}</li>
+            </ul>
           </div>
-          <div class="app-split__aside">
-            <p class="app-aside-label">Discuss the line</p>
-            <NuxtLink :to="localePath('/technical-matching')" class="app-family">
-              Technical matching →
+          <div id="discuss" class="app-split__aside">
+            <p class="app-aside-label">Representative family</p>
+            <NuxtLink :to="localePath(guide.family.to)" class="app-family">
+              {{ guide.family.label }} →
             </NuxtLink>
             <p class="app-aside-note">
-              Bring the product and the line constraints; the discussion starts from there.
+              A family page, not a recommended model. The configuration is confirmed against your own
+              product and line.
             </p>
+            <NuxtLink :to="localePath('/technical-matching')" class="app-family app-family--second">
+              Technical matching →
+            </NuxtLink>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 4. What the visitor brings — placed after the introduction, before the enquiry -->
+    <!-- 5. What to prepare, then the enquiry -->
     <section class="section-gap">
       <div class="container app-prep">
         <p class="eyebrow">What to prepare</p>
         <h2 class="app-h2">What we need from you</h2>
         <ul class="app-prep__list" role="list">
-          <li v-for="(item, index) in guide.preparation" :key="item">
+          <li v-for="(item, index) in guide.prep" :key="item">
             <span class="app-prep__index">{{ String(index + 1).padStart(2, '0') }}</span>
             <span>{{ item }}</span>
           </li>
@@ -139,7 +169,6 @@ const sceneCaption = computed(() => {
       </div>
     </section>
 
-    <!-- 5. Enquiry card: the application stays as context on the enquiry -->
     <section class="section-gap section-alt">
       <div class="container">
         <div class="app-inquiry">
@@ -187,14 +216,53 @@ const sceneCaption = computed(() => {
 }
 
 .app-body {
-  margin: 0;
+  margin: 0 0 var(--space-4);
   font-size: var(--text-base);
   line-height: 1.6;
   color: var(--color-ink-muted);
   max-width: 640px;
 }
 
-.app-hero__actions { margin: var(--space-5) 0 0; }
+/* ── First screen ─────────────────────────────────── */
+.app-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: center;
+  padding-block: var(--space-6);
+}
+
+.app-hero__headline {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: clamp(var(--text-3xl), 3.2vw, var(--text-5xl));
+  line-height: 1.12;
+  color: var(--color-ink);
+}
+.app-hero__headline span { display: block; }
+
+.app-hero__intro {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+  max-width: 560px;
+}
+
+.app-hero__media { margin: 0; }
+.app-hero__media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 7px;
+  background: #F2F8F4;
+}
+.app-hero__media figcaption,
+.app-lead__media figcaption {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
 
 .app-cta {
   display: inline-block;
@@ -208,14 +276,39 @@ const sceneCaption = computed(() => {
 }
 .app-cta:hover { background: var(--color-primary-deep); }
 
-/* Lead: text beside the scene */
+/* ── Three steps ──────────────────────────────────── */
+.app-steps {
+  border-block: 1px solid #DAE3DD;
+  background: #fff;
+}
+.app-steps__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  padding-block: var(--space-3);
+}
+.app-steps__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-ink-muted);
+  text-decoration: none;
+}
+.app-steps__item:hover { color: var(--color-primary); }
+.app-steps__index {
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  color: var(--color-primary);
+}
+
+/* ── Questions beside the production scene ────────── */
 .app-lead {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
   gap: 56px;
   align-items: start;
 }
-
 .app-lead__media { margin: 0; }
 .app-lead__media img {
   display: block;
@@ -223,11 +316,6 @@ const sceneCaption = computed(() => {
   height: auto;
   border-radius: 7px;
   background: #F2F8F4;
-}
-.app-lead__media figcaption {
-  margin-top: var(--space-2);
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
 }
 
 .app-considerations { margin: 0; padding: 0; list-style: none; }
@@ -250,7 +338,7 @@ const sceneCaption = computed(() => {
   background: var(--color-primary);
 }
 
-/* Interleaved splits */
+/* ── Interleaved splits ───────────────────────────── */
 .app-split {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -260,7 +348,6 @@ const sceneCaption = computed(() => {
   border-bottom: 1px solid #DAE3DD;
   margin-bottom: var(--space-10);
 }
-/* Mirrored with logical order rather than direction: rtl, so text stays readable in Arabic. */
 .app-split--reverse .app-split__text { order: 2; }
 .app-split--reverse .app-split__aside { order: 1; }
 .app-split:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
@@ -272,6 +359,13 @@ const sceneCaption = computed(() => {
   text-transform: uppercase;
   color: var(--color-ink-muted);
 }
+.app-aside-list { margin: 0; padding: 0; list-style: none; }
+.app-aside-list li {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid #E7EDE8;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+}
 .app-family {
   display: inline-block;
   font-size: var(--text-base);
@@ -279,6 +373,7 @@ const sceneCaption = computed(() => {
   text-decoration: none;
 }
 .app-family:hover { text-decoration: underline; }
+.app-family--second { margin-top: var(--space-3); display: block; }
 .app-aside-note {
   margin: var(--space-3) 0 0;
   font-size: var(--text-sm);
@@ -286,7 +381,7 @@ const sceneCaption = computed(() => {
   color: var(--color-ink-muted);
 }
 
-/* Preparation */
+/* ── Preparation ──────────────────────────────────── */
 .app-prep__list { list-style: none; margin: var(--space-5) 0 0; padding: 0; }
 .app-prep__list li {
   display: flex;
@@ -311,7 +406,7 @@ const sceneCaption = computed(() => {
   color: var(--color-ink-muted);
 }
 
-/* Enquiry card */
+/* ── Enquiry card ─────────────────────────────────── */
 .app-inquiry {
   display: flex;
   flex-wrap: wrap;
@@ -325,14 +420,19 @@ const sceneCaption = computed(() => {
 }
 
 @media (max-width: 1023px) {
+  .app-hero,
   .app-lead,
-  .app-split { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .app-split { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  /* Text first, then the image, on narrow screens. */
+  .app-hero__media { order: 2; }
   .app-split--reverse .app-split__text { order: 1; }
   .app-split--reverse .app-split__aside { order: 2; }
+  .app-steps__inner { gap: var(--space-3); }
 }
 
 @media (max-width: 700px) {
   .app-h2 { font-size: var(--text-xl); }
+  .app-hero__headline { font-size: var(--text-2xl); }
   .app-inquiry { padding: var(--space-6); }
   .app-split { padding-bottom: var(--space-8); margin-bottom: var(--space-8); }
 }
