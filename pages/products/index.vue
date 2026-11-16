@@ -50,16 +50,16 @@ useSeoHead({
             :to="localePath(`/products/${cat.slug}`)"
             class="category-card"
           >
-            <div class="category-card__image-wrap">
+            <!-- No photograph on file: the card has no media area. An empty framed box reads as a
+                 broken image, which is worse than a text-first card. -->
+            <div v-if="cat.heroMedia.url" class="category-card__image-wrap">
               <img
-                v-if="cat.heroMedia.url"
                 :src="cat.heroMedia.url"
                 :alt="loc(cat.heroMedia.alt)"
                 class="category-card__image"
                 loading="lazy"
                 @error="($event.target as HTMLImageElement).style.display = 'none'"
               >
-              <div class="category-card__image-placeholder img-placeholder" aria-hidden="true" />
             </div>
             <div class="category-card__body">
               <h2 class="category-card__title">{{ loc(cat.title) }}</h2>
