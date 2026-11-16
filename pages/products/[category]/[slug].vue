@@ -40,6 +40,37 @@ const category = computed(() => categoryData.value?.category)
 
 const prodSeoTitle = computed(() => (product.value ? loc(product.value.seo.title) : '') || t('seo.products.title'))
 const prodSeoDesc = computed(() => (product.value ? loc(product.value.seo.description) : ''))
+
+// ─── Structured data: Product + BreadcrumbList ──────────────────────
+// Facts come straight from the published product record. No offers/price, no ratings, no
+// certifications — none of those are published, and a fabricated one would be a false claim.
+const structuredData = useStructuredData()
+const productJsonLd = computed<Record<string, unknown>[]>(() => {
+  const p = product.value
+  if (!p || !loc(p.name)) return []
+  const images = [p.heroMedia?.url, ...(p.gallery ?? []).map(g => g.url)].filter((u): u is string => Boolean(u))
+  const crumbs = [
+    { name: 'Home', path: '/' },
+    { name: 'Products', path: '/products' },
+  ]
+  if (category.value && loc(category.value.title)) {
+    crumbs.push({ name: loc(category.value.title), path: `/products/${categorySlug}` })
+  }
+  crumbs.push({ name: loc(p.name), path: `/products/${categorySlug}/${slug}` })
+
+  return [
+    structuredData.product({
+      name: loc(p.name),
+      description: loc(p.summary),
+      slug,
+      categorySlug,
+      model: p.modelSeries ?? '',
+      images,
+    }),
+    structuredData.breadcrumb(crumbs),
+  ]
+})
+
 useSeoHead({
   title: prodSeoTitle,
   description: prodSeoDesc,
@@ -47,6 +78,7 @@ useSeoHead({
   ogImage: computed(() => product.value?.seo.ogImage),
   noIndex: computed(() => product.value?.seo.noIndex),
   ogType: 'website',
+  jsonLd: productJsonLd,
 })
 
 // Prefer structured spec groups; fall back to inline specifications array

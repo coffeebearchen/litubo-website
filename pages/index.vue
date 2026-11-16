@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import type { HomeContent, PostsResult, ProductCategory } from '~/types/content'
+import type { PublicSiteSettings } from '~/types/settings'
 import { INDUSTRY_GUIDES } from '~/content/industry-guides'
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
+const structuredData = useStructuredData()
+
+// Organisation + Website entities for the home page; values come from the published site settings.
+const { data: siteSettings } = await useAsyncData<PublicSiteSettings | null>(
+  'home-site-settings',
+  () => $fetch<PublicSiteSettings>('/api/cms/site-settings'),
+  { default: () => null },
+)
 
 // Home "Inspection by application" — the same eight industries as /applications.
 const appCards = INDUSTRY_GUIDES.map(g => ({ slug: g.slug, title: g.title }))
@@ -141,6 +150,10 @@ useSeoHead({
   title: t('seo.home.title'),
   description: t('seo.home.description'),
   canonicalPath: '/',
+  jsonLd: computed(() => [
+    structuredData.org(siteSettings.value),
+    structuredData.website(),
+  ]),
 })
 
 // ─── Blog & Insights: real published English articles only ──────────

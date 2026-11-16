@@ -377,7 +377,9 @@ export default defineEventHandler(async (event) => {
     ? {
         id: illustrationId,
         url: mediaUrl(illustrationId),
-        alt: illustrationMedia ? ls(illustrationMedia.alt_en, illustrationMedia.alt_es, illustrationMedia.alt_pt) : '',
+        alt: illustrationMedia
+          ? ls(illustrationMedia.alt_en, illustrationMedia.alt_es, illustrationMedia.alt_pt)
+          : { en: '', es: '', pt: '' },
       }
     : null
 

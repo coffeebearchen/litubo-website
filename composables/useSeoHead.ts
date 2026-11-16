@@ -22,6 +22,14 @@ export interface SeoHeadOptions {
   noIndex?: MaybeRefOrGetter<boolean | undefined>
   /** og:type — defaults to 'website'. Pass 'article' for content detail pages. */
   ogType?: 'website' | 'article'
+  /**
+   * schema.org JSON-LD for this page (a node or a list of nodes).
+   *
+   * Emitted only for the English, indexable rendering: ES/PT are noindex in this phase, and shipping
+   * structured data for a page we ask engines not to index would be contradictory. Callers pass facts
+   * from the database only — never invented ratings, prices or certifications.
+   */
+  jsonLd?: MaybeRefOrGetter<Record<string, unknown> | Record<string, unknown>[] | undefined>
 }
 
 const OG_IMAGE_FALLBACK = '/images/home/home-hero-inspection-line.png'
@@ -110,6 +118,20 @@ export function useSeoHead(options: SeoHeadOptions) {
     meta.push({ name: 'twitter:description', content: description })
     meta.push({ name: 'twitter:image', content: ogImage })
 
+    // Structured data: English + indexable only, so it never contradicts the robots meta.
+    const jsonLdProp = toValue(options.jsonLd)
+    const script: Array<{ type: string; innerHTML: string }> = []
+    if (jsonLdProp && !showNoIndex) {
+      const nodes = Array.isArray(jsonLdProp) ? jsonLdProp : [jsonLdProp]
+      for (const node of nodes) {
+        if (!node || Object.keys(node).length === 0) continue
+        script.push({
+          type: 'application/ld+json',
+          innerHTML: JSON.stringify(node),
+        })
+      }
+    }
+
     return {
       title,
       meta: [
@@ -117,6 +139,7 @@ export function useSeoHead(options: SeoHeadOptions) {
         ...meta,
       ],
       link,
+      script,
     }
   }))
 }

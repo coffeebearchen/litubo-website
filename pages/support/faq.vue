@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PostsResult, FaqGroup } from '~/types/content'
+import type { PostsResult, FaqGroup, PostListItem } from '~/types/content'
 
 type Lang = 'en' | 'es' | 'pt'
 
@@ -10,15 +10,39 @@ const localePath = useLocalePath()
 // listed only with text in the current locale; another locale's text is never shown instead.
 assertPublishedLocale()
 
-useSeoHead({ title: t('seo.faq.title'), description: t('seo.faq.description'), canonicalPath: '/support/faq' })
-
 const { data: faqData, error: faqError } = await useAsyncData<PostsResult>(
   'cms-faq-list',
   () => $fetch<PostsResult>('/api/cms/posts?content_type=faq&sort=publish_date'),
   { default: () => ({ posts: [], cmsError: false }) },
 )
 
-const faqs = computed(() => (faqData.value?.posts ?? []).filter(f => Boolean(f.title[locale.value as Lang])))
+const faqs = computed<PostListItem[]>(() => (faqData.value?.posts ?? []).filter(f => Boolean(f.title[locale.value as Lang])))
+
+// ─── Structured data: FAQPage ───────────────────────────────────────
+// The answer is the published FAQ body with markup stripped. A question with no published answer in
+// this locale is left out rather than paired with an empty answer.
+const structuredData = useStructuredData()
+const faqJsonLd = computed(() => {
+  const pairs = faqs.value
+    .map((f: PostListItem) => {
+      const html = f.bodyHtml?.[locale.value as Lang] ?? ''
+      const answer = html
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      return { question: f.title[locale.value as Lang] ?? '', answer }
+    })
+    .filter((p: { question: string; answer: string }) => p.question && p.answer)
+  return pairs.length ? structuredData.faq(pairs) : undefined
+})
+
+useSeoHead({
+  title: t('seo.faq.title'),
+  description: t('seo.faq.description'),
+  canonicalPath: '/support/faq',
+  jsonLd: faqJsonLd,
+})
 // A refused or failed FAQ request (for example a production server not configured for Directus, which answers
 // 503) shows the unavailable state, never an empty FAQ list.
 const cmsError = computed(() => Boolean(faqError.value) || (faqData.value?.cmsError ?? false))
@@ -58,10 +82,10 @@ const groupedFaqs = computed(() => {
   return ordered
 })
 
-function faqQuestion(f: (typeof faqs.value)[number]): string {
+function faqQuestion(f: PostListItem): string {
   return f.title[locale.value as Lang] ?? ''
 }
-function faqAnswer(f: (typeof faqs.value)[number]): string {
+function faqAnswer(f: PostListItem): string {
   if (!f.bodyHtml) return ''
   return f.bodyHtml[locale.value as Lang] ?? ''
 }
@@ -72,7 +96,7 @@ const activeGroup = ref<string>('all')
 
 const visibleFaqs = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  return faqs.value.filter((f) => {
+  return faqs.value.filter((f: PostListItem) => {
     if (activeGroup.value !== 'all' && (f.faqGroup ?? 'general') !== activeGroup.value) return false
     if (!q) return true
     const haystack = `${faqQuestion(f)} ${faqAnswer(f).replace(/<[^>]*>/g, ' ')}`.toLowerCase()
@@ -100,7 +124,7 @@ const filteredGroups = computed(() => {
 
 // The category list shown in the sidebar (only groups that actually have items).
 const sidebarGroups = computed(() => {
-  const present = new Set(faqs.value.map(f => f.faqGroup ?? 'general'))
+  const present = new Set(faqs.value.map((f: PostListItem) => f.faqGroup ?? 'general'))
   return GROUP_ORDER.filter(g => present.has(g)).map(g => ({ key: g, label: GROUP_LABELS[g] }))
 })
 </script>
