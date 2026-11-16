@@ -291,4 +291,11 @@ const requirements = [
 @media (prefers-reduced-motion: reduce) {
   .qm-action { transition: none; }
 }
+
+@media (max-width: 380px) {
+  /* The design lowers the display heading again at 320px; without this the longest word meets the
+     right edge of the viewport. */
+  .qm-hero__title { font-size: 39px; }
+}
+
 </style>

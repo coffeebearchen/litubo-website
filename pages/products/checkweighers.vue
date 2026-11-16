@@ -514,4 +514,11 @@ const enquiryPath = computed(() => {
 @media (prefers-reduced-motion: reduce) {
   .cw-series__card, .cw-card { transition: none; }
 }
+
+@media (max-width: 380px) {
+  /* The design lowers the display heading again at 320px; without this the longest word meets the
+     right edge of the viewport. */
+  .cw-hero__title { font-size: 40px; }
+}
+
 </style>

@@ -413,4 +413,11 @@ async function submit() {
 @media (prefers-reduced-motion: reduce) {
   .pt-topic { transition: none; }
 }
+
+@media (max-width: 380px) {
+  /* The design lowers the display heading again at 320px; without this the longest word meets the
+     right edge of the viewport. */
+  .pt-hero__title { font-size: 39px; }
+}
+
 </style>

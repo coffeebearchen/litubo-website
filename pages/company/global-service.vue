@@ -277,4 +277,11 @@ const steps = [
 @media (prefers-reduced-motion: reduce) {
   .gs-entry { transition: none; }
 }
+
+@media (max-width: 380px) {
+  /* The design lowers the display heading again at 320px; without this the longest word meets the
+     right edge of the viewport. */
+  .gs-hero__title { font-size: 39px; }
+}
+
 </style>

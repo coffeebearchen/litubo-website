@@ -489,4 +489,11 @@ const enquiryPath = computed(() => {
   .vd-family img { height: 220px; }
   .vd-card { padding: 24px; }
 }
+
+@media (max-width: 380px) {
+  /* The design lowers the display heading again at 320px; without this the longest word meets the
+     right edge of the viewport. */
+  .vd-hero__title { font-size: 39px; }
+}
+
 </style>
