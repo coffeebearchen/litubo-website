@@ -184,6 +184,10 @@ export interface PublicDownload {
 }
 
 export interface Product {
+  /** Checkweigher metadata. Null means not yet classified; the product still appears under All series. */
+  checkweigherSeries?: 'compact' | 'standard' | 'medium-range' | 'extra-large' | 'pharmaceutical' | null
+  checkweigherConfiguration?: 'online' | 'left-right' | null
+  checkweigherLSeries?: boolean | null
   id: string
   categoryId: string
   slug: string

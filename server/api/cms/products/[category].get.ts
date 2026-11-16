@@ -37,6 +37,10 @@ interface DirectusProduct {
   summary_es: string | null
   summary_pt: string | null
   hero_image: string | null
+  model_or_series: string | null
+  checkweigher_series: string | null
+  checkweigher_configuration: string | null
+  checkweigher_l_series: boolean | null
   highlights: unknown[] | null
   specifications: unknown[] | null
   related_product_slugs: string[] | null
@@ -78,6 +82,10 @@ function mapProduct(p: DirectusProduct, catSlug: string, heroFileId: string | nu
   return {
     id: String(p.id),
     categoryId: String(p.category_id),
+    checkweigherSeries: (p.checkweigher_series ?? null) as Product['checkweigherSeries'],
+    checkweigherConfiguration: (p.checkweigher_configuration ?? null) as Product['checkweigherConfiguration'],
+    checkweigherLSeries: p.checkweigher_l_series ?? null,
+    modelSeries: p.model_or_series ?? undefined,
     slug: p.slug,
     name: { en: p.name_en, es: p.name_es ?? '', pt: p.name_pt ?? '' },
     summary: { en: p.summary_en ?? '', es: p.summary_es ?? '', pt: p.summary_pt ?? '' },
