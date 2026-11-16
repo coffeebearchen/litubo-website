@@ -15,11 +15,11 @@ const localePath = useLocalePath()
 useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'), canonicalPath: '/company/about' })
 
 const families = [
-  { label: 'X-Ray Inspection', body: 'Dense contaminant detection and fill or count checks.', to: '/products/x-ray-inspection', image: '/images/devices/xray-real.webp' },
-  { label: 'Metal Detection', body: 'Ferrous, non-ferrous and stainless contamination.', to: '/products/metal-detection', image: '/images/devices/metal-real.webp' },
-  { label: 'Checkweighers', body: 'Inline weight control and left-right sorting.', to: '/products/checkweighers', image: '/images/devices/weigher-real.webp' },
-  { label: 'Combination Inspection', body: 'More than one technology on a single line.', to: '/products/combination-inspection', image: '/images/devices/combination-real.webp' },
-  { label: 'Conveyors & Reject Systems', body: 'Transfer and rejection around the inspection point.', to: '/products/conveyors-reject-systems', image: '' },
+  { label: 'X-Ray Inspection', body: 'Dense contaminant detection and fill or count checks.', to: '/products/x-ray-inspection', icon: 'x-ray-inspection.svg' },
+  { label: 'Metal Detection', body: 'Ferrous, non-ferrous and stainless contamination.', to: '/products/metal-detection', icon: 'metal-detection.svg' },
+  { label: 'Checkweighers', body: 'Inline weight control and left-right sorting.', to: '/products/checkweighers', icon: 'checkweighers.svg' },
+  { label: 'Combination Inspection', body: 'More than one technology on a single line.', to: '/products/combination-inspection', icon: 'combination-inspection.svg' },
+  { label: 'Conveyors & Reject Systems', body: 'Transfer and rejection around the inspection point.', to: '/products/conveyors-reject-systems', icon: 'conveyors-reject-systems.svg' },
 ]
 
 const nextSteps = [
@@ -98,9 +98,12 @@ const company = {
         <ul class="ab-families" role="list">
           <li v-for="f in families" :key="f.to">
             <NuxtLink :to="localePath(f.to)" class="ab-family">
-              <span class="ab-family__name">{{ f.label }}</span>
-              <span class="ab-family__body">{{ f.body }}</span>
-              <span class="ab-family__link">Explore →</span>
+              <img class="ab-family__icon" :src="`/icons/product-categories/${f.icon}`" alt="" width="42" height="42" loading="lazy" decoding="async">
+              <span class="ab-family__text">
+                <span class="ab-family__name">{{ f.label }}</span>
+                <span class="ab-family__body">{{ f.body }}</span>
+              </span>
+              <span class="ab-family__arrow" aria-hidden="true">→</span>
             </NuxtLink>
           </li>
         </ul>
@@ -236,24 +239,25 @@ const company = {
 .ab-identity__card a { color: var(--color-link-on-light); }
 
 /* Families */
-.ab-families { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.ab-families { list-style: none; margin: var(--space-5) 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; }
 .ab-family {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  height: 100%;
-  padding: 27px;
-  border: 1px solid #D2DFD0;
-  border-radius: 6px;
-  background: #fff;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 20px;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid #E3EBE4;
   text-decoration: none;
   color: inherit;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition: color 160ms ease;
 }
-.ab-family:hover { border-color: var(--color-primary); box-shadow: 0 4px 16px rgba(27, 66, 36, 0.08); }
-.ab-family__name { font-family: var(--font-display); font-size: 29px; color: var(--color-ink); }
-.ab-family__body { font-size: 20px; line-height: 1.5; color: var(--color-ink-muted); flex: 1; }
-.ab-family__link { font-size: var(--text-sm); color: var(--color-link-on-light); }
+.ab-family:hover .ab-family__name { color: var(--color-primary); }
+.ab-family:hover .ab-family__arrow { transform: translateX(3px); }
+.ab-family__icon { width: 42px; height: 42px; display: block; }
+.ab-family__text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ab-family__name { font-size: var(--text-lg); font-weight: 600; color: var(--color-ink); transition: color 160ms ease; }
+.ab-family__body { font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-muted); }
+.ab-family__arrow { font-size: var(--text-base); color: var(--color-link-on-light); transition: transform 160ms ease; }
 
 /* Steps */
 .ab-steps { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
@@ -289,10 +293,11 @@ const company = {
 @media (max-width: 700px) {
   .ab-band { padding: var(--space-10) 0; }
   .ab-hero__title { font-size: 45px; }
-  .ab-families { grid-template-columns: minmax(0, 1fr); gap: 13px; }
-  .ab-family { padding: 26px; }
-  .ab-family__name { font-size: 30px; }
-  .ab-family__body { font-size: 22px; }
+  .ab-families { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .ab-family { grid-template-columns: 35px minmax(0, 1fr) 18px; padding: var(--space-3) 0; }
+  .ab-family__icon { width: 30px; height: 30px; }
+  .ab-family__name { font-size: var(--text-base); }
+  .ab-family__body { font-size: var(--text-sm); }
   .ab-contact__inner { flex-direction: column; align-items: flex-start; }
 }
 
