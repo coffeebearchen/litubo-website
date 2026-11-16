@@ -1,0 +1,428 @@
+# Codex 审查任务书 —— LITUBO 网站现状审核 + AI 功能建议 + 图片再生 + SEO 补齐
+
+> 生成时间：2026-11-16
+> 生成者：DSH（Claude）
+> 接收者：Codex
+> 交付回传：给 DSH 的可执行修正指令
+
+---
+
+## 0. 仓库与环境（先确认再动手）
+
+```
+仓库：github.com:coffeebearchen/litubo-website  （公开仓库）
+分支：work/c-refined-v1
+HEAD：1642b68   ← 本地与远程已完全同步，0 未推送，工作区干净
+```
+
+**技术栈**
+
+| 项 | 版本 |
+|---|---|
+| Nuxt | 3.21.11 |
+| Vue | 3.5.42（TS strict） |
+| Nitro | 2.13.4 |
+| Node | 22.22.2（用 fnm） |
+| Directus | 12.3.1 |
+| PostgreSQL | 16.15-alpine（Docker） |
+
+**本地启动**
+
+```bash
+fnm use 22.22.2
+npm install
+# Directus + Postgres 需先起（docker compose），或改用 fixture 模式
+CMS_MODE=directus npm run dev     # http://localhost:3000
+```
+
+**数据备份在仓库内**
+
+```
+backup/2026-11-16/content/*.json    ← 内容快照（无个人信息，可安全读取）
+backup/2026-11-16/README.md         ← 恢复说明
+```
+
+**注意**：`backup/` 里**没有**询盘、访客事件、数据库 dump、用户表。这些只在本机 `D:\LITUBO-backup-20261116r2.zip`，不要去找。
+
+---
+
+## 1. 审查范围：**只做英语版（en）**
+
+业主明确：**先只做英语**。
+
+因此：
+
+- 评审对象是 `/en`（默认语言，无前缀）下的所有页面
+- `es` / `pt` 内容是机翻半成品，**不在本轮评审范围**
+- `ar` / `ja` / `ru` / `fr` 只有 i18n 键，**无内容**
+- 生产环境非 `en` 路由会 404（`publishedLocales: ['en']`），这是**有意设计**，不是 bug
+
+**不要在报告里把"西语不完整"当作缺陷列出**——那是已知且暂缓的项。
+
+---
+
+## 2. 任务 A：全站审查（页面 / 设计 / 后端）
+
+### 2.1 要审什么
+
+| 层 | 具体 |
+|---|---|
+| **页面** | 全部 66 个 `pages/**/*.vue`，重点是用户可见的公开页 |
+| **设计** | 视觉一致性：字体层级、间距、颜色、栅格、响应式断点、空状态 |
+| **后端** | 191 个 `server/**` 文件；API 契约、权限、错误处理、数据校验 |
+| **数据** | Directus 集合结构、字段权限、发布状态、媒体公开资格 |
+
+### 2.2 已知页面清单（英语可见）
+
+```
+/                                        首页
+/products                                分类总览
+/products/x-ray-inspection               五分类（含 series 子页 checkweighers）
+/products/metal-detection
+/products/checkweighers
+/products/combination-inspection
+/products/conveyors-reject-systems
+/products/<category>/<slug>              29 个产品详情
+/applications                            8 个应用
+/applications/<slug>
+/resources                               资源总览
+/resources/insights                      文章列表
+/resources/insights/<slug>               10 篇文章
+/resources/downloads                     资料申请
+/resources/videos                        演示咨询
+/support                                 支持总览
+/support/technical-support               通用表单
+/support/manual-request
+/support/request-spare-parts             备件申请
+/support/service-training                服务培训
+/support/send-product-test               产品测试
+/company/about
+/company/quality-manufacturing
+/company/global-service
+/company/become-a-partner
+/find-a-distributor
+/technical-matching
+/contact
+/privacy-policy
+/terms
+```
+
+### 2.3 请重点看这些方向
+
+1. **结构一致性**：不同页面的 hero、区块间距、卡片样式是否统一
+2. **响应式**：320 / 390 / 768 / 1024 / 1440 断点是否有断裂
+3. **空状态**：没有产品/没有文章/无图的分类，是否显示合理文案
+4. **加载与失败**：API 失败时页面是否白屏、是否有错误提示
+5. **表单**：五个表单（contact / distributor / 三种 support / partner）的校验、错误定位、失败重试是否一致
+6. **无障碍**：焦点可见性、键盘可达、表单 label 关联、对比度
+7. **后端**：
+   - `/api/inquiries` 的字段白名单与校验
+   - 各 `/api/cms/*` 的错误处理
+   - Directus 服务角色的字段权限是否过宽或过窄
+   - 是否有未鉴权的写操作
+8. **明显错误**：死链、拼写错误、占位文案残留（如 lorem、TODO）
+
+### 2.4 已知问题（不必重复报告，但可验证是否已修）
+
+| 项 | 状态 |
+|---|---|
+| 手机横向溢出（390/500px） | **未解决**，原因未找到 |
+| `VALID_LOCALES = ['en','es','pt']` 缺 `ar` | **未修**（`server/utils/publicInquiry.ts:48`） |
+| `technical-matching` 不读 query 参数 | **未修**，导致 Checkweighers 的 `series=` 上下文丢失 |
+| 5 张分类图缺失 | **未补** |
+| 隐私政策是占位文本 | **未写**（需法务） |
+
+### 2.5 输出格式
+
+按严重程度分四档，每条给：
+
+```
+[P0 严重] 文件:行  问题描述  复现步骤  建议修法  影响范围
+[P1 重要] ...
+[P2 建议] ...
+[P3 观感] ...
+```
+
+**只报真实存在、可复现的问题。不要为了凑数写"建议优化"。**
+
+---
+
+## 3. 任务 B：AI 功能建议（业主想上 AI）
+
+### 3.1 背景
+
+LITUBO 是**食品与包装检测设备**的外贸 B2B 网站。客户是食品厂、包装厂的工程/质量经理。
+
+**现有表单流程**：客户描述产品、包装、产线 → 我们人工判断选型 → 报价。
+
+### 3.2 要回答的问题
+
+**「先做哪些 AI 功能？」**
+
+请给出**排序后的建议清单**，每项包含：
+
+| 字段 | 说明 |
+|---|---|
+| 功能名 | |
+| 解决什么真实问题 | 用客户的话描述痛点 |
+| 为什么它排在这个位置 | 依据（实现难度 / 数据依赖 / 商业价值 / 风险） |
+| 需要什么数据 | 现有数据够不够？不够要业主补什么？ |
+| 风险 | 说错了会怎样？如何限制？ |
+| 预计工作量 | 小 / 中 / 大 |
+| 是否建议现在做 | 是 / 否，为什么 |
+
+### 3.3 强约束（务必遵守）
+
+```
+❌ 不要建议：用 AI 编造产品参数、检测精度、认证、客户案例
+❌ 不要建议：AI 自动报价、AI 自动承诺交期
+❌ 不要建议：AI 生成假的检测结果或合规声明
+❌ 不要建议：需要大量客户数据训练但我们现在没有的功能
+❌ 不要建议：把 LLM 直接暴露给客户自由对话而不加约束
+```
+
+**为什么**：这个站的定位是"可信的工业供应商"。一条编造的参数就会毁掉信任，也可能带来法律风险。
+
+### 3.4 优先考虑的方向（供参考，不是要求）
+
+- 客户描述 → 结构化选型信息提取（辅助人工，不替代）
+- 产品/包装描述 → 匹配到合适的设备家族（概率排序 + 人工确认）
+- 询盘自动分类与优先级（销售内部用，不面向客户）
+- 多语言内容的质量校准（现有西语机翻 → 人工可用的初稿）
+- 文档检索（从真实 datasheet 中找答案，带出处）
+
+### 3.5 输出格式
+
+```
+## 建议排序
+1. <功能名> —— 理由一句话
+2. ...
+
+## 详细说明
+### 1. <功能名>
+- 解决什么问题：
+- 为什么排第一：
+- 需要的数据：现有 ✅/❌
+- 风险与限制：
+- 工作量：
+- 结论：现在做 / 以后做
+
+### 2. ...
+```
+
+---
+
+## 4. 任务 C：Blog 图片重复与错配审计 + 再生指令
+
+### 4.1 背景
+
+业主发现 `resources/insights` 的文章封面图**有重复、有与内容不符的**。
+
+他要求：**重新生成合适的图片**，并且**给我（DSH）可执行的修正指令**。
+
+### 4.2 事实（已确认）
+
+```
+文章总数：33 条（Directus posts）
+已发布：10 条
+封面图：全部走 Directus files，is_public=true 才对外可见
+媒体总数：115 个文件
+```
+
+**已知的图片问题（业主观察）**：
+
+- 多篇文章用了同一张图
+- 有的图和文章主题不匹配
+- 有的图看起来像通用素材，不像真实设备
+
+### 4.3 要做什么
+
+**第一步：审计**
+
+逐篇列出 10 篇已发布文章：
+
+| 文章 slug | 标题 | 当前封面图文件 ID | 图片内容描述 | 是否与其他文章重复 | 是否匹配主题 |
+|---|---|---|---|---|---|
+
+**第二步：判断**
+
+对每张有问题的图，说明：
+
+- 是**重复**（几篇共用一张）
+- 是**错配**（图与标题/正文无关）
+- 是**低质**（模糊、有 AI 痕迹、像通用素材）
+
+**第三步：生成替代图**
+
+对需要换图的文章，**生成新的图片**，并输出：
+
+```
+文件名：insights-<slug>.webp
+尺寸：1600 × 900
+内容描述：<具体画什么>
+风格：真实工业摄影感，浅色背景，与现有设备图一致
+避免：AI 感、文字水印、虚假工厂场景、虚假人物
+```
+
+**第四步：给 DSH 的落地指令**
+
+每条替换写成 DSH 能直接执行的形式：
+
+```
+## 替换 #1
+文章 slug: how-x-ray-inspection-works-in-food-production
+旧文件 ID: <id>
+旧文件名: <filename>
+新图路径: docs/project/blog-images/insights-how-x-ray-inspection-works.webp
+DSH 操作:
+  1. 上传新图到 Directus /files
+  2. PATCH posts/<id> { "cover_image": "<new_file_id>" }
+  3. PATCH files/<new_file_id> { "is_public": true }
+  4. 验证 GET /api/cms/posts/<slug> 返回新 coverImageUrl
+  5. 旧图 PATCH is_public=false（不删除）
+```
+
+### 4.4 强约束
+
+```
+❌ 不要生成带文字的图（不能有 "LITUBO"、型号、英文标语）
+❌ 不要生成看起来像真实工厂车间的图（我们无法证明那是我们的工厂）
+❌ 不要生成人物特写（肖像权与"这是我们的员工"的暗示）
+✅ 可以生成：产品/包装/传送带/检测过程的技术示意图或静物摄影感图片
+✅ 优先复用现有 115 个真实设备照片，能被复用就不要生成新的
+```
+
+### 4.5 输出
+
+1. 审计表（10 篇）
+2. 问题分类
+3. 需要生成的图片清单（含具体描述）
+4. 给 DSH 的逐条落地指令
+
+---
+
+## 5. 任务 D：SEO 与 Alt 现状核对 + 补齐
+
+### 5.1 我已经核对过的现状（2026-11-16 实测）
+
+| 项 | 状态 | 细节 |
+|---|---|---|
+| `robots.txt` | ❌ **缺失** | `public/robots.txt` 不存在 |
+| `sitemap.xml` | ✅ 有 | `server/routes/sitemap.xml.ts` + `server/utils/sitemap.ts` |
+| `useSeoHead` composable | ✅ 有 | 支持 title / description / canonical / hreflang / og / twitter / noindex / jsonLd |
+| JSON-LD 结构化数据 | ⚠️ **仅 3 处** | `pages/index.vue`、`pages/*/[slug].vue`、`pages/*/faq.vue` |
+| canonical | ✅ | 由 `useSeoHead` 统一输出 |
+| hreflang | ✅ | 同上 |
+| OG / Twitter 卡 | ✅ | 未传时用 `OG_IMAGE_FALLBACK = '/images/home/home-hero-inspection-line.png'` |
+| `<img>` 总数 | 57 | 在 `pages/` 与 `components/` 中 |
+| 完全无 `alt` 属性 | **0** ✅ | 没有裸 `<img>` |
+| `alt=""`（视为装饰） | 16 | 需要逐张判断是否该有描述 |
+| 有实质 alt | 41 | |
+
+### 5.2 要审什么
+
+**A. robots.txt**
+
+建议内容（请确认或调整）：
+
+```
+User-agent: *
+Allow: /
+
+# 非英语语言在现阶段不应被索引（内容不完整）
+Disallow: /es/
+Disallow: /pt/
+
+Sitemap: https://www.litubo.com/sitemap.xml
+```
+
+**B. 那 16 个 `alt=""` 是否正确**
+
+逐张判断：**这是在传递信息（该有 alt），还是纯装饰（保持空）**？
+
+- 产品设备图 → **必须**有描述性 alt
+- 图标、分隔线、纯装饰形状 → 保持 `alt=""`
+- 背景图 → 保持空
+
+列出需要补 alt 的位置：`文件:行` + 建议的 alt 文案（英文，来源于真实产品名）。
+
+**C. JSON-LD 是否该扩展**
+
+只有 3 个页面有结构化数据。考虑补：
+
+| 页面类型 | 建议 schema |
+|---|---|
+| 产品详情 | `Product`（**注意**：无真实价格/评分就**不要**填 `offers` / `aggregateRating`） |
+| 文章 | `BlogPosting`（headline / datePublished / author / image） |
+| 公司页 | `Organization`（name / url / email / address，全部用真实值） |
+| 面包屑 | `BreadcrumbList` |
+| FAQ 页 | `FAQPage`（已有） |
+| 联系方式 | `ContactPage` |
+
+**严禁**：编造评分、价格、认证、成立年份。
+
+**D. 其他 SEO 检查**
+
+- 标题长度（>60 字符会被截断）
+- 描述长度（>160 字符）
+- H1 是否唯一
+- 标题层级是否跳级（h2 → h4）
+- 图片文件名是否可读（`IMG_2831.jpg` vs `xray-inspection-conveyor.webp`）
+- 内部链接是否有孤岛页面
+- 是否有重复 title / description
+- sitemap 是否包含所有公开页、是否包含非英语页（不应包含）
+- 是否有 404 页面
+
+### 5.3 输出
+
+1. 现状确认表（我上面的数据对不对）
+2. 缺口清单（按 P0/P1/P2）
+3. 每条的具体修法（文件 + 内容）
+4. robots.txt 最终内容
+5. 需补 alt 的位置表
+6. JSON-LD 建议清单
+
+---
+
+## 6. 交付格式
+
+请按下面结构输出一份完整报告：
+
+```markdown
+# LITUBO 审查报告
+
+## 摘要（5 行以内）
+最严重的 3 个问题 + AI 功能的最终建议
+
+## A. 全站审查
+### P0
+### P1
+### P2
+### P3
+
+## B. AI 功能建议
+### 排序结论
+### 详细说明
+
+## C. Blog 图片审计
+### 审计表
+### 问题分类
+### 需生成的图片
+### 给 DSH 的落地指令
+
+## D. SEO 与 Alt
+### 现状确认
+### 缺口与修法
+
+## E. 建议的下一步
+按优先级排的 5 条
+```
+
+---
+
+## 7. 最后
+
+- **这份文档里的数据是 DSH 实测的**，不是推测。如果你发现对不上，请以代码为准并指出差异。
+- **不要修改代码**。这是审查任务，产出是报告和给 DSH 的指令。
+- 如果某个结论你无法验证，**明说无法验证**，不要猜。
+- 报告用中文写，但**代码、文件路径、字段名、alt 文案保持英文原文**。
