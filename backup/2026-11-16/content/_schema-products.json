@@ -1,0 +1,206 @@
+[
+  {
+    "field": "id",
+    "type": "integer",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "status",
+    "type": "string",
+    "nullable": false,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "sort",
+    "type": "integer",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "date_created",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "date_updated",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "category_id",
+    "type": "integer",
+    "nullable": true,
+    "interface": "select-dropdown-m2o"
+  },
+  {
+    "field": "slug",
+    "type": "string",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "name_en",
+    "type": "string",
+    "nullable": false,
+    "interface": "input"
+  },
+  {
+    "field": "name_es",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "name_pt",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "summary_en",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "summary_es",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "summary_pt",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "hero_image",
+    "type": "uuid",
+    "nullable": true,
+    "interface": "file-image"
+  },
+  {
+    "field": "highlights",
+    "type": "json",
+    "nullable": true,
+    "interface": "list"
+  },
+  {
+    "field": "specifications",
+    "type": "json",
+    "nullable": true,
+    "interface": "list"
+  },
+  {
+    "field": "related_product_slugs",
+    "type": "json",
+    "nullable": true,
+    "interface": "tags"
+  },
+  {
+    "field": "application_slugs",
+    "type": "json",
+    "nullable": true,
+    "interface": "tags"
+  },
+  {
+    "field": "seo_title_en",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "seo_title_es",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "seo_title_pt",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "seo_description_en",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "seo_description_es",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "seo_description_pt",
+    "type": "text",
+    "nullable": true,
+    "interface": "textarea"
+  },
+  {
+    "field": "seo_image",
+    "type": "uuid",
+    "nullable": true,
+    "interface": "file-image"
+  },
+  {
+    "field": "seo_noindex",
+    "type": "boolean",
+    "nullable": true,
+    "interface": "boolean"
+  },
+  {
+    "field": "model_or_series",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "page_preset_id",
+    "type": "integer",
+    "nullable": true,
+    "interface": "select-dropdown-m2o"
+  },
+  {
+    "field": "published_at",
+    "type": "timestamp",
+    "nullable": true,
+    "interface": "datetime"
+  },
+  {
+    "field": "review_notes",
+    "type": "text",
+    "nullable": true,
+    "interface": "input-multiline"
+  },
+  {
+    "field": "product_code",
+    "type": "string",
+    "nullable": true,
+    "interface": "input"
+  },
+  {
+    "field": "checkweigher_series",
+    "type": "string",
+    "nullable": true,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "checkweigher_configuration",
+    "type": "string",
+    "nullable": true,
+    "interface": "select-dropdown"
+  },
+  {
+    "field": "checkweigher_l_series",
+    "type": "boolean",
+    "nullable": true,
+    "interface": "boolean"
+  }
+]

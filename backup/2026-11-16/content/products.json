@@ -30,7 +30,10 @@
     "page_preset_id": null,
     "published_at": "2026-09-04T00:40:33.248Z",
     "review_notes": "Testing sample — model and technical data not verified. Source: private-product-source/LT-180C/. Created for Phase 9A-2B UI/UX verification only. Do not publish.",
-    "product_code": null
+    "product_code": null,
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 4,
@@ -63,7 +66,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": null,
-    "product_code": "D"
+    "product_code": "D",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 5,
@@ -96,7 +102,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": null,
-    "product_code": null
+    "product_code": null,
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 6,
@@ -129,7 +138,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": null,
-    "product_code": "LT-180C-MIXED-BETA-01"
+    "product_code": "LT-180C-MIXED-BETA-01",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 11,
@@ -162,7 +174,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/810e02d2-bf34-4bd2-b5eb-8a65a584f42e#sha256=4ea437371d75dfeedfd5c52b9710ca193d3760ee5c4d96447eca43a62a9a9445",
-    "product_code": "XR-200D"
+    "product_code": "XR-200D",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 12,
@@ -195,7 +210,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/08b2309d-f03b-4014-ae01-209cd26e1637#sha256=f1a3b9b566981676b20913f8fad331f25a707d7095e7162ac2ce8643f41b5e08",
-    "product_code": "XR-300D"
+    "product_code": "XR-300D",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 13,
@@ -228,7 +246,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/21dbc1ee-fe61-4673-9dc5-8d170ba4b838#sha256=1d76035c38682bcaadcb463c4535139f2e519ae2a714d96d0edc4a90dea098a3",
-    "product_code": "XR-500D"
+    "product_code": "XR-500D",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 14,
@@ -261,7 +282,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/67093dc2-3c23-4e22-817c-d9be757e73a7#sha256=4397b389ab7e14cc3e71d9de8b80c9a55fa214ee456cbc6906aa2b155d385785",
-    "product_code": "XR-600D"
+    "product_code": "XR-600D",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 15,
@@ -294,7 +318,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/e208ab54-3346-44f6-befb-8b8a567804ae#sha256=ba32ad0c5e6993d284ed6e97b0c211647d11386380384ef312c5391b392cdda1",
-    "product_code": "XR-6550G"
+    "product_code": "XR-6550G",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 16,
@@ -327,7 +354,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/156cb7a5-d952-4caf-967c-267a61a83b30#sha256=90f9b0c87d4cf3493da83a7428dcfd21660e53a29900a1e03249bc102de828e8",
-    "product_code": "XR-3500D"
+    "product_code": "XR-3500D",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 17,
@@ -360,7 +390,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/f539814c-ef9a-4437-a28d-957a91cdcdf4#sha256=d741e01f148e6e2208329386bdded6ea480f9830143972e089089357b69d88b1",
-    "product_code": "XR-4000D"
+    "product_code": "XR-4000D",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 18,
@@ -393,7 +426,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/87ed5019-9056-4e44-9361-95ecb8c57566#sha256=b374acfdb9bce43695ef4d75776087034d3655d7125e6d3caec096a549dc49a5",
-    "product_code": "XR-5000D"
+    "product_code": "XR-5000D",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 19,
@@ -426,7 +462,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/d8162748-a8e3-4e8b-9603-cf711841c08d#sha256=69105956a4736922871e093afb2062b69c0da07f230e7ab68eb62504c4ea41be",
-    "product_code": "XR-700"
+    "product_code": "XR-700",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 20,
@@ -459,7 +498,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/c1ad09d9-0b15-4f36-8bdd-fd846c3470bc#sha256=1c8e6af61c09172439225f88059a692c7ccf9adb3fe81ce91e36b9a96715411e",
-    "product_code": "XR-800"
+    "product_code": "XR-800",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 21,
@@ -492,7 +534,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/c2344490-53e6-4736-9fb0-93d38a336d46#sha256=f2f1247b965d577d340bb701202f9e9af705619f65161195d32e4f7e5e96fffa",
-    "product_code": "XR-900"
+    "product_code": "XR-900",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 22,
@@ -525,7 +570,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/7bf105fc-628f-40f9-a3e3-68664f87de06#sha256=9238b75aaa75c1933afe5d8d4e5465e4ccd88cb8d988b2628c683c5be8f646cb",
-    "product_code": "XR-50C"
+    "product_code": "XR-50C",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 23,
@@ -558,7 +606,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/14816376-8861-484c-a4c8-b2383a67bd49#sha256=7bd8c542421aa2d63b2b31f1b8eb723a5f601a4f605796d6915227caa85795b0",
-    "product_code": "XR-100C"
+    "product_code": "XR-100C",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 24,
@@ -591,7 +642,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/682a22fe-4ddc-464d-9e62-4dda070d94b3#sha256=54fb4d00e7a9da4760cc76f0f1aca0335f66698cec84472578462d6342c8e080",
-    "product_code": "XR-100C-1"
+    "product_code": "XR-100C-1",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 25,
@@ -624,7 +678,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/7a2e071e-c29a-4e1e-b92a-d246154c1d59#sha256=e4b00901c18eb76c97b4736d0e0b91b4b35c226e2eab8f21ffba9ba3ee7b7fcf",
-    "product_code": "XR-100C-2"
+    "product_code": "XR-100C-2",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 26,
@@ -657,7 +714,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import124/88f11409-1624-4495-8f00-67d0ced450c8#sha256=17a5fcf3ee9c83de2a42bee89038df631ce8ab8fa0ef96466f7cb3d7994ebba0",
-    "product_code": "XR-1000D"
+    "product_code": "XR-1000D",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 27,
@@ -690,14 +750,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/6e7f5a1f-bc9c-4ec6-a6ad-396d9407ee92#sha256=a977930c54b878ce689304f31145d8f9baf40f4795948cf3bbd2df1589939157",
-    "product_code": null
+    "product_code": null,
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 28,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:53.032Z",
-    "date_updated": "2026-11-16T05:42:28.457Z",
+    "date_updated": "2026-11-16T11:23:45.908Z",
     "category_id": 3,
     "slug": "lt-150-compact-online-checkweigher",
     "name_en": "Compact Online Checkweigher",
@@ -723,14 +786,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/3946d961-d578-4484-844d-9cc68503c520#sha256=b0a5395ece95121a72a4e784aeb9fc5be0037c7bd87d5b7daf3fe12eb1b19a2f",
-    "product_code": "LT-150"
+    "product_code": "LT-150",
+    "checkweigher_series": "compact",
+    "checkweigher_configuration": "online",
+    "checkweigher_l_series": false
   },
   {
     "id": 29,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:53.740Z",
-    "date_updated": "2026-11-16T05:42:28.489Z",
+    "date_updated": "2026-11-16T11:23:45.936Z",
     "category_id": 3,
     "slug": "lt-150l-compact-l-series-online-checkweigher",
     "name_en": "Compact Online Checkweigher, L-Series",
@@ -756,14 +822,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/16527eba-f513-4e44-87cf-7d44521765b5#sha256=9a8279f0785651da9084db89978a9f00bf4257f6636b3064826f6e42c4f31b82",
-    "product_code": "LT-150L"
+    "product_code": "LT-150L",
+    "checkweigher_series": "compact",
+    "checkweigher_configuration": "online",
+    "checkweigher_l_series": true
   },
   {
     "id": 30,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:54.461Z",
-    "date_updated": "2026-11-16T05:42:28.592Z",
+    "date_updated": "2026-11-16T11:23:46.036Z",
     "category_id": 3,
     "slug": "lt-220-standard-online-checkweigher",
     "name_en": "Standard Online Checkweigher",
@@ -789,14 +858,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/c6c00122-3605-4dad-81f1-89e3a185c779#sha256=dc0e788341d8288f26ad609ce08d48e8aa62877ec00a7059623e64cc2b296f6c",
-    "product_code": "LT-220"
+    "product_code": "LT-220",
+    "checkweigher_series": "standard",
+    "checkweigher_configuration": "online",
+    "checkweigher_l_series": false
   },
   {
     "id": 31,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:55.276Z",
-    "date_updated": "2026-11-16T05:42:28.612Z",
+    "date_updated": "2026-11-16T11:23:46.061Z",
     "category_id": 3,
     "slug": "lt-220l-standard-l-series-online-checkweigher",
     "name_en": "Standard Online Checkweigher, L-Series",
@@ -822,14 +894,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/12523b0e-549a-474e-a314-477bb6f2ac0e#sha256=42797966f30c02eb9a3aa6409afb9f5f3657a5b20754f9eeacb746255665dfa2",
-    "product_code": "LT-220L"
+    "product_code": "LT-220L",
+    "checkweigher_series": "standard",
+    "checkweigher_configuration": "online",
+    "checkweigher_l_series": true
   },
   {
     "id": 32,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:56.008Z",
-    "date_updated": "2026-11-16T05:42:28.673Z",
+    "date_updated": "2026-11-16T11:23:46.110Z",
     "category_id": 3,
     "slug": "lt-300-medium-range-online-checkweigher",
     "name_en": "Medium-Range Online Checkweigher",
@@ -855,14 +930,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/b940ef21-840e-4007-9c18-eee62f6cb0b5#sha256=3ff4e8e82c4999e91893d823d910aff9a12dcad8fc456eeb85ce6664191fd943",
-    "product_code": "LT-300"
+    "product_code": "LT-300",
+    "checkweigher_series": "medium-range",
+    "checkweigher_configuration": "online",
+    "checkweigher_l_series": false
   },
   {
     "id": 33,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:56.693Z",
-    "date_updated": "2026-11-16T05:42:28.707Z",
+    "date_updated": "2026-11-16T11:23:46.143Z",
     "category_id": 3,
     "slug": "lt-300l-wide-belt-l-series-online-checkweigher",
     "name_en": "Wide-Belt Online Checkweigher, L-Series",
@@ -888,14 +966,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/393febba-4b87-4dce-93dd-b6d603356716#sha256=782a74defb9141e1d69c33fc3f0281afb47e0caddbf9addef67fe87c930a6a6d",
-    "product_code": "LT-300L"
+    "product_code": "LT-300L",
+    "checkweigher_series": "medium-range",
+    "checkweigher_configuration": "online",
+    "checkweigher_l_series": true
   },
   {
     "id": 34,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:57.366Z",
-    "date_updated": "2026-11-16T05:42:28.727Z",
+    "date_updated": "2026-11-16T11:23:46.170Z",
     "category_id": 3,
     "slug": "lt-400-heavy-duty-online-checkweigher",
     "name_en": "Heavy-Duty Online Checkweigher",
@@ -921,14 +1002,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/ad51b669-0e00-4bd4-8ec6-c9edbf358407#sha256=0824148f72fcffab3e0962516bae009fac318e1062a658178ee6f18cf9243374",
-    "product_code": "LT-400"
+    "product_code": "LT-400",
+    "checkweigher_series": "extra-large",
+    "checkweigher_configuration": "online",
+    "checkweigher_l_series": false
   },
   {
     "id": 35,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:58.060Z",
-    "date_updated": "2026-11-16T05:42:28.748Z",
+    "date_updated": "2026-11-16T11:23:46.196Z",
     "category_id": 3,
     "slug": "lt-450-large-range-online-checkweigher",
     "name_en": "Large-Range Online Checkweigher",
@@ -954,14 +1038,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/6ec92b0b-0510-4e1b-b6af-5862842d0eee#sha256=2d7c4c67c4a778c25b15d315523a77bfa7f026bf95603fc58228a1fd47292453",
-    "product_code": "LT-450"
+    "product_code": "LT-450",
+    "checkweigher_series": "extra-large",
+    "checkweigher_configuration": "online",
+    "checkweigher_l_series": false
   },
   {
     "id": 36,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:58.729Z",
-    "date_updated": "2026-11-16T05:42:28.816Z",
+    "date_updated": "2026-11-16T11:23:46.268Z",
     "category_id": 3,
     "slug": "lt-600-extra-large-online-checkweigher",
     "name_en": "Extra-Large Online Checkweigher",
@@ -987,14 +1074,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/f1263a96-3f9f-4c40-b2b3-36c0c4a34d50#sha256=78cb81a8718a84f79b3c67b14727dfca00bbe38068fc2f42586e5f59529dbf16",
-    "product_code": "LT-600"
+    "product_code": "LT-600",
+    "checkweigher_series": "extra-large",
+    "checkweigher_configuration": "online",
+    "checkweigher_l_series": false
   },
   {
     "id": 37,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:53:59.475Z",
-    "date_updated": "2026-11-16T05:42:28.518Z",
+    "date_updated": "2026-11-16T11:23:45.972Z",
     "category_id": 3,
     "slug": "lt-150lr-compact-left-right-sorting-checkweigher",
     "name_en": "Compact Left-Right Sorting Checkweigher",
@@ -1020,14 +1110,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/3462b000-5b06-4f4a-98b5-9dec20a66d49#sha256=89397e2dc40b47c424854b1c5c5743db3aa051d0dc7125005d2fc71ffa1435cd",
-    "product_code": "LT-150LR"
+    "product_code": "LT-150LR",
+    "checkweigher_series": "compact",
+    "checkweigher_configuration": "left-right",
+    "checkweigher_l_series": false
   },
   {
     "id": 38,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:54:00.182Z",
-    "date_updated": "2026-11-16T05:42:28.655Z",
+    "date_updated": "2026-11-16T11:23:46.086Z",
     "category_id": 3,
     "slug": "lt-220lr-standard-left-right-sorting-checkweigher",
     "name_en": "Standard Left-Right Sorting Checkweigher",
@@ -1053,14 +1146,17 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/e81aef4b-2e38-4476-9b90-c6febb074733#sha256=b9028db95797ce65da2ceb92a1ec7b3b6af943ff6ebbbae0d3bce859c2c36ba6",
-    "product_code": "LT-220LR"
+    "product_code": "LT-220LR",
+    "checkweigher_series": "standard",
+    "checkweigher_configuration": "left-right",
+    "checkweigher_l_series": false
   },
   {
     "id": 39,
     "status": "published",
     "sort": null,
     "date_created": "2026-11-15T11:54:00.855Z",
-    "date_updated": "2026-11-16T05:42:28.560Z",
+    "date_updated": "2026-11-16T11:23:45.995Z",
     "category_id": 3,
     "slug": "lt-150lrh-high-speed-left-right-sorting-checkweigher",
     "name_en": "High-Speed Left-Right Sorting Checkweigher",
@@ -1086,7 +1182,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/4a6a8089-fcf7-420b-9d9d-82060d655653#sha256=685c19a7ff5c7540c5f3e62b12e99c12e42510be47863527be49f8073d5e0a5f",
-    "product_code": "LT-150LRH"
+    "product_code": "LT-150LRH",
+    "checkweigher_series": "compact",
+    "checkweigher_configuration": "left-right",
+    "checkweigher_l_series": false
   },
   {
     "id": 40,
@@ -1119,7 +1218,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/5006de55-d2b9-4a09-87aa-aa7ed4ce41e4#sha256=1af37724f21d01f8de62fb7b02b0b21d9652783a7f47dc8f1549dd5f8d539ea0",
-    "product_code": "LT-JS220"
+    "product_code": "LT-JS220",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 41,
@@ -1152,7 +1254,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/cb4da262-ed9a-4e85-a7e6-d1204196924c#sha256=8dd7225a8e01674467becc462ab884b3707bb4cf188e5a945e973f1de2973443",
-    "product_code": "LT-T300"
+    "product_code": "LT-T300",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 42,
@@ -1185,7 +1290,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/d6772cfe-fcd2-4784-82e6-83eb3e9456aa#sha256=3d4a8345c34443e41a62885632eb3e00e2dfcbf89246cc869606e4b397ab9373",
-    "product_code": null
+    "product_code": null,
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 43,
@@ -1218,7 +1326,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/26aca08d-c0da-4e19-a112-fb3468d96b22#sha256=ea3b7c223eab682d72c1f10a03d9c7f3aee97337da6928e25eeacbce0abc45e3",
-    "product_code": null
+    "product_code": null,
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 44,
@@ -1251,7 +1362,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/9828805c-0d63-423c-89d6-6eb26ae68bab#sha256=d25662125287d0e0b984d6b6c017130a04133afca98abcb44c55b1317a94faa0",
-    "product_code": "LT-HS80"
+    "product_code": "LT-HS80",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 45,
@@ -1284,7 +1398,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/8f4d395d-04dd-4fad-b212-28ef5d62f9b5#sha256=4f10289d1577e62dcdd25ed522b1c49c1de196cb81df7ebd3de21f098cfa8f7b",
-    "product_code": "LT-HS100"
+    "product_code": "LT-HS100",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 46,
@@ -1317,7 +1434,10 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/a748de3d-4051-4865-91bf-06be36370f5f#sha256=b197f6528da68a069eaf80c28fb971187d7fd5f2022bdd82642cc217e3a5d5e9",
-    "product_code": "LT-HS150"
+    "product_code": "LT-HS150",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   },
   {
     "id": 47,
@@ -1350,6 +1470,9 @@
     "page_preset_id": null,
     "published_at": null,
     "review_notes": "wix://a2f78c10-cc08-4913-8174-fcd326b9511d/Import126/5c6b3795-2ee9-4ad4-95a1-cb4e23b1c044#sha256=e14a6b4434abf695fa737b1ee162e7df5521a56dfcf9492ad1f90d1668c6610f",
-    "product_code": "LT-HS200"
+    "product_code": "LT-HS200",
+    "checkweigher_series": null,
+    "checkweigher_configuration": null,
+    "checkweigher_l_series": null
   }
 ]
