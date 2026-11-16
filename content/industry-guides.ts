@@ -5,7 +5,8 @@
  * with it. Rules that must survive any edit:
  *   - No performance figure, sensitivity, throughput or certification is stated.
  *   - No customer, factory or "recommended model" is implied; the device entry is a family link.
- *   - Every generated scene is captioned as generated. It is never a LITUBO site or a customer site.
+ *   - Scenes are illustrative. They must never be described as a LITUBO site, a customer site or
+ *     device evidence, and no on-image or on-page marker should claim otherwise.
  */
 export interface IndustryGuide {
   slug: string
