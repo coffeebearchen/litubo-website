@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "settings_id": 1,
+    "platform": "linkedin",
+    "url": "https://www.linkedin.com/company/litubo",
+    "sort": 1,
+    "enabled": false
+  },
+  {
+    "id": 2,
+    "settings_id": 1,
+    "platform": "youtube",
+    "url": "https://www.youtube.com/@litubo",
+    "sort": 2,
+    "enabled": true
+  }
+]

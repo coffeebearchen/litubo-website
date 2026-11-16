@@ -43,3 +43,11 @@ npm-debug.log*
 # Type declarations (generated)
 *.d.ts
 !types/**/*.d.ts
+
+# 备份里永远不提交凭据与客户个人信息
+backup/**/*.sql
+backup/**/inquiries.json
+backup/**/visitor_events.json
+backup/**/_media_index.json
+backup/**/uploads/
+
