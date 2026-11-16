@@ -63,11 +63,15 @@ async function submit() {
         <h3>Thank you — your enquiry has been received.</h3>
         <p>Our team will get back to you shortly.</p>
       </div>
-      <div v-else-if="status === 'error'" class="expert__state expert__state--error">
-        <p>Something went wrong. Please try again or email info@litubo.com.</p>
-      </div>
 
-      <form v-else class="expert__form" novalidate @submit.prevent="submit">
+      <template v-else>
+        <!-- A failure keeps the form and everything typed into it: the message sits above the
+             fields as an alert so the visitor can correct and resubmit without retyping. -->
+        <div v-if="status === 'error'" class="expert__alert" role="alert">
+          <p>We could not send your enquiry. Your details are still here — please try again, or email info@litubo.com.</p>
+        </div>
+
+      <form class="expert__form" novalidate @submit.prevent="submit">
         <div class="expert__grid">
           <label class="expert__field">
             <span>First name <em>*</em></span>
@@ -105,6 +109,7 @@ async function submit() {
           {{ status === 'loading' ? 'Sending…' : 'Submit inquiry' }}
         </button>
       </form>
+        </template>
     </div>
   </section>
 </template>
@@ -214,6 +219,18 @@ async function submit() {
   color: var(--color-primary);
   margin: 0 0 var(--space-2);
 }
+
+.expert__alert {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid #E5B4A0;
+  border-radius: var(--radius-sm);
+  background: #FDF0EA;
+  color: #8A3A1A;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.expert__alert p { margin: 0; }
 
 .expert__state--error { border-color: #b3261e; }
 
