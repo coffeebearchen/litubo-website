@@ -1,130 +1,175 @@
-﻿{
+{
   "nav": {
-    "products": "TODO_TRANSLATION",
-    "applications": "TODO_TRANSLATION",
-    "resources": "TODO_TRANSLATION",
-    "support": "TODO_TRANSLATION",
-    "company": "TODO_TRANSLATION",
-    "contact": "TODO_TRANSLATION",
-    "findDistributor": "TODO_TRANSLATION"
+    "products": "Products",
+    "applications": "Applications",
+    "resources": "Resources",
+    "support": "Support",
+    "company": "Company",
+    "contact": "Contact",
+    "findDistributor": "Find a distributor"
   },
   "nav_products": {
-    "heading": "TODO_TRANSLATION",
-    "systemsHeading": "TODO_TRANSLATION",
-    "techHeading": "TODO_TRANSLATION",
-    "appHeading": "TODO_TRANSLATION",
-    "xray": "TODO_TRANSLATION",
-    "metal": "TODO_TRANSLATION",
-    "checkweighers": "TODO_TRANSLATION",
-    "combination": "TODO_TRANSLATION",
-    "conveyors": "TODO_TRANSLATION",
-    "xrayTech": "TODO_TRANSLATION",
-    "metalTech": "TODO_TRANSLATION",
-    "checkTech": "TODO_TRANSLATION",
-    "viewAll": "TODO_TRANSLATION",
-    "exploreAll": "TODO_TRANSLATION"
+    "heading": "Products",
+    "systemsHeading": "INSPECTION SYSTEMS",
+    "techHeading": "BY TECHNOLOGY",
+    "appHeading": "BY APPLICATION",
+    "xray": "X-Ray Inspection",
+    "metal": "Metal Detection",
+    "checkweighers": "Checkweighers",
+    "combination": "Combination Inspection",
+    "conveyors": "Conveyors & Reject Systems",
+    "xrayTech": "X-ray Technology",
+    "metalTech": "Metal Detection Technology",
+    "checkTech": "Checkweighing Technology",
+    "viewAll": "View all products",
+    "exploreAll": "Explore all systems"
   },
   "nav_applications": {
-    "heading": "TODO_TRANSLATION",
-    "packaged": "TODO_TRANSLATION",
-    "bottled": "TODO_TRANSLATION",
-    "meat": "TODO_TRANSLATION",
-    "frozen": "TODO_TRANSLATION",
-    "bakery": "TODO_TRANSLATION",
-    "nuts": "TODO_TRANSLATION",
-    "powder": "TODO_TRANSLATION",
-    "pharma": "TODO_TRANSLATION",
-    "viewAll": "TODO_TRANSLATION"
+    "heading": "Applications",
+    "packaged": "Packaged Food",
+    "bottled": "Bottled & Canned Products",
+    "meat": "Meat & Seafood",
+    "frozen": "Frozen Food",
+    "bakery": "Bakery & Snacks",
+    "nuts": "Nuts, Seeds & Dried Food",
+    "powder": "Powder & Granules",
+    "pharma": "Pharmaceutical & Daily Chemical",
+    "viewAll": "View all applications"
   },
   "nav_resources": {
-    "heading": "TODO_TRANSLATION",
-    "overview": "TODO_TRANSLATION",
-    "insights": "TODO_TRANSLATION",
-    "caseStudies": "TODO_TRANSLATION",
-    "downloads": "TODO_TRANSLATION",
-    "videos": "TODO_TRANSLATION",
-    "viewAll": "TODO_TRANSLATION",
-    "featuredHeading": "TODO_TRANSLATION",
-    "featuredTitle": "TODO_TRANSLATION",
-    "readArticle": "TODO_TRANSLATION"
+    "heading": "Resources",
+    "overview": "Resource Overview",
+    "insights": "LITUBO Insights",
+    "caseStudies": "Case Studies",
+    "downloads": "Downloads",
+    "videos": "Videos",
+    "viewAll": "View all resources",
+    "featuredHeading": "FEATURED INSIGHT",
+    "featuredTitle": "Choosing the right inspection solution for your line",
+    "readArticle": "Read article"
   },
   "nav_support": {
-    "heading": "TODO_TRANSLATION",
-    "directHeading": "TODO_TRANSLATION",
-    "docsHeading": "TODO_TRANSLATION",
-    "overview": "TODO_TRANSLATION",
-    "faq": "TODO_TRANSLATION",
-    "spareParts": "TODO_TRANSLATION",
-    "productTest": "TODO_TRANSLATION",
-    "techSupport": "TODO_TRANSLATION",
-    "manualRequest": "TODO_TRANSLATION",
-    "serviceTraining": "TODO_TRANSLATION",
-    "techDocs": "TODO_TRANSLATION"
+    "heading": "Support",
+    "directHeading": "DIRECT SUPPORT",
+    "docsHeading": "SUPPORT DOCUMENTS",
+    "overview": "Support Overview",
+    "faq": "FAQ",
+    "spareParts": "Request Spare Parts",
+    "productTest": "Send Product for Test",
+    "techSupport": "Technical Support",
+    "manualRequest": "Request a Manual",
+    "serviceTraining": "Service & Training",
+    "techDocs": "Technical Documents"
   },
   "nav_company": {
-    "heading": "TODO_TRANSLATION",
-    "about": "TODO_TRANSLATION",
-    "quality": "TODO_TRANSLATION",
-    "globalService": "TODO_TRANSLATION",
-    "partner": "TODO_TRANSLATION",
-    "promoTitle": "TODO_TRANSLATION",
-    "promoBody": "TODO_TRANSLATION"
+    "heading": "Company",
+    "about": "About LITUBO",
+    "quality": "Quality & Manufacturing",
+    "globalService": "Global Service Capability",
+    "partner": "Become a Partner",
+    "promoTitle": "Built for reliable inspection",
+    "promoBody": "Discover LITUBO's approach to quality, manufacturing and support."
   },
   "common": {
-    "talkToEngineer": "TODO_TRANSLATION",
-    "findDistributor": "TODO_TRANSLATION",
-    "learnMore": "TODO_TRANSLATION",
-    "viewAll": "TODO_TRANSLATION",
-    "downloadPdf": "TODO_TRANSLATION",
-    "contactUs": "TODO_TRANSLATION",
-    "submit": "TODO_TRANSLATION",
-    "required": "TODO_TRANSLATION",
-    "optional": "TODO_TRANSLATION",
-    "privacyConsent": "TODO_TRANSLATION",
-    "privacyPolicy": "TODO_TRANSLATION",
-    "successTitle": "TODO_TRANSLATION",
-    "successBody": "TODO_TRANSLATION",
-    "errorTitle": "TODO_TRANSLATION",
-    "errorBody": "TODO_TRANSLATION",
-    "loading": "TODO_TRANSLATION"
+    "talkToEngineer": "Talk to an engineer",
+    "findDistributor": "Find a distributor",
+    "learnMore": "Learn more",
+    "viewAll": "View all",
+    "downloadPdf": "Download PDF",
+    "contactUs": "Contact us",
+    "submit": "Submit",
+    "required": "Required",
+    "optional": "Optional",
+    "privacyConsent": "I agree to the processing of my personal data in accordance with the {0}.",
+    "privacyPolicy": "Privacy Policy",
+    "successTitle": "Thank you",
+    "successBody": "Your message has been received. Our team will be in touch shortly.",
+    "errorTitle": "Submission failed",
+    "errorBody": "Something went wrong. Please try again or email us directly.",
+    "loading": "Sending…"
   },
   "mobile_bar": {
-    "whatsapp": "TODO_TRANSLATION",
-    "matching": "TODO_TRANSLATION"
+    "whatsapp": "WhatsApp",
+    "matching": "Technical Matching"
   },
   "footer": {
-    "tagline": "TODO_TRANSLATION",
-    "description": "TODO_TRANSLATION",
+    "tagline": "Food & Packaging Inspection Solutions",
+    "description": "Helping food and packaging manufacturers protect consumers and brands with reliable inspection solutions.",
     "legalName": "Shanghai NingPin Industrial Dev. Co., Ltd.",
-    "address": "TODO_TRANSLATION",
-    "newsletter": "TODO_TRANSLATION",
-    "copyright": "TODO_TRANSLATION",
-    "links_products": "TODO_TRANSLATION",
-    "links_applications": "TODO_TRANSLATION",
-    "links_company": "TODO_TRANSLATION",
-    "links_support": "TODO_TRANSLATION",
-    "links_resources": "TODO_TRANSLATION",
-    "links_legal": "TODO_TRANSLATION",
-    "privacy": "TODO_TRANSLATION",
-    "terms": "TODO_TRANSLATION",
-    "sitemap": "TODO_TRANSLATION"
+    "address": "No. 23, Huangtu Rd., Huaqiao Town, Kunshan, Jiangsu Province, China",
+    "newsletter": "Stay informed — visit our Resources section for the latest insights.",
+    "copyright": "© {year} LITUBO. All rights reserved.",
+    "links_products": "Products",
+    "links_applications": "Applications",
+    "links_company": "Company",
+    "links_support": "Support",
+    "links_resources": "Resources",
+    "links_legal": "Legal",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "sitemap": "Sitemap"
   },
   "seo": {
-    "home": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "products": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "applications": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "resources": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "contact": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "technicalMatching": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "findDistributor": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "support": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "faq": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "about": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "quality": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "globalService": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "partner": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "404": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" },
-    "503": { "title": "TODO_TRANSLATION", "description": "TODO_TRANSLATION" }
+    "home": {
+      "title": "LITUBO — Food & Packaging Inspection Solutions",
+      "description": "Industrial X-Ray, Metal Detection, Checkweighing and Combination Inspection systems for food and packaging manufacturers."
+    },
+    "products": {
+      "title": "Products — Inspection Systems | LITUBO",
+      "description": "Explore LITUBO's full range of food and packaging inspection systems."
+    },
+    "applications": {
+      "title": "Applications — LITUBO",
+      "description": "Inspection solutions for packaged food, meat, beverages, pharmaceuticals and more."
+    },
+    "resources": {
+      "title": "Resources — Insights, Downloads & Videos | LITUBO",
+      "description": "Technical insights, case studies, product downloads and video demonstrations."
+    },
+    "contact": {
+      "title": "Contact Us — LITUBO",
+      "description": "Get in touch with LITUBO to discuss your inspection requirements."
+    },
+    "technicalMatching": {
+      "title": "Technical Matching — Find the Right System | LITUBO",
+      "description": "Describe your line requirements and we will recommend the right inspection solution."
+    },
+    "findDistributor": {
+      "title": "Find a Distributor — LITUBO",
+      "description": "Submit a distributor enquiry to the LITUBO team."
+    },
+    "support": {
+      "title": "Support — LITUBO",
+      "description": "Technical support, manuals, spare parts and service resources."
+    },
+    "faq": {
+      "title": "FAQ — LITUBO",
+      "description": "Frequently asked questions about LITUBO inspection systems."
+    },
+    "about": {
+      "title": "About LITUBO",
+      "description": "LITUBO provides food and packaging inspection solutions: X-ray inspection, metal detection, checkweighing and combination inspection."
+    },
+    "quality": {
+      "title": "Quality & Manufacturing — LITUBO",
+      "description": "Our quality standards and manufacturing capabilities."
+    },
+    "globalService": {
+      "title": "Global Service Capability — LITUBO",
+      "description": "Technical support, spare-parts, manual and distributor enquiries for LITUBO inspection systems."
+    },
+    "partner": {
+      "title": "Become a Partner — LITUBO",
+      "description": "Distributor and business partnership enquiries."
+    },
+    "404": {
+      "title": "Page Not Found — LITUBO",
+      "description": "The page you are looking for could not be found."
+    },
+    "503": {
+      "title": "Temporarily Unavailable — LITUBO",
+      "description": "This page is temporarily unavailable."
+    }
   },
   "pages": {
     "productDetail": {
@@ -136,127 +181,152 @@
       "documents": "Documentos"
     },
     "home": {
-      "heroEyebrow": "TODO_TRANSLATION",
-      "heroTitle": "TODO_TRANSLATION",
-      "heroSubtitle": "TODO_TRANSLATION",
-      "heroCta": "TODO_TRANSLATION",
-      "heroCtaSecondary": "TODO_TRANSLATION",
-      "pathTitle": "TODO_TRANSLATION",
-      "pathCard1Title": "TODO_TRANSLATION",
-      "pathCard1Cta1": "TODO_TRANSLATION",
-      "pathCard1Cta2": "TODO_TRANSLATION",
-      "pathCard2Title": "TODO_TRANSLATION",
-      "pathCard2Cta1": "TODO_TRANSLATION",
-      "pathCard2Cta2": "TODO_TRANSLATION",
-      "latestTitle": "TODO_TRANSLATION",
-      "latestCta": "TODO_TRANSLATION",
-      "faqTitle": "TODO_TRANSLATION",
-      "faqSubtitle": "TODO_TRANSLATION",
-      "faqCta": "TODO_TRANSLATION",
-      "ctaTitle": "TODO_TRANSLATION",
-      "ctaBody": "TODO_TRANSLATION",
-      "ctaCta": "TODO_TRANSLATION"
+      "heroEyebrow": "FOOD & PACKAGING INSPECTION",
+      "heroTitle": "Built for safer production.",
+      "heroSubtitle": "Reliable inspection systems and expert support help food and packaging producers deliver safe, high-quality products.",
+      "heroCta": "Explore solutions",
+      "heroCtaSecondary": "Talk to an engineer",
+      "pathTitle": "Find the right path for you",
+      "pathCard1Title": "Looking for inspection equipment?",
+      "pathCard1Cta1": "Explore by product",
+      "pathCard1Cta2": "Explore by application",
+      "pathCard2Title": "Already working with LITUBO?",
+      "pathCard2Cta1": "Technical matching",
+      "pathCard2Cta2": "Talk to an engineer",
+      "latestTitle": "Latest from LITUBO",
+      "latestCta": "All resources",
+      "faqTitle": "Questions about your line?",
+      "faqSubtitle": "Find quick answers to common questions about our systems and solutions.",
+      "faqCta": "View all FAQs",
+      "ctaTitle": "Talk to the team who understands your line.",
+      "ctaBody": "From product selection to integration and ongoing support, our engineers are ready to help.",
+      "ctaCta": "Start a conversation"
     },
-    "products": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION", "empty": "TODO_TRANSLATION" },
-    "applications": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION" },
-    "resources": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION" },
+    "products": {
+      "heroTitle": "Inspection Systems",
+      "heroSubtitle": "Five proven technology lines, configurable for your production environment.",
+      "empty": "Product information is being prepared."
+    },
+    "applications": {
+      "heroTitle": "Applications",
+      "heroSubtitle": "Inspection solutions across eight core food and packaging industries."
+    },
+    "resources": {
+      "heroTitle": "Resources",
+      "heroSubtitle": "Insights, case studies, downloads and video demonstrations."
+    },
     "contact": {
-      "heroTitle": "TODO_TRANSLATION",
-      "heroSubtitle": "TODO_TRANSLATION",
-      "nameLabel": "TODO_TRANSLATION",
-      "companyLabel": "TODO_TRANSLATION",
-      "emailLabel": "TODO_TRANSLATION",
-      "countryLabel": "TODO_TRANSLATION",
-      "phoneLabel": "TODO_TRANSLATION",
-      "messageLabel": "TODO_TRANSLATION",
-      "messagePlaceholder": "TODO_TRANSLATION",
-      "submitLabel": "TODO_TRANSLATION"
+      "heroTitle": "Contact Us",
+      "heroSubtitle": "Tell us about your requirements. We will respond promptly.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "countryLabel": "Country / Region",
+      "phoneLabel": "Phone (optional)",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Describe your inspection challenge or question.",
+      "submitLabel": "Send message"
     },
     "technicalMatching": {
-      "heroTitle": "TODO_TRANSLATION",
-      "heroSubtitle": "TODO_TRANSLATION",
-      "productLabel": "TODO_TRANSLATION",
-      "formatLabel": "TODO_TRANSLATION",
-      "speedLabel": "TODO_TRANSLATION",
-      "dimensionsLabel": "TODO_TRANSLATION",
-      "contaminantLabel": "TODO_TRANSLATION",
-      "existingEquipLabel": "TODO_TRANSLATION",
-      "messageLabel": "TODO_TRANSLATION",
-      "submitLabel": "TODO_TRANSLATION"
+      "heroTitle": "Technical Matching",
+      "heroSubtitle": "Describe your line requirements for a tailored product recommendation.",
+      "productLabel": "Product / application of interest",
+      "formatLabel": "Product format",
+      "speedLabel": "Line speed (ppm or kg/hr)",
+      "dimensionsLabel": "Package dimensions",
+      "contaminantLabel": "Contaminant concern",
+      "existingEquipLabel": "Existing equipment on the line",
+      "messageLabel": "Additional notes",
+      "submitLabel": "Request recommendation"
     },
     "findDistributor": {
-      "heroTitle": "TODO_TRANSLATION",
-      "heroSubtitle": "TODO_TRANSLATION",
-      "nameLabel": "TODO_TRANSLATION",
-      "companyLabel": "TODO_TRANSLATION",
-      "emailLabel": "TODO_TRANSLATION",
-      "countryLabel": "TODO_TRANSLATION",
-      "phoneLabel": "TODO_TRANSLATION",
-      "messageLabel": "TODO_TRANSLATION",
-      "submitLabel": "TODO_TRANSLATION"
+      "heroTitle": "Find a Distributor",
+      "heroSubtitle": "Tell us your location and requirements and our team will review your distributor enquiry.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "countryLabel": "Country / Region",
+      "phoneLabel": "Phone (optional)",
+      "messageLabel": "How can we help?",
+      "submitLabel": "Request distributor contact"
     },
-    "support": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION" },
-    "faq": { "heroTitle": "TODO_TRANSLATION", "heroSubtitle": "TODO_TRANSLATION" },
+    "support": {
+      "heroTitle": "Support",
+      "heroSubtitle": "Spare parts, technical support, service requests and manuals."
+    },
+    "faq": {
+      "heroTitle": "Frequently Asked Questions",
+      "heroSubtitle": "Common questions about LITUBO inspection systems."
+    },
     "spareParts": {
-      "heroTitle": "TODO_TRANSLATION",
-      "heroSubtitle": "TODO_TRANSLATION",
-      "modelLabel": "TODO_TRANSLATION",
-      "serialLabel": "TODO_TRANSLATION",
-      "partsLabel": "TODO_TRANSLATION",
-      "countryLabel": "TODO_TRANSLATION",
-      "emailLabel": "TODO_TRANSLATION",
-      "messageLabel": "TODO_TRANSLATION",
-      "submitLabel": "TODO_TRANSLATION"
+      "heroTitle": "Request Spare Parts",
+      "heroSubtitle": "Send a spare-parts request with your machine model and serial number. Our team will reply.",
+      "modelLabel": "Machine model",
+      "serialLabel": "Serial number",
+      "partsLabel": "Parts required",
+      "countryLabel": "Installation country",
+      "emailLabel": "Email address",
+      "messageLabel": "Additional notes",
+      "submitLabel": "Submit inquiry"
     },
     "productTest": {
-      "heroTitle": "TODO_TRANSLATION",
-      "heroSubtitle": "TODO_TRANSLATION",
-      "nameLabel": "TODO_TRANSLATION",
-      "companyLabel": "TODO_TRANSLATION",
-      "emailLabel": "TODO_TRANSLATION",
-      "productLabel": "TODO_TRANSLATION",
-      "concernLabel": "TODO_TRANSLATION",
-      "countryLabel": "TODO_TRANSLATION",
-      "messageLabel": "TODO_TRANSLATION",
-      "submitLabel": "TODO_TRANSLATION"
+      "heroTitle": "Send Product for Test",
+      "heroSubtitle": "Submit your product details and testing requirements for technical review.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "productLabel": "Product description",
+      "concernLabel": "Contaminant or issue",
+      "countryLabel": "Country",
+      "messageLabel": "Additional notes",
+      "submitLabel": "Request test"
     },
     "serviceRequest": {
-      "heroTitle": "TODO_TRANSLATION",
-      "heroSubtitle": "TODO_TRANSLATION",
-      "nameLabel": "TODO_TRANSLATION",
-      "companyLabel": "TODO_TRANSLATION",
-      "emailLabel": "TODO_TRANSLATION",
-      "modelLabel": "TODO_TRANSLATION",
-      "serialLabel": "TODO_TRANSLATION",
-      "countryLabel": "TODO_TRANSLATION",
-      "issueLabel": "TODO_TRANSLATION",
-      "urgencyLabel": "TODO_TRANSLATION",
-      "submitLabel": "TODO_TRANSLATION"
+      "heroTitle": "Service Request",
+      "heroSubtitle": "Submit a service or technical support request.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "modelLabel": "Machine model",
+      "serialLabel": "Serial number",
+      "countryLabel": "Installation country",
+      "issueLabel": "Issue description",
+      "urgencyLabel": "Urgency",
+      "submitLabel": "Submit request"
     },
-    "about": { "heroTitle": "TODO_TRANSLATION" },
-    "quality": { "heroTitle": "TODO_TRANSLATION" },
-    "globalService": { "heroTitle": "TODO_TRANSLATION" },
+    "about": {
+      "heroTitle": "About LITUBO"
+    },
+    "quality": {
+      "heroTitle": "Quality & Manufacturing"
+    },
+    "globalService": {
+      "heroTitle": "Global Service Capability"
+    },
     "partner": {
-      "heroTitle": "TODO_TRANSLATION",
-      "heroSubtitle": "TODO_TRANSLATION",
-      "nameLabel": "TODO_TRANSLATION",
-      "companyLabel": "TODO_TRANSLATION",
-      "emailLabel": "TODO_TRANSLATION",
-      "countryLabel": "TODO_TRANSLATION",
-      "messageLabel": "TODO_TRANSLATION",
-      "submitLabel": "TODO_TRANSLATION"
+      "heroTitle": "Become a Partner",
+      "heroSubtitle": "Submit a distributor or business partnership enquiry.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company name",
+      "emailLabel": "Email address",
+      "countryLabel": "Country / Region",
+      "messageLabel": "Tell us about your market and experience",
+      "submitLabel": "Submit application"
     },
-    "privacy": { "heroTitle": "TODO_TRANSLATION" },
-    "terms": { "heroTitle": "TODO_TRANSLATION" },
+    "privacy": {
+      "heroTitle": "Privacy Policy"
+    },
+    "terms": {
+      "heroTitle": "Terms of Use"
+    },
     "404": {
-      "title": "TODO_TRANSLATION",
-      "body": "TODO_TRANSLATION",
-      "cta": "TODO_TRANSLATION"
+      "title": "Page not found",
+      "body": "The page you are looking for may have moved or no longer exists.",
+      "cta": "Return to home"
     },
     "503": {
-      "title": "TODO_TRANSLATION",
-      "body": "TODO_TRANSLATION"
+      "title": "Temporarily unavailable",
+      "body": "This information cannot be loaded right now. Please try again in a few minutes."
     }
   }
 }
-

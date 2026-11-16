@@ -1,1 +1,332 @@
-{}
+{
+  "nav": {
+    "products": "Products",
+    "applications": "Applications",
+    "resources": "Resources",
+    "support": "Support",
+    "company": "Company",
+    "contact": "Contact",
+    "findDistributor": "Find a distributor"
+  },
+  "nav_products": {
+    "heading": "Products",
+    "systemsHeading": "INSPECTION SYSTEMS",
+    "techHeading": "BY TECHNOLOGY",
+    "appHeading": "BY APPLICATION",
+    "xray": "X-Ray Inspection",
+    "metal": "Metal Detection",
+    "checkweighers": "Checkweighers",
+    "combination": "Combination Inspection",
+    "conveyors": "Conveyors & Reject Systems",
+    "xrayTech": "X-ray Technology",
+    "metalTech": "Metal Detection Technology",
+    "checkTech": "Checkweighing Technology",
+    "viewAll": "View all products",
+    "exploreAll": "Explore all systems"
+  },
+  "nav_applications": {
+    "heading": "Applications",
+    "packaged": "Packaged Food",
+    "bottled": "Bottled & Canned Products",
+    "meat": "Meat & Seafood",
+    "frozen": "Frozen Food",
+    "bakery": "Bakery & Snacks",
+    "nuts": "Nuts, Seeds & Dried Food",
+    "powder": "Powder & Granules",
+    "pharma": "Pharmaceutical & Daily Chemical",
+    "viewAll": "View all applications"
+  },
+  "nav_resources": {
+    "heading": "Resources",
+    "overview": "Resource Overview",
+    "insights": "LITUBO Insights",
+    "caseStudies": "Case Studies",
+    "downloads": "Downloads",
+    "videos": "Videos",
+    "viewAll": "View all resources",
+    "featuredHeading": "FEATURED INSIGHT",
+    "featuredTitle": "Choosing the right inspection solution for your line",
+    "readArticle": "Read article"
+  },
+  "nav_support": {
+    "heading": "Support",
+    "directHeading": "DIRECT SUPPORT",
+    "docsHeading": "SUPPORT DOCUMENTS",
+    "overview": "Support Overview",
+    "faq": "FAQ",
+    "spareParts": "Request Spare Parts",
+    "productTest": "Send Product for Test",
+    "techSupport": "Technical Support",
+    "manualRequest": "Request a Manual",
+    "serviceTraining": "Service & Training",
+    "techDocs": "Technical Documents"
+  },
+  "nav_company": {
+    "heading": "Company",
+    "about": "About LITUBO",
+    "quality": "Quality & Manufacturing",
+    "globalService": "Global Service Capability",
+    "partner": "Become a Partner",
+    "promoTitle": "Built for reliable inspection",
+    "promoBody": "Discover LITUBO's approach to quality, manufacturing and support."
+  },
+  "common": {
+    "talkToEngineer": "Talk to an engineer",
+    "findDistributor": "Find a distributor",
+    "learnMore": "Learn more",
+    "viewAll": "View all",
+    "downloadPdf": "Download PDF",
+    "contactUs": "Contact us",
+    "submit": "Submit",
+    "required": "Required",
+    "optional": "Optional",
+    "privacyConsent": "I agree to the processing of my personal data in accordance with the {0}.",
+    "privacyPolicy": "Privacy Policy",
+    "successTitle": "Thank you",
+    "successBody": "Your message has been received. Our team will be in touch shortly.",
+    "errorTitle": "Submission failed",
+    "errorBody": "Something went wrong. Please try again or email us directly.",
+    "loading": "Sending…"
+  },
+  "footer": {
+    "tagline": "Food & Packaging Inspection Solutions",
+    "description": "Helping food and packaging manufacturers protect consumers and brands with reliable inspection solutions.",
+    "legalName": "Shanghai NingPin Industrial Dev. Co., Ltd.",
+    "address": "No. 23, Huangtu Rd., Huaqiao Town, Kunshan, Jiangsu Province, China",
+    "newsletter": "Stay informed — visit our Resources section for the latest insights.",
+    "copyright": "© {year} LITUBO. All rights reserved.",
+    "links_products": "Products",
+    "links_applications": "Applications",
+    "links_company": "Company",
+    "links_support": "Support",
+    "links_resources": "Resources",
+    "links_legal": "Legal",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "sitemap": "Sitemap"
+  },
+  "mobile_bar": {
+    "whatsapp": "WhatsApp",
+    "matching": "Technical Matching"
+  },
+  "seo": {
+    "home": {
+      "title": "LITUBO — Food & Packaging Inspection Solutions",
+      "description": "Industrial X-Ray, Metal Detection, Checkweighing and Combination Inspection systems for food and packaging manufacturers."
+    },
+    "products": {
+      "title": "Products — Inspection Systems | LITUBO",
+      "description": "Explore LITUBO's full range of food and packaging inspection systems."
+    },
+    "applications": {
+      "title": "Applications — LITUBO",
+      "description": "Inspection solutions for packaged food, meat, beverages, pharmaceuticals and more."
+    },
+    "resources": {
+      "title": "Resources — Insights, Downloads & Videos | LITUBO",
+      "description": "Technical insights, case studies, product downloads and video demonstrations."
+    },
+    "contact": {
+      "title": "Contact Us — LITUBO",
+      "description": "Get in touch with LITUBO to discuss your inspection requirements."
+    },
+    "technicalMatching": {
+      "title": "Technical Matching — Find the Right System | LITUBO",
+      "description": "Describe your line requirements and we will recommend the right inspection solution."
+    },
+    "findDistributor": {
+      "title": "Find a Distributor — LITUBO",
+      "description": "Submit a distributor enquiry to the LITUBO team."
+    },
+    "support": {
+      "title": "Support — LITUBO",
+      "description": "Technical support, manuals, spare parts and service resources."
+    },
+    "faq": {
+      "title": "FAQ — LITUBO",
+      "description": "Frequently asked questions about LITUBO inspection systems."
+    },
+    "about": {
+      "title": "About LITUBO",
+      "description": "LITUBO provides food and packaging inspection solutions: X-ray inspection, metal detection, checkweighing and combination inspection."
+    },
+    "quality": {
+      "title": "Quality & Manufacturing — LITUBO",
+      "description": "Our quality standards and manufacturing capabilities."
+    },
+    "globalService": {
+      "title": "Global Service Capability — LITUBO",
+      "description": "Technical support, spare-parts, manual and distributor enquiries for LITUBO inspection systems."
+    },
+    "partner": {
+      "title": "Become a Partner — LITUBO",
+      "description": "Distributor and business partnership enquiries."
+    },
+    "404": {
+      "title": "Page Not Found — LITUBO",
+      "description": "The page you are looking for could not be found."
+    },
+    "503": {
+      "title": "Temporarily Unavailable — LITUBO",
+      "description": "This page is temporarily unavailable."
+    }
+  },
+  "pages": {
+    "home": {
+      "heroEyebrow": "FOOD & PACKAGING INSPECTION",
+      "heroTitle": "Built for safer production.",
+      "heroSubtitle": "Reliable inspection systems and expert support help food and packaging producers deliver safe, high-quality products.",
+      "heroCta": "Explore solutions",
+      "heroCtaSecondary": "Talk to an engineer",
+      "pathTitle": "Find the right path for you",
+      "pathCard1Title": "Looking for inspection equipment?",
+      "pathCard1Cta1": "Explore by product",
+      "pathCard1Cta2": "Explore by application",
+      "pathCard2Title": "Already working with LITUBO?",
+      "pathCard2Cta1": "Technical matching",
+      "pathCard2Cta2": "Talk to an engineer",
+      "latestTitle": "Latest from LITUBO",
+      "latestCta": "All resources",
+      "faqTitle": "Questions about your line?",
+      "faqSubtitle": "Find quick answers to common questions about our systems and solutions.",
+      "faqCta": "View all FAQs",
+      "ctaTitle": "Talk to the team who understands your line.",
+      "ctaBody": "From product selection to integration and ongoing support, our engineers are ready to help.",
+      "ctaCta": "Start a conversation"
+    },
+    "products": {
+      "heroTitle": "Inspection Systems",
+      "heroSubtitle": "Five proven technology lines, configurable for your production environment.",
+      "empty": "Product information is being prepared."
+    },
+    "applications": {
+      "heroTitle": "Applications",
+      "heroSubtitle": "Inspection solutions across eight core food and packaging industries."
+    },
+    "resources": {
+      "heroTitle": "Resources",
+      "heroSubtitle": "Insights, case studies, downloads and video demonstrations."
+    },
+    "contact": {
+      "heroTitle": "Contact Us",
+      "heroSubtitle": "Tell us about your requirements. We will respond promptly.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "countryLabel": "Country / Region",
+      "phoneLabel": "Phone (optional)",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Describe your inspection challenge or question.",
+      "submitLabel": "Send message"
+    },
+    "technicalMatching": {
+      "heroTitle": "Technical Matching",
+      "heroSubtitle": "Describe your line requirements for a tailored product recommendation.",
+      "productLabel": "Product / application of interest",
+      "formatLabel": "Product format",
+      "speedLabel": "Line speed (ppm or kg/hr)",
+      "dimensionsLabel": "Package dimensions",
+      "contaminantLabel": "Contaminant concern",
+      "existingEquipLabel": "Existing equipment on the line",
+      "messageLabel": "Additional notes",
+      "submitLabel": "Request recommendation"
+    },
+    "findDistributor": {
+      "heroTitle": "Find a Distributor",
+      "heroSubtitle": "Tell us your location and requirements and our team will review your distributor enquiry.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "countryLabel": "Country / Region",
+      "phoneLabel": "Phone (optional)",
+      "messageLabel": "How can we help?",
+      "submitLabel": "Request distributor contact"
+    },
+    "support": {
+      "heroTitle": "Support",
+      "heroSubtitle": "Spare parts, technical support, service requests and manuals."
+    },
+    "faq": {
+      "heroTitle": "Frequently Asked Questions",
+      "heroSubtitle": "Common questions about LITUBO inspection systems."
+    },
+    "spareParts": {
+      "heroTitle": "Request Spare Parts",
+      "heroSubtitle": "Send a spare-parts request with your machine model and serial number. Our team will reply.",
+      "modelLabel": "Machine model",
+      "serialLabel": "Serial number",
+      "partsLabel": "Parts required",
+      "countryLabel": "Installation country",
+      "emailLabel": "Email address",
+      "messageLabel": "Additional notes",
+      "submitLabel": "Submit inquiry"
+    },
+    "productTest": {
+      "heroTitle": "Send Product for Test",
+      "heroSubtitle": "Submit your product details and testing requirements for technical review.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "productLabel": "Product description",
+      "concernLabel": "Contaminant or issue",
+      "countryLabel": "Country",
+      "messageLabel": "Additional notes",
+      "submitLabel": "Request test"
+    },
+    "serviceRequest": {
+      "heroTitle": "Service Request",
+      "heroSubtitle": "Submit a service or technical support request.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company",
+      "emailLabel": "Email address",
+      "modelLabel": "Machine model",
+      "serialLabel": "Serial number",
+      "countryLabel": "Installation country",
+      "issueLabel": "Issue description",
+      "urgencyLabel": "Urgency",
+      "submitLabel": "Submit request"
+    },
+    "about": {
+      "heroTitle": "About LITUBO"
+    },
+    "quality": {
+      "heroTitle": "Quality & Manufacturing"
+    },
+    "globalService": {
+      "heroTitle": "Global Service Capability"
+    },
+    "partner": {
+      "heroTitle": "Become a Partner",
+      "heroSubtitle": "Submit a distributor or business partnership enquiry.",
+      "nameLabel": "Full name",
+      "companyLabel": "Company name",
+      "emailLabel": "Email address",
+      "countryLabel": "Country / Region",
+      "messageLabel": "Tell us about your market and experience",
+      "submitLabel": "Submit application"
+    },
+    "privacy": {
+      "heroTitle": "Privacy Policy"
+    },
+    "terms": {
+      "heroTitle": "Terms of Use"
+    },
+    "404": {
+      "title": "Page not found",
+      "body": "The page you are looking for may have moved or no longer exists.",
+      "cta": "Return to home"
+    },
+    "503": {
+      "title": "Temporarily unavailable",
+      "body": "This information cannot be loaded right now. Please try again in a few minutes."
+    },
+    "productDetail": {
+      "selectionNote": "Final configuration, inspection performance and suitability are confirmed with our team for your product and production line.",
+      "imageOnRequest": "Ask our team for product images and configuration details.",
+      "sectionsLabel": "Product information",
+      "overview": "Overview",
+      "specifications": "Specifications",
+      "documents": "Documents"
+    }
+  }
+}
