@@ -42,7 +42,20 @@ useSeoHead({
             :to="localePath(`/applications/${INDUSTRY_GUIDES[index].slug}`)"
           >
             <div class="app-card__image-wrap">
-              <div class="app-card__image-placeholder img-placeholder img-placeholder--warm" aria-hidden="true" />
+              <!--
+                Application illustrations (light hand-drawn V1). A controlled asset mapping keyed by
+                the industry slug; the industry name stays real HTML text, so the image is decorative
+                and carries an empty alt.
+              -->
+              <img
+                class="app-card__image"
+                :src="`/images/applications/${INDUSTRY_GUIDES[index].slug}.webp`"
+                alt=""
+                width="275"
+                height="206"
+                loading="lazy"
+                decoding="async"
+              >
             </div>
             <div class="app-card__body">
               <h2 class="app-card__title">{{ industry }}</h2>
@@ -108,12 +121,30 @@ useSeoHead({
   aspect-ratio: 4 / 3;
   position: relative;
   overflow: hidden;
+  /* Warm paper ground behind the hand-drawn artwork — the illustrations sit on their own cream,
+     so the card never looks like a photo cut-out. */
+  background: #FDF8F0;
+  border-bottom: 4px solid var(--color-accent);
 }
 
-.app-card__image-placeholder {
+/* Contain, never cover: an illustration must never be cropped, and it is never scaled up
+   beyond its own resolution. */
+.app-card__image {
   width: 100%;
   height: 100%;
-  border-bottom: 4px solid var(--color-accent);
+  object-fit: contain;
+  display: block;
+  transition: transform var(--transition-normal);
+}
+
+/* Light hover only: a 1.02 nudge, no looping, no rotation. */
+.app-card:hover .app-card__image {
+  transform: scale(1.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-card__image { transition: none !important; }
+  .app-card:hover .app-card__image { transform: none; }
 }
 
 .app-card__body {
