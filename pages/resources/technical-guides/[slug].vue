@@ -73,9 +73,9 @@ useSeoHead({
 </template>
 
 <style scoped>
-.page-hero { background: var(--color-primary); padding: var(--space-12) 0; color: var(--color-white); }
+.page-hero { background: linear-gradient(180deg, #F4E5C8 0%, #FAF8F3 100%); padding: var(--space-12) 0; color: var(--color-ink); }
 .page-hero__title { font-family: var(--font-display); font-size: clamp(var(--text-2xl), 3.5vw, var(--text-4xl)); font-weight: 600; line-height: var(--leading-tight); margin: var(--space-3) 0; }
-.page-hero__sub { font-size: var(--text-lg); color: rgba(255,255,255,0.8); max-width: 640px; line-height: var(--leading-normal); margin-top: var(--space-2); }
+.page-hero__sub { font-size: var(--text-lg); color: var(--color-ink-muted); max-width: 640px; line-height: var(--leading-normal); margin-top: var(--space-2); }
 .post-meta { font-size: var(--text-sm); color: rgba(255,255,255,0.65); margin-bottom: var(--space-2); }
 .section-gap { padding: var(--space-16) 0; }
 .post-layout { max-width: 760px; }

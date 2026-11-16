@@ -48,9 +48,9 @@ useSeoHead({ title: t('seo.support.title'), description: t('seo.support.descript
 </template>
 
 <style scoped>
-.page-hero { background: var(--color-primary); padding: var(--space-12) 0; color: var(--color-white); }
+.page-hero { background: linear-gradient(180deg, #F4E5C8 0%, #FAF8F3 100%); padding: var(--space-12) 0; color: var(--color-ink); }
 .page-hero__title { font-family: var(--font-display); font-size: clamp(var(--text-3xl), 4vw, var(--text-5xl)); font-weight: 600; line-height: var(--leading-tight); margin: var(--space-4) 0; }
-.page-hero__sub { font-size: var(--text-lg); color: rgba(255,255,255,0.8); max-width: 560px; line-height: var(--leading-normal); }
+.page-hero__sub { font-size: var(--text-lg); color: var(--color-ink-muted); max-width: 560px; line-height: var(--leading-normal); }
 .section-gap { padding: var(--space-16) 0; }
 .support-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-5); }
 .support-card { display: block; padding: var(--space-6); background: var(--color-white); border: 1px solid var(--color-line); border-radius: var(--radius-sm); box-shadow: var(--shadow-card); text-decoration: none; transition: box-shadow var(--transition-normal); }

@@ -15,7 +15,7 @@ const documents = [
     <section class="page-hero">
       <div class="container">
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.resources'), to: localePath('/resources') }, { label: t('nav_resources.downloads') }]" />
-        <h1 class="page-hero__title">{{ t('nav_resources.downloads') }}</h1>
+        <h1 class="page-hero__title">Request technical documents</h1>
       </div>
     </section>
     <section class="section-gap">
@@ -28,7 +28,7 @@ const documents = [
 </template>
 
 <style scoped>
-.page-hero { background: var(--color-primary); padding: var(--space-12) 0; color: var(--color-white); }
+.page-hero { background: linear-gradient(180deg, #F4E5C8 0%, #FAF8F3 100%); padding: var(--space-12) 0; color: var(--color-ink); }
 .page-hero__title { font-family: var(--font-display); font-size: clamp(var(--text-3xl), 4vw, var(--text-5xl)); font-weight: 600; line-height: var(--leading-tight); margin: var(--space-4) 0; }
 .section-gap { padding: var(--space-16) 0; }
 .content-placeholder { font-size: var(--text-base); color: var(--color-ink-muted); }

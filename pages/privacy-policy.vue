@@ -41,7 +41,7 @@ useSeoHead({ title: 'Privacy Policy — LITUBO', description: 'LITUBO privacy po
 </template>
 
 <style scoped>
-.page-hero { background: var(--color-primary); padding: var(--space-12) 0; color: var(--color-white); }
+.page-hero { background: linear-gradient(180deg, #F4E5C8 0%, #FAF8F3 100%); padding: var(--space-12) 0; color: var(--color-ink); }
 .page-hero__title { font-family: var(--font-display); font-size: clamp(var(--text-3xl), 4vw, var(--text-5xl)); font-weight: 600; line-height: var(--leading-tight); margin: var(--space-4) 0; }
 .section-gap { padding: var(--space-16) 0; }
 .prose { max-width: 760px; font-size: var(--text-base); color: var(--color-ink); line-height: var(--leading-normal); }

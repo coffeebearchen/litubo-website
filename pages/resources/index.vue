@@ -271,9 +271,9 @@ const categories = [
 
 <style scoped>
 .page-hero {
-  background: var(--color-primary);
+  background: linear-gradient(180deg, #F4E5C8 0%, #FAF8F3 100%);
   padding: var(--space-12) 0;
-  color: var(--color-white);
+  color: var(--color-ink);
 }
 .page-hero__title {
   font-family: var(--font-display);
@@ -284,7 +284,7 @@ const categories = [
 }
 .page-hero__sub {
   font-size: var(--text-lg);
-  color: rgba(255,255,255,0.8);
+  color: var(--color-ink-muted);
   max-width: 560px;
   line-height: var(--leading-normal);
 }
