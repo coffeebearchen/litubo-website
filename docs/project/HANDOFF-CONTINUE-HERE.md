@@ -108,6 +108,11 @@ V2-00 ~ V2-07 全部完成，实现细节、实测记录与边界都写在 `BACK
 | V2-06 | `ai-proposal` / `ai-confirm` 两个接口 + 询盘详情 AI 面板；新 target `inquiry-summary` |
 | V2-07 | 9 张实现截图 + 差异表：`reviews/2026-11-17-BACKEND-DSH-V2-0e6e98d/04-verification/` |
 
+### 5.15 已关闭的业主决定（2026-11-17）
+
+- **8 个 X-Ray 草稿暂不上线**：产品 id 19–26（XR-700/800/900/50C/100C/100C-1/100C-2/1000D）保持 `draft`，**不是待办缺口**。已实测 8 个详情 URL 全 404、分类列表页不出现。媒体库里只有 XR-180C 的图，型号不同不得套用。
+- **产品编辑器语言**：已按设计改成 7 个英文 tab（Basics / Content / Specifications / Media / FAQ / SEO / Preview）。
+- **品牌 logo 颜色**：已按 `tokens.css --color-primary #2F6B3A` 重上色；新增 favicon / apple-touch-icon / theme-color（提交 `32be265`）。
 ### 5.2 需要业主拍板的两件事（不要自行决定）
 
 1. **产品编辑器其余文案**：tab 已改成 7 个英文（Basics/Content/Specifications/Media/FAQ/SEO/Preview，2026-11-17 完成），但卡片标题、按钮仍是中文（基础信息/发布状态/撤回草稿等）。要不要整页英文化，是另一个决定，会牵动更多页面与测试。
