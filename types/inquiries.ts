@@ -25,6 +25,16 @@ export interface AdminInquiry {
   hubspot_sync_status: HubspotSyncStatus
   hubspot_error_summary: string | null
   raw_fields: Record<string, string> | null
+  /**
+   * V2-06 — what a person confirmed from an AI proposal, or null when nothing was confirmed yet.
+   * `ai_reviewed` is true only for a confirmed result; it is not an audit history and not a claim that
+   * the content is correct. `ai_confidence` stays null: this scope has no calibrated basis for one.
+   */
+  ai_summary: string | null
+  ai_intent: string | null
+  ai_confidence: number | null
+  ai_processed_at: string | null
+  ai_reviewed: boolean
 }
 
 export interface AdminInquiriesResult {

@@ -56,6 +56,12 @@ describe('inquiry operator workflow', () => {
       hubspot_sync_status: 'failed',
       hubspot_error_summary: 'TIMEOUT',
       raw_fields: { tm_product_interest: 'fallback', message: 'private message' },
+      // V2-06 — nothing confirmed for this inquiry yet.
+      ai_summary: null,
+      ai_intent: null,
+      ai_confidence: null,
+      ai_processed_at: null,
+      ai_reviewed: false,
     } satisfies AdminInquiry
 
     expect(hubspotInputFromInquiry(inquiry)).toEqual({

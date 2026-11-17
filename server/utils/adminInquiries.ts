@@ -4,7 +4,12 @@ import type { AdminInquiry, AdminInquiriesResult } from '../../types/inquiries'
 import type { HubspotSyncInput } from './syncHubspot'
 import type { FetchFn } from './mediaLifecycle'
 
-const FIELDS = 'id,status,inquiry_type,submitted_at,updated_at,first_handled_at,contact_name,contact_email,contact_company,contact_country,contact_phone,message,locale,note,model_number,serial_number,related_product_slug,source_url,hubspot_sync_status,hubspot_error_summary,raw_fields'
+/**
+ * V2-06 — the confirmed AI result is read back with the inquiry so the screen can show what was
+ * accepted and when. `ai_recommended_products` and `ai_draft_reply` are deliberately not read: this
+ * scope never writes them, and showing an always-empty field would suggest otherwise.
+ */
+const FIELDS = 'id,status,inquiry_type,submitted_at,updated_at,first_handled_at,contact_name,contact_email,contact_company,contact_country,contact_phone,message,locale,note,model_number,serial_number,related_product_slug,source_url,hubspot_sync_status,hubspot_error_summary,raw_fields,ai_summary,ai_intent,ai_confidence,ai_processed_at,ai_reviewed'
 
 export function inquiryId(value: unknown): number {
   if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) throw createError({ statusCode: 400, message: 'Invalid inquiry ID' })

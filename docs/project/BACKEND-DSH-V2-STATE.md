@@ -135,7 +135,7 @@ ERROR [inquiry] email notification failed { id: 35 }
 | **V2-03** posts 管理 | ✅ 完成 | 见提交 | `/admin/posts`（Blog/FAQ 同页，读 posts）+ GET/PATCH 接口 | 路由可达、typecheck 0 | 隐藏导航入口，数据未迁 | — |
 | **V2-04** Hero | ✅ 完成（13/13 页已接） | 见提交 | 13 页注册表 + `/admin/page-content` + 单行 PATCH（publish/withdraw）；13 页前台全部读覆盖；CTA 标签与路径按「成对」合并 | 8 页真实覆盖往返（建行→读 HTML→删行→恢复默认）；首页走 `/api/cms/home` 同源验证；CTA 半对用例；typecheck 0 | 关闭覆盖读取（前台回默认文案） | — |
 | **V2-05** cover_fit | ✅ 完成（含「Product categories」tab） | 见提交 | `posts.cover_fit` nullable string；按已核实清单迁移 10 篇；接口输出 coverFit；页面优先读它，null 回退旧清单；`/admin/page-content` 五 tab（Home/Company/Support/Resources + Product categories），分类 tab 直接读写 `product_categories` | 接口 coverFit=contain/cover 正确；分类读写往返 + 4 个拒绝用例；浏览器点选与深链实测 | 关新读路径、保留列不 DROP；分类 tab 不建副本、不改 slug/status | — |
-| V2-06 内部询盘 AI | 待做 | — | — | — | — | — |
+| **V2-06** 内部询盘 AI | ✅ 完成（摘要/意图/缺项 + 人工确认） | 见提交 | 新 target `inquiry-summary`；`ai-proposal` 只出候选不写库；`ai-confirm` 校验绑定/一次性/原文指纹后写 4 列；询盘详情加 AI 面板；询盘读取增加 5 个 ai 列 | 合成询盘全链路（生成不写库→确认写 4 列→重放/伪 ref/未选/原文变动全部拒绝）；浏览器点击实测；CSRF 与未登录拦截；typecheck 0、lint 0 | 关闭 AI 入口（面板消失，普通状态/备注流程不受影响），已写列保留 | 见下方「待业主确认 #2」 |
 | V2-07 视觉与合同验收 | 待做 | — | — | — | — | — |
 
 ---
@@ -194,6 +194,65 @@ ERROR [inquiry] email notification failed { id: 35 }
 | **后台未读徽标** | ✅ 已加：侧栏「Customer Inquiries」显示待处理数量（当前 21） |
 
 询盘始终写入数据库；徽标让新询盘不再像空收件箱。
+
+## V2-06 询盘 AI 实测（本地已测）
+
+**做了什么**
+
+| 文件 | 作用 |
+|---|---|
+| `server/utils/aiTargets/inquirySummaryTarget.ts` | 新 target `inquiry-summary`：输出只有 `summary` / `intent` / `missing` 三个字段；`intent` 用**项目已有的 6 个询盘类型**作词表，不另造分类 |
+| `server/utils/inquiryAi.ts` | subject key（`inquiry:<id>`）、原文指纹（sha256）、给模型的输入（**不含姓名/邮箱/电话/公司**） |
+| `server/api/admin/inquiries/[id]/ai-proposal.post.ts` | 只生成候选，**不写 inquiries**；provider 未配置时返回 `{ok:false, unavailable:true}`，人工流程照常 |
+| `server/api/admin/inquiries/[id]/ai-confirm.post.ts` | 校验后写 `ai_summary` / `ai_intent` / `ai_processed_at` / `ai_reviewed` |
+| `pages/admin/inquiries/[id].vue` | AI 面板：Generate / Confirm selected / Discard proposal，缺项红框标 Needs human review |
+| `server/utils/adminInquiries.ts` + `types/inquiries.ts` | 询盘读取新增 5 个 ai 列（`ai_recommended_products`、`ai_draft_reply` 刻意不读，因为不写） |
+
+**复用而不是新建**：provider 注册表、DeepSeek 适配器、`claimGenerateSlot` 限速、`rememberAnalysis` / `claimApply` / `readProposal` 提案机制全部沿用现有实现；没有新表、没有 Redis、没有队列、没有新依赖。
+
+**Confirm 的校验链（按执行顺序）**
+
+```
+1 该 ref 属于这个管理员 + 这个询盘      → 否则 409
+2 未过期                              → 否则 409
+3 未被确认过（claimApply 一次性）      → 否则 409「已确认」
+4 原文指纹与生成时一致（sha256 比对）   → 否则 409「询盘已改动，请重新生成」
+5 至少接受一项                        → 否则 400
+```
+
+写入内容来自**服务端保存的候选**，不来自请求体——客户端自己发一段 "summary" 没有东西可写。
+
+**实测结果（合成询盘 id=38/41，用完即删，库回到 22 行）**
+
+| 用例 | 结果 |
+|---|---|
+| 未登录调用两个接口 | `401` |
+| 无 `Origin` / 错 `Origin` / 正确 `Origin`（node fetch 精确控制） | `403` / `403` / `200` |
+| 空 message 生成 | `{ok:false, error:'This inquiry has no message to summarize.'}` |
+| 生成候选 | `ok:true`，返回摘要+意图+4–5 条缺项；**数据库 ai_summary 仍为 null、ai_reviewed 仍为 false** |
+| Confirm（摘要+意图） | 写入 4 列；`ai_recommended_products`、`ai_draft_reply` 仍为 null；`ai_confidence` 仍为 null |
+| 重复 Confirm | `409`，消息「This proposal has already been confirmed.」 |
+| 一项都不选 | `400`「Choose at least one recommendation to save.」 |
+| 伪造 ref | `409`「This proposal is no longer available. Generate a new one.」 |
+| 生成后改动原文再 Confirm | `409`「The inquiry changed since this proposal was generated. Generate a new one.」 |
+| 浏览器点击（真实 Chrome + CDP） | 初始只有 Generate；生成后徽标 `Unreviewed proposal`、缺项列表、Confirm/Discard；确认后徽标 `Confirmed`、显示 intent 与 `confidence: Not assessed`、按钮变 Generate again；**0 console error** |
+
+**关于 DeepSeek**：为了验证链路真实可通，本轮用**合成文本**（`test-only@example.invalid`，正文明确写 TEST-ONLY）调用 provider 3 次。**没有把任何真实客户询盘内容发给 provider**，「是否允许用真实客户数据」仍是待业主确认项。
+
+**不写什么（硬约束，已按代码实现并用实测证明）**
+
+- 不写 `ai_recommended_products`、`ai_draft_reply`（一期保留不用）
+- 不写 `ai_confidence`（没有校准依据，UI 显示 `Not assessed`）
+- 不写 `status`、`inquiry_type`、`note`、`first_handled_at` 或任何联系方式字段
+- 不发送任何客户回复；Discard 只清浏览器里的候选
+
+**已知限制（如实记录）**
+
+- 候选存在**进程内存**里（沿用现有提案机制）：重启或换进程后 ref 失效，重新生成即可；多实例部署时各实例互不可见。这与现有产品 AI 的限制一致，不是新引入的。
+- `ai_reviewed` 只是「有人确认过」的开关，**不是审核历史**；没有 `ai_review_meta` 之类的表。
+- 摘要由模型生成，可能读错语义；界面把原文放在同一页，确认前不落库——但这不是内容正确性的保证。
+
+---
 
 ## V2-05 分类小 tab 实测（本地已测）
 
@@ -282,8 +341,8 @@ ERROR [inquiry] email notification failed { id: 35 }
 | # | 项 | 说明 |
 |---|---|---|
 | 1 | 邮件通知 | 业主已选方案 C：暂不配 SMTP/企微，改用后台未读徽标。日后要邮件需提供 SMTP_HOST/USER/PASS |
-| 2 | AI provider | 需确认 DeepSeek 预算与是否允许处理真实客户数据 |
-| 3 | Hero 13 页的 page_key | 除 `home` 外均为建议命名，需确认是否与既有行冲突 |
+| 2 | AI provider | ✅ 已核实配置：`AI_DEFAULT_PROVIDER=deepseek`、`DEEPSEEK_MODEL=deepseek-v4-flash`、`DEEPSEEK_API_KEY` 存在。**仍需业主确认的两点**：(a) 是否允许把**真实客户询盘内容**发给 DeepSeek（目前只用合成文本验证过）；(b) 预算口径。功能本身已可用，未确认前不要在真实客户询盘上点 Generate |
+| 3 | Hero 13 页的 page_key | 除 `home` 外均为建议命名；本地已验证首次发布会在 `site_content` 建对应行，无冲突。若业主希望改名，只需改 `server/utils/heroRegistry.ts` 的 `contentKey` |
 
 ---
 
