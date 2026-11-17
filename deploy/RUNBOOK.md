@@ -147,3 +147,49 @@ ssh <user>@<host> '
 - 把 `git rev-parse --short HEAD` 与部署时间记进 `docs/project/BACKEND-DSH-V2-STATE.md`
 - 生产 `.env` 不进 Git；`/etc/litubo/litubo.env` 权限保持 640
 - 关闭 Cloudflare 的「开发模式」，确认缓存规则没有把 `/admin` 缓存
+
+## 12. 换 AI Key（DeepSeek）
+
+AI 的 key 只存在于服务器环境变量里：不进数据库、不进浏览器、后台也没有输入框。换 key 只有一条路——改 `/etc/litubo/litubo.env` 并重启服务。
+
+**推荐做法：本地改，一条命令同步**
+
+1. 改本地 `D:\LITUBO-website\.env` 里的 `DEEPSEEK_API_KEY=sk-...`（或 `DEEPSEEK_MODEL`）
+2. 在本机仓库根目录执行：
+
+```bash
+node scripts/sync-ai-env.mjs --host 43.165.125.203 --user ubuntu
+```
+
+脚本会：读取本地值 → 删掉远端同名行 → 追加新值 → `chown root:litubo` / `chmod 640` → 重启 `litubo` → 用 **sha256 前 8 位**比对本地与远端是否一致。**全程不打印密钥值**。
+
+只想同步某一个键：
+
+```bash
+node scripts/sync-ai-env.mjs --host 43.165.125.203 --user ubuntu --keys DEEPSEEK_MODEL
+```
+
+只看本地读到了什么、不连服务器：
+
+```bash
+node scripts/sync-ai-env.mjs --host 43.165.125.203 --user ubuntu --dry-run
+```
+
+**手改（不用脚本时）**
+
+```bash
+ssh ubuntu@43.165.125.203
+sudo sed -i 's|^DEEPSEEK_API_KEY=.*|DEEPSEEK_API_KEY=sk-新key|' /etc/litubo/litubo.env
+sudo systemctl restart litubo
+systemctl is-active litubo
+```
+
+**验证生效**
+
+```bash
+# 后台登录后（或看页面上的 AI 按钮是否可用）
+curl -sk --resolve tuboluo.com:443:127.0.0.1 -b <cookie> https://tuboluo.com/api/admin/ai/providers
+# 期望：deepseek configured:true, isDefault:true
+```
+
+**注意**：key 泄漏过就必须去 platform.deepseek.com 吊销重发；不要把 key 贴进聊天、文档或 Git。
