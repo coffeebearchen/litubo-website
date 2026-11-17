@@ -195,6 +195,40 @@ ERROR [inquiry] email notification failed { id: 35 }
 
 询盘始终写入数据库；徽标让新询盘不再像空收件箱。
 
+## 追加批次（业主 2026-11-17）：上产品（单文档导入 → 一次点击发布）——后端
+
+业主决策：**发布按钮要 A**（一次点击＝保存+审核+发布）；**PDF/DOCX/XLSX/图片都能传**；AI 填**名称/摘要/分类/SEO/参数**；批量 10 份逐个确认。
+
+### 已完成后端
+
+| 文件 | 作用 |
+|---|---|
+| `server/utils/aiTargets/productIntakeTarget.ts` | 新 target `product-intake`：输出名称/型号/摘要/SEO 标题与描述/分类 id/参数行（≤40）；名称拿不到就整份拒绝 |
+| `server/utils/productIntake.ts` | 下载文件（管理员令牌）、文本提取（复用现有 PDF/图片/DOCX/XLSX 提取器）、指纹（文件 id + 品号）、slug 生成与去重 |
+| `server/api/admin/products/intake/proposal.post.ts` | 只出候选：读文档 → AI 提炼 → 返回提案 + 一次性 ref；产品尚未创建 |
+| `server/api/admin/products/intake/confirm.post.ts` | **一次点击**：查重品号 → 建 Draft → 写参数组/项 → `draft→review→published`（每步校验 `ALLOWED_TRANSITIONS`） |
+
+**一次点击的语义（已按业主选择实现）**：服务端顺序执行"写字段 → 迁移到 review → 迁移到 published"，`published_at` 由服务端补；审核态是必经但不停留。品号必填且查重、分类必选、字段长度照旧校验。
+
+### 实测（合成 TXT 文档，明确标 TEST-ONLY；测后全部删除）
+
+| 步骤 | 结果 |
+|---|---|
+| 上传 | 文件进入媒体库 |
+| 提炼提案 | 200：名称 `Compact Online Checkweigher`、型号 `CX-100`、分类 3（Checkweighers）、摘要、SEO 标题/描述、**6 条参数**（含单位原样保留） |
+| 一次点击确认 | 200：建产品 id=48，`status=published`，`published_at` 已写，参数 5 组 6 项 |
+| 公开页 | `/products/checkweighers/compact-online-checkweigher` → **200**（真的发布了，不是只在库里改状态） |
+| 清理 | 参数项/组/产品/测试文件全部删除；产品总数回到 41；无残留 |
+| typecheck / eslint | 0 / 0 |
+
+### 还没做
+
+- **后台页面的 UI**（`/admin/products/import`：上传 → 选文件 → 填品号 → 生成 → 预览 → 一键发布）。当前只有接口，尚未有可点击的入口。
+- **批量 10 份**：逐个确认的队列。
+- 图片：按业主指示**不做自动导入**，仍需人工上传。
+
+---
+
 ## 追加批次（业主 2026-11-17）：产品中心 AI —— 主图与 alt 建议
 
 | 文件 | 作用 |
