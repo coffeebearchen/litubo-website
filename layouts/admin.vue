@@ -6,6 +6,27 @@ const router = useRouter()
 const route = useRoute()
 const menuOpen = ref(false)
 
+/**
+ * New inquiries waiting for a first look.
+ *
+ * Email and WeCom notification are both unconfigured in this environment, so without a visible
+ * count a saved lead looks like an empty inbox. This is the number only — no contact details.
+ * Refreshed when the shell mounts and when the route changes away from the list.
+ */
+const unreadInquiries = ref(0)
+
+async function loadUnread(): Promise<void> {
+  try {
+    const r = await $fetch<{ count: number }>('/api/admin/inquiries/unread-count')
+    unreadInquiries.value = r?.count ?? 0
+  } catch {
+    // A count is a convenience, never a blocker: leave the last value rather than show an error.
+  }
+}
+
+onMounted(loadUnread)
+watch(() => route.path, loadUnread)
+
 // Refresh interval: 10 min (Directus access token expires at ~15 min)
 const REFRESH_MS = 10 * 60 * 1000
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -135,6 +156,7 @@ function closeMenu() {
         <NuxtLink to="/admin/inquiries" class="nav-item" active-class="nav-item--active" @click="closeMenu">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 6 9 7 9-7" /></svg>
           Customer Inquiries
+          <span v-if="unreadInquiries > 0" class="nav-badge" :aria-label="`${unreadInquiries} new`">{{ unreadInquiries }}</span>
         </NuxtLink>
         <NuxtLink to="/admin/visitors" class="nav-item" active-class="nav-item--active" @click="closeMenu">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
@@ -164,6 +186,19 @@ function closeMenu() {
 </template>
 
 <style scoped>
+/* A count, not an alarm: sits inline with the label so the row stays one line at every width. */
+.nav-badge {
+  margin-inline-start: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #B42318;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
 /* ── Shell ── */
 .admin-shell {
   display: flex;

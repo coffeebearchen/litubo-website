@@ -53,6 +53,12 @@ async function save() {
         category_id: form.value.category_id,
         page_preset_id: form.value.page_preset_id,
         review_notes: form.value.review_notes,
+        // V2-01: the form rendered these three controls but the payload never carried them, so any
+        // change was silently dropped. `false` and `null` are sent as-is: false means reviewed and not
+        // an L-series variant, null means not reviewed yet.
+        checkweigher_series: form.value.checkweigher_series ?? null,
+        checkweigher_configuration: form.value.checkweigher_configuration ?? null,
+        checkweigher_l_series: form.value.checkweigher_l_series ?? null,
       },
     })
     form.value = { ...updated }

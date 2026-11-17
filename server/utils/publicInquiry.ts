@@ -283,8 +283,10 @@ export async function handlePublicInquiry(event: H3Event, toInquiryFields: Inqui
   const result = await writeInquiry(payload)
 
   // Email notification (best-effort; log only the record ID, no PII)
-  sendInquiryEmail(result.id, san.inquiry_type as InquiryType).catch(() => {
-    console.error('[inquiry] email notification failed', { id: result.id })
+  // A genuine send failure still surfaces. "Not configured" is reported once by sendInquiryEmail
+  // itself, so this branch only fires when a configured relay actually rejected the message.
+  sendInquiryEmail(result.id, san.inquiry_type as InquiryType).catch((err: unknown) => {
+    console.error('[inquiry] email notification failed', { id: result.id, reason: (err as Error)?.message ?? 'unknown' })
   })
 
   // WeCom group robot (best-effort; only when WECOM_WEBHOOK_URL is set). The full inquiry content
