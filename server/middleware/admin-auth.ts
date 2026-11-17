@@ -5,7 +5,13 @@ export default defineEventHandler(async (event) => {
   const url = getRequestURL(event).pathname
 
   const isAdminApi = url.startsWith('/api/admin/')
-  const isAdminPage = url.startsWith('/admin/') && !isAdminApi
+  /**
+   * The bare `/admin` path is an admin page too. `startsWith('/admin/')` alone skipped it, so
+   * `/admin` rendered the admin shell (10.6 KB of navigation, no data) to an anonymous request
+   * instead of redirecting to the login page — the shell is harmless, but a gate should treat every
+   * admin path the same way, and the browser should not be bounced by a client-side redirect.
+   */
+  const isAdminPage = (url === '/admin' || url.startsWith('/admin/')) && !isAdminApi
 
   // Not an admin route — let through unchanged
   if (!isAdminPage && !isAdminApi) return
