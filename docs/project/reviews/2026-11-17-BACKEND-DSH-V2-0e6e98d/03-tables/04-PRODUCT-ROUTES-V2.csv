@@ -1,0 +1,8 @@
+﻿current,V2_destination,action,rollback,database_move
+/admin/product-workspace/:id/overview,/admin/products/:id,复用成熟组件于主编辑器；旧URL临时跳转,恢复旧入口；不删原页面/API,无
+/admin/product-workspace/:id/page-content,/admin/products/:id/content,复用成熟组件于主编辑器；旧URL临时跳转,恢复旧入口；不删原页面/API,无
+/admin/product-workspace/:id/specifications,/admin/products/:id/specs,复用成熟组件于主编辑器；旧URL临时跳转,恢复旧入口；不删原页面/API,无
+/admin/product-workspace/:id/media-resources,/admin/products/:id/media,复用成熟组件于主编辑器；旧URL临时跳转,恢复旧入口；不删原页面/API,无
+/admin/product-workspace/:id/sources-evidence,保留原路径,保留唯一工具功能，不建重复新URL,恢复旧入口；不删原页面/API,无
+/admin/product-workspace/:id/ai-source-intake,保留原路径,保留唯一工具功能，不建重复新URL,恢复旧入口；不删原页面/API,无
+/admin/product-workspace/:id/ai-proposal-review,保留原路径,保留唯一工具功能，不建重复新URL,恢复旧入口；不删原页面/API,无

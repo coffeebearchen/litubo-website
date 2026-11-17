@@ -1,0 +1,8 @@
+﻿field,schema_type,purpose,writer,reader,guard
+ai_summary,text/null,人工确认的摘要,Confirm服务端,销售,不替换message
+ai_intent,string/null,受控意图，作为提示,Confirm服务端,销售,不自动改inquiry_type/负责人
+ai_recommended_products,json/null,一期不做，保留原字段,一期不写,销售（后续）,不猜型号/参数
+ai_draft_reply,text/null,一期不做，保留原字段,一期不写,销售（后续）,不自动发送
+ai_confidence,float/null,未校准保持null/Not assessed,仅有明确依据才写,销售,低证据红色+文字；不造正确率
+ai_processed_at,timestamp/null,确认结果对应的生成时间,服务端,销售,不代表已联系客户
+ai_reviewed,boolean non-null,人工确认时true；清除已保存AI结果时false,仅Confirm/明确清除,销售,不是参数正确性保证，不是完整审核历史

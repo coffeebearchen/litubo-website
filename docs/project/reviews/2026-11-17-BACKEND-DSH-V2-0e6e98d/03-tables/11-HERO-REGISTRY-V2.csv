@@ -1,0 +1,14 @@
+﻿public_url_unchanged,page_key,content_key,existing_default_source,scope
+/,home,home.hero,pages/index.vue,现有key，9个首页块全部保留
+/company/about,company.about,company.about.hero,pages/company/about.vue,建议key；仅Hero，不迁全部正文
+/company/quality-manufacturing,company.quality-manufacturing,company.quality-manufacturing.hero,pages/company/quality-manufacturing.vue,建议key；仅Hero，不迁全部正文
+/company/global-service,company.global-service,company.global-service.hero,pages/company/global-service.vue,建议key；仅Hero，不迁全部正文
+/company/become-a-partner,company.become-a-partner,company.become-a-partner.hero,pages/company/become-a-partner.vue,建议key；仅Hero，不迁全部正文
+/support/technical-support,support.technical-support,support.technical-support.hero,pages/support/[requestType].vue,建议key；保留业务表单/必填/请求类型
+/support/manual-request,support.manual-request,support.manual-request.hero,pages/support/[requestType].vue,建议key；保留业务表单/必填/请求类型
+/support/service-training,support.service-training,support.service-training.hero,pages/support/[requestType].vue,建议key；保留业务表单/必填/请求类型
+/support/request-spare-parts,support.request-spare-parts,support.request-spare-parts.hero,pages/support/request-spare-parts.vue,建议key；保留业务表单/必填/请求类型
+/support/send-product-test,support.send-product-test,support.send-product-test.hero,pages/support/send-product-test.vue,建议key；保留业务表单/必填/请求类型
+/resources,resources.overview,resources.overview.hero,pages/resources/index.vue,建议key；当前布局/内容默认保留
+/resources/downloads,resources.downloads,resources.downloads.hero,pages/resources/downloads.vue,建议key；当前布局/内容默认保留
+/resources/videos,resources.videos,resources.videos.hero,pages/resources/videos.vue,建议key；当前布局/内容默认保留

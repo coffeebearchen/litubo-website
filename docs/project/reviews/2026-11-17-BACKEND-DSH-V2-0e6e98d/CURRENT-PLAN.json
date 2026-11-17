@@ -1,0 +1,11 @@
+{
+  "plan_id": "BACKEND-DSH-V2-0e6e98d",
+  "base_commit": "0e6e98dc3c0676137e6b8531aca524aa5d962b9b",
+  "date": "2026-11-17",
+  "instruction_source": "00-DSH-SOURCE-AS-RECEIVED.txt",
+  "design_status": "READY_FOR_DSH_IMPLEMENTATION",
+  "website_launch_status": "NOT_AUTHORIZED_BY_THIS_PACKAGE",
+  "active_entry": "00-READ-ME-FIRST-V2.md",
+  "excluded_plan": "c963115版后端设计暂不采用，不得混用其UI/施工指令",
+  "business_code_modified_by_codex": false
+}
