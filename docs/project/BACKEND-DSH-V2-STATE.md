@@ -195,6 +195,13 @@ ERROR [inquiry] email notification failed { id: 35 }
 
 询盘始终写入数据库；徽标让新询盘不再像空收件箱。
 
+## 业主决定（2026-11-17）：HubSpot 暂不接
+
+- 询盘只留在 LITUBO 自己的数据库与后台，不外发到 HubSpot。
+- `HUBSPOT_ACCESS_TOKEN` 保持未配置；`inquiries.hubspot_sync_status` 一直是 `not_configured`，不是故障。
+- 不做自动外发、不做 PII 出境。将来要接时的最小形态：**人工点"同步这一条"**，单向写入 contact + note，不做双向、不做自动。
+
+---
 ## 业主决定（2026-11-17）：es / pt 翻译暂不做
 
 - 界面文案：`i18n/{en,es,pt}.json` 各 **236 键**，且 es 是真西语（`Productos`、`Aplicaciones`）。
