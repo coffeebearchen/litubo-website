@@ -98,6 +98,28 @@ const productCategoryName = ref('')
 
 const savedText = ref('')
 
+// 站点体检：只读统计，可选让 AI 说一句"先修哪里"
+interface SiteAuditCollection {
+  total: number
+  missingSeoTitle: number
+  missingSeoDescription: number
+  shortTitle: number
+  longTitle: number
+  shortDescription: number
+  longDescription: number
+  updatedToday: number
+  issues: Array<{ id: string | number, label: string, slug: string, problems: string[] }>
+}
+interface SiteAudit {
+  generatedAt: string
+  collections: { posts: SiteAuditCollection, products: SiteAuditCollection, categories: SiteAuditCollection }
+  media: { total: number, unclassified: number, withoutAlt: number }
+  duplicateSeoTitles?: number
+}
+const auditBusy = ref(false)
+const audit = ref<SiteAudit | null>(null)
+const auditAdvice = ref('')
+
 // 批量：媒体页可用，一次最多 5 张，逐条确认后才写
 interface BatchRow {
   fileId: string
@@ -413,6 +435,65 @@ async function saveProduct() {
   }
 }
 
+async function runAudit() {
+  if (auditBusy.value) return
+  auditBusy.value = true
+  error.value = ''
+  auditAdvice.value = ''
+  try {
+    audit.value = await $fetch<SiteAudit>('/api/admin/ai/site-audit')
+  }
+  catch (e: unknown) {
+    error.value = describeError(e, 'The site check could not run.')
+  }
+  finally {
+    auditBusy.value = false
+  }
+}
+
+async function askAuditAdvice() {
+  if (!audit.value || auditBusy.value) return
+  auditBusy.value = true
+  error.value = ''
+  try {
+    const c = audit.value.collections
+    const res = await $fetch<{ ok: boolean, unavailable?: boolean, error?: string, advice?: string }>(
+      '/api/admin/ai/site-audit-summary',
+      {
+        method: 'POST',
+        body: {
+          counts: {
+            posts: c.posts.total,
+            postsMissingTitle: c.posts.missingSeoTitle,
+            postsMissingDescription: c.posts.missingSeoDescription,
+            products: c.products.total,
+            productsMissingTitle: c.products.missingSeoTitle,
+            productsMissingDescription: c.products.missingSeoDescription,
+            categories: c.categories.total,
+            categoriesMissingDescription: c.categories.missingSeoDescription,
+            mediaTotal: audit.value.media.total,
+            mediaWithoutAlt: audit.value.media.withoutAlt,
+            mediaUnclassified: audit.value.media.unclassified,
+            updatedToday: c.posts.updatedToday + c.products.updatedToday,
+            duplicateTitles: audit.value.duplicateSeoTitles ?? 0,
+          },
+        },
+      },
+    )
+    if (!res.ok) {
+      error.value = res.unavailable ? 'AI is not configured on this server yet.' : (res.error ?? 'No advice could be generated.')
+      return
+    }
+    auditAdvice.value = res.advice ?? ''
+  }
+  catch (e: unknown) {
+    error.value = describeError(e, 'No advice could be generated.')
+  }
+  finally {
+    auditBusy.value = false
+  }
+}
+
 async function runBatch() {
   if (batchBusy.value) return
   batchBusy.value = true
@@ -523,6 +604,34 @@ async function saveBatchRow(row: BatchRow) {
           <p v-if="!context" class="ai-assist__hint">
             Open an article, a content item or a media file to use the assistant. This page has nothing to write to.
           </p>
+        </div>
+
+        <!-- 站点体检：只读统计，任何后台页面都能跑 -->
+        <div class="ai-assist__audit">
+          <div class="ai-assist__batch-head">
+            <span class="ai-assist__label">Site check</span>
+            <button type="button" class="ai-assist__ghost" :disabled="auditBusy" @click="runAudit">
+              {{ auditBusy ? 'Working…' : 'Run check' }}
+            </button>
+          </div>
+
+          <div v-if="audit" class="ai-assist__audit-grid">
+            <p><strong>{{ audit.collections.posts.total }}</strong> articles · {{ audit.collections.posts.missingSeoTitle }} no title · {{ audit.collections.posts.missingSeoDescription }} no description</p>
+            <p><strong>{{ audit.collections.products.total }}</strong> products · {{ audit.collections.products.missingSeoTitle }} no title · {{ audit.collections.products.missingSeoDescription }} no description</p>
+            <p><strong>{{ audit.collections.categories.total }}</strong> categories · {{ audit.collections.categories.missingSeoDescription }} no description</p>
+            <p><strong>{{ audit.media.total }}</strong> images · {{ audit.media.withoutAlt }} no alt · {{ audit.media.unclassified }} not in a folder</p>
+            <p v-if="audit.duplicateSeoTitles">{{ audit.duplicateSeoTitles }} records share a search title</p>
+            <p>Updated today: {{ audit.collections.posts.updatedToday + audit.collections.products.updatedToday }} records</p>
+          </div>
+
+          <div v-if="audit" class="ai-assist__row">
+            <button type="button" class="ai-assist__save" :disabled="auditBusy" @click="askAuditAdvice">
+              What should I fix first?
+            </button>
+          </div>
+
+          <pre v-if="auditAdvice" class="ai-assist__advice">{{ auditAdvice }}</pre>
+          <p v-if="!audit" class="ai-assist__hint">Read-only: counts missing search titles, descriptions, alt text and unfiled images. Writes nothing.</p>
         </div>
 
         <!-- 媒体库：批量描述没有 alt 的文件（逐条确认） -->
@@ -788,6 +897,11 @@ async function saveBatchRow(row: BatchRow) {
 
 .ai-assist__saved { margin-top: 14px; border-top: 1px dashed #E6D9C6; padding-top: 12px; }
 .ai-assist__saved-line { margin: 0 0 4px; font-size: 13px; color: #18332B; }
+
+.ai-assist__audit { margin-top: 14px; border-top: 1px dashed #E6D9C6; padding-top: 12px; }
+.ai-assist__audit-grid { font-size: 12px; color: #18332B; line-height: 1.5; margin-bottom: 8px; }
+.ai-assist__audit-grid p { margin: 0 0 3px; }
+.ai-assist__advice { margin: 8px 0 0; padding: 10px; background: #FFFDF8; border: 1px solid #E6D9C6; border-radius: 6px; font-size: 12px; line-height: 1.55; white-space: pre-wrap; color: #18332B; font-family: inherit; }
 
 .ai-assist__batch { margin-top: 14px; border-top: 1px dashed #E6D9C6; padding-top: 12px; }
 .ai-assist__batch-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
