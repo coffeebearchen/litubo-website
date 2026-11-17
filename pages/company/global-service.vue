@@ -12,6 +12,20 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 useSeoHead({ title: t('seo.globalService.title'), description: t('seo.globalService.description'), canonicalPath: '/company/global-service' })
 
+/**
+ * V2-04 — the hero may be overridden from /admin/page-content. The i18n title stays the default, so
+ * an untouched CMS renders exactly what the page rendered before.
+ */
+const { hero } = await usePageHero('company.global-service', {
+  eyebrow: 'Support · Global',
+  title: t('pages.globalService.heroTitle'),
+  body: 'Support starts with a clear request. Tell us the machine, where it runs and what you need, and the team will confirm the right path.',
+  ctaPrimaryLabel: 'Start a support request',
+  ctaPrimaryPath: '/support',
+  ctaSecondaryLabel: 'Not sure where to begin?',
+  ctaSecondaryPath: '/contact',
+})
+
 const entries = [
   { title: 'Technical support', body: 'Describe the machine and the issue in a technical-support request.', to: '/support/technical-support' },
   { title: 'Spare parts', body: 'Request parts with the machine model and serial number.', to: '/support/request-spare-parts' },
@@ -34,15 +48,12 @@ const steps = [
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.company') }, { label: t('nav_company.globalService') }]" />
         <div class="gs-hero">
           <div class="gs-hero__text">
-            <p class="eyebrow">Support · Global</p>
-            <h1 class="gs-hero__title">{{ t('pages.globalService.heroTitle') }}</h1>
-            <p class="gs-hero__intro">
-              Support starts with a clear request. Tell us the machine, where it runs and what you need,
-              and the team will confirm the right path.
-            </p>
-            <p class="gs-hero__actions">
-              <NuxtLink :to="localePath('/support')" class="gs-cta">Start a support request</NuxtLink>
-              <NuxtLink :to="localePath('/contact')" class="gs-link">Not sure where to begin? →</NuxtLink>
+            <p class="eyebrow">{{ hero.eyebrow }}</p>
+            <h1 class="gs-hero__title">{{ hero.title }}</h1>
+            <p class="gs-hero__intro">{{ hero.body }}</p>
+            <p v-if="hero.ctaPrimaryLabel" class="gs-hero__actions">
+              <NuxtLink :to="localePath(hero.ctaPrimaryPath)" class="gs-cta">{{ hero.ctaPrimaryLabel }}</NuxtLink>
+              <NuxtLink v-if="hero.ctaSecondaryLabel" :to="localePath(hero.ctaSecondaryPath)" class="gs-link">{{ hero.ctaSecondaryLabel }} →</NuxtLink>
             </p>
           </div>
           <aside class="gs-hero__aside">

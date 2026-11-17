@@ -15,5 +15,5 @@ useSeoHead({
 </script>
 
 <template>
-  <SupportRequestPage mode="spare-parts" />
+  <SupportRequestPage mode="spare-parts" page-key="support.request-spare-parts" />
 </template>

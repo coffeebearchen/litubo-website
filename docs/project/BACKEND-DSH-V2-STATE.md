@@ -133,7 +133,7 @@ ERROR [inquiry] email notification failed { id: 35 }
 | **V2-01** 字段闭环 | ✅ 完成（除 A05） | 见提交 | 保存 payload 补 3 字段；新建接口补白名单+枚举校验；邮件通知守卫；后台未读徽标 | 5/5 通过（false/null 区别、改系列、置空、还原） | 移除 3 行 payload + 2 处白名单回旧值 | — |
 | **V2-02** 导航 + 统一入口 | ✅ 完成 | 见提交 | 五色分区导航（文字+图标）；4 个重复路径改跳转，旧文件保留；3 个独有工具保留 | 导航渲染、跳转目标、typecheck 0 | 恢复旧 nav 块 + 4 个文件旧内容 | — |
 | **V2-03** posts 管理 | ✅ 完成 | 见提交 | `/admin/posts`（Blog/FAQ 同页，读 posts）+ GET/PATCH 接口 | 路由可达、typecheck 0 | 隐藏导航入口，数据未迁 | — |
-| **V2-04** Hero | 🟡 后台完成，前台待接 | 见提交 | 13 页注册表 + `/admin/page-content` + 单行 PATCH（publish/withdraw） | 路由可达、typecheck 0 | 关闭覆盖读取 | — |
+| **V2-04** Hero | ✅ 完成（13/13 页已接） | 见提交 | 13 页注册表 + `/admin/page-content` + 单行 PATCH（publish/withdraw）；13 页前台全部读覆盖；CTA 标签与路径按「成对」合并 | 8 页真实覆盖往返（建行→读 HTML→删行→恢复默认）；首页走 `/api/cms/home` 同源验证；CTA 半对用例；typecheck 0 | 关闭覆盖读取（前台回默认文案） | — |
 | **V2-05** cover_fit | ✅ 完成（分类 tab 未做） | 见提交 | `posts.cover_fit` nullable string；按已核实清单迁移 10 篇；接口输出 coverFit；页面优先读它，null 回退旧清单 | 接口 coverFit=contain/cover 正确；渲染 class 正确 | 关新读路径，保留列不 DROP | — |
 | V2-06 内部询盘 AI | 待做 | — | — | — | — | — |
 | V2-07 视觉与合同验收 | 待做 | — | — | — | — | — |
@@ -194,6 +194,52 @@ ERROR [inquiry] email notification failed { id: 35 }
 | **后台未读徽标** | ✅ 已加：侧栏「Customer Inquiries」显示待处理数量（当前 21） |
 
 询盘始终写入数据库；徽标让新询盘不再像空收件箱。
+
+## V2-04 前台接线实测（13/13 页）
+
+测试方法：用 Directus 管理员凭据**临时建一个已发布行**（标题/正文写 `OVERRIDE-*` 标记），读页面 HTML 确认字段真的渲染，然后**删除该行**，再读一次确认恢复默认。不是"看代码觉得对"。
+
+| 页面 | page_key | 覆盖渲染 | 清理后残留 |
+|---|---|---|---|
+| `/company/about` | `company.about` | ✅ 眉标/标题/正文 + 主次按钮 | 无 |
+| `/company/quality-manufacturing` | `company.quality-manufacturing` | ✅（上一批已接，本轮回归 200） | 无 |
+| `/company/global-service` | `company.global-service` | ✅ 眉标/标题/正文 + 主次按钮 | 无 |
+| `/company/become-a-partner` | `company.become-a-partner` | ✅ 眉标/标题/正文（此页无按钮） | 无 |
+| `/resources` | `resources.overview` | ✅ 标题/正文（此页无眉标、无按钮） | 无 |
+| `/support/technical-support` | `support.technical-support` | ✅ 标题/正文（此页无眉标） | 无 |
+| `/support/manual-request` | `support.manual-request` | ✅ 标题/正文（此页无眉标） | 无 |
+| `/support/service-training` | `support.service-training` | ✅ 眉标/标题/正文（组件内渲染） | 无 |
+| `/support/request-spare-parts` | `support.request-spare-parts` | ✅ 眉标/标题/正文 | 无 |
+| `/support/send-product-test` | `support.send-product-test` | ✅ 眉标/标题/正文 | 无 |
+| `/resources/downloads` | `resources.downloads` | ✅（上一批已接，本轮回归 200） | 无 |
+| `/resources/videos` | `resources.videos` | ✅（上一批已接，本轮回归 200） | 无 |
+| `/` | `home` | ✅ 走 `/api/cms/home`：库内 `home.hero`（id=1，published）的 `title_en` 与首页 `<h1>` 完全一致 | 未动其 8 个原有块 |
+
+**首页不需要第二个读取器**：`/api/cms/home` 本来就读 `site_content` 的 `home.hero`（含 es/pt），而 `/admin/page-content` 写的也正是 `content_key='home.hero'` 这一行。再叠一层 `usePageHero` 只会造成两个读取器抢同一行。
+
+### 顺手修掉的两个真实缺陷
+
+| # | 缺陷 | 修法 |
+|---|---|---|
+| 1 | CTA 的「成对」保护实际不生效：`label` 与 `path` 各自回落，于是"只填标签"会配上**默认页面的旧地址**，按钮指向错地方 | `usePageHero` 改为整对合并：标签和路径都来自覆盖，或都保留默认 |
+| 2 | `ResolvedHero` 的 CTA 字段是可选的，模板里 `localePath(hero.ctaPrimaryPath)` 拿不到确定字符串 | 返回值统一成 `string`（`fromDefaults` 归一化），模板不再需要判空 |
+
+### 其他证据
+
+| 项 | 结果 |
+|---|---|
+| `npm run typecheck` | 0 错误（默认堆会 OOM，需 `NODE_OPTIONS=--max-old-space-size=6144`） |
+| `npx eslint`（9 个改动文件） | 0 错误，6 条既有未使用变量警告 |
+| 浏览器水合（CDP，`/company/about`、`/support/service-training`） | `__vue_app__` 存在，0 条 console error，0 个失败请求 |
+| 测试行清理 | 建了 8 行、删了 8 行；`site_content` 回到 9 行（1 hero + 8 个首页块），`OVERRIDE-` 残留为 false |
+| **生产构建 `nuxt build`** | **本轮未验证**：两次尝试都把机器内存打满（15.5 GB 总量），Windows 杀掉 DSH 渲染进程。详见交接文件「坑 6」 |
+
+### 已知限制（记录，不隐藏）
+
+- `/resources`、两个支持表单页的 hero 设计里**没有眉标**，`/company/become-a-partner` **没有按钮**。这几个页面上对应的后台字段可以编辑但不会显示。
+- 覆盖只写 `_en` 列；`/api/cms/home` 支持 es/pt，`usePageHero` 只读英文。当前仅英文对外，不影响。
+
+---
 
 ## 待业主确认 / 待资料
 

@@ -6,6 +6,10 @@
  * unreachable CMS all leave the default in place, so a page can never render blank because the
  * editor has not filled the form in yet.
  *
+ * A button is merged as a pair, not field by field: a label without a path (or the reverse) keeps the
+ * whole default button, because a label pointing at the previous default's destination is worse than
+ * no override at all.
+ *
  * The default lives in the page component, which is why it is passed in rather than looked up here:
  * the registry on the server owns the keys, the component owns its own fallback copy.
  */
@@ -31,7 +35,16 @@ export interface HeroDefault {
   ctaSecondaryPath?: string
 }
 
-export interface ResolvedHero extends HeroDefault {
+/** A hero after fallback. Every field is a string, so a template never has to guard for undefined. */
+export interface ResolvedHero {
+  eyebrow: string
+  title: string
+  body: string
+  imageUrl: string
+  ctaPrimaryLabel: string
+  ctaPrimaryPath: string
+  ctaSecondaryLabel: string
+  ctaSecondaryPath: string
   /** True when at least one field came from a published override. */
   overridden: boolean
 }
@@ -39,6 +52,33 @@ export interface ResolvedHero extends HeroDefault {
 function pick(value: string | null | undefined, fallback: string | undefined): string {
   const v = (value ?? '').trim()
   return v || (fallback ?? '')
+}
+
+/** A label and its path come from one source: either both are overridden, or both stay default. */
+function pair(
+  label: string | null | undefined,
+  path: string | null | undefined,
+  defaultLabel: string | undefined,
+  defaultPath: string | undefined,
+): { label: string; path: string } {
+  const l = (label ?? '').trim()
+  const p = (path ?? '').trim()
+  if (l && p) return { label: l, path: p }
+  return { label: defaultLabel ?? '', path: defaultPath ?? '' }
+}
+
+function fromDefaults(defaults: HeroDefault): ResolvedHero {
+  return {
+    eyebrow: defaults.eyebrow,
+    title: defaults.title,
+    body: defaults.body,
+    imageUrl: defaults.imageUrl ?? '',
+    ctaPrimaryLabel: defaults.ctaPrimaryLabel ?? '',
+    ctaPrimaryPath: defaults.ctaPrimaryPath ?? '',
+    ctaSecondaryLabel: defaults.ctaSecondaryLabel ?? '',
+    ctaSecondaryPath: defaults.ctaSecondaryPath ?? '',
+    overridden: false,
+  }
 }
 
 export async function usePageHero(
@@ -56,27 +96,22 @@ export async function usePageHero(
     // Fall through to the default; a hero is never a reason to fail a page.
   }
 
-  if (!override) {
-    return { hero: { ...defaults, overridden: false } }
-  }
+  if (!override) return { hero: fromDefaults(defaults) }
 
-  // A CTA is only usable as a pair: a label with no path, or a path with no label, is ignored.
-  const primaryLabel = pick(override.ctaPrimaryLabel, defaults.ctaPrimaryLabel)
-  const primaryPath = pick(override.ctaPrimaryPath, defaults.ctaPrimaryPath)
-  const secondaryLabel = pick(override.ctaSecondaryLabel, defaults.ctaSecondaryLabel)
-  const secondaryPath = pick(override.ctaSecondaryPath, defaults.ctaSecondaryPath)
+  const primary = pair(override.ctaPrimaryLabel, override.ctaPrimaryPath, defaults.ctaPrimaryLabel, defaults.ctaPrimaryPath)
+  const secondary = pair(override.ctaSecondaryLabel, override.ctaSecondaryPath, defaults.ctaSecondaryLabel, defaults.ctaSecondaryPath)
 
   return {
     hero: {
-    eyebrow: pick(override.eyebrow, defaults.eyebrow),
-    title: pick(override.title, defaults.title),
-    body: pick(override.body, defaults.body),
-    imageUrl: pick(override.imageUrl, defaults.imageUrl),
-    ctaPrimaryLabel: primaryLabel && primaryPath ? primaryLabel : (defaults.ctaPrimaryLabel ?? ''),
-    ctaPrimaryPath: primaryLabel && primaryPath ? primaryPath : (defaults.ctaPrimaryPath ?? ''),
-    ctaSecondaryLabel: secondaryLabel && secondaryPath ? secondaryLabel : (defaults.ctaSecondaryLabel ?? ''),
-    ctaSecondaryPath: secondaryLabel && secondaryPath ? secondaryPath : (defaults.ctaSecondaryPath ?? ''),
-    overridden: true,
+      eyebrow: pick(override.eyebrow, defaults.eyebrow),
+      title: pick(override.title, defaults.title),
+      body: pick(override.body, defaults.body),
+      imageUrl: pick(override.imageUrl, defaults.imageUrl),
+      ctaPrimaryLabel: primary.label,
+      ctaPrimaryPath: primary.path,
+      ctaSecondaryLabel: secondary.label,
+      ctaSecondaryPath: secondary.path,
+      overridden: true,
     },
   }
 }

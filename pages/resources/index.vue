@@ -13,6 +13,16 @@ useSeoHead({
 })
 
 /**
+ * V2-04 — the hero may be overridden from /admin/page-content. This hero has no eyebrow line and no
+ * button, so only the title and the introduction are editable; the i18n copy stays the default.
+ */
+const { hero } = await usePageHero('resources.overview', {
+  eyebrow: 'Resources',
+  title: t('pages.resources.heroTitle'),
+  body: t('pages.resources.heroSubtitle'),
+})
+
+/**
  * CC-IMP-10 (D-035) — Phase 1 route ownership of "Latest from LITUBO":
  *   Insights (Technical Articles) and Case Studies → Content Center public API only
  *   Technical Guides → legacy posts
@@ -171,8 +181,8 @@ const categories = [
     <section class="page-hero">
       <div class="container">
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.resources') }]" />
-        <h1 class="page-hero__title">{{ t('pages.resources.heroTitle') }}</h1>
-        <p class="page-hero__sub">{{ t('pages.resources.heroSubtitle') }}</p>
+        <h1 class="page-hero__title">{{ hero.title }}</h1>
+        <p class="page-hero__sub">{{ hero.body }}</p>
       </div>
     </section>
 

@@ -15,5 +15,5 @@ useSeoHead({
 </script>
 
 <template>
-  <SupportRequestPage mode="product-test" />
+  <SupportRequestPage mode="product-test" page-key="support.send-product-test" />
 </template>

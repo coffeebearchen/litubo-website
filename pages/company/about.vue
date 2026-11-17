@@ -23,6 +23,8 @@ const { hero } = await usePageHero('company.about', {
   body: 'LITUBO builds inspection equipment for food and packaging producers: X-ray inspection, metal detection, checkweighing, combination inspection, and conveyors and reject systems.',
   ctaPrimaryLabel: 'Explore the equipment',
   ctaPrimaryPath: '/products',
+  ctaSecondaryLabel: 'Talk to an engineer',
+  ctaSecondaryPath: '/contact',
 })
 
 useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'), canonicalPath: '/company/about' })
@@ -59,9 +61,9 @@ const company = {
             <p class="eyebrow">{{ hero.eyebrow }}</p>
             <h1 class="ab-hero__title">{{ hero.title }}</h1>
             <p class="ab-hero__intro">{{ hero.body }}</p>
-            <p class="ab-hero__actions">
-              <NuxtLink :to="localePath('/products')" class="ab-cta">Explore the equipment</NuxtLink>
-              <NuxtLink :to="localePath('/contact')" class="ab-link">Talk to an engineer →</NuxtLink>
+            <p v-if="hero.ctaPrimaryLabel" class="ab-hero__actions">
+              <NuxtLink :to="localePath(hero.ctaPrimaryPath)" class="ab-cta">{{ hero.ctaPrimaryLabel }}</NuxtLink>
+              <NuxtLink v-if="hero.ctaSecondaryLabel" :to="localePath(hero.ctaSecondaryPath)" class="ab-link">{{ hero.ctaSecondaryLabel }} →</NuxtLink>
             </p>
           </div>
           <div class="ab-hero__media">

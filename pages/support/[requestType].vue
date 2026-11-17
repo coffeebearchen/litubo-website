@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { ResolvedHero } from '~/composables/usePageHero'
+
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
@@ -8,6 +10,13 @@ const titles: Record<string, string> = {
   'technical-support': t('nav_support.techSupport'),
   'manual-request':    t('nav_support.manualRequest'),
   'service-training':  t('nav_support.serviceTraining'),
+}
+
+/** V2-04 — one registered page key per request type; the server owns the keys, not the client. */
+const heroKeys: Record<string, string> = {
+  'technical-support': 'support.technical-support',
+  'manual-request':    'support.manual-request',
+  'service-training':  'support.service-training',
 }
 
 if (!Object.prototype.hasOwnProperty.call(titles, requestType.value)) {
@@ -30,15 +39,27 @@ const form = reactive({ name: '', company: '', email: '', model: '', serial: '',
  */
 const isServiceTraining = computed(() => requestType.value === 'service-training')
 
+/**
+ * V2-04 — the two generic forms read their hero override here. service-training renders
+ * SupportRequestPage, which reads its own key, so this lookup is skipped rather than fetched twice.
+ */
+const heroState: { hero: ResolvedHero | null } = isServiceTraining.value
+  ? { hero: null }
+  : await usePageHero(heroKeys[requestType.value]!, {
+    eyebrow: 'Support',
+    title: pageTitle.value,
+    body: t('pages.serviceRequest.heroSubtitle'),
+  })
+
 </script>
 <template>
-  <SupportRequestPage v-if="isServiceTraining" mode="service" />
+  <SupportRequestPage v-if="isServiceTraining" mode="service" page-key="support.service-training" />
   <div v-else>
     <section class="page-hero">
       <div class="container">
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.support'), to: localePath('/support') }, { label: pageTitle }]" />
-        <h1 class="page-hero__title">{{ pageTitle }}</h1>
-        <p class="page-hero__sub">{{ t('pages.serviceRequest.heroSubtitle') }}</p>
+        <h1 class="page-hero__title">{{ heroState.hero?.title || pageTitle }}</h1>
+        <p class="page-hero__sub">{{ heroState.hero?.body || t('pages.serviceRequest.heroSubtitle') }}</p>
       </div>
     </section>
     <section class="section-gap">

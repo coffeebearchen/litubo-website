@@ -10,7 +10,8 @@
 **项目**：LITUBO 外贸官网（食品/包装检测设备）。Nuxt 3 + Directus 12 + PostgreSQL。
 **仓库**：`D:\LITUBO-website`（**注意：不是 `D:\LITUBO_New_Website`，那是空目录**）
 **当前任务**：按 Codex 的 V2 设计包做**后台**改造，计划号 `BACKEND-DSH-V2-0e6e98d`。
-**进度**：V2-00 ~ V2-05 基本完成，V2-04 前台只接了 4/13 页，V2-06/V2-07 未做。
+**进度**：V2-00 ~ V2-05 完成（V2-04 已 13/13 页接完，V2-05 只差分类小 tab），V2-06/V2-07 未做。
+> 2026-11-17 更新：本轮把 V2-04 剩下的 9 页接完，并修掉 CTA「成对」保护失效的真实缺陷。
 
 ---
 
@@ -72,7 +73,7 @@ docs/project/BACKEND-DSH-V2-STATE.md
 | **V2-01** | `1e780e6` | **修称重三字段保存丢失**（表单有、payload 没有）；新建接口补白名单+枚举；删 `SMTP_HOST=...` 占位符；后台未读徽标 |
 | **V2-02** | `55abc4a` | 五色分区导航；4 个重复路径改跳转；3 个独有工具保留 |
 | **V2-03** | `55abc4a` | `/admin/posts`（读 `posts`，非 `content_items`）+ GET/PATCH |
-| **V2-04** | `55abc4a` `b707a28` | 13 页注册表；`/admin/page-content`；公开接口 `page-hero`；`usePageHero`；**只接了 4 页** |
+| **V2-04** | `55abc4a` `b707a28` + 本批 | 13 页注册表；`/admin/page-content`；公开接口 `page-hero`；`usePageHero`；**13/13 页已接** |
 | **V2-05** | `0837b49` | `posts.cover_fit`（唯一新增列）；迁移 10 篇；DTO 输出 `coverFit`；页面优先读它 |
 
 ### 已验证的（本地实测，不是"看代码觉得对"）
@@ -86,37 +87,14 @@ docs/project/BACKEND-DSH-V2-STATE.md
 
 ## 5. 未完成（照这个顺序做）
 
-### V2-04 剩余：9 个页面还没接 Hero
+### V2-04：✅ 已完成（13/13 页已接，不要再重做）
 
-已接：`about` `quality-manufacturing` `downloads` `videos`
+13 个注册 key 全部接通，实测记录见 `BACKEND-DSH-V2-STATE.md` 的「V2-04 前台接线实测」。
 
-**待接**：
+两个关键结论，避免下一轮重复劳动或改错：
 
-```
-company/global-service        → company.global-service
-company/become-a-partner      → company.become-a-partner
-resources/index               → resources.overview
-support/[requestType]         → support.technical-support / manual-request / service-training（三条 key）
-support/request-spare-parts   → support.request-spare-parts
-support/send-product-test     → support.send-product-test
-pages/index.vue               → home（首页最特殊，有 9 个原有块）
-```
-
-**接法**（照已接的 4 页抄）：
-
-```ts
-const { hero } = await usePageHero('company.global-service', {
-  eyebrow: '...', title: '...', body: '...',
-  ctaPrimaryLabel: '...', ctaPrimaryPath: '...',
-})
-```
-
-模板里把写死的 `eyebrow` / `h1` / `intro` 换成 `{{ hero.eyebrow }}` / `{{ hero.title }}` / `{{ hero.body }}`。
-
-**注意**：
-- `pages/support/[requestType].vue` 是动态路由，服务 3 个 key，要按 `requestType` 选 key
-- `global-service` 和 `become-a-partner` 目前的标题来自 i18n（`t('pages...')`），替换时保留 i18n 作为默认值
-- 首页有 9 个原有 `site_content` 块，**不要动它们**，只接 hero
+- **首页不需要接 `usePageHero`**。`/api/cms/home` 本来就读 `site_content` 的 `home.hero`（还带 es/pt），`/admin/page-content` 写的也是同一行。加第二个读取器只会抢同一行数据。
+- **CTA 现在按整对合并**：`usePageHero` 的返回值所有字段都是 `string`；只填标签不填路径时，整对按钮保留默认，不会出现"新文字 + 旧地址"。
 
 ### V2-05 剩余：分类小 tab
 
@@ -179,6 +157,22 @@ Discard                                     只在浏览器丢候选，不清原
 
 `SMTP_HOST=...`（字面三个点）曾导致每条询盘都报"邮件发送失败"。
 **已删。** 现在 SMTP 未配置时只提示一次。
+
+### 坑 6：这台机器只有 15.5 GB 内存 —— 大堆构建会打死 DSH
+
+**现象**：DSH 弹「应用无法启动或已意外停止 / Desktop renderer exited: oom」。
+崩溃日志在 `%APPDATA%\@deepseek-ai\dsh-desktop\logs\crash-*-renderer.log`，`--- error ---` 一行就是 `oom`。
+
+**原因**（2026-11-17 实测，两次）：本机同时跑着 Docker Desktop（PostgreSQL + Directus + 一整套 Supabase + deploy 栈）、Electron GUI 和 Nuxt dev server，空闲物理内存常年在 **1 GB 上下**。此时再跑
+`NODE_OPTIONS=--max-old-space-size=6144 nuxt build`，Windows 会先把 Chromium 渲染进程 OOM 掉 —— **不是 DSH 的 bug，也不是会话文件损坏，不要重装**。
+
+**处理**：
+
+1. 先看 `Get-CimInstance Win32_Process -Filter "Name='node.exe'"`，把还在跑的孤儿 `nuxt build` / `nuxt dev` 杀掉（它会一直占着 1 GB+）
+2. 半成品 `.output` 要删掉，否则可能被误当成"构建成功"
+3. **在本机 GUI 开着的时候不要跑 `nuxt build`**。用 `npm run typecheck`（仍需 `--max-old-space-size=6144`，默认堆会 `Fatal process out of memory: Zone`）+ dev server 实测 + 浏览器 CDP 水合检查代替；真要构建，先关掉无关的 Docker 栈或退出 GUI
+
+**旁证**：`nuxt dev` 启动时偶尔会刷 `Failed to resolve import "#app-manifest"` —— 这是启动竞态（`.nuxt/manifest/meta/dev.json` 在报错后几秒才写出来），页面照常 200，水合正常，`0 console error`。不要在这上面浪费时间。
 
 ---
 

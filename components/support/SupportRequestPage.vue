@@ -14,7 +14,11 @@
  */
 type Mode = 'spare-parts' | 'service' | 'product-test'
 
-const props = defineProps<{ mode: Mode }>()
+const props = defineProps<{
+  mode: Mode
+  /** V2-04 — the registered page key whose hero this layout renders. */
+  pageKey: string
+}>()
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
@@ -189,6 +193,19 @@ const configs: Record<Mode, Config> = {
 
 const cfg = computed(() => configs[props.mode])
 
+/**
+ * V2-04 — the hero may be overridden from /admin/page-content.
+ *
+ * The approved copy stays in this file's config, so a missing row, an unpublished row or an empty
+ * field renders exactly what the page rendered before. The three support pages share this layout,
+ * so each passes its own registered page key rather than duplicating the lookup.
+ */
+const { hero } = await usePageHero(props.pageKey, {
+  eyebrow: cfg.value.eyebrow,
+  title: cfg.value.title,
+  body: cfg.value.intro,
+})
+
 const form = reactive({
   name: '', company: '', email: '', model: '', serial: '', country: '',
   parts: '', issue: '', product: '', concern: '', notes: '',
@@ -316,9 +333,9 @@ const nav = [
     <section class="sp-hero">
       <div class="container sp-hero__inner">
         <div class="sp-hero__text">
-          <p class="eyebrow">{{ cfg.eyebrow }}</p>
-          <h1 class="sp-hero__title">{{ cfg.title }}</h1>
-          <p class="sp-hero__intro">{{ cfg.intro }}</p>
+          <p class="eyebrow">{{ hero.eyebrow }}</p>
+          <h1 class="sp-hero__title">{{ hero.title }}</h1>
+          <p class="sp-hero__intro">{{ hero.body }}</p>
           <ol class="sp-steps" role="list">
             <li v-for="(s, i) in cfg.steps" :key="s">
               <span class="sp-steps__n">{{ i + 1 }}</span>{{ s }}

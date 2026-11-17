@@ -15,6 +15,16 @@ const route = useRoute()
 
 useSeoHead({ title: t('seo.partner.title'), description: t('seo.partner.description'), canonicalPath: '/company/become-a-partner' })
 
+/**
+ * V2-04 — the hero may be overridden from /admin/page-content. The i18n title stays the default, and
+ * this hero carries no button, so only the eyebrow, title and body are editable here.
+ */
+const { hero } = await usePageHero('company.become-a-partner', {
+  eyebrow: 'Partnership',
+  title: t('pages.partner.heroTitle'),
+  body: 'Introduce your market, your experience and what you have in mind. A partnership enquiry is a conversation about fit — not an application for an account.',
+})
+
 type Interest = 'distribution' | 'service' | 'integration' | 'other'
 
 const interests: { key: Interest, title: string, body: string }[] = [
@@ -91,12 +101,9 @@ async function submit() {
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.company') }, { label: t('nav_company.partner') }]" />
         <div class="pt-hero">
           <div class="pt-hero__text">
-            <p class="eyebrow">Partnership</p>
-            <h1 class="pt-hero__title">{{ t('pages.partner.heroTitle') }}</h1>
-            <p class="pt-hero__intro">
-              Introduce your market, your experience and what you have in mind. A partnership enquiry is
-              a conversation about fit — not an application for an account.
-            </p>
+            <p class="eyebrow">{{ hero.eyebrow }}</p>
+            <h1 class="pt-hero__title">{{ hero.title }}</h1>
+            <p class="pt-hero__intro">{{ hero.body }}</p>
           </div>
           <aside class="pt-hero__aside">
             <span class="pt-symbol" aria-hidden="true">
