@@ -459,6 +459,7 @@ async function saveCategory(): Promise<void> {
                 <button v-if="form.heroImage" type="button" class="link-btn" @click="form.heroImage = ''">Remove image</button>
               </div>
               <p class="hint">Alt text comes from the existing media title; editing that title affects every use of the file.</p>
+              <p class="hint hint--warn">Saved with this hero, but not yet shown on the public page: none of the page layouts render it yet.</p>
             </div>
           </div>
 
@@ -592,6 +593,7 @@ h1 { margin: 0 0 6px; font-size: 28px; line-height: 1.2; color: #20352B; }
 .imgbox__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 10px; }
 .imgbox__value { margin: 0 0 4px; font-size: 16px; color: #20352B; }
 .hint { margin: 4px 0 0; font-size: 14px; color: #52665C; }
+.hint--warn { color: #945A20; }
 .muted { color: #52665C; }
 
 .actions { display: flex; align-items: center; gap: 16px; margin-top: 8px; }

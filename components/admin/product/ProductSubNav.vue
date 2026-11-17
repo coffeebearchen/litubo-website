@@ -3,13 +3,23 @@ const props = defineProps<{ productId: string | number }>()
 const route = useRoute()
 const router = useRouter()
 
+/**
+ * The seven tabs of the unified product editor, in the order the approved visual master lists them
+ * (UI-03): Basics / Content / Specifications / Media / FAQ / SEO / Preview. They are English because
+ * the master is, and because the labels name concepts that do not translate cleanly ("Specifications"
+ * is not the same thing as "技术参数" once a reader also sees the public product page).
+ *
+ * Preview is a real page but deliberately not part of the admin layout — it renders the product the
+ * way a visitor would see it, so it opens full-screen and offers "Back to Edit".
+ */
 const tabs = [
-  { label: '基础信息', path: `/admin/products/${props.productId}` },
-  { label: '页面模块', path: `/admin/products/${props.productId}/content` },
-  { label: '技术参数', path: `/admin/products/${props.productId}/specs` },
-  { label: '图片与资料', path: `/admin/products/${props.productId}/media` },
-  { label: '产品 FAQ', path: `/admin/products/${props.productId}/faq` },
+  { label: 'Basics', path: `/admin/products/${props.productId}` },
+  { label: 'Content', path: `/admin/products/${props.productId}/content` },
+  { label: 'Specifications', path: `/admin/products/${props.productId}/specs` },
+  { label: 'Media', path: `/admin/products/${props.productId}/media` },
+  { label: 'FAQ', path: `/admin/products/${props.productId}/faq` },
   { label: 'SEO', path: `/admin/products/${props.productId}/seo` },
+  { label: 'Preview', path: `/admin/products/${props.productId}/preview` },
 ]
 
 function isActive(path: string) {
@@ -24,8 +34,8 @@ function onSelectChange(event: Event) {
 </script>
 
 <template>
-  <!-- 桌面端：横向 tab 栏 -->
-  <nav class="subnav" aria-label="产品编辑导航">
+  <!-- 桌面端：横向 tab 栏（tab 溢出时只做局部横滚，不挤压主内容） -->
+  <nav class="subnav" aria-label="Product editor navigation">
     <NuxtLink
       v-for="tab in tabs"
       :key="tab.path"
@@ -37,7 +47,7 @@ function onSelectChange(event: Event) {
     </NuxtLink>
   </nav>
 
-  <!-- 移动端：select 下拉导航（全部 6 个页面可直接选择） -->
+  <!-- 移动端：select 下拉导航（全部 7 个页面可直接选择） -->
   <div class="subnav-mobile">
     <select class="subnav-select" :value="currentTab" @change="onSelectChange">
       <option v-for="tab in tabs" :key="tab.path" :value="tab.path">
