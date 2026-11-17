@@ -26,6 +26,8 @@ type Context =
   | { kind: 'post', id: number, label: string }
   | { kind: 'contentItem', id: number, label: string }
   | { kind: 'media', id: string, label: string }
+  | { kind: 'category', id: number, label: string }
+  | { kind: 'product', id: number, label: string }
 
 const route = useRoute()
 
@@ -42,6 +44,19 @@ const draftDescription = ref('')
 
 const altRef = ref('')
 const altDraft = ref('')
+
+// 分类：介绍 + 两个 SEO 字段
+const catRef = ref('')
+const catIntro = ref('')
+const catTitle = ref('')
+const catDescription = ref('')
+
+// 产品：复用已有的文案 AI（草稿才可用）
+const productRef = ref('')
+const productSummary = ref('')
+const productSeoTitle = ref('')
+const productSeoDescription = ref('')
+const productCategoryName = ref('')
 
 const savedText = ref('')
 
@@ -83,14 +98,25 @@ const context = computed<Context | null>(() => {
     if (UUID_RE.test(fileId)) return { kind: 'media', id: fileId, label: 'Media file' }
   }
 
+  // A single product category editor.
+  const category = /^\/admin\/products\/categories\/(\d+)(?:\/|$)/.exec(path)
+  if (category) return { kind: 'category', id: Number(category[1]), label: `Category #${category[1]}` }
+
+  // A single product editor. `/new`, `/import` and the categories index do not match the id pattern.
+  const product = /^\/admin\/products\/(\d+)(?:\/|$)/.exec(path)
+  if (product) return { kind: 'product', id: Number(product[1]), label: `Product #${product[1]}` }
+
   return null
 })
 
 const contextText = computed(() => context.value?.label ?? 'No single item on this page')
-const isMedia = computed(() => context.value?.kind === 'media')
 const actionLabel = computed(() => {
-  if (!context.value) return 'Nothing to write here'
-  return isMedia.value ? 'Write this file’s alt text' : 'Write this page’s SEO'
+  const kind = context.value?.kind
+  if (!kind) return 'Nothing to write here'
+  if (kind === 'media') return 'Write this file’s alt text'
+  if (kind === 'category') return 'Write this category’s intro'
+  if (kind === 'product') return 'Suggest this product’s copy'
+  return 'Write this page’s SEO'
 })
 
 function resetProposal() {
@@ -99,6 +125,15 @@ function resetProposal() {
   draftDescription.value = ''
   altRef.value = ''
   altDraft.value = ''
+  catRef.value = ''
+  catIntro.value = ''
+  catTitle.value = ''
+  catDescription.value = ''
+  productRef.value = ''
+  productSummary.value = ''
+  productSeoTitle.value = ''
+  productSeoDescription.value = ''
+  productCategoryName.value = ''
 }
 
 function openPanel() {
@@ -155,6 +190,53 @@ async function suggest() {
       if (!res.proposal.altText) {
         error.value = 'The file name gives the model nothing to describe. Look at the picture and write the alt yourself.'
       }
+      return
+    }
+
+    if (ctx.kind === 'category') {
+      const res = await $fetch<{
+        ok: boolean
+        unavailable?: boolean
+        error?: string
+        proposal?: { intro: string, seoTitle: string, seoDescription: string }
+        proposalRef?: string
+        reused?: boolean
+        productCount?: number
+      }>('/api/admin/ai/category-proposal', { method: 'POST', body: { id: ctx.id } })
+      if (!res.ok || !res.proposal) {
+        error.value = res.unavailable ? 'AI is not configured on this server yet.' : (res.error ?? 'The suggestion could not be generated.')
+        return
+      }
+      catRef.value = res.proposalRef ?? ''
+      catIntro.value = res.proposal.intro
+      catTitle.value = res.proposal.seoTitle
+      catDescription.value = res.proposal.seoDescription
+      notice.value = res.reused
+        ? 'This is the suggestion already generated for this category.'
+        : `Based on ${res.productCount ?? 0} published products in this category.`
+      return
+    }
+
+    if (ctx.kind === 'product') {
+      const res = await $fetch<{
+        ok: boolean
+        unavailable?: boolean
+        error?: string
+        proposal?: { summary: string, seoTitle: string, seoDescription: string, categoryId: number | null }
+        proposalRef?: string
+        reused?: boolean
+        categories?: Array<{ id: number, name: string }>
+      }>(`/api/admin/products/${ctx.id}/ai-listing-proposal`, { method: 'POST', body: {} })
+      if (!res.ok || !res.proposal) {
+        error.value = res.unavailable ? 'AI is not configured on this server yet.' : (res.error ?? 'The suggestion could not be generated.')
+        return
+      }
+      productRef.value = res.proposalRef ?? ''
+      productSummary.value = res.proposal.summary
+      productSeoTitle.value = res.proposal.seoTitle
+      productSeoDescription.value = res.proposal.seoDescription
+      productCategoryName.value = (res.categories ?? []).find(c => c.id === res.proposal?.categoryId)?.name ?? ''
+      notice.value = res.reused ? 'This is the suggestion already generated for this product.' : ''
       return
     }
 
@@ -223,6 +305,66 @@ async function saveAlt() {
     })
     savedText.value = res.altText
     notice.value = 'Saved. Reload the page to see the stored alt text.'
+    resetProposal()
+  }
+  catch (e: unknown) {
+    error.value = describeError(e, 'Saving failed.')
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+async function saveCategory() {
+  const ctx = context.value
+  if (!ctx || ctx.kind !== 'category' || !catRef.value || busy.value) return
+  busy.value = true
+  error.value = ''
+  try {
+    const res = await $fetch<{ ok: boolean, saved: { intro: string, seoTitle: string, seoDescription: string } }>(
+      '/api/admin/ai/category-confirm',
+      {
+        method: 'POST',
+        body: {
+          id: ctx.id,
+          proposalRef: catRef.value,
+          intro: catIntro.value,
+          seoTitle: catTitle.value,
+          seoDescription: catDescription.value,
+        },
+      },
+    )
+    savedText.value = `${res.saved.intro}\n${res.saved.seoTitle}\n${res.saved.seoDescription}`
+    notice.value = 'Saved. Reload the page to see the stored values.'
+    resetProposal()
+  }
+  catch (e: unknown) {
+    error.value = describeError(e, 'Saving failed.')
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+async function saveProduct() {
+  const ctx = context.value
+  if (!ctx || ctx.kind !== 'product' || !productRef.value || busy.value) return
+  busy.value = true
+  error.value = ''
+  try {
+    await $fetch(`/api/admin/products/${ctx.id}/ai-listing-confirm`, {
+      method: 'POST',
+      body: {
+        proposalRef: productRef.value,
+        // 只写入这三项；分类归属不在面板里改（那是另一个决定）。
+        acceptSummary: true,
+        acceptSeoTitle: true,
+        acceptSeoDescription: true,
+        acceptCategory: false,
+      },
+    })
+    savedText.value = `${productSummary.value}\n${productSeoTitle.value}\n${productSeoDescription.value}`
+    notice.value = 'Saved. Reload the page to see the stored values.'
     resetProposal()
   }
   catch (e: unknown) {
@@ -412,6 +554,57 @@ async function saveBatchRow(row: BatchRow) {
             <button type="button" class="ai-assist__ghost" :disabled="busy" @click="resetProposal">Discard</button>
           </div>
           <p class="ai-assist__hint">Writes the file’s title field, which the library and the public pages read as alt. Nothing else changes.</p>
+        </div>
+
+        <!-- 产品分类：介绍 + SEO -->
+        <div v-if="catRef" class="ai-assist__proposal">
+          <p class="ai-assist__proposal-head">Review before saving</p>
+          <label class="ai-assist__field">
+            <span class="ai-assist__label">Category introduction</span>
+            <textarea v-model="catIntro" rows="5" maxlength="400" />
+            <span class="ai-assist__count" :class="{ 'is-off': catIntro.length > 320 }">
+              {{ catIntro.length }} / 400 · ideal ≤ 320
+            </span>
+          </label>
+          <label class="ai-assist__field">
+            <span class="ai-assist__label">Search title</span>
+            <input v-model="catTitle" type="text" maxlength="120">
+          </label>
+          <label class="ai-assist__field">
+            <span class="ai-assist__label">Search description</span>
+            <textarea v-model="catDescription" rows="3" maxlength="320" />
+            <span class="ai-assist__count" :class="{ 'is-off': catDescription.length < DESCRIPTION_IDEAL.min || catDescription.length > DESCRIPTION_IDEAL.max }">
+              {{ catDescription.length }} / 320 · ideal {{ DESCRIPTION_IDEAL.min }}–{{ DESCRIPTION_IDEAL.max }}
+            </span>
+          </label>
+          <div class="ai-assist__row">
+            <button type="button" class="ai-assist__save" :disabled="busy" @click="saveCategory">Save these three fields</button>
+            <button type="button" class="ai-assist__ghost" :disabled="busy" @click="resetProposal">Discard</button>
+          </div>
+          <p class="ai-assist__hint">Writes the category introduction and its two search fields. The name, slug, image and product list stay untouched.</p>
+        </div>
+
+        <!-- 产品：摘要 + SEO（复用产品文案 AI，草稿才可用） -->
+        <div v-if="productRef" class="ai-assist__proposal">
+          <p class="ai-assist__proposal-head">Review before saving</p>
+          <label class="ai-assist__field">
+            <span class="ai-assist__label">Product summary</span>
+            <textarea v-model="productSummary" rows="4" maxlength="600" />
+          </label>
+          <label class="ai-assist__field">
+            <span class="ai-assist__label">Search title</span>
+            <input v-model="productSeoTitle" type="text" maxlength="120">
+          </label>
+          <label class="ai-assist__field">
+            <span class="ai-assist__label">Search description</span>
+            <textarea v-model="productSeoDescription" rows="3" maxlength="320" />
+          </label>
+          <p v-if="productCategoryName" class="ai-assist__hint">Suggested category: {{ productCategoryName }} (not changed by this save).</p>
+          <div class="ai-assist__row">
+            <button type="button" class="ai-assist__save" :disabled="busy" @click="saveProduct">Save summary and SEO</button>
+            <button type="button" class="ai-assist__ghost" :disabled="busy" @click="resetProposal">Discard</button>
+          </div>
+          <p class="ai-assist__hint">Available while the product is a Draft. Only the summary and the two search fields are written.</p>
         </div>
 
         <div v-if="savedText" class="ai-assist__saved">
