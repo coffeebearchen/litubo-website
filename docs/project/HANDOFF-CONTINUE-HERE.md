@@ -110,10 +110,10 @@ V2-00 ~ V2-07 全部完成，实现细节、实测记录与边界都写在 `BACK
 
 ### 5.2 需要业主拍板的两件事（不要自行决定）
 
-1. **产品编辑器 tab**：实现是 6 个中文 tab（基础信息/页面模块/技术参数/图片与资料/产品 FAQ/SEO），设计是 7 个英文 tab（含 Preview）。改语言会影响既有测试与导航。
+1. **产品编辑器其余文案**：tab 已改成 7 个英文（Basics/Content/Specifications/Media/FAQ/SEO/Preview，2026-11-17 完成），但卡片标题、按钮仍是中文（基础信息/发布状态/撤回草稿等）。要不要整页英文化，是另一个决定，会牵动更多页面与测试。
 2. **页面内容清单 tab 结构**：以文字规格（Home/Company/Support/Resources）为准，还是改成设计图（All page heroes / Home blocks / Product categories）。当前按文字规格实现。
 
-> 原先列在这里的另外两项已于 2026-11-17 完成：
+> 原先列在这里的更多项已于 2026-11-17 完成：
 > - 测试草稿 `DRAFT: This should not appear in public API [TEST]` 已删除（备份 `backup/2026-11-17/`），`posts` 33 → 32。
 > - Hero 编辑页已补 Media Library 选择器（实测选图→发布→库中值一致→公开接口可取图）。
 
