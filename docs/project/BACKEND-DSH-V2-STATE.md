@@ -195,6 +195,39 @@ ERROR [inquiry] email notification failed { id: 35 }
 
 询盘始终写入数据库；徽标让新询盘不再像空收件箱。
 
+## 追加批次（业主 2026-11-17）：产品中心 AI —— 主图与 alt 建议
+
+| 文件 | 作用 |
+|---|---|
+| `server/utils/aiTargets/productMediaTarget.ts` | 新 target `product-media`：输出 `mediaRowId`（必须是给定候选之一，0 表示"看不出"）+ `altText`（≤160） |
+| `server/utils/productMediaAi.ts` | 只把**已启用且当前公开可用**的图片列为候选；发给模型的只有行 id 与文件名/媒体标题，**不发文件 UUID** |
+| `server/api/admin/products/[id]/ai-media-proposal.post.ts` | 只出候选；产品必须 Draft；复用限速与提案机制 |
+| `server/api/admin/products/[id]/ai-media-confirm.post.ts` | 写 `products_files.file_role='hero'`（并把本品其他行的 hero 清掉）与 `alt_en`；也接受**由人指定**的 `mediaRowId`（仍校验属于本产品可用图片） |
+| `pages/admin/products/[id]/index.vue` | AI 卡片新增「图片」小节：AI 建议 / 由人从下拉指定 / alt 勾选 |
+
+**实测（draft 产品 19 + 临时挂两条公开图片关联，测完删除，`products_files` 回到 67 行）**
+
+| 用例 | 结果 |
+|---|---|
+| 生成 | 200，候选 2 条；模型对哈希文件名**诚实拒绝选图**（`mediaRowId=0`） |
+| 人工指定图片 + 只存 alt | 200，`saved=alt` |
+| 人工指定图片 + 设为主图 | 200，`saved=hero`，该行 `file_role=hero` |
+| 再次生成 | 200，**新 ref**（不是已用过的那个） |
+| 第二次改设另一张为主图 | 200；旧行 hero 被清空，**只剩一条 hero** |
+| 重放同一 ref | 409 |
+| 已发布产品生成 | 409（仅 Draft 可用） |
+| 未登录 | 401 |
+| typecheck / eslint | 0 / 0 |
+
+**两个由实测暴露并修掉的缺陷**
+
+1. **确认过的建议会被当成缓存再发一次**：`rememberAnalysis` 按 scope 复用，导致"已确认"的建议又出现在界面上，而保存必然 409。现在三个 proposal 接口（询盘 / 列表文案 / 图片）遇到 `alreadyApplied` 改用带时间戳的新 scope，旧 ref 保持作废。
+2. **模型说"看不出"时整份建议被判失败**，连带把"由人指定图片"的入口也弄没了。现在允许空建议返回，界面给出下拉让人自己选图。
+
+**限制（如实记录）**：模型看不到图片，只能读文件名与媒体标题；文件名是哈希时它无法判断，这是设计上的诚实，不是故障。候选只含当前公开可用的图片（RSG-06），私有/归档文件不会成为建议。
+
+---
+
 ## 追加批次（业主 2026-11-17）：产品中心 AI —— 摘要 / SEO / 分类建议
 
 > 这一批**不属于 V2 包**，是业主要求"AI 参与产品中心的工作"后新增的模块。

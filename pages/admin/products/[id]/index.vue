@@ -123,7 +123,7 @@ const aiAccept = reactive({ summary: true, seoTitle: true, seoDescription: true,
 const acceptedCategoryName = computed(() => {
   const id = aiProposal.value?.categoryId
   if (id === null || id === undefined) return ''
-  return aiCategories.value.find(c => c.id === id)?.name ?? `#${id}`
+  return aiCategories.value.find((c: { id: number, name: string }) => c.id === id)?.name ?? `#${id}`
 })
 
 async function generateListingSuggestion() {
@@ -188,6 +188,103 @@ async function confirmListingSuggestion() {
     aiError.value = fe.data?.message ?? 'The suggestion could not be saved. Nothing was written.'
   } finally {
     aiSaving.value = false
+  }
+}
+
+/**
+ * Picture suggestion: which of this product's own pictures should be its hero, and alt text for it.
+ * The model cannot see the images — it only reads file names and media titles — so this is a
+ * shortlist choice for a person, never an automatic placement.
+ */
+interface MediaCandidateOption { rowId: number, label: string, title: string | null, currentAlt: string | null }
+interface MediaProposal { mediaRowId: number, altText: string }
+interface MediaProposalResponse {
+  ok: boolean
+  unavailable?: boolean
+  error?: string
+  proposal?: MediaProposal
+  proposalRef?: string
+  candidates?: MediaCandidateOption[]
+}
+
+const mediaProposal = ref<MediaProposal | null>(null)
+const mediaRef = ref('')
+const mediaCandidates = ref<MediaCandidateOption[]>([])
+const mediaGenerating = ref(false)
+const mediaSaving = ref(false)
+const mediaError = ref('')
+const mediaFeedback = ref('')
+const mediaAccept = reactive({ hero: true, alt: true })
+/** Used when the model declines to choose a picture — the person picks one instead. */
+const mediaPickRowId = ref(0)
+
+const chosenMedia = computed(() => {
+  const suggested = mediaProposal.value?.mediaRowId ?? 0
+  const effective = suggested > 0 ? suggested : mediaPickRowId.value
+  return mediaCandidates.value.find((c: MediaCandidateOption) => c.rowId === effective) ?? null
+})
+
+async function generateMediaSuggestion() {
+  mediaGenerating.value = true
+  mediaError.value = ''
+  mediaFeedback.value = ''
+  try {
+    const res = await $fetch<MediaProposalResponse>(`/api/admin/products/${id}/ai-media-proposal`, { method: 'POST', body: {} })
+    if (!res.ok || !res.proposal || !res.proposalRef) {
+      mediaError.value = res.error ?? 'A suggestion could not be generated. Nothing changed.'
+      return
+    }
+    mediaProposal.value = res.proposal
+    mediaRef.value = res.proposalRef
+    mediaCandidates.value = res.candidates ?? []
+    mediaAccept.hero = res.proposal.mediaRowId > 0
+    mediaAccept.alt = Boolean(res.proposal.altText)
+    // When the model declines to choose, start the person on the first usable picture so the alt text
+    // they keep has somewhere to land.
+    mediaPickRowId.value = res.proposal.mediaRowId > 0 ? 0 : (res.candidates?.[0]?.rowId ?? 0)
+  } catch (err: unknown) {
+    const fe = err as { data?: { message?: string } }
+    mediaError.value = fe.data?.message ?? 'A suggestion could not be generated. Nothing changed.'
+  } finally {
+    mediaGenerating.value = false
+  }
+}
+
+function discardMediaSuggestion() {
+  mediaProposal.value = null
+  mediaRef.value = ''
+  mediaError.value = ''
+  mediaFeedback.value = 'Suggestion discarded. Nothing was saved.'
+}
+
+async function confirmMediaSuggestion() {
+  if (!mediaProposal.value) return
+  if (!mediaAccept.hero && !mediaAccept.alt) {
+    mediaError.value = 'Choose at least one suggestion to save.'
+    return
+  }
+  mediaSaving.value = true
+  mediaError.value = ''
+  mediaFeedback.value = ''
+  try {
+    const res = await $fetch<{ ok: boolean, saved: string[] }>(`/api/admin/products/${id}/ai-media-confirm`, {
+      method: 'POST',
+      body: {
+        proposalRef: mediaRef.value,
+        acceptHero: mediaAccept.hero,
+        acceptAlt: mediaAccept.alt,
+        // Only meaningful when the model declined: the person names the picture instead.
+        mediaRowId: mediaPickRowId.value || undefined,
+      },
+    })
+    mediaProposal.value = null
+    mediaRef.value = ''
+    mediaFeedback.value = res.saved.length ? `Saved: ${res.saved.join(', ')}.` : 'Nothing to save.'
+  } catch (err: unknown) {
+    const fe = err as { data?: { message?: string } }
+    mediaError.value = fe.data?.message ?? 'The suggestion could not be saved. Nothing was written.'
+  } finally {
+    mediaSaving.value = false
   }
 }
 </script>
@@ -277,6 +374,53 @@ async function confirmListingSuggestion() {
             <p v-if="aiError" class="ai-error" role="alert">{{ aiError }}</p>
             <p v-if="aiFeedback" class="ai-hint" role="status">{{ aiFeedback }}</p>
             <p class="ai-note">AI 只写摘要、SEO 标题/描述、技术分类。不改名称、slug、code、状态，也不发布。</p>
+
+            <div class="ai-media">
+              <p class="ai-sub">图片</p>
+              <p v-if="!mediaProposal" class="ai-hint">
+                从本产品已启用且可公开的图片里，建议一张作为主图，并写它的 alt 文本。
+              </p>
+
+              <button type="button" class="ai-btn" :disabled="mediaGenerating" @click="generateMediaSuggestion">
+                {{ mediaGenerating ? '生成中…' : (mediaProposal ? '重新建议图片' : '建议主图与 alt') }}
+              </button>
+
+              <div v-if="mediaProposal" class="ai-proposal">
+                <label v-if="mediaProposal.mediaRowId > 0 && chosenMedia" class="ai-item">
+                  <input v-model="mediaAccept.hero" type="checkbox">
+                  <span><strong>主图（AI 建议）</strong><br>{{ chosenMedia.label }}</span>
+                </label>
+
+                <div v-else-if="mediaCandidates?.length" class="ai-pick">
+                  <p class="ai-hint">AI 没能挑出主图（文件名里的信息不足）。你可以自己指定一张：</p>
+                  <select v-model.number="mediaPickRowId">
+                    <option v-for="c in mediaCandidates" :key="c.rowId" :value="c.rowId">{{ c.label }}</option>
+                  </select>
+                  <label class="ai-item">
+                    <input v-model="mediaAccept.hero" type="checkbox">
+                    <span>把上面这张设为主图</span>
+                  </label>
+                </div>
+
+                <label v-if="mediaProposal.altText" class="ai-item">
+                  <input v-model="mediaAccept.alt" type="checkbox">
+                  <span><strong>alt 文本</strong><br>{{ mediaProposal.altText }}</span>
+                </label>
+
+                <div class="ai-actions">
+                  <button type="button" class="ai-btn" :disabled="mediaSaving" @click="confirmMediaSuggestion">
+                    {{ mediaSaving ? '保存中…' : '保存勾选项' }}
+                  </button>
+                  <button type="button" class="ai-btn ai-btn--ghost" :disabled="mediaSaving" @click="discardMediaSuggestion">
+                    丢弃
+                  </button>
+                </div>
+              </div>
+
+              <p v-if="mediaError" class="ai-error" role="alert">{{ mediaError }}</p>
+              <p v-if="mediaFeedback" class="ai-hint" role="status">{{ mediaFeedback }}</p>
+              <p class="ai-note">模型看不到图片，只能按文件名和媒体标题判断，所以要你确认。不改文件本身，也不改它的公开状态。</p>
+            </div>
           </template>
         </div>
 
@@ -375,6 +519,20 @@ async function confirmListingSuggestion() {
 .ai-btn--ghost { background: #fff; color: #7250A2; border: 1px solid #D9CFEA; }
 .ai-btn:disabled { opacity: .6; cursor: default; }
 .ai-error { margin: var(--space-2) 0 0; font-size: 12px; line-height: 1.5; color: #B42318; }
+.ai-media { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed #D9CFEA; }
+.ai-sub { margin: 0 0 var(--space-2); font-size: 12px; font-weight: 600; color: #7250A2; letter-spacing: .04em; }
+.ai-pick select {
+  width: 100%;
+  min-height: 34px;
+  margin: 0 0 var(--space-2);
+  padding: 6px 8px;
+  border: 1px solid #D9CFEA;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-ink);
+}
 
 .meta-card {
   background: white;

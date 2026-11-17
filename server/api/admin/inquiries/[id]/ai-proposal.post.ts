@@ -92,7 +92,21 @@ export default defineEventHandler(async (event) => {
     }
 
     const reusable = lookupAnalysis<InquirySummaryProposal>(scope)
-    if (reusable) {
+    /**
+     * The guard keys its records by scope, and ememberAnalysis hands back an existing reference for
+     * the same scope. That is what stops one analysis being applied twice - but it would also make
+     * "generate again" after a confirmation return a reference that is already spent, so every save
+     * would answer 409. A confirmed record therefore gets a distinct scope for the next generation:
+     * the old reference stays dead, the new one is a real, fresh, one-time proposal.
+     */
+    const generationScope = reusable && reusable.alreadyApplied
+      ? { ...scope, fingerprint: +
+""+
+":" }
+      : scope
+    // An already-confirmed analysis is not reused: its reference is spent, so handing it back would
+    // give the reviewer a proposal whose confirm can only answer 409.
+    if (reusable && !reusable.alreadyApplied) {
       return {
         ok: true,
         proposal: reusable.output,
@@ -108,7 +122,7 @@ export default defineEventHandler(async (event) => {
 
     // The generation timestamp travels with the reference, so Confirm can store when the proposal was
     // produced rather than when somebody pressed the button.
-    const proposalRef = rememberAnalysis(scope, result.output, Date.now(), { fingerprint, generatedAt: new Date().toISOString() })
+    const proposalRef = rememberAnalysis(generationScope, result.output, Date.now(), { fingerprint, generatedAt: new Date().toISOString() })
 
     return {
       ok: true,
