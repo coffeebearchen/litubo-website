@@ -26,6 +26,8 @@ type Entity = 'post' | 'contentItem'
 const route = useRoute()
 
 const open = ref(false)
+/** 折叠后只留标题栏，方便一边看生成结果、一边看被面板挡住的那部分表单。 */
+const collapsed = ref(false)
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
@@ -187,10 +189,22 @@ async function confirmSeo() {
             {{ contextText }}
           </p>
         </div>
-        <button type="button" class="ai-assist__close" aria-label="Close assistant" @click="closePanel">×</button>
+        <div class="ai-assist__head-actions">
+          <button
+            type="button"
+            class="ai-assist__collapse"
+            :aria-label="collapsed ? 'Expand assistant' : 'Collapse assistant'"
+            :aria-expanded="!collapsed"
+            @click="collapsed = !collapsed"
+          >
+            {{ collapsed ? '▾' : '▴' }}
+          </button>
+          <button type="button" class="ai-assist__close" aria-label="Close assistant" @click="closePanel">×</button>
+        </div>
       </header>
 
-      <p v-if="error" class="ai-assist__error" role="alert">{{ error }}</p>
+      <div v-show="!collapsed">
+        <p v-if="error" class="ai-assist__error" role="alert">{{ error }}</p>
       <p v-if="notice" class="ai-assist__notice">{{ notice }}</p>
 
       <div class="ai-assist__actions">
@@ -238,6 +252,7 @@ async function confirmSeo() {
         <p class="ai-assist__saved-line"><strong>{{ saved.seoTitle }}</strong></p>
         <p class="ai-assist__saved-line">{{ saved.seoDescription }}</p>
       </div>
+      </div>
     </section>
   </div>
 </template>
@@ -249,6 +264,19 @@ async function confirmSeo() {
   right: 20px;
   z-index: 90;
 }
+
+.ai-assist__head-actions { display: flex; align-items: center; gap: 2px; }
+.ai-assist__collapse {
+  border: 0;
+  background: none;
+  font-size: 15px;
+  line-height: 1;
+  color: #4A5E58;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.ai-assist__collapse:hover { background: #FFF1F7; color: #F0208C; }
 
 .ai-assist__launch {
   display: inline-flex;

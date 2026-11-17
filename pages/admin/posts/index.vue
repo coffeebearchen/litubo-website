@@ -71,7 +71,9 @@ async function edit(row: PostRow): Promise<void> {
     if (route.query.id !== String(row.id)) void router.replace({ query: { ...route.query, id: String(row.id) } })
     form.title_en = String(full.title ? (full.title as Record<string, string>).en ?? '' : '')
     form.excerpt_en = String(full.excerpt ? (full.excerpt as Record<string, string>).en ?? '' : '')
-    form.body_en = String(full.bodyHtml ?? '')
+    // bodyHtml is per-language ({ en, es, pt }); String() on the object produced "[object Object]" and
+    // saving that back would have replaced the article body with those thirteen characters.
+    form.body_en = String((full.bodyHtml as Record<string, string> | undefined)?.en ?? '')
     form.cover_image = (full.coverImageId as string) ?? null
     form.cover_fit = ((full.coverFit as string) === 'contain' || (full.coverFit as string) === 'cover')
       ? (full.coverFit as 'contain' | 'cover')
@@ -87,6 +89,11 @@ async function edit(row: PostRow): Promise<void> {
 
 async function save(): Promise<void> {
   if (!selected.value) return
+  // Belt and braces: never let the placeholder from a mis-mapped body reach the database.
+  if (form.body_en.trim() === '[object Object]') {
+    error.value = 'The body did not load correctly, so saving would overwrite it. Reload the record first.'
+    return
+  }
   saving.value = true
   error.value = ''
   notice.value = ''
