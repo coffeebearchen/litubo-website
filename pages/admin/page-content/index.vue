@@ -8,6 +8,10 @@
  * There is no draft row. Edits live in this browser until a person presses Publish; that is stated
  * plainly, because a writer who closes the tab would otherwise assume the work was saved.
  */
+import MediaLibraryPicker from '~/components/admin/media/MediaLibraryPicker.vue'
+import { useMediaLibraryBrowser } from '~/composables/useMediaLibraryBrowser'
+import { workspaceMediaThumbUrl } from '~/utils/productWorkspace'
+
 definePageMeta({ layout: 'admin' })
 
 interface HeroRow {
@@ -49,6 +53,24 @@ const dirty = ref(false)
 const selectedKey = computed(() => (typeof route.query.page === 'string' ? route.query.page : ''))
 const current = computed(() => pages.value.find((p: HeroPage) => p.pageKey === selectedKey.value) ?? null)
 
+/**
+ * Zones come from the server registry, so the tab row cannot drift away from the pages the server
+ * accepts. "Product categories" is a fifth tab because it edits the existing `product_categories`
+ * collection, not a hero row — it is the original collection, not a copy.
+ */
+type Tab = 'Home' | 'Company' | 'Support' | 'Resources' | 'categories'
+
+const TABS: { key: Tab, label: string }[] = [
+  { key: 'Home', label: 'Home' },
+  { key: 'Company', label: 'Company' },
+  { key: 'Support', label: 'Support' },
+  { key: 'Resources', label: 'Resources' },
+  { key: 'categories', label: 'Product categories' },
+]
+
+const tab = ref<Tab>('Home')
+const listedPages = computed(() => pages.value.filter((p: HeroPage) => p.zone === tab.value))
+
 const form = reactive({
   eyebrow: '', title: '', body: '',
   heroImage: '', ctaPrimaryLabel: '', ctaPrimaryPath: '',
@@ -74,7 +96,11 @@ async function load(): Promise<void> {
   try {
     const r = await $fetch<{ pages: HeroPage[] }>('/api/admin/page-content')
     pages.value = r.pages
-    if (current.value) fillFrom(current.value)
+    // A deep link (?page=...) opens the tab that page belongs to, so the list behind it agrees.
+    if (current.value) {
+      tab.value = current.value.zone as Tab
+      fillFrom(current.value)
+    }
   } catch (e: unknown) {
     error.value = (e as { data?: { message?: string } })?.data?.message ?? 'Could not load page content'
   } finally {
@@ -138,6 +164,111 @@ async function withdraw(): Promise<void> {
 watch(selectedKey, () => { if (current.value) fillFrom(current.value) })
 watch(form, () => { dirty.value = true }, { deep: true })
 onMounted(load)
+
+// ── Product categories: the existing collection, edited in place ─────────────
+// There is no copy in site_content and no second publication state. Saving writes the row the
+// public product pages already read.
+interface CategoryRow {
+  id: number
+  slug: string
+  name: string
+  intro: string
+  heroImage: string | null
+  status: string
+  sort: number | null
+}
+
+const categories = ref<CategoryRow[]>([])
+const categoryId = ref<number | null>(null)
+const catSaving = ref(false)
+const catError = ref('')
+const catNotice = ref('')
+const categoryForm = reactive({ name: '', intro: '', heroImage: '' })
+const browser = useMediaLibraryBrowser()
+
+const selectedCategory = computed(() => categories.value.find((c: CategoryRow) => c.id === categoryId.value) ?? null)
+
+async function loadCategories(): Promise<void> {
+  catError.value = ''
+  try {
+    const r = await $fetch<{ categories: CategoryRow[] }>('/api/admin/page-content/categories')
+    categories.value = r.categories
+  }
+  catch (e: unknown) {
+    catError.value = (e as { data?: { message?: string } })?.data?.message ?? 'Could not load product categories'
+  }
+}
+
+function switchTab(key: Tab): void {
+  tab.value = key
+  error.value = ''
+  notice.value = ''
+  catError.value = ''
+  catNotice.value = ''
+  categoryId.value = null
+  // Leaving a zone closes the open page editor, so the tab and the form never disagree.
+  if (current.value && key !== 'categories' && current.value.zone !== key) {
+    router.push({ query: {} })
+  }
+  if (key === 'categories') {
+    if (current.value) router.push({ query: {} })
+    if (!categories.value.length) void loadCategories()
+  }
+}
+
+function openCategory(c: CategoryRow): void {
+  categoryId.value = c.id
+  categoryForm.name = c.name
+  categoryForm.intro = c.intro
+  categoryForm.heroImage = c.heroImage ?? ''
+  catError.value = ''
+  catNotice.value = ''
+}
+
+function closeCategory(): void {
+  categoryId.value = null
+  catError.value = ''
+  catNotice.value = ''
+}
+
+function pickCategoryImage(fileId: string): void {
+  categoryForm.heroImage = fileId
+  browser.closeLibrary()
+}
+
+function categoryThumb(id: string): string {
+  return workspaceMediaThumbUrl(id, { width: 320, height: 168 }) ?? ''
+}
+
+async function saveCategory(): Promise<void> {
+  if (categoryId.value === null) return
+  catSaving.value = true
+  catError.value = ''
+  catNotice.value = ''
+  try {
+    await $fetch('/api/admin/page-content/categories', {
+      method: 'PATCH',
+      body: {
+        id: categoryId.value,
+        name: categoryForm.name,
+        intro: categoryForm.intro,
+        heroImage: categoryForm.heroImage || null,
+      },
+    })
+    await loadCategories()
+    const fresh = categories.value.find((c: CategoryRow) => c.id === categoryId.value)
+    // openCategory clears the notice, so it is set after the row is re-selected.
+    if (fresh) openCategory(fresh)
+    catNotice.value = 'Category saved. The public product page uses these values.'
+  }
+  catch (e: unknown) {
+    // Keep every typed value on failure; a lost paragraph is worse than a retry.
+    catError.value = (e as { data?: { message?: string } })?.data?.message ?? 'Save failed — your text is unchanged'
+  }
+  finally {
+    catSaving.value = false
+  }
+}
 </script>
 
 <template>
@@ -146,7 +277,10 @@ onMounted(load)
       <p class="crumb">Content / Page Content</p>
       <h1>Page Content</h1>
       <p class="sub">Choose a page. Edit its hero without rebuilding the page.</p>
-      <p class="source">Source: <code>site_content</code> — one row per page</p>
+      <p class="source">
+        <template v-if="tab === 'categories'">Source: <code>product_categories</code> — the existing collection, not a copy</template>
+        <template v-else>Source: <code>site_content</code> — one row per page</template>
+      </p>
     </div>
 
     <p v-if="error" class="banner banner--error" role="alert">{{ error }}</p>
@@ -154,8 +288,129 @@ onMounted(load)
 
     <p v-if="loading" class="muted">Loading…</p>
 
+    <!-- Zone tabs, then the existing product_categories collection as its own tab -->
+    <nav class="tabs" role="tablist" aria-label="Page content sections">
+      <button
+        v-for="t in TABS"
+        :key="t.key"
+        type="button"
+        role="tab"
+        class="tab"
+        :class="{ 'tab--active': tab === t.key }"
+        :aria-selected="tab === t.key"
+        @click="switchTab(t.key)"
+      >
+        {{ t.label }}
+      </button>
+    </nav>
+
+    <!-- Product categories: the original collection, edited in place -->
+    <template v-if="tab === 'categories'">
+      <p v-if="catError" class="banner banner--error" role="alert">{{ catError }}</p>
+      <p v-if="catNotice" class="banner banner--ok" role="status">{{ catNotice }}</p>
+
+      <template v-if="!selectedCategory">
+        <div class="explain">
+          <strong>These are the existing product categories.</strong>
+          The name, introduction and image stay in <code>product_categories</code>; nothing is copied into page content.
+        </div>
+
+        <table class="grid">
+          <thead>
+            <tr><th>Category</th><th>Slug</th><th>Status</th><th><span class="sr">Action</span></th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="c in categories" :key="c.id">
+              <td>
+                <span class="page-name">{{ c.name }}</span>
+                <span class="page-path">{{ c.intro || 'No introduction yet' }}</span>
+              </td>
+              <td class="scope">{{ c.slug }}</td>
+              <td><span class="state">{{ c.status }}</span></td>
+              <td><button class="link-btn" @click="openCategory(c)">Edit category →</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
+
+      <template v-else>
+        <p class="back"><button class="link-btn" @click="closeCategory">← All categories</button></p>
+
+        <h2 class="h2">{{ categoryForm.name || 'Category' }} — Category content</h2>
+        <p class="state-line"><span class="state">{{ selectedCategory.status }}</span> <span class="hint">{{ selectedCategory.slug }}</span></p>
+
+        <div class="warn">
+          <strong>Saving writes the existing category record.</strong>
+          The public product pages read this row, so a change is live as soon as it is saved. The slug and publication status are not editable here.
+        </div>
+
+        <div class="split">
+          <section class="panel">
+            <h3>Category content <span class="chip">Existing record</span></h3>
+
+            <label class="field"><span>Name</span><input v-model="categoryForm.name" type="text"></label>
+            <label class="field"><span>Introduction</span><textarea v-model="categoryForm.intro" rows="4" /></label>
+
+            <div class="field">
+              <span>Category image</span>
+              <div class="imgbox">
+                <img v-if="categoryForm.heroImage" :src="categoryThumb(categoryForm.heroImage)" alt="" class="imgbox__thumb">
+                <p class="imgbox__value">{{ categoryForm.heroImage ? 'Media Library image selected' : 'No image — the page renders without a category picture' }}</p>
+                <div class="imgbox__actions">
+                  <button type="button" class="btn" @click="browser.openLibrary('image')">Select from Media Library</button>
+                  <button v-if="categoryForm.heroImage" type="button" class="link-btn" @click="categoryForm.heroImage = ''">Remove image</button>
+                </div>
+                <p class="hint">Alt text comes from the existing media title; editing that title affects every use of the file.</p>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn btn--primary" :disabled="catSaving" @click="saveCategory">
+                {{ catSaving ? 'Saving…' : 'Save category' }}
+              </button>
+            </div>
+          </section>
+
+          <aside class="panel panel--preview">
+            <h3>Page preview</h3>
+            <p class="hint">Uses the same category presentation. Local preview — not live.</p>
+            <div class="preview">
+              <img v-if="categoryForm.heroImage" :src="categoryThumb(categoryForm.heroImage)" alt="" class="preview__img">
+              <p class="preview__title">{{ categoryForm.name || selectedCategory.name }}</p>
+              <p class="preview__body">{{ categoryForm.intro || 'No introduction yet' }}</p>
+            </div>
+            <p class="note">Products inside the category are not changed here — this screen edits the category record only.</p>
+          </aside>
+        </div>
+      </template>
+
+      <MediaLibraryPicker
+        :open="browser.open.value"
+        :files="browser.files.value"
+        :loading="browser.loading.value"
+        :error="browser.error.value"
+        :total="browser.total.value"
+        :search="browser.search.value"
+        :type-filter="browser.typeFilter.value"
+        :folders="browser.folders.value"
+        :folders-error="browser.foldersError.value"
+        :folder-id="browser.folderId.value"
+        :linked-file-ids="categoryForm.heroImage ? [categoryForm.heroImage] : []"
+        title="Select a category image from Media Library"
+        linked-title="Current category image"
+        @close="browser.closeLibrary"
+        @update-search="browser.updateSearch"
+        @update-type-filter="browser.updateTypeFilter"
+        @navigate-folder="browser.navigateFolder"
+        @retry-folders="browser.loadFolders"
+        @retry-files="browser.loadFiles(true)"
+        @load-more="browser.loadFiles(false)"
+        @pick-file="pickCategoryImage"
+      />
+    </template>
+
     <!-- Page list -->
-    <template v-if="!selectedKey">
+    <template v-else-if="!selectedKey">
       <div class="explain">
         <strong>Your existing pages remain the default.</strong>
         Only a published override changes the public page. Full page copy and forms stay in their existing components.
@@ -166,7 +421,7 @@ onMounted(load)
           <tr><th>Page</th><th>Editing scope</th><th>State</th><th><span class="sr">Action</span></th></tr>
         </thead>
         <tbody>
-          <tr v-for="p in pages" :key="p.pageKey">
+          <tr v-for="p in listedPages" :key="p.pageKey">
             <td>
               <span class="page-name">{{ p.label }}</span>
               <span class="page-path">{{ p.path }}</span>
@@ -254,8 +509,25 @@ h1 { margin: 0 0 6px; font-size: 28px; line-height: 1.2; color: #20352B; }
 .banner--error { background: #FFF1EF; border: 1px solid #F3B5AC; color: #B42318; }
 .banner--ok { background: #EEF5EF; border: 1px solid #C7D8CA; color: #2F6B3A; }
 
-.explain { padding: 18px 20px; border-radius: 8px; background: #EEF5EF; font-size: 16px; line-height: 1.55; color: #20352B; margin-bottom: 20px; }
-.warn { padding: 16px 20px; border-radius: 8px; background: #FFF8E8; border: 1px solid #EBD9AE; font-size: 16px; line-height: 1.5; color: #20352B; margin-bottom: 20px; }
+.explain { padding: 18px 20px; border-radius: 8px; background: #EEF5EF; font-size: 16px; line-height: 1.55; color: #20352B; margin-bottom: 20px; }.warn { padding: 16px 20px; border-radius: 8px; background: #FFF8E8; border: 1px solid #EBD9AE; font-size: 16px; line-height: 1.5; color: #20352B; margin-bottom: 20px; }
+
+/* Tabs: underline for the active one, never colour alone */
+.tabs { display: flex; flex-wrap: wrap; gap: 28px; border-bottom: 1px solid #DEE6E1; margin: 0 0 20px; }
+.tab {
+  min-height: 44px;
+  padding: 0 0 10px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  color: #52665C;
+  cursor: pointer;
+}
+.tab:hover { color: #2F6B3A; }
+.tab--active { color: #20352B; border-bottom-color: #2F6B3A; }
+.tab:focus-visible { outline: 3px solid #2563A6; outline-offset: 3px; }
 
 .grid { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #DEE6E1; border-radius: 10px; overflow: hidden; }
 .grid th { text-align: start; padding: 12px 16px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #52665C; border-bottom: 1px solid #DEE6E1; }
@@ -287,6 +559,8 @@ h1 { margin: 0 0 6px; font-size: 28px; line-height: 1.2; color: #20352B; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
 .imgbox { padding: 16px; border: 1px dashed #B9C8BF; border-radius: 8px; }
+.imgbox__thumb { display: block; width: 100%; max-width: 320px; aspect-ratio: 16 / 9; object-fit: contain; background: #F6F8F7; border: 1px solid #DEE6E1; border-radius: 6px; margin-bottom: 10px; }
+.imgbox__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 10px; }
 .imgbox__value { margin: 0 0 4px; font-size: 16px; color: #20352B; }
 .hint { margin: 4px 0 0; font-size: 14px; color: #52665C; }
 .muted { color: #52665C; }
@@ -303,6 +577,7 @@ hr { margin: 20px 0 12px; border: 0; border-top: 1px solid #DEE6E1; }
 .preview__title { margin: 0 0 10px; font-size: 26px; line-height: 1.2; color: #20352B; }
 .preview__body { margin: 0 0 12px; font-size: 16px; line-height: 1.55; color: #52665C; }
 .preview__cta { margin: 0; font-size: 16px; color: #2F6B3A; font-weight: 600; }
+.preview__img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #fff; border: 1px solid #DEE6E1; border-radius: 6px; margin-bottom: 12px; }
 .note { margin: 16px 0 0; padding: 14px 16px; border-radius: 8px; background: #EEF5EF; font-size: 15px; line-height: 1.5; color: #52665C; }
 
 @media (max-width: 900px) {

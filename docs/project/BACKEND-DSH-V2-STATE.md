@@ -134,7 +134,7 @@ ERROR [inquiry] email notification failed { id: 35 }
 | **V2-02** 导航 + 统一入口 | ✅ 完成 | 见提交 | 五色分区导航（文字+图标）；4 个重复路径改跳转，旧文件保留；3 个独有工具保留 | 导航渲染、跳转目标、typecheck 0 | 恢复旧 nav 块 + 4 个文件旧内容 | — |
 | **V2-03** posts 管理 | ✅ 完成 | 见提交 | `/admin/posts`（Blog/FAQ 同页，读 posts）+ GET/PATCH 接口 | 路由可达、typecheck 0 | 隐藏导航入口，数据未迁 | — |
 | **V2-04** Hero | ✅ 完成（13/13 页已接） | 见提交 | 13 页注册表 + `/admin/page-content` + 单行 PATCH（publish/withdraw）；13 页前台全部读覆盖；CTA 标签与路径按「成对」合并 | 8 页真实覆盖往返（建行→读 HTML→删行→恢复默认）；首页走 `/api/cms/home` 同源验证；CTA 半对用例；typecheck 0 | 关闭覆盖读取（前台回默认文案） | — |
-| **V2-05** cover_fit | ✅ 完成（分类 tab 未做） | 见提交 | `posts.cover_fit` nullable string；按已核实清单迁移 10 篇；接口输出 coverFit；页面优先读它，null 回退旧清单 | 接口 coverFit=contain/cover 正确；渲染 class 正确 | 关新读路径，保留列不 DROP | — |
+| **V2-05** cover_fit | ✅ 完成（含「Product categories」tab） | 见提交 | `posts.cover_fit` nullable string；按已核实清单迁移 10 篇；接口输出 coverFit；页面优先读它，null 回退旧清单；`/admin/page-content` 五 tab（Home/Company/Support/Resources + Product categories），分类 tab 直接读写 `product_categories` | 接口 coverFit=contain/cover 正确；分类读写往返 + 4 个拒绝用例；浏览器点选与深链实测 | 关新读路径、保留列不 DROP；分类 tab 不建副本、不改 slug/status | — |
 | V2-06 内部询盘 AI | 待做 | — | — | — | — | — |
 | V2-07 视觉与合同验收 | 待做 | — | — | — | — | — |
 
@@ -194,6 +194,42 @@ ERROR [inquiry] email notification failed { id: 35 }
 | **后台未读徽标** | ✅ 已加：侧栏「Customer Inquiries」显示待处理数量（当前 21） |
 
 询盘始终写入数据库；徽标让新询盘不再像空收件箱。
+
+## V2-05 分类小 tab 实测（本地已测）
+
+`/admin/page-content` 现在是五个 tab：`Home` / `Company` / `Support` / `Resources` / `Product categories`。
+前四个按注册表的 `zone` 过滤页面列表；第五个直接读写现有 `product_categories`，**不复制进 `site_content`**。
+
+| 用例 | 结果 |
+|---|---|
+| 未登录访问 `/admin/page-content` | 302 → `/admin/login`（守卫仍在） |
+| 默认 tab = Home，只列 Home 一行 | ✅（浏览器实测，`rows: ["Home/"]`） |
+| 点 Product categories | ✅ 列出真实 5 条（X-Ray / Metal / Checkweighers / Combination / Conveyors） |
+| 点「Edit category」 | ✅ 标题 `X-Ray Inspection — Category content`，字段 Name / Introduction / Category image，媒体选择器存在 |
+| 深链 `?page=company.global-service` | ✅ tab 自动切到 Company，标题 `Global Service Capability — Hero` |
+| 浏览器 console error | 0 |
+
+### 分类写接口的被拒用例（全部按预期拒绝）
+
+| 用例 | 结果 |
+|---|---|
+| 不带 `Origin` 的 PATCH | `403`（CSRF 守卫，正常行为） |
+| 不存在的 id（99999 / 12345） | `404` ← **本轮修掉的缺陷**：原来返回 `200 OK`，因为 Directus 对不存在的 id 执行 PATCH 不报错 |
+| 空名称 | `400` |
+| 图片不是文件 id | `400` |
+| 分类行在拒绝后是否被改动 | 否 |
+
+### 往返测试（含图片）
+
+把 `X-Ray Inspection` 的名称、简介、`hero_image` 改成临时值 → 读回确认三项都落库 → 改回原值 → 读回确认完全一致；公开页 `/products/x-ray-inspection` 返回 200、无临时文案残留、原简介仍在。
+
+### 接口边界的刻意选择
+
+- 只写 `name_en` / `intro_en` / `hero_image`；**不写 slug**（公开 URL 依赖它）、**不写 status**（发布是另一道有闸门的决定）、不建行不删行。
+- 图片必须是合法 uuid 且来自媒体库；空值表示移除图片。
+- 写成功但返回行 id 不匹配时抛 `409`，不谎报"已保存"。
+
+---
 
 ## V2-04 前台接线实测（13/13 页）
 
