@@ -54,3 +54,6 @@ backup/**/uploads/
 
 # 本地下载的 Node 运行时（不是项目代码）
 .tools/
+
+# 验收截图输出（可重建，不入库）
+reports/
