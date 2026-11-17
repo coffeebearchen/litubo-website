@@ -51,3 +51,6 @@ backup/**/visitor_events.json
 backup/**/_media_index.json
 backup/**/uploads/
 
+
+# 本地下载的 Node 运行时（不是项目代码）
+.tools/

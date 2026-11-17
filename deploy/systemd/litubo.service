@@ -1,0 +1,28 @@
+[Unit]
+Description=LITUBO website (Nuxt 3 / Nitro node-server)
+Documentation=https://github.com/coffeebearchen/litubo-website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=litubo
+Group=litubo
+WorkingDirectory=/srv/litubo/current
+EnvironmentFile=/etc/litubo/litubo.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+ExecStart=/usr/bin/node /srv/litubo/current/.output/server/index.mjs
+Restart=always
+RestartSec=3
+# 只监听回环，由 Nginx 反代对外
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/litubo
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
