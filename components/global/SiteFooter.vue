@@ -88,7 +88,14 @@ const companyLinks = [
         <!-- Brand + contact -->
         <div class="site-footer__top">
           <div class="site-footer__brand">
-            <p class="site-footer__logo">LITUBO</p>
+            <img
+                class="site-footer__logo"
+                src="/images/brand/litubo-logo-light.png"
+                alt="LITUBO"
+                width="2035"
+                height="309"
+                loading="lazy"
+              >
             <p class="site-footer__tagline">{{ t('footer.tagline') }}</p>
             <p class="site-footer__description">{{ t('footer.description') }}</p>
           </div>
@@ -199,14 +206,11 @@ const companyLinks = [
 .site-footer__brand { max-width: 560px; }
 
 .site-footer__logo {
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--color-white);
-  text-transform: uppercase;
-  margin: 0 0 var(--space-2);
-}
+    display: block;
+    height: calc(1.25rem * var(--type-scale));
+    width: auto;
+    margin: 0 0 var(--space-3);
+  }
 
 .site-footer__tagline {
   font-size: var(--text-xs);
@@ -247,7 +251,7 @@ const companyLinks = [
 .site-footer__social-block { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
 
 .site-footer__social-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--type-scale));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -284,7 +288,7 @@ const companyLinks = [
 }
 
 .site-footer__col-title {
-  font-size: 11px;
+  font-size: calc(11px * var(--type-scale));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -312,7 +316,7 @@ const companyLinks = [
 .site-footer__col a {
   display: inline-block;
   padding: 5px 0;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--type-scale));
   line-height: 1.35;
   color: rgba(255, 255, 255, 0.72);
   text-decoration: none;
@@ -335,7 +339,7 @@ const companyLinks = [
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
-  font-size: 12px;
+  font-size: calc(12px * var(--type-scale));
   color: rgba(255, 255, 255, 0.5);
 }
 

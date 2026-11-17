@@ -162,7 +162,7 @@ const steps = [
 .gs-h2 {
   margin: 0 0 var(--space-4);
   font-family: var(--font-display);
-  font-size: clamp(var(--text-2xl), 3vw, 41px);
+  font-size: clamp(var(--text-2xl), 3vw, calc(41px * var(--type-scale)));
   line-height: 1.15;
   color: var(--color-ink);
 }
@@ -184,7 +184,7 @@ const steps = [
 .gs-hero__title {
   margin: 0 0 var(--space-4);
   font-family: var(--font-display);
-  font-size: clamp(var(--text-3xl), 4vw, 61px);
+  font-size: clamp(var(--text-3xl), 4vw, calc(61px * var(--type-scale)));
   line-height: 1.08;
   color: var(--color-ink);
 }
@@ -252,8 +252,8 @@ const steps = [
   border: 2px solid var(--color-primary);
   grid-row: span 3;
 }
-.gs-entry__title { font-size: 29px; font-weight: 600; color: var(--color-ink); }
-.gs-entry__body { font-size: 20px; line-height: 1.5; color: var(--color-ink-muted); }
+.gs-entry__title { font-size: calc(29px * var(--type-scale)); font-weight: 600; color: var(--color-ink); }
+.gs-entry__body { font-size: calc(20px * var(--type-scale)); line-height: 1.5; color: var(--color-ink-muted); }
 .gs-entry__link { font-size: var(--text-sm); color: var(--color-link-on-light); }
 
 /* Steps */
@@ -278,7 +278,7 @@ const steps = [
 
 @media (max-width: 700px) {
   .gs-band { padding: var(--space-10) 0; }
-  .gs-hero__title { font-size: 45px; }
+  .gs-hero__title { font-size: calc(45px * var(--type-scale)); }
   .gs-entry { padding: 20px; grid-template-columns: 35px minmax(0, 1fr); }
   .gs-entry__mark { width: 35px; height: 35px; }
   .gs-entry__title { font-size: var(--text-xl); }
@@ -293,7 +293,7 @@ const steps = [
 @media (max-width: 380px) {
   /* The design lowers the display heading again at 320px; without this the longest word meets the
      right edge of the viewport. */
-  .gs-hero__title { font-size: 39px; }
+  .gs-hero__title { font-size: calc(39px * var(--type-scale)); }
 }
 
 </style>

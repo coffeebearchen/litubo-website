@@ -52,7 +52,7 @@ function isActive(to: string): boolean {
 }
 .company-nav__inner::-webkit-scrollbar { display: none; }
 .company-nav__item {
-  font-size: 16px;
+  font-size: calc(16px * var(--type-scale));
   color: var(--color-ink-muted);
   text-decoration: none;
   padding-bottom: 6px;
@@ -67,6 +67,6 @@ function isActive(to: string): boolean {
 
 @media (max-width: 700px) {
   .company-nav__inner { gap: 24px; padding-block: 15px; }
-  .company-nav__item { font-size: 15px; }
+  .company-nav__item { font-size: calc(15px * var(--type-scale)); }
 }
 </style>

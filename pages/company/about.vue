@@ -169,7 +169,7 @@ const company = {
 .ab-h2 {
   margin: 0 0 var(--space-4);
   font-family: var(--font-display);
-  font-size: clamp(var(--text-2xl), 3vw, 41px);
+  font-size: clamp(var(--text-2xl), 3vw, calc(41px * var(--type-scale)));
   line-height: 1.15;
   color: var(--color-ink);
 }
@@ -192,7 +192,7 @@ const company = {
 .ab-hero__title {
   margin: 0 0 var(--space-4);
   font-family: var(--font-display);
-  font-size: clamp(var(--text-3xl), 4vw, 61px);
+  font-size: clamp(var(--text-3xl), 4vw, calc(61px * var(--type-scale)));
   line-height: 1.08;
   color: var(--color-ink);
 }
@@ -247,7 +247,7 @@ const company = {
 .ab-identity__card dl div { padding: var(--space-3) 0; border-bottom: 1px solid #E3EBE4; }
 .ab-identity__card dl div:last-child { border-bottom: 0; }
 .ab-identity__card dt { font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-ink-muted); margin-bottom: 4px; }
-.ab-identity__card dd { margin: 0; font-size: 20px; line-height: 1.5; color: var(--color-ink); }
+.ab-identity__card dd { margin: 0; font-size: calc(20px * var(--type-scale)); line-height: 1.5; color: var(--color-ink); }
 .ab-identity__card a { color: var(--color-link-on-light); }
 
 /* Families */
@@ -304,7 +304,7 @@ const company = {
 
 @media (max-width: 700px) {
   .ab-band { padding: var(--space-10) 0; }
-  .ab-hero__title { font-size: 45px; }
+  .ab-hero__title { font-size: calc(45px * var(--type-scale)); }
   .ab-families { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .ab-family { grid-template-columns: 35px minmax(0, 1fr) 18px; padding: var(--space-3) 0; }
   .ab-family__icon { width: 30px; height: 30px; }
@@ -320,7 +320,7 @@ const company = {
 @media (max-width: 380px) {
   /* The design lowers the display heading again at 320px; without this the longest word meets the
      right edge of the viewport. */
-  .ab-hero__title { font-size: 39px; }
+  .ab-hero__title { font-size: calc(39px * var(--type-scale)); }
 }
 
 </style>

@@ -154,7 +154,7 @@ const requirements = [
 .qm-h2 {
   margin: 0 0 var(--space-4);
   font-family: var(--font-display);
-  font-size: clamp(var(--text-2xl), 3vw, 41px);
+  font-size: clamp(var(--text-2xl), 3vw, calc(41px * var(--type-scale)));
   line-height: 1.15;
   color: var(--color-ink);
 }
@@ -177,7 +177,7 @@ const requirements = [
 .qm-hero__title {
   margin: 0 0 var(--space-4);
   font-family: var(--font-display);
-  font-size: clamp(var(--text-3xl), 4vw, 61px);
+  font-size: clamp(var(--text-3xl), 4vw, calc(61px * var(--type-scale)));
   line-height: 1.08;
   color: var(--color-ink);
 }
@@ -275,8 +275,8 @@ const requirements = [
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 .qm-action:hover { border-color: var(--color-primary); box-shadow: 0 4px 16px rgba(27, 66, 36, 0.08); }
-.qm-action__title { font-family: var(--font-display); font-size: 29px; color: var(--color-ink); }
-.qm-action__body { font-size: 20px; line-height: 1.5; color: var(--color-ink-muted); flex: 1; }
+.qm-action__title { font-family: var(--font-display); font-size: calc(29px * var(--type-scale)); color: var(--color-ink); }
+.qm-action__body { font-size: calc(20px * var(--type-scale)); line-height: 1.5; color: var(--color-ink-muted); flex: 1; }
 .qm-action__link { font-size: var(--text-sm); color: var(--color-link-on-light); }
 
 .qm-footnote { margin: var(--space-6) 0 0; max-width: 760px; font-size: var(--text-sm); line-height: 1.6; color: var(--color-ink-muted); }
@@ -290,11 +290,11 @@ const requirements = [
 
 @media (max-width: 700px) {
   .qm-band { padding: var(--space-10) 0; }
-  .qm-hero__title { font-size: 45px; }
+  .qm-hero__title { font-size: calc(45px * var(--type-scale)); }
   .qm-checks li { grid-template-columns: 34px minmax(0, 1fr); }
   .qm-action { padding: 26px; }
-  .qm-action__title { font-size: 30px; }
-  .qm-action__body { font-size: 22px; }
+  .qm-action__title { font-size: calc(30px * var(--type-scale)); }
+  .qm-action__body { font-size: calc(22px * var(--type-scale)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -304,7 +304,7 @@ const requirements = [
 @media (max-width: 380px) {
   /* The design lowers the display heading again at 320px; without this the longest word meets the
      right edge of the viewport. */
-  .qm-hero__title { font-size: 39px; }
+  .qm-hero__title { font-size: calc(39px * var(--type-scale)); }
 }
 
 </style>

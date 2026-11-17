@@ -105,7 +105,7 @@ watch(list, () => { if (active.value >= list.value.length) active.value = 0 })
   border: 1px solid var(--color-line);
   background: rgba(255, 255, 255, 0.92);
   color: var(--color-primary);
-  font-size: 22px;
+  font-size: calc(22px * var(--type-scale));
   line-height: 1;
   display: grid;
   place-items: center;

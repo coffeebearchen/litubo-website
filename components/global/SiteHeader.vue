@@ -196,7 +196,14 @@ onUnmounted(() => { document.removeEventListener('click', handleOutsideClick) })
     <div class="site-header__container container">
       <!-- Logo -->
       <NuxtLink :to="localePath('/')" class="site-header__logo" aria-label="LITUBO — Home">
-        <span class="logo-wordmark">LITUBO</span>
+        <img
+          class="logo-wordmark"
+          src="/images/brand/litubo-logo.png"
+          alt="LITUBO"
+          width="2035"
+          height="309"
+          decoding="async"
+        >
         <span class="logo-divider" aria-hidden="true" />
         <span class="logo-tagline">Food &amp; Packaging<br>Inspection Solutions</span>
       </NuxtLink>
@@ -306,15 +313,11 @@ onUnmounted(() => { document.removeEventListener('click', handleOutsideClick) })
 }
 
 .logo-wordmark {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--color-primary);
-  text-transform: uppercase;
-  line-height: 1;
-  white-space: nowrap;
-}
+    display: block;
+    height: calc(1.5rem * var(--type-scale));
+    width: auto;
+    flex-shrink: 0;
+  }
 
 .logo-divider {
   display: block;
@@ -326,7 +329,7 @@ onUnmounted(() => { document.removeEventListener('click', handleOutsideClick) })
 
 .logo-tagline {
   font-family: var(--font-body);
-  font-size: 0.6875rem;
+  font-size: calc(0.6875rem * var(--type-scale));
   line-height: 1.4;
   color: var(--color-ink-muted);
   font-weight: 400;

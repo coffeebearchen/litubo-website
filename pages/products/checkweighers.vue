@@ -293,7 +293,7 @@ const enquiryPath = computed(() => {
 .cw-hero__title {
   margin: var(--space-4) 0 var(--space-4);
   font-family: var(--font-display);
-  font-size: clamp(var(--text-3xl), 4vw, 62px);
+  font-size: clamp(var(--text-3xl), 4vw, calc(62px * var(--type-scale)));
   line-height: 1.08;
   color: var(--color-ink);
 }
@@ -313,7 +313,7 @@ const enquiryPath = computed(() => {
 
 /* Series */
 .cw-series { padding-block: 38px 34px; }
-.cw-series__title { margin: 0 0 var(--space-4); font-family: var(--font-display); font-size: 34px; color: var(--color-ink); }
+.cw-series__title { margin: 0 0 var(--space-4); font-family: var(--font-display); font-size: calc(34px * var(--type-scale)); color: var(--color-ink); }
 .cw-series__row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
 .cw-series__card {
   display: flex;
@@ -331,7 +331,7 @@ const enquiryPath = computed(() => {
 .cw-series__card.is-active { border: 2px solid var(--color-primary); background: #F3F7EF; padding: 15px 14px 17px; }
 .cw-series__count { font-family: var(--font-display); font-size: var(--text-2xl); color: var(--color-primary); }
 .cw-series__symbol { color: var(--color-primary); height: 52px; display: flex; align-items: center; }
-.cw-series__name { font-size: 20px; font-weight: 600; color: var(--color-ink); }
+.cw-series__name { font-size: calc(20px * var(--type-scale)); font-weight: 600; color: var(--color-ink); }
 .cw-series__blurb { font-size: var(--text-xs); line-height: 1.5; color: var(--color-ink-muted); }
 .cw-all {
   margin-top: var(--space-4);
@@ -341,7 +341,7 @@ const enquiryPath = computed(() => {
   border-radius: 999px;
   background: #fff;
   font: inherit;
-  font-size: 16px;
+  font-size: calc(16px * var(--type-scale));
   color: var(--color-ink);
   cursor: pointer;
 }
@@ -350,7 +350,7 @@ const enquiryPath = computed(() => {
 /* Results */
 .cw-results { background: #FAFBF7; padding-block: 39px 60px; }
 .cw-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
-.cw-head__title { margin: 0; font-family: var(--font-display); font-size: 38px; color: var(--color-ink); }
+.cw-head__title { margin: 0; font-family: var(--font-display); font-size: calc(38px * var(--type-scale)); color: var(--color-ink); }
 .cw-head__count { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--color-ink-muted); }
 .cw-search { display: flex; flex-direction: column; gap: 4px; width: 310px; }
 .cw-search__label { font-size: var(--text-xs); color: var(--color-ink-muted); }
@@ -361,7 +361,7 @@ const enquiryPath = computed(() => {
   border: 1px solid #D7E0D5;
   border-radius: 4px;
   font: inherit;
-  font-size: 18px;
+  font-size: calc(18px * var(--type-scale));
   color: var(--color-ink);
   background: #fff;
 }
@@ -375,7 +375,7 @@ const enquiryPath = computed(() => {
   border-radius: 999px;
   background: #fff;
   font: inherit;
-  font-size: 15px;
+  font-size: calc(15px * var(--type-scale));
   color: var(--color-ink);
   cursor: pointer;
 }
@@ -399,11 +399,11 @@ const enquiryPath = computed(() => {
 .cw-card__media { padding: 20px 25px; background: #fff; }
 .cw-card__media img { display: block; width: 100%; height: 245px; object-fit: contain; }
 .cw-card__body { display: flex; flex-direction: column; gap: var(--space-2); padding: 23px 25px 26px; flex: 1; }
-.cw-card__model { margin: 0; font-size: 15px; letter-spacing: 0.04em; color: var(--color-ink-muted); }
+.cw-card__model { margin: 0; font-size: calc(15px * var(--type-scale)); letter-spacing: 0.04em; color: var(--color-ink-muted); }
 .cw-card__title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 29px;
+  font-size: calc(29px * var(--type-scale));
   line-height: 1.2;
   color: var(--color-ink);
   display: -webkit-box;
@@ -413,7 +413,7 @@ const enquiryPath = computed(() => {
 }
 .cw-card__summary {
   margin: 0;
-  font-size: 20px;
+  font-size: calc(20px * var(--type-scale));
   line-height: 1.6;
   color: var(--color-ink-muted);
   display: -webkit-box;
@@ -426,10 +426,10 @@ const enquiryPath = computed(() => {
   padding: 3px 9px;
   border-radius: 999px;
   background: #F2F6EF;
-  font-size: 12px;
+  font-size: calc(12px * var(--type-scale));
   color: var(--color-ink-muted);
 }
-.cw-card__link { font-size: 18px; color: var(--color-link-on-light); }
+.cw-card__link { font-size: calc(18px * var(--type-scale)); color: var(--color-link-on-light); }
 
 .cw-state { padding: var(--space-8) 0; text-align: center; color: var(--color-ink-muted); }
 .cw-state__title { margin: 0 0 var(--space-3); font-size: var(--text-base); }
@@ -458,8 +458,8 @@ const enquiryPath = computed(() => {
 .cw-pharma__side { display: grid; place-items: center; padding: var(--space-8); background: #EEF4E9; }
 .cw-pharma__symbol { color: var(--color-primary); }
 .cw-pharma__body { padding: 40px 45px; }
-.cw-pharma__title { margin: 0 0 var(--space-4); font-family: var(--font-display); font-size: 37px; line-height: 1.15; color: var(--color-ink); }
-.cw-pharma__text { margin: 0 0 var(--space-5); font-size: 21px; line-height: 1.6; color: var(--color-ink-muted); }
+.cw-pharma__title { margin: 0 0 var(--space-4); font-family: var(--font-display); font-size: calc(37px * var(--type-scale)); line-height: 1.15; color: var(--color-ink); }
+.cw-pharma__text { margin: 0 0 var(--space-5); font-size: calc(21px * var(--type-scale)); line-height: 1.6; color: var(--color-ink-muted); }
 .cw-pharma__list { list-style: none; margin: 0 0 var(--space-6); padding: 0; }
 .cw-pharma__list li { padding: var(--space-3) 0; border-bottom: 1px solid #E3EBE4; font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-muted); }
 .cw-pharma__list li span { display: block; font-weight: 600; color: var(--color-ink); }
@@ -512,16 +512,16 @@ const enquiryPath = computed(() => {
 
 @media (max-width: 700px) {
   .cw-hero { padding-block: var(--space-4) 28px; }
-  .cw-hero__title { font-size: 46px; }
+  .cw-hero__title { font-size: calc(46px * var(--type-scale)); }
   .cw-series { padding-block: 30px 27px; }
-  .cw-series__title { font-size: 29px; }
+  .cw-series__title { font-size: calc(29px * var(--type-scale)); }
   .cw-results { padding-block: 30px 40px; }
-  .cw-head__title { font-size: 34px; }
+  .cw-head__title { font-size: calc(34px * var(--type-scale)); }
   .cw-card__media img { height: 255px; }
   .cw-card__body { padding: 25px; }
   .cw-pharma__body { padding: 27px; }
-  .cw-pharma__title { font-size: 33px; }
-  .cw-pharma__text { font-size: 22px; }
+  .cw-pharma__title { font-size: calc(33px * var(--type-scale)); }
+  .cw-pharma__text { font-size: calc(22px * var(--type-scale)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -531,7 +531,7 @@ const enquiryPath = computed(() => {
 @media (max-width: 380px) {
   /* The design lowers the display heading again at 320px; without this the longest word meets the
      right edge of the viewport. */
-  .cw-hero__title { font-size: 40px; }
+  .cw-hero__title { font-size: calc(40px * var(--type-scale)); }
 }
 
 </style>

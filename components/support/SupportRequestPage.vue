@@ -533,7 +533,7 @@ const nav = [
 .sp-steps__n {
   display: inline-grid; place-items: center;
   width: 18px; height: 18px; border-radius: 50%;
-  border: 1px solid #C7D8CA; font-size: 10px; color: var(--color-primary);
+  border: 1px solid #C7D8CA; font-size: calc(10px * var(--type-scale)); color: var(--color-primary);
 }
 
 .sp-hero__card {
@@ -547,7 +547,7 @@ const nav = [
 .sp-hero__card-title { margin: 0 0 var(--space-4); font-family: var(--font-display); font-size: var(--text-xl); color: var(--color-ink); }
 .sp-labels { margin: 0 0 var(--space-4); display: flex; flex-direction: column; gap: 6px; }
 .sp-labels div { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: var(--space-2); padding: 8px 10px; border: 1px solid #E3EBE4; border-radius: 4px; background: #FAFBF8; }
-.sp-labels dt { font-size: 11px; letter-spacing: 0.08em; color: var(--color-ink-muted); }
+.sp-labels dt { font-size: calc(11px * var(--type-scale)); letter-spacing: 0.08em; color: var(--color-ink-muted); }
 .sp-labels dd { margin: 0; font-size: var(--text-xs); color: var(--color-ink); }
 .sp-hero__note { margin: 0; padding: var(--space-3); border-inline-start: 3px solid var(--color-primary); background: #F0F5EC; font-size: var(--text-xs); line-height: 1.5; color: var(--color-ink-muted); }
 

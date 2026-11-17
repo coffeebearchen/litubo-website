@@ -194,7 +194,7 @@ function onKeydown(event: KeyboardEvent) {
   transform: translateY(8px);
 }
 .copy-kicker {
-  font-size: 15px;
+  font-size: calc(15px * var(--type-scale));
   font-weight: 600;
   letter-spacing: 1px;
   color: var(--color-link-on-light);
@@ -227,7 +227,7 @@ function onKeydown(event: KeyboardEvent) {
   border: 1px solid #D0B47A;
   background: #FFFCF5E8;
   border-radius: 50%;
-  font-size: 26px;
+  font-size: calc(26px * var(--type-scale));
   color: var(--color-link-on-light);
   z-index: 2;
 }

@@ -502,7 +502,7 @@ const enquiryPath = computed(() => {
 @media (max-width: 380px) {
   /* The design lowers the display heading again at 320px; without this the longest word meets the
      right edge of the viewport. */
-  .vd-hero__title { font-size: 39px; }
+  .vd-hero__title { font-size: calc(39px * var(--type-scale)); }
 }
 
 </style>

@@ -263,7 +263,7 @@ function handleKeydown(e: KeyboardEvent) {
 
 .mega-menu__link-arrow {
   color: var(--color-accent);
-  font-size: 1rem;
+  font-size: calc(1rem * var(--type-scale));
   line-height: 1;
   flex-shrink: 0;
 }

@@ -24,16 +24,24 @@
   --font-display: 'Source Serif 4', Georgia, serif;
   --font-body:    'Inter', system-ui, sans-serif;
 
-  --text-xs:   1.035rem;   /* 16.56px  +38% */
-  --text-sm:   1.2075rem;  /* 19.32px  +38% */
-  --text-base: 1.38rem;    /* 22.08px  +38% */
-  --text-lg:   1.5525rem;  /* 24.84px  +38% */
-  --text-xl:   1.725rem;   /* 27.6px   +38% */
-  --text-2xl:  2.07rem;    /* 33.12px  +38% */
-  --text-3xl:  2.5875rem;  /* 41.4px   +38% */
-  --text-4xl:  3.105rem;   /* 49.68px  +38% */
-  --text-5xl:  4.14rem;    /* 66.24px  +38% */
-  --text-6xl:  5.175rem;   /* 82.8px   +38% */
+  /* ─── Global type scale ─────────────────────────────────────────
+   * One knob for the whole site. 1 = the approved sizes below; 0.8 = 20% smaller.
+   * Every --text-* token multiplies by it, and the absolute font sizes still hard-coded in
+   * public pages/components multiply by it too, so the hierarchy shrinks as one piece.
+   * To undo: set --type-scale back to 1; nothing else changes.
+   */
+  --type-scale: 0.8;
+
+  --text-xs:   calc(1.035rem  * var(--type-scale));
+  --text-sm:   calc(1.2075rem * var(--type-scale));
+  --text-base: calc(1.38rem   * var(--type-scale));
+  --text-lg:   calc(1.5525rem * var(--type-scale));
+  --text-xl:   calc(1.725rem  * var(--type-scale));
+  --text-2xl:  calc(2.07rem   * var(--type-scale));
+  --text-3xl:  calc(2.5875rem * var(--type-scale));
+  --text-4xl:  calc(3.105rem  * var(--type-scale));
+  --text-5xl:  calc(4.14rem   * var(--type-scale));
+  --text-6xl:  calc(5.175rem  * var(--type-scale));
 
   --leading-tight:  1.15;
   --leading-snug:   1.35;

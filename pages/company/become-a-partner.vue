@@ -274,7 +274,7 @@ async function submit() {
 .pt-h2 {
   margin: 0 0 var(--space-5);
   font-family: var(--font-display);
-  font-size: clamp(var(--text-2xl), 3vw, 41px);
+  font-size: clamp(var(--text-2xl), 3vw, calc(41px * var(--type-scale)));
   line-height: 1.15;
   color: var(--color-ink);
 }
@@ -289,7 +289,7 @@ async function submit() {
 .pt-hero__title {
   margin: 0 0 var(--space-4);
   font-family: var(--font-display);
-  font-size: clamp(var(--text-3xl), 4vw, 61px);
+  font-size: clamp(var(--text-3xl), 4vw, calc(61px * var(--type-scale)));
   line-height: 1.08;
   color: var(--color-ink);
 }
@@ -409,7 +409,7 @@ async function submit() {
 
 @media (max-width: 700px) {
   .pt-band { padding: var(--space-10) 0; }
-  .pt-hero__title { font-size: 45px; }
+  .pt-hero__title { font-size: calc(45px * var(--type-scale)); }
   .pt-topic { padding: 18px; }
   .pt-topic.is-active { padding: 17px; }
   .pt-form { padding: 25px 23px; }
@@ -425,7 +425,7 @@ async function submit() {
 @media (max-width: 380px) {
   /* The design lowers the display heading again at 320px; without this the longest word meets the
      right edge of the viewport. */
-  .pt-hero__title { font-size: 39px; }
+  .pt-hero__title { font-size: calc(39px * var(--type-scale)); }
 }
 
 </style>
