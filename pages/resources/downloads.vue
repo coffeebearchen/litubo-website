@@ -28,8 +28,7 @@ const { hero } = await usePageHero('resources.downloads', {
 useSeoHead({
   title: 'Request technical documents — LITUBO',
   description: 'Request product datasheets, manuals and drawings. Confirm the model with the LITUBO team.',
-  canonicalPath: '/resources/downloads',
-})
+  canonicalPath: '/resources/downloads', ogImage: hero.imageUrl || undefined })
 
 type DocType = 'datasheet' | 'manual' | 'drawing'
 
@@ -102,7 +101,7 @@ const messagePrefix = computed(() => `Document request: ${activeType.value.title
             </p>
           </div>
           <figure class="dl-hero__media">
-            <img src="/images/devices/weigher-real.webp" alt="" width="800" height="533" loading="eager" decoding="async">
+            <img :src="hero.imageUrl || '/images/devices/weigher-real.webp'" :alt="hero.imageAlt || ''" width="800" height="533" loading="eager" decoding="async">
           </figure>
         </div>
       </div>

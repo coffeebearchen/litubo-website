@@ -18,6 +18,7 @@ export interface HeroOverride {
   title?: string | null
   body?: string | null
   imageUrl?: string | null
+  imageAlt?: string | null
   ctaPrimaryLabel?: string | null
   ctaPrimaryPath?: string | null
   ctaSecondaryLabel?: string | null
@@ -29,6 +30,7 @@ export interface HeroDefault {
   title: string
   body: string
   imageUrl?: string
+  imageAlt?: string
   ctaPrimaryLabel?: string
   ctaPrimaryPath?: string
   ctaSecondaryLabel?: string
@@ -41,6 +43,8 @@ export interface ResolvedHero {
   title: string
   body: string
   imageUrl: string
+  /** Alt text for the hero picture: the Media Library title, or '' when the page's own default applies. */
+  imageAlt: string
   ctaPrimaryLabel: string
   ctaPrimaryPath: string
   ctaSecondaryLabel: string
@@ -73,6 +77,7 @@ function fromDefaults(defaults: HeroDefault): ResolvedHero {
     title: defaults.title,
     body: defaults.body,
     imageUrl: defaults.imageUrl ?? '',
+    imageAlt: defaults.imageAlt ?? '',
     ctaPrimaryLabel: defaults.ctaPrimaryLabel ?? '',
     ctaPrimaryPath: defaults.ctaPrimaryPath ?? '',
     ctaSecondaryLabel: defaults.ctaSecondaryLabel ?? '',
@@ -107,6 +112,7 @@ export async function usePageHero(
       title: pick(override.title, defaults.title),
       body: pick(override.body, defaults.body),
       imageUrl: pick(override.imageUrl, defaults.imageUrl),
+      imageAlt: pick(override.imageAlt, defaults.imageAlt),
       ctaPrimaryLabel: primary.label,
       ctaPrimaryPath: primary.path,
       ctaSecondaryLabel: secondary.label,

@@ -10,7 +10,6 @@
  */
 const { t } = useI18n()
 const localePath = useLocalePath()
-useSeoHead({ title: t('seo.globalService.title'), description: t('seo.globalService.description'), canonicalPath: '/company/global-service' })
 
 /**
  * V2-04 — the hero may be overridden from /admin/page-content. The i18n title stays the default, so
@@ -25,6 +24,8 @@ const { hero } = await usePageHero('company.global-service', {
   ctaSecondaryLabel: 'Not sure where to begin?',
   ctaSecondaryPath: '/contact',
 })
+  useSeoHead({ title: t('seo.globalService.title'), description: t('seo.globalService.description'), canonicalPath: '/company/global-service', ogImage: hero.imageUrl || undefined })
+
 
 const entries = [
   { title: 'Technical support', body: 'Describe the machine and the issue in a technical-support request.', to: '/support/technical-support' },

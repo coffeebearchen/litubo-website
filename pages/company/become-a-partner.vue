@@ -13,7 +13,6 @@ const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
 
-useSeoHead({ title: t('seo.partner.title'), description: t('seo.partner.description'), canonicalPath: '/company/become-a-partner' })
 
 /**
  * V2-04 — the hero may be overridden from /admin/page-content. The i18n title stays the default, and
@@ -24,6 +23,8 @@ const { hero } = await usePageHero('company.become-a-partner', {
   title: t('pages.partner.heroTitle'),
   body: 'Introduce your market, your experience and what you have in mind. A partnership enquiry is a conversation about fit — not an application for an account.',
 })
+  useSeoHead({ title: t('seo.partner.title'), description: t('seo.partner.description'), canonicalPath: '/company/become-a-partner', ogImage: hero.imageUrl || undefined })
+
 
 type Interest = 'distribution' | 'service' | 'integration' | 'other'
 

@@ -28,8 +28,7 @@ const { hero } = await usePageHero('resources.videos', {
 useSeoHead({
   title: 'Equipment demonstrations — LITUBO',
   description: 'Discuss a demonstration of LITUBO inspection equipment and the questions that matter to your production line.',
-  canonicalPath: '/resources/videos',
-})
+  canonicalPath: '/resources/videos', ogImage: hero.imageUrl || undefined })
 
 type Family = 'metal-detection' | 'checkweighers' | 'combination-inspection' | 'x-ray-inspection' | 'conveyors-reject-systems' | ''
 
@@ -105,7 +104,7 @@ const enquiryPath = computed(() => {
           </div>
           <figure class="vd-hero__media">
             <p class="vd-hero__label">Equipment view</p>
-            <img src="/images/devices/combination-real.webp" alt="LITUBO combination inspection system" width="800" height="533" loading="eager" decoding="async">
+            <img :src="hero.imageUrl || '/images/devices/combination-real.webp'" :alt="hero.imageAlt || 'LITUBO combination inspection system'" width="800" height="533" loading="eager" decoding="async">
             <figcaption>
               <span>Equipment photograph</span>
               <NuxtLink :to="localePath('/contact?topic=demonstration')">Ask about demonstration material</NuxtLink>

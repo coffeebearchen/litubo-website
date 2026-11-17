@@ -27,7 +27,7 @@ const { hero } = await usePageHero('company.about', {
   ctaSecondaryPath: '/contact',
 })
 
-useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'), canonicalPath: '/company/about' })
+useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'), canonicalPath: '/company/about', ogImage: hero.imageUrl || undefined })
 
 const families = [
   { label: 'X-Ray Inspection', body: 'Dense contaminant detection and fill or count checks.', to: '/products/x-ray-inspection', icon: 'x-ray-inspection.svg' },
@@ -67,7 +67,7 @@ const company = {
             </p>
           </div>
           <div class="ab-hero__media">
-            <img class="ab-hero__main" src="/images/devices/combination-real.webp" alt="LITUBO combination inspection system with metal detection and checkweighing" width="800" height="481" loading="eager" decoding="async">
+            <img class="ab-hero__main" :src="hero.imageUrl || '/images/devices/combination-real.webp'" :alt="hero.imageAlt || 'LITUBO combination inspection system with metal detection and checkweighing'" width="800" height="481" loading="eager" decoding="async">
             <div class="ab-hero__pair">
               <img src="/images/devices/metal-real.webp" alt="LITUBO metal detection head on a conveyor" width="800" height="533" loading="lazy" decoding="async">
               <img src="/images/devices/weigher-real.webp" alt="LITUBO checkweigher on a production line" width="800" height="533" loading="lazy" decoding="async">

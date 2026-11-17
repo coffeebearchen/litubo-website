@@ -48,10 +48,26 @@ export default defineEventHandler(async (event) => {
     // The image must pass the same public-eligibility gate as every other media reference; a private
     // or archived file returns no URL rather than leaking its id or a Directus path.
     let imageUrl = ''
+    let imageAlt = ''
     if (row.hero_image) {
       const files = await resolvePublicFiles(directusFetch, [row.hero_image])
       const id = publicFileId(files, row.hero_image)
-      if (id) imageUrl = `/api/cms/media/${id}`
+      if (id) {
+        imageUrl = `/api/cms/media/${id}`
+        // Alt text comes from the Media Library title: it is the only description the editor already
+        // wrote for this picture. A missing title is not an error - the page falls back to the alt
+        // text it has always used, which is better than an empty one.
+        try {
+          const meta = await directusFetch<{ data?: Array<{ title?: string | null }> }>(
+            `/files?filter[id][_eq]=${id.toLowerCase()}&fields=title&limit=1`,
+          )
+          const title = Array.isArray(meta?.data) ? meta.data[0]?.title : null
+          imageAlt = typeof title === 'string' ? title.trim() : ''
+        }
+        catch {
+          imageAlt = ''
+        }
+      }
     }
 
     return {
@@ -60,6 +76,7 @@ export default defineEventHandler(async (event) => {
         title: row.title_en ?? null,
         body: row.body_en ?? null,
         imageUrl,
+        imageAlt,
         ctaPrimaryLabel: row.cta_primary_label_en ?? null,
         ctaPrimaryPath: row.cta_primary_path ?? null,
         ctaSecondaryLabel: row.cta_secondary_label_en ?? null,

@@ -6,11 +6,6 @@ const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const publishedLocales = useRuntimeConfig().public.publishedLocales
 
-useSeoHead({
-  title: t('seo.resources.title'),
-  description: t('seo.resources.description'),
-  canonicalPath: '/resources',
-})
 
 /**
  * V2-04 — the hero may be overridden from /admin/page-content. This hero has no eyebrow line and no
@@ -21,6 +16,11 @@ const { hero } = await usePageHero('resources.overview', {
   title: t('pages.resources.heroTitle'),
   body: t('pages.resources.heroSubtitle'),
 })
+  useSeoHead({
+  title: t('seo.resources.title'),
+  description: t('seo.resources.description'),
+  canonicalPath: '/resources', ogImage: hero.imageUrl || undefined })
+
 
 /**
  * CC-IMP-10 (D-035) — Phase 1 route ownership of "Latest from LITUBO":

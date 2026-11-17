@@ -24,7 +24,7 @@ const { hero } = await usePageHero('company.quality-manufacturing', {
   ctaPrimaryPath: '/technical-matching',
 })
 
-useSeoHead({ title: t('seo.quality.title'), description: t('seo.quality.description'), canonicalPath: '/company/quality-manufacturing' })
+useSeoHead({ title: t('seo.quality.title'), description: t('seo.quality.description'), canonicalPath: '/company/quality-manufacturing', ogImage: hero.imageUrl || undefined })
 
 const checks = [
   { title: 'The product and the pack', body: 'Product form, pack material and how the pack runs on a conveyor.' },
@@ -57,7 +57,7 @@ const requirements = [
             </p>
           </div>
           <figure class="qm-hero__media">
-            <img src="/images/devices/weigher-real.webp" alt="LITUBO checkweigher on a production line" width="800" height="533" loading="eager" decoding="async">
+            <img :src="hero.imageUrl || '/images/devices/weigher-real.webp'" :alt="hero.imageAlt || 'LITUBO checkweigher on a production line'" width="800" height="533" loading="eager" decoding="async">
             <figcaption>Equipment photograph. The configuration is confirmed against your own product.</figcaption>
           </figure>
         </div>
