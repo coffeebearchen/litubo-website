@@ -120,7 +120,19 @@ async function save(): Promise<void> {
 }
 
 watch(tab, () => { selected.value = null; load() })
-onMounted(load)
+// 从 URL 恢复：?id=21 表示"打开这一篇"（助手、书签、刷新都靠它）
+onMounted(async () => {
+  await load()
+  const wanted = String(route.query.id ?? '')
+  if (!/^\d+$/.test(wanted)) return
+  const row = rows.value.find((r: PostRow) => r.id === Number(wanted))
+  if (!row) return
+  if (tab.value !== (row.content_type === 'faq' ? 'faq' : 'blog')) {
+    tab.value = row.content_type === 'faq' ? 'faq' : 'blog'
+    await load()
+  }
+  await edit(row)
+})
 </script>
 
 <template>
