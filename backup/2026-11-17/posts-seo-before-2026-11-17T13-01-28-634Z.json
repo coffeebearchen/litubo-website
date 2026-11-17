@@ -1,0 +1,326 @@
+[
+  {
+    "id": 12,
+    "slug": "how-x-ray-inspection-works",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Understand how X-ray inspection works in food production",
+      "seoDescription": "See how an X-ray system detects dense contaminants in packaged food, what affects performance, and why results are confirmed on your own product and line."
+    },
+    "problems": []
+  },
+  {
+    "id": 13,
+    "slug": "x-ray-or-metal-detection",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "X-ray or metal detection: how to choose for your product",
+      "seoDescription": "Compare X-ray and metal detection by what you need to find, your packaging and line space, and see when each system or a combination fits."
+    },
+    "problems": []
+  },
+  {
+    "id": 14,
+    "slug": "how-metal-detection-works",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Understand how metal detection works and when to use it",
+      "seoDescription": "Metal detectors use a balanced coil system, and wet, salty or hot products can disturb the field. Test with your real contaminant types at line speed."
+    },
+    "problems": []
+  },
+  {
+    "id": 15,
+    "slug": "checkweighing-basics",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Checkweighing basics: keep fill weights compliant",
+      "seoDescription": "A checkweigher compares each pack against a target weight and rejects packs outside the range, giving a record of under-filling and over-filling."
+    },
+    "problems": []
+  },
+  {
+    "id": 16,
+    "slug": "combination-inspection",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "How to plan a combination inspection system for your line",
+      "seoDescription": "Combination systems put X-ray, metal detection and checkweighing in one frame with a single reject, saving floor space and operator time."
+    },
+    "problems": []
+  },
+  {
+    "id": 17,
+    "slug": "conveyors-and-reject-systems",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "How to Choose Reject Systems and Conveyors for Inspection Lines",
+      "seoDescription": "The reject type depends on product shape, speed and how the failed pack must be handled. Compare pusher, air blast, drop flap and retracting belt options."
+    },
+    "problems": []
+  },
+  {
+    "id": 18,
+    "slug": "preparing-a-product-sample",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Prepare a product sample for inspection testing",
+      "seoDescription": "Inspection performance depends on your real product and packaging. A good sample set makes the test meaningful."
+    },
+    "problems": []
+  },
+  {
+    "id": 19,
+    "slug": "inspection-sensitivity-and-product-effect",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "How to read inspection sensitivity claims and product effect",
+      "seoDescription": "Sensitivity depends on the contaminant, product, packaging and line speed. Ask for the test conditions behind any sensitivity claim and a test on your own product."
+    },
+    "problems": []
+  },
+  {
+    "id": 20,
+    "slug": "fitting-inspection-into-a-line",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "How to fit inspection equipment into an existing line",
+      "seoDescription": "Space, product flow and reject handling usually decide the layout more than the inspection technology itself. Measure the space first, then choose the technology."
+    },
+    "problems": []
+  },
+  {
+    "id": 21,
+    "slug": "what-to-prepare-for-a-quotation",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Prepare details before requesting an inspection quotation",
+      "seoDescription": "A short, specific brief gets a more useful inspection quotation. Include product, pack format, contaminants, line speed, packaging and space."
+    },
+    "problems": []
+  },
+  {
+    "id": 22,
+    "slug": "faq-what-can-xray-detect",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": null,
+    "problems": [
+      "调用失败"
+    ]
+  },
+  {
+    "id": 23,
+    "slug": "faq-xray-aluminium-trays",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Learn how X-ray inspection handles aluminium trays and foil",
+      "seoDescription": "X-ray inspection is not blocked by aluminium trays, foil or metalised film. Packaging affects the image, so settings are confirmed against your actual pack."
+    },
+    "problems": []
+  },
+  {
+    "id": 24,
+    "slug": "faq-xray-need-samples",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Find out if you should send product samples for testing",
+      "seoDescription": "A test with your real product in its final packaging gives a meaningful performance figure, while a different product or pack size can mislead."
+    },
+    "problems": []
+  },
+  {
+    "id": 25,
+    "slug": "faq-metal-what-metals",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Find out which metals a metal detector can detect",
+      "seoDescription": "A standard metal detector finds ferrous, non-ferrous and stainless-steel contamination. Sensitivity depends on aperture size, the product and line speed."
+    },
+    "problems": []
+  },
+  {
+    "id": 26,
+    "slug": "faq-metal-product-effect",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Understand why wet products affect metal detection",
+      "seoDescription": "Wet, salty or hot products can disturb the detector field, called product effect. See how phase discrimination compensates and why product testing matters."
+    },
+    "problems": []
+  },
+  {
+    "id": 27,
+    "slug": "faq-check-weight-accuracy",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Understand checkweigher accuracy on your line",
+      "seoDescription": "Accuracy depends on pack weight relative to the weigh cell, belt speed, pack stability and vibration; confirm actual results on your line."
+    },
+    "problems": []
+  },
+  {
+    "id": 28,
+    "slug": "faq-check-reject",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Understand How Checkweighers Reject Out-of-Weight Packs",
+      "seoDescription": "A checkweigher compares each pack against the target range and activates a pusher, air blast, drop flap or other reject device for non-conforming packs."
+    },
+    "problems": []
+  },
+  {
+    "id": 29,
+    "slug": "faq-app-industries",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "See which food and packaging industries LITUBO serves",
+      "seoDescription": "LITUBO serves bakery, meat and seafood, frozen food, bottled and canned products, powders and granules, and pharmaceutical or daily-chemical packs."
+    },
+    "problems": []
+  },
+  {
+    "id": 30,
+    "slug": "faq-app-frozen",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "How to Inspect Frozen Products with X-ray and Metal Detection",
+      "seoDescription": "Frozen products can be inspected, but ice crystals and product density affect X-ray and metal detection performance. Testing with frozen samples is recommended."
+    },
+    "problems": []
+  },
+  {
+    "id": 31,
+    "slug": "faq-support-spare-parts",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Request spare parts using your model and serial number",
+      "seoDescription": "Send the machine model and serial number, plus the part description or a photo, through the spare-parts request form. We will confirm the correct part."
+    },
+    "problems": []
+  },
+  {
+    "id": 32,
+    "slug": "faq-support-training",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "How to Arrange Operator Training for Inspection Equipment",
+      "seoDescription": "Operator and maintenance training can be arranged as part of a project or as a separate service visit, with scope and schedule confirmed with your team."
+    },
+    "problems": []
+  },
+  {
+    "id": 33,
+    "slug": "faq-support-manual",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "How to Request a Replacement Manual for Your Machine",
+      "seoDescription": "Manuals are supplied with the machine. To get a replacement copy, send the model and serial number through the support request form."
+    },
+    "problems": []
+  },
+  {
+    "id": 34,
+    "slug": "faq-general-quotation",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "How to Get a Quotation for Inspection Equipment",
+      "seoDescription": "Send product type, pack format, contaminants, line speed, packaging material and space constraints. Our team confirms the configuration before quoting."
+    },
+    "problems": []
+  },
+  {
+    "id": 35,
+    "slug": "faq-general-location",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "Find Where LITUBO Is Based: Kunshan, Jiangsu, China",
+      "seoDescription": "LITUBO operates under Shanghai NingPin Industrial Dev. Co., Ltd. in Kunshan, Jiangsu Province, China and works with distributors and end users internationally."
+    },
+    "problems": []
+  },
+  {
+    "id": 36,
+    "slug": "faq-general-distributor",
+    "before": {
+      "seo_title_en": null,
+      "seo_description_en": null
+    },
+    "proposed": {
+      "seoTitle": "How to enquire about becoming an equipment distributor",
+      "seoDescription": "We welcome enquiries from distributors. Use the become-a-partner form and tell us about your market, customers and technical support capability."
+    },
+    "problems": []
+  }
+]

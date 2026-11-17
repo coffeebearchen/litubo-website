@@ -20,11 +20,15 @@ const resolved = post.value
 if (!resolved) throw createError({ statusCode: 404, fatal: true })
 if (resolved.contentType !== 'insight') throw createError({ statusCode: 404, fatal: true })
 
-useSeoHead({
-  title: resolved.title[l] || resolved.title.en,
-  description: resolved.excerpt[l] || resolved.excerpt.en,
-  canonicalPath: `/resources/insights/${slug}`,
-})
+  // The API has always returned a per-language `seo` block (title / description / OG image) and
+  // this page used to ignore it, so every article used its own title as the <title> and its
+  // excerpt as the description. The editorial fields now win; the old values stay as fallback.
+  useSeoHead({
+    title: resolved.seo.title[l] || resolved.title[l] || resolved.title.en,
+    description: resolved.seo.description[l] || resolved.excerpt[l] || resolved.excerpt.en,
+    canonicalPath: `/resources/insights/${slug}`,
+    ogImage: resolved.seo.ogImage,
+  })
 
 /**
  * A08 - a device photograph must not be cropped, so it is contained; a scene fills the frame.

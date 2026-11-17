@@ -85,7 +85,9 @@ function toPost(r: DirectusPostDetail, slug: string, files: ReadonlyMap<string, 
         pt: r.seo_description_pt ?? '',
       },
       canonicalPath: pathPrefix ? `${pathPrefix}/${postSlug}` : '',
-      ogImage: ogFileId ? `/api/cms/media/${ogFileId}` : undefined,
+      // A designated OG image wins; otherwise the cover is the honest fallback, because a share
+      // card showing the site default on every article tells the reader nothing about this one.
+      ogImage: ogFileId ? `/api/cms/media/${ogFileId}` : coverFileId ? `/api/cms/media/${coverFileId}` : undefined,
     },
   }
 }
