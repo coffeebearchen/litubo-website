@@ -12,6 +12,19 @@
  */
 const { t } = useI18n()
 const localePath = useLocalePath()
+
+/**
+ * V2-04 — the hero may be overridden from /admin/page-content. Every field falls back to the copy
+ * below, so the page renders exactly as before until someone publishes an override.
+ */
+const { hero } = await usePageHero('company.about', {
+  eyebrow: 'About LITUBO',
+  title: 'Food & packaging inspection solutions.',
+  body: 'LITUBO builds inspection equipment for food and packaging producers: X-ray inspection, metal detection, checkweighing, combination inspection, and conveyors and reject systems.',
+  ctaPrimaryLabel: 'Explore the equipment',
+  ctaPrimaryPath: '/products',
+})
+
 useSeoHead({ title: t('seo.about.title'), description: t('seo.about.description'), canonicalPath: '/company/about' })
 
 const families = [
@@ -43,12 +56,9 @@ const company = {
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.company') }, { label: t('nav_company.about') }]" />
         <div class="ab-hero">
           <div class="ab-hero__text">
-            <p class="eyebrow">About LITUBO</p>
-            <h1 class="ab-hero__title">Food &amp; packaging inspection solutions.</h1>
-            <p class="ab-hero__intro">
-              LITUBO builds inspection equipment for food and packaging producers: X-ray inspection, metal
-              detection, checkweighing, combination inspection, and conveyors and reject systems.
-            </p>
+            <p class="eyebrow">{{ hero.eyebrow }}</p>
+            <h1 class="ab-hero__title">{{ hero.title }}</h1>
+            <p class="ab-hero__intro">{{ hero.body }}</p>
             <p class="ab-hero__actions">
               <NuxtLink :to="localePath('/products')" class="ab-cta">Explore the equipment</NuxtLink>
               <NuxtLink :to="localePath('/contact')" class="ab-link">Talk to an engineer →</NuxtLink>

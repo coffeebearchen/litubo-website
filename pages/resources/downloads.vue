@@ -12,6 +12,19 @@
 const { t } = useI18n()
 const localePath = useLocalePath()
 
+/**
+ * V2-04 — the hero may be overridden from /admin/page-content. Every field falls back to the copy
+ * below, so the page renders exactly as before until someone publishes an override.
+ */
+const { hero } = await usePageHero('resources.downloads', {
+  eyebrow: 'Technical documents',
+  title: 'The right information. A clearer next step.',
+  body: 'Datasheets, manuals and drawings are provided on request, because the correct document depends on the model and the configuration you are discussing.',
+  ctaPrimaryLabel: 'Request a document',
+  ctaPrimaryPath: '#request',
+})
+
+
 useSeoHead({
   title: 'Request technical documents — LITUBO',
   description: 'Request product datasheets, manuals and drawings. Confirm the model with the LITUBO team.',
@@ -80,12 +93,9 @@ const messagePrefix = computed(() => `Document request: ${activeType.value.title
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.resources'), to: localePath('/resources') }, { label: 'Downloads' }]" />
         <div class="dl-hero">
           <div class="dl-hero__text">
-            <p class="eyebrow">Technical documents</p>
-            <h1 class="dl-hero__title">The right information. A clearer next step.</h1>
-            <p class="dl-hero__intro">
-              Datasheets, manuals and drawings are provided on request, because the correct document
-              depends on the model and the configuration you are discussing.
-            </p>
+            <p class="eyebrow">{{ hero.eyebrow }}</p>
+            <h1 class="dl-hero__title">{{ hero.title }}</h1>
+            <p class="dl-hero__intro">{{ hero.body }}</p>
             <p class="dl-hero__actions">
               <a href="#request" class="dl-cta">Request a document</a>
               <NuxtLink :to="localePath('/technical-matching')" class="dl-link">Not sure what you need? →</NuxtLink>

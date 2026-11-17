@@ -87,6 +87,8 @@ export interface PostListItem {
   author: string | null
   topics: PostTopic[]
   coverImageUrl: string
+  /** V2-05 — how the cover is fitted. Null keeps the previous per-slug behaviour. */
+  coverFit?: 'contain' | 'cover' | null
   title: LocalizedString
   excerpt: LocalizedString
   /** Populated only when the list endpoint is called with content_type=faq */

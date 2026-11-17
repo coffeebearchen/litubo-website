@@ -11,6 +11,19 @@
  */
 const { t } = useI18n()
 const localePath = useLocalePath()
+
+/**
+ * V2-04 — the hero may be overridden from /admin/page-content. Every field falls back to the copy
+ * below, so the page renders exactly as before until someone publishes an override.
+ */
+const { hero } = await usePageHero('company.quality-manufacturing', {
+  eyebrow: 'Quality &amp; manufacturing',
+  title: 'Clear requirements come before configuration.',
+  body: 'A machine is confirmed against your product and your line, not selected from a catalogue. This page sets out what the technical discussion needs, and where to request the documents that apply to a specific model.',
+  ctaPrimaryLabel: 'Discuss your requirements',
+  ctaPrimaryPath: '/technical-matching',
+})
+
 useSeoHead({ title: t('seo.quality.title'), description: t('seo.quality.description'), canonicalPath: '/company/quality-manufacturing' })
 
 const checks = [
@@ -35,13 +48,9 @@ const requirements = [
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.company') }, { label: t('nav_company.quality') }]" />
         <div class="qm-hero">
           <div class="qm-hero__text">
-            <p class="eyebrow">Quality &amp; manufacturing</p>
-            <h1 class="qm-hero__title">Clear requirements come before configuration.</h1>
-            <p class="qm-hero__intro">
-              A machine is confirmed against your product and your line, not selected from a catalogue.
-              This page sets out what the technical discussion needs, and where to request the documents
-              that apply to a specific model.
-            </p>
+            <p class="eyebrow">{{ hero.eyebrow }}</p>
+            <h1 class="qm-hero__title">{{ hero.title }}</h1>
+            <p class="qm-hero__intro">{{ hero.body }}</p>
             <p class="qm-hero__actions">
               <NuxtLink :to="localePath('/technical-matching')" class="qm-cta">Discuss your requirements</NuxtLink>
               <NuxtLink :to="localePath('/resources/downloads')" class="qm-link">Request documents →</NuxtLink>

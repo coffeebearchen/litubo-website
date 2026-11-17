@@ -12,6 +12,19 @@
 const { t } = useI18n()
 const localePath = useLocalePath()
 
+/**
+ * V2-04 — the hero may be overridden from /admin/page-content. Every field falls back to the copy
+ * below, so the page renders exactly as before until someone publishes an override.
+ */
+const { hero } = await usePageHero('resources.videos', {
+  eyebrow: 'Videos &amp; demonstrations',
+  title: 'A closer look at your inspection line.',
+  body: 'Start with the equipment and the questions that matter to your production line. Ask our team about relevant demonstration material.',
+  ctaPrimaryLabel: 'Explore the equipment',
+  ctaPrimaryPath: '#families',
+})
+
+
 useSeoHead({
   title: 'Equipment demonstrations — LITUBO',
   description: 'Discuss a demonstration of LITUBO inspection equipment and the questions that matter to your production line.',
@@ -82,12 +95,9 @@ const enquiryPath = computed(() => {
         <Breadcrumb :items="[{ label: 'Home', to: localePath('/') }, { label: t('nav.resources'), to: localePath('/resources') }, { label: 'Videos' }]" />
         <div class="vd-hero">
           <div class="vd-hero__text">
-            <p class="eyebrow">Videos &amp; demonstrations</p>
-            <h1 class="vd-hero__title">A closer look at your inspection line.</h1>
-            <p class="vd-hero__intro">
-              Start with the equipment and the questions that matter to your production line. Ask our
-              team about relevant demonstration material.
-            </p>
+            <p class="eyebrow">{{ hero.eyebrow }}</p>
+            <h1 class="vd-hero__title">{{ hero.title }}</h1>
+            <p class="vd-hero__intro">{{ hero.body }}</p>
             <p class="vd-hero__actions">
               <a href="#families" class="vd-cta">Explore the equipment</a>
               <NuxtLink :to="localePath('/contact?topic=demonstration')" class="vd-link">Discuss a demonstration</NuxtLink>
