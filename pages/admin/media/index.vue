@@ -37,6 +37,8 @@ const loading = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 
+const route = useRoute()
+const router = useRouter()
 const selectedFile = ref<MediaFile | null>(null)
 // ML-CLOUD-02 — `filename` is the human-visible download name, a different
 // thing from `title`. Keeping them as separate fields here is the point: the
@@ -546,6 +548,8 @@ async function batchMoveToFolder() {
 // ── File detail ───────────────────────────────────────────────────────────────
 async function openFile(f: MediaFile) {
   selectedFile.value = f
+  // 选中文件写进 URL：刷新/分享能回到这个文件，全局 AI 助手也能据此知道"当前是哪个文件"。
+  if (route.query.id !== f.id) void router.replace({ query: { ...route.query, id: f.id } })
   editForm.value = {
     filename: f.filename_download ?? f.filename_disk ?? '',
     title: f.title ?? '',

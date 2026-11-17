@@ -5,23 +5,27 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
  * The admin assistant, present on every admin page in the top-right corner.
  *
  * It exists because the same three things are useful wherever the editor happens to be standing: write
- * the search metadata for the item in front of me, tell me what this page controls, and let me fix a
+ * the search metadata for the item in front of me, describe the picture I have open, and let me fix a
  * value without hunting for the right tab. So it lives in the layout, not in a page.
  *
- * What it may write is deliberately small: seo title and seo description, for one named item, only
- * after the person presses 采纳并写入. Everything else it does is read-only. The item is read from the
- * URL and sent explicitly, so the server never has to guess which record the panel meant.
+ * What it may write is deliberately small: a search title and description for one article or content
+ * item, or the alt text of one Media Library file - each for one named record, only after the person
+ * presses save. The record is read from the URL and sent explicitly, so the server never has to guess
+ * which item a panel floating over another page meant.
  *
  * The colours are a bright clash (magenta into orange) against the admin's green: this is a control
  * that must be findable at a glance, and it is the one thing in the shell that is not part of the
  * site's own palette.
  */
-interface Proposal {
+interface SeoProposal {
   seoTitle: string
   seoDescription: string
 }
 
-type Entity = 'post' | 'contentItem'
+type Context =
+  | { kind: 'post', id: number, label: string }
+  | { kind: 'contentItem', id: number, label: string }
+  | { kind: 'media', id: string, label: string }
 
 const route = useRoute()
 
@@ -31,52 +35,65 @@ const collapsed = ref(false)
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
-const proposal = ref<Proposal | null>(null)
+
 const proposalRef = ref('')
 const draftTitle = ref('')
 const draftDescription = ref('')
-const saved = ref<Proposal | null>(null)
+
+const altRef = ref('')
+const altDraft = ref('')
+
+const savedText = ref('')
 
 const TITLE_IDEAL = { min: 30, max: 65 }
 const DESCRIPTION_IDEAL = { min: 70, max: 165 }
+const ALT_IDEAL = 125
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Which record the panel is looking at, read from the admin URL. */
-const context = computed<{ entity: Entity, id: number, label: string } | null>(() => {
+const context = computed<Context | null>(() => {
   const path = route.path
+
   const content = /^\/admin\/content-center\/(\d+)(?:\/|$)/.exec(path)
-  if (content) return { entity: 'contentItem', id: Number(content[1]), label: `Content item #${content[1]}` }
+  if (content) return { kind: 'contentItem', id: Number(content[1]), label: `Content item #${content[1]}` }
 
   // The posts editor is a single page with a list; it puts the open article in ?id=.
   if (path === '/admin/posts' || path === '/admin/posts/') {
     const id = String(route.query.id ?? '')
-    if (/^\d+$/.test(id)) return { entity: 'post', id: Number(id), label: `Article #${id}` }
+    if (/^\d+$/.test(id)) return { kind: 'post', id: Number(id), label: `Article #${id}` }
   }
 
-  const post = /^\/admin\/posts\/(\d+)(?:\/|$)/.exec(path)
-  if (post) return { entity: 'post', id: Number(post[1]), label: `Article #${post[1]}` }
+  // The media library is also a single page; it puts the open file in ?id=.
+  if (path.startsWith('/admin/media')) {
+    const fileId = String(route.query.id ?? '')
+    if (UUID_RE.test(fileId)) return { kind: 'media', id: fileId, label: 'Media file' }
+  }
 
   return null
 })
 
-const contextText = computed(() => {
-  if (context.value) return context.value.label
-  return 'No single item on this page'
+const contextText = computed(() => context.value?.label ?? 'No single item on this page')
+const isMedia = computed(() => context.value?.kind === 'media')
+const actionLabel = computed(() => {
+  if (!context.value) return 'Nothing to write here'
+  return isMedia.value ? 'Write this file’s alt text' : 'Write this page’s SEO'
 })
 
-const canSuggestSeo = computed(() => Boolean(context.value))
-
 function resetProposal() {
-  proposal.value = null
   proposalRef.value = ''
   draftTitle.value = ''
   draftDescription.value = ''
+  altRef.value = ''
+  altDraft.value = ''
 }
 
 function openPanel() {
   open.value = true
+  collapsed.value = false
   error.value = ''
   notice.value = ''
-  saved.value = null
+  savedText.value = ''
 }
 
 function closePanel() {
@@ -90,71 +107,113 @@ function onKeydown(event: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
-async function suggestSeo() {
-  if (!context.value || busy.value) return
+function describeError(e: unknown, fallback: string): string {
+  const fe = e as { data?: { message?: string, statusCode?: number }, statusCode?: number }
+  const status = fe?.data?.statusCode ?? fe?.statusCode
+  if (status === 401) return 'Your session expired. Sign in again.'
+  return fe?.data?.message ?? fallback
+}
+
+async function suggest() {
+  const ctx = context.value
+  if (!ctx || busy.value) return
   busy.value = true
   error.value = ''
   notice.value = ''
   resetProposal()
+  savedText.value = ''
   try {
+    if (ctx.kind === 'media') {
+      const res = await $fetch<{
+        ok: boolean
+        unavailable?: boolean
+        error?: string
+        proposal?: { altText: string }
+        proposalRef?: string
+        reused?: boolean
+      }>('/api/admin/ai/media-alt-proposal', { method: 'POST', body: { fileId: ctx.id } })
+      if (!res.ok || !res.proposal) {
+        error.value = res.unavailable ? 'AI is not configured on this server yet.' : (res.error ?? 'No suggestion could be generated.')
+        return
+      }
+      altRef.value = res.proposalRef ?? ''
+      altDraft.value = res.proposal.altText
+      notice.value = res.reused ? 'This is the suggestion already generated for this file.' : ''
+      if (!res.proposal.altText) {
+        error.value = 'The file name gives the model nothing to describe. Look at the picture and write the alt yourself.'
+      }
+      return
+    }
+
     const res = await $fetch<{
       ok: boolean
       unavailable?: boolean
       error?: string
-      proposal?: Proposal
+      proposal?: SeoProposal
       proposalRef?: string
       reused?: boolean
-    }>('/api/admin/ai/seo-proposal', {
-      method: 'POST',
-      body: { entity: context.value.entity, id: context.value.id },
-    })
+    }>('/api/admin/ai/seo-proposal', { method: 'POST', body: { entity: ctx.kind, id: ctx.id } })
     if (!res.ok || !res.proposal) {
       error.value = res.unavailable ? 'AI is not configured on this server yet.' : (res.error ?? 'The suggestion could not be generated.')
       return
     }
-    proposal.value = res.proposal
     proposalRef.value = res.proposalRef ?? ''
     draftTitle.value = res.proposal.seoTitle
     draftDescription.value = res.proposal.seoDescription
     notice.value = res.reused ? 'This is the suggestion already generated for this item.' : ''
   }
   catch (e: unknown) {
-    const fe = e as { data?: { message?: string, statusCode?: number }, statusCode?: number }
-    const status = fe?.data?.statusCode ?? fe?.statusCode
-    error.value = status === 401
-      ? 'Your session expired. Sign in again.'
-      : (fe?.data?.message ?? 'The suggestion could not be generated.')
+    error.value = describeError(e, 'The suggestion could not be generated.')
   }
   finally {
     busy.value = false
   }
 }
 
-async function confirmSeo() {
-  if (!context.value || !proposalRef.value || busy.value) return
+async function saveSeo() {
+  const ctx = context.value
+  if (!ctx || ctx.kind === 'media' || !proposalRef.value || busy.value) return
   busy.value = true
   error.value = ''
   try {
-    const res = await $fetch<{ ok: boolean, saved: Proposal }>('/api/admin/ai/seo-confirm', {
+    const res = await $fetch<{ ok: boolean, saved: SeoProposal }>('/api/admin/ai/seo-confirm', {
       method: 'POST',
       body: {
-        entity: context.value.entity,
-        id: context.value.id,
+        entity: ctx.kind,
+        id: ctx.id,
         proposalRef: proposalRef.value,
         seoTitle: draftTitle.value,
         seoDescription: draftDescription.value,
       },
     })
-    saved.value = res.saved
+    savedText.value = `${res.saved.seoTitle}\n${res.saved.seoDescription}`
     notice.value = 'Saved. Reload the page to see the stored values in the form.'
     resetProposal()
   }
   catch (e: unknown) {
-    const fe = e as { data?: { message?: string, statusCode?: number }, statusCode?: number }
-    const status = fe?.data?.statusCode ?? fe?.statusCode
-    error.value = status === 401
-      ? 'Your session expired. Sign in again.'
-      : (fe?.data?.message ?? 'Saving failed.')
+    error.value = describeError(e, 'Saving failed.')
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+async function saveAlt() {
+  const ctx = context.value
+  if (!ctx || ctx.kind !== 'media' || !altRef.value || busy.value) return
+  busy.value = true
+  error.value = ''
+  try {
+    const res = await $fetch<{ ok: boolean, altText: string }>('/api/admin/ai/media-alt-confirm', {
+      method: 'POST',
+      body: { fileId: ctx.id, proposalRef: altRef.value, altText: altDraft.value },
+    })
+    savedText.value = res.altText
+    notice.value = 'Saved. Reload the page to see the stored alt text.'
+    resetProposal()
+  }
+  catch (e: unknown) {
+    error.value = describeError(e, 'Saving failed.')
   }
   finally {
     busy.value = false
@@ -205,53 +264,70 @@ async function confirmSeo() {
 
       <div v-show="!collapsed">
         <p v-if="error" class="ai-assist__error" role="alert">{{ error }}</p>
-      <p v-if="notice" class="ai-assist__notice">{{ notice }}</p>
+        <p v-if="notice" class="ai-assist__notice">{{ notice }}</p>
 
-      <div class="ai-assist__actions">
-        <button
-          type="button"
-          class="ai-assist__action"
-          :disabled="busy || !canSuggestSeo"
-          @click="suggestSeo"
-        >
-          {{ busy ? 'Working…' : 'Write this page’s SEO' }}
-        </button>
-        <p v-if="!canSuggestSeo" class="ai-assist__hint">
-          Open an article or a content item to write its SEO. This page has nothing to write to.
-        </p>
-      </div>
-
-      <div v-if="proposal" class="ai-assist__proposal">
-        <p class="ai-assist__proposal-head">Review before saving</p>
-
-        <label class="ai-assist__field">
-          <span class="ai-assist__label">Search title</span>
-          <input v-model="draftTitle" type="text" maxlength="120">
-          <span class="ai-assist__count" :class="{ 'is-off': draftTitle.length < TITLE_IDEAL.min || draftTitle.length > TITLE_IDEAL.max }">
-            {{ draftTitle.length }} / 120 · ideal {{ TITLE_IDEAL.min }}–{{ TITLE_IDEAL.max }}
-          </span>
-        </label>
-
-        <label class="ai-assist__field">
-          <span class="ai-assist__label">Search description</span>
-          <textarea v-model="draftDescription" rows="4" maxlength="320" />
-          <span class="ai-assist__count" :class="{ 'is-off': draftDescription.length < DESCRIPTION_IDEAL.min || draftDescription.length > DESCRIPTION_IDEAL.max }">
-            {{ draftDescription.length }} / 320 · ideal {{ DESCRIPTION_IDEAL.min }}–{{ DESCRIPTION_IDEAL.max }}
-          </span>
-        </label>
-
-        <div class="ai-assist__row">
-          <button type="button" class="ai-assist__save" :disabled="busy" @click="confirmSeo">Save these two fields</button>
-          <button type="button" class="ai-assist__ghost" :disabled="busy" @click="resetProposal">Discard</button>
+        <div class="ai-assist__actions">
+          <button
+            type="button"
+            class="ai-assist__action"
+            :disabled="busy || !context"
+            @click="suggest"
+          >
+            {{ busy ? 'Working…' : actionLabel }}
+          </button>
+          <p v-if="!context" class="ai-assist__hint">
+            Open an article, a content item or a media file to use the assistant. This page has nothing to write to.
+          </p>
         </div>
-        <p class="ai-assist__hint">Only the two fields above are written. Nothing else changes.</p>
-      </div>
 
-      <div v-if="saved" class="ai-assist__saved">
-        <p class="ai-assist__label">Saved</p>
-        <p class="ai-assist__saved-line"><strong>{{ saved.seoTitle }}</strong></p>
-        <p class="ai-assist__saved-line">{{ saved.seoDescription }}</p>
-      </div>
+        <!-- 文章 / 内容项：SEO -->
+        <div v-if="proposalRef" class="ai-assist__proposal">
+          <p class="ai-assist__proposal-head">Review before saving</p>
+
+          <label class="ai-assist__field">
+            <span class="ai-assist__label">Search title</span>
+            <input v-model="draftTitle" type="text" maxlength="120">
+            <span class="ai-assist__count" :class="{ 'is-off': draftTitle.length < TITLE_IDEAL.min || draftTitle.length > TITLE_IDEAL.max }">
+              {{ draftTitle.length }} / 120 · ideal {{ TITLE_IDEAL.min }}–{{ TITLE_IDEAL.max }}
+            </span>
+          </label>
+
+          <label class="ai-assist__field">
+            <span class="ai-assist__label">Search description</span>
+            <textarea v-model="draftDescription" rows="4" maxlength="320" />
+            <span class="ai-assist__count" :class="{ 'is-off': draftDescription.length < DESCRIPTION_IDEAL.min || draftDescription.length > DESCRIPTION_IDEAL.max }">
+              {{ draftDescription.length }} / 320 · ideal {{ DESCRIPTION_IDEAL.min }}–{{ DESCRIPTION_IDEAL.max }}
+            </span>
+          </label>
+
+          <div class="ai-assist__row">
+            <button type="button" class="ai-assist__save" :disabled="busy" @click="saveSeo">Save these two fields</button>
+            <button type="button" class="ai-assist__ghost" :disabled="busy" @click="resetProposal">Discard</button>
+          </div>
+          <p class="ai-assist__hint">Only the two fields above are written. Nothing else changes.</p>
+        </div>
+
+        <!-- 媒体文件：alt -->
+        <div v-if="altRef" class="ai-assist__proposal">
+          <p class="ai-assist__proposal-head">Review before saving</p>
+          <label class="ai-assist__field">
+            <span class="ai-assist__label">Alt text</span>
+            <textarea v-model="altDraft" rows="3" maxlength="160" />
+            <span class="ai-assist__count" :class="{ 'is-off': altDraft.length > ALT_IDEAL }">
+              {{ altDraft.length }} / 160 · ideal ≤ {{ ALT_IDEAL }}
+            </span>
+          </label>
+          <div class="ai-assist__row">
+            <button type="button" class="ai-assist__save" :disabled="busy" @click="saveAlt">Save the alt text</button>
+            <button type="button" class="ai-assist__ghost" :disabled="busy" @click="resetProposal">Discard</button>
+          </div>
+          <p class="ai-assist__hint">Writes the file’s title field, which the library and the public pages read as alt. Nothing else changes.</p>
+        </div>
+
+        <div v-if="savedText" class="ai-assist__saved">
+          <p class="ai-assist__label">Saved</p>
+          <p v-for="line in savedText.split('\n')" :key="line" class="ai-assist__saved-line">{{ line }}</p>
+        </div>
       </div>
     </section>
   </div>
