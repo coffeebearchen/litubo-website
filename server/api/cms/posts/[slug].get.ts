@@ -18,6 +18,7 @@ interface DirectusPostDetail {
   related_product_slugs: string[] | null
   related_application_slugs: string[] | null
   cover_image: string | null
+  cover_fit: string | null
   seo_og_image: string | null
   title_en: string | null
   title_es: string | null
@@ -62,6 +63,9 @@ function toPost(r: DirectusPostDetail, slug: string, files: ReadonlyMap<string, 
     relatedProductSlugs: r.related_product_slugs ?? [],
     relatedApplicationSlugs: r.related_application_slugs ?? [],
     coverImageUrl: coverFileId ? `/api/cms/media/${coverFileId}?v=2` : '',
+    // V2-05: the fit now comes from the record. Null means "no opinion yet", and the page keeps its
+    // previous behaviour for that article rather than being forced to a value.
+    coverFit: r.cover_fit === 'contain' || r.cover_fit === 'cover' ? r.cover_fit : null,
     title: { en: r.title_en ?? '', es: r.title_es ?? '', pt: r.title_pt ?? '' },
     excerpt: { en: r.excerpt_en ?? '', es: r.excerpt_es ?? '', pt: r.excerpt_pt ?? '' },
     bodyHtml: {
@@ -101,7 +105,7 @@ export default defineEventHandler(async (event): Promise<Post> => {
   const fields = [
     'id', 'content_type', 'status', 'slug', 'publish_date', 'author',
     'topics', 'faq_group', 'related_product_slugs', 'related_application_slugs',
-    'cover_image', 'seo_og_image',
+    'cover_image', 'cover_fit', 'seo_og_image',
     'title_en', 'title_es', 'title_pt',
     'excerpt_en', 'excerpt_es', 'excerpt_pt',
     'body_en', 'body_es', 'body_pt',

@@ -134,7 +134,7 @@ ERROR [inquiry] email notification failed { id: 35 }
 | **V2-02** 导航 + 统一入口 | ✅ 完成 | 见提交 | 五色分区导航（文字+图标）；4 个重复路径改跳转，旧文件保留；3 个独有工具保留 | 导航渲染、跳转目标、typecheck 0 | 恢复旧 nav 块 + 4 个文件旧内容 | — |
 | **V2-03** posts 管理 | ✅ 完成 | 见提交 | `/admin/posts`（Blog/FAQ 同页，读 posts）+ GET/PATCH 接口 | 路由可达、typecheck 0 | 隐藏导航入口，数据未迁 | — |
 | **V2-04** Hero | 🟡 后台完成，前台待接 | 见提交 | 13 页注册表 + `/admin/page-content` + 单行 PATCH（publish/withdraw） | 路由可达、typecheck 0 | 关闭覆盖读取 | — |
-| V2-05 cover_fit + 分类小 tab | 待做 | — | — | — | — | — |
+| **V2-05** cover_fit | ✅ 完成（分类 tab 未做） | 见提交 | `posts.cover_fit` nullable string；按已核实清单迁移 10 篇；接口输出 coverFit；页面优先读它，null 回退旧清单 | 接口 coverFit=contain/cover 正确；渲染 class 正确 | 关新读路径，保留列不 DROP | — |
 | V2-06 内部询盘 AI | 待做 | — | — | — | — | — |
 | V2-07 视觉与合同验收 | 待做 | — | — | — | — | — |
 
@@ -148,16 +148,18 @@ ERROR [inquiry] email notification failed { id: 35 }
 | `products` | 含称重 3 列 | 复用现有 | **无差异** |
 | `inquiries` | 含 7 个 AI 列 | 复用现有 | **无差异** |
 | `product_categories` | 名称/简介/图片 | 复用现有 | **无差异** |
-| `posts` | 无 `cover_fit` | **新增 nullable string** | **待建** |
+| `posts` | **已加 `cover_fit`** | nullable string | ✅ 已建并迁移 10 篇 |
 | `site_settings` | 联系方式 | 复用现有 | **无差异** |
 
-### `posts.cover_fit` 迁移计划（V2-05）
+### `posts.cover_fit` 迁移结果（V2-05，已完成）
 
-1. 先导出受影响记录旧值与 schema
-2. Directus 建列：nullable string，允许 `null` / `contain` / `cover`
-3. 只按**已核实清单**迁移（当前 10 篇 Insights 的 contain/cover 归属已在 `pages/resources/insights/[slug].vue` 的 `CONTAIN_SLUGS` 中）
-4. 前端保留 `CONTAIN_SLUGS` 作为 null 兼容
-5. 回退：关闭新读写，**保留列不 DROP**
+**已完成。** 备份：`backup/2026-11-16/cover_fit-migration-backup.json`（33 条旧值）。
+
+1. ✅ 已导出受影响记录旧值与 schema
+2. ✅ 已建列：nullable string，dropdown 界面；**公开读权限白名单同步加列**（否则接口 503）
+3. ✅ 按已核实清单迁移 10 篇（5 contain + 5 cover），其余 23 篇保持 null
+4. ✅ 前端优先读 `coverFit`，null 时仍用 `CONTAIN_SLUGS`
+5. 回退：关新读路径，**保留列不 DROP**
 
 ---
 

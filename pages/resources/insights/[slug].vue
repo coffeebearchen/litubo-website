@@ -39,7 +39,14 @@ const CONTAIN_SLUGS = new Set([
   'combination-inspection',
 ])
 
-const coverFit = computed(() => (CONTAIN_SLUGS.has(slug) ? 'post-cover__img--contain' : ''))
+const coverFit = computed(() => {
+  // V2-05: the record wins once it has a value; a null keeps the previous per-slug behaviour so no
+  // existing article changes appearance just because the column was added.
+  const fromRecord = post.value?.coverFit
+  if (fromRecord === 'contain') return 'post-cover__img--contain'
+  if (fromRecord === 'cover') return ''
+  return CONTAIN_SLUGS.has(slug) ? 'post-cover__img--contain' : ''
+})
 
 /** A08 - the cover carried no alt text at all. The article title describes it truthfully. */
 const coverAlt = computed(() => (resolved?.title[l] || resolved?.title.en || ''))

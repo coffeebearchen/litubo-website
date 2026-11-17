@@ -1,0 +1,200 @@
+[
+  {
+    "id": 3,
+    "slug": "test-poultry-xray-case-study",
+    "cover_image": null,
+    "status": "draft"
+  },
+  {
+    "id": 6,
+    "slug": "test-faq-xray-penetration",
+    "cover_image": null,
+    "status": "draft"
+  },
+  {
+    "id": 8,
+    "slug": "test-faq-calibration-frequency",
+    "cover_image": null,
+    "status": "draft"
+  },
+  {
+    "id": 7,
+    "slug": "test-faq-metal-detector-wet-products",
+    "cover_image": null,
+    "status": "draft"
+  },
+  {
+    "id": 2,
+    "slug": "test-metal-detector-sensitivity-guide",
+    "cover_image": null,
+    "status": "draft"
+  },
+  {
+    "id": 1,
+    "slug": "test-xray-food-safety-101",
+    "cover_image": null,
+    "status": "draft"
+  },
+  {
+    "id": 21,
+    "slug": "what-to-prepare-for-a-quotation",
+    "cover_image": "48abc396-4545-436f-9e43-93cc7a212b99",
+    "status": "published"
+  },
+  {
+    "id": 4,
+    "slug": "test-company-news-2026",
+    "cover_image": null,
+    "status": "draft"
+  },
+  {
+    "id": 20,
+    "slug": "fitting-inspection-into-a-line",
+    "cover_image": "ee164aee-527c-4663-8bf4-6a07de851f96",
+    "status": "published"
+  },
+  {
+    "id": 19,
+    "slug": "inspection-sensitivity-and-product-effect",
+    "cover_image": "dfc39fd9-aac6-456a-87b4-48802e318599",
+    "status": "published"
+  },
+  {
+    "id": 36,
+    "slug": "faq-general-distributor",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 35,
+    "slug": "faq-general-location",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 34,
+    "slug": "faq-general-quotation",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 18,
+    "slug": "preparing-a-product-sample",
+    "cover_image": "2757dcfa-49fe-44da-a94d-95e05870ff34",
+    "status": "published"
+  },
+  {
+    "id": 33,
+    "slug": "faq-support-manual",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 32,
+    "slug": "faq-support-training",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 31,
+    "slug": "faq-support-spare-parts",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 30,
+    "slug": "faq-app-frozen",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 29,
+    "slug": "faq-app-industries",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 28,
+    "slug": "faq-check-reject",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 27,
+    "slug": "faq-check-weight-accuracy",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 17,
+    "slug": "conveyors-and-reject-systems",
+    "cover_image": "a7702883-58a2-401f-8222-eeb1b86bf88a",
+    "status": "published"
+  },
+  {
+    "id": 26,
+    "slug": "faq-metal-product-effect",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 25,
+    "slug": "faq-metal-what-metals",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 24,
+    "slug": "faq-xray-need-samples",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 23,
+    "slug": "faq-xray-aluminium-trays",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 22,
+    "slug": "faq-what-can-xray-detect",
+    "cover_image": null,
+    "status": "published"
+  },
+  {
+    "id": 16,
+    "slug": "combination-inspection",
+    "cover_image": "77add968-6cc5-4982-a37c-2cad080b1757",
+    "status": "published"
+  },
+  {
+    "id": 15,
+    "slug": "checkweighing-basics",
+    "cover_image": "a6d701d1-4902-4880-a2f5-87ec36a0c03e",
+    "status": "published"
+  },
+  {
+    "id": 14,
+    "slug": "how-metal-detection-works",
+    "cover_image": "f4899fc4-5ff1-4198-9e7c-fee718ef1940",
+    "status": "published"
+  },
+  {
+    "id": 13,
+    "slug": "x-ray-or-metal-detection",
+    "cover_image": "8667aa78-3555-475f-9ace-bfcae53e37bf",
+    "status": "published"
+  },
+  {
+    "id": 12,
+    "slug": "how-x-ray-inspection-works",
+    "cover_image": "d3eb45ab-2b32-4661-919e-d41b3c8bca1e",
+    "status": "published"
+  },
+  {
+    "id": 5,
+    "slug": "test-draft-post-do-not-publish",
+    "cover_image": null,
+    "status": "draft"
+  }
+]
