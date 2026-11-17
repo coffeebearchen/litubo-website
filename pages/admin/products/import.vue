@@ -315,6 +315,7 @@ function label(status: Status): string {
         </ul>
         <div class="actions">
           <NuxtLink :to="`/admin/products/${selected.product.id}`" class="btn btn-primary">打开产品编辑</NuxtLink>
+          <NuxtLink :to="`/admin/products/${selected.product.id}/media`" class="btn">上传图片</NuxtLink>
           <button type="button" class="btn" @click="removeItem(selected.key)">从队列移除</button>
         </div>
       </template>

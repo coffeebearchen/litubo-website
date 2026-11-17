@@ -222,6 +222,74 @@ async function pickFromLibrary(file: LibraryFile) {
   }
 }
 
+/**
+ * 人工批量上传图片并直接关联到本产品。
+ *
+ * 上传走的是媒体库唯一的上传入口（/api/admin/media/upload），关联走的是与"从媒体库选择"完全相同的接口，
+ * 所以这里没有第二条写入路径：同一套校验、同一套重复检查、同样要求 Draft。
+ * 一张失败不影响其余几张，失败原因逐条列出。
+ */
+const uploadingImages = ref(false)
+const uploadResults = ref<Array<{ name: string, ok: boolean, message: string }>>([])
+const canUpload = computed(() => (productData.value?.status ?? '') === 'draft')
+
+async function uploadImages(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (files.length === 0) return
+  if (!canUpload.value) {
+    error.value = '只有 Draft 状态的产品可以上传并关联图片。先把它转回草稿。'
+    return
+  }
+  uploadingImages.value = true
+  error.value = ''
+  success.value = ''
+  uploadResults.value = []
+  let linked = 0
+  try {
+    for (const file of files) {
+      try {
+        const fd = new FormData()
+        fd.append('file', file, file.name)
+        const up = await $fetch<{ uploaded?: Array<{ id: string }>, errors?: Array<{ message: string }> }>(
+          '/api/admin/media/upload',
+          { method: 'POST', body: fd },
+        )
+        if (up.errors?.length) {
+          uploadResults.value.push({ name: file.name, ok: false, message: up.errors[0]?.message ?? '上传失败' })
+          continue
+        }
+        const fileId = up.uploaded?.[0]?.id
+        if (!fileId) {
+          uploadResults.value.push({ name: file.name, ok: false, message: '上传未返回文件 id' })
+          continue
+        }
+        await $fetch(`/api/admin/products/${id}/media`, {
+          method: 'POST',
+          body: { directus_files_id: fileId, file_role: null },
+        })
+        uploadResults.value.push({ name: file.name, ok: true, message: '已上传并关联' })
+        linked += 1
+      }
+      catch (e: unknown) {
+        uploadResults.value.push({
+          name: file.name,
+          ok: false,
+          message: (e as { data?: { message?: string } })?.data?.message ?? '上传或关联失败',
+        })
+      }
+    }
+    if (linked > 0) {
+      success.value = `已上传并关联 ${linked} 个文件`
+      await refreshMedia()
+      setTimeout(() => (success.value = ''), 4000)
+    }
+  }
+  finally {
+    uploadingImages.value = false
+  }
+}
 function libIsImage(type: string | null | undefined) { return (type ?? '').startsWith('image/') }
 function libThumb(id: string) { return `/api/admin/media/${id}?width=160&height=120&fit=cover` }
 function libFmtSize(bytes: number | null | undefined) {
@@ -256,12 +324,30 @@ async function removeMedia(mid: number) {
 
     <p v-if="error" class="error-banner">{{ error }}</p>
     <p v-if="success" class="success-banner">{{ success }}</p>
+    <ul v-if="uploadResults.length" class="upload-results" role="status">
+      <li v-for="r in uploadResults" :key="r.name" :class="r.ok ? 'is-ok' : 'is-bad'">
+        {{ r.name }} — {{ r.message }}
+      </li>
+    </ul>
+    <p v-if="!canUpload" class="lock-hint">当前状态不是 Draft，不能上传新图片。先转回草稿。</p>
 
     <div class="content-card">
       <div class="card-header">
         <h2 class="card-title">图片与资料</h2>
         <span class="card-note">已绑定 {{ mediaList.length }} 个文件</span>
-        <button class="btn-from-lib" @click="openLibrary">从媒体库选择</button>
+        <div class="header-actions">
+          <button class="btn-from-lib" @click="openLibrary">从媒体库选择</button>
+          <label class="btn-upload" :class="{ 'is-disabled': !canUpload || uploadingImages }">
+            {{ uploadingImages ? '上传中…' : '批量上传图片' }}
+            <input
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp"
+              :disabled="!canUpload || uploadingImages"
+              @change="uploadImages"
+            >
+          </label>
+        </div>
       </div>
 
       <div v-if="mediaList.length === 0" class="empty-state">
@@ -718,6 +804,26 @@ async function removeMedia(mid: number) {
 .success-banner { background: #d1f0e8; border: 1px solid #a3dbc8; border-radius: var(--radius-sm); color: #2F6B3A; font-size: var(--text-sm); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-5); }
 
 /* "从媒体库选择" 按钮 */
+.header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.btn-upload {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px dashed var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+.btn-upload.is-disabled { opacity: .55; cursor: default; border-style: solid; }
+.btn-upload input[type='file'] { display: none; }
+.upload-results { list-style: none; margin: 0 0 var(--space-4); padding: 0; font-size: var(--text-sm); }
+.upload-results li { padding: 4px 0; }
+.upload-results li.is-ok { color: #2F6B3A; }
+.upload-results li.is-bad { color: #B42318; }
+.lock-hint { margin: 0 0 var(--space-4); font-size: var(--text-sm); color: #8A5A00; }
 .btn-from-lib {
   font-size: var(--text-sm);
   font-weight: 600;
