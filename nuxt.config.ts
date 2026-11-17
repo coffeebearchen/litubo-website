@@ -48,6 +48,10 @@ export default defineNuxtConfig({
   app: {
     head: {
       link: [
+        // Site icons. The wordmark is 2035x309, unreadable at 16px, so the icons use the "L" glyph
+        // cropped from the same file (public/images/brand/litubo-mark.png).
+        { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico', sizes: 'any' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
         {
           rel: 'preconnect',
           href: 'https://fonts.googleapis.com',
@@ -65,6 +69,8 @@ export default defineNuxtConfig({
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { charset: 'utf-8' },
+        // Brand green, so mobile browsers tint the chrome to match the site instead of defaulting to blue.
+        { name: 'theme-color', content: '#2F6B3A' },
       ],
     },
   },
