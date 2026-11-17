@@ -10,7 +10,7 @@ LITUBO 后端设计任务 —— 给 Codex 的完整指令
 【仓库】
   coffeebearchen/litubo-website
   分支 work/c-refined-v1
-  HEAD c963115
+  HEAD e1db6c8（本文件所在提交）
 
 【一句话说明】
 这个站是外贸 B2B（食品/包装检测设备），Nuxt 3 + Directus 12。
@@ -22,7 +22,7 @@ LITUBO 后端设计任务 —— 给 Codex 的完整指令
 # Codex 任务书 —— 前后端对应审查 + 后台重新设计
 
 > 生成：2026-11-17
-> 仓库：`coffeebearchen/litubo-website`　分支：`work/c-refined-v1`　HEAD：`b3ba225`
+> 仓库：`coffeebearchen/litubo-website`　分支：`work/c-refined-v1`　HEAD：`e1db6c8`
 > 本文件的事实全部由 DSH 实测，不是推测
 
 ---
@@ -412,3 +412,4 @@ A15  短查询不作废旧搜索结果
 - 报告用中文；代码、路径、字段名保持英文原文
 
 ===============================================================
+
