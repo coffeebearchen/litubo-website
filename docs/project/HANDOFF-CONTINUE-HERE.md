@@ -1,6 +1,6 @@
 # 交接文件 —— 下一个会话从这里开始
 
-> 写入：2026-11-17　分支：`work/c-refined-v1`　HEAD：`5f3fb25`
+> 写入：2026-11-17　分支：`work/c-refined-v1`　HEAD：见 `git log -1`
 > **这是唯一入口。读完本文件即可无缝接手，不需要读上一轮对话。**
 
 ---
@@ -10,8 +10,9 @@
 **项目**：LITUBO 外贸官网（食品/包装检测设备）。Nuxt 3 + Directus 12 + PostgreSQL。
 **仓库**：`D:\LITUBO-website`（**注意：不是 `D:\LITUBO_New_Website`，那是空目录**）
 **当前任务**：按 Codex 的 V2 设计包做**后台**改造，计划号 `BACKEND-DSH-V2-0e6e98d`。
-**进度**：**V2-00 ~ V2-05 全部完成**（V2-04 十三页接完、V2-05 分类 tab 做完）。**下一步 V2-06（询盘 AI）**，然后 V2-07（视觉验收）。
-**最近两个提交**：`2df3f73`（V2-04 收尾）、`5f3fb25`（V2-05 分类 tab）。都只在本地，**未推送**。
+**进度**：**V2-00 ~ V2-07 全部完成**（V2-04 十三页接完、V2-05 分类 tab、V2-06 询盘 AI、V2-07 视觉验收）。
+**当前状态**：V2 包的设计与施工范围已经走完，剩下的都是**需要业主拍板的决定**（见 §5），不是待写的代码。
+**最近提交**：`2df3f73`（V2-04）、`5f3fb25`（V2-05）、`a6e08b5`（V2-06）、最新一条 `docs(v2-07)…`（V2-07 + 交接文件）。都只在本地，**未推送**。
 
 ---
 
@@ -94,45 +95,35 @@ docs/project/BACKEND-DSH-V2-STATE.md
 
 ---
 
-## 5. 下一步：V2-06 询盘 AI（V2-04/V2-05 已完成，不要重做）
+## 5. V2 包已走完 —— 剩下的是**需要业主决定的事**
 
-已完成的部分见 `BACKEND-DSH-V2-STATE.md` 的「V2-04 前台接线实测」「V2-05 分类小 tab 实测」，**两张表里已写清实现方式和边界，先读再动手**。
+V2-00 ~ V2-07 全部完成，实现细节、实测记录与边界都写在 `BACKEND-DSH-V2-STATE.md` 的对应小节里（先读再动手，不要在已完成的东西上重做）。
 
-### V2-06：按 `01-specs/10-MINIMAL-SCHEMA-API-V2.md`
+### 5.1 已完成（速查）
 
-```
-POST /api/admin/inquiries/:id/ai-proposal   只返回候选，不写 inquiries
-POST /api/admin/inquiries/:id/ai-confirm    校验绑定/过期/原文未变，写现有 7 个 ai_* 列
-Discard                                     只在浏览器丢候选，不清原文
-```
+| 任务 | 关键实现 |
+|---|---|
+| V2-04 | 13 页 Hero 注册表 + `/admin/page-content` + `/api/cms/page-hero`；首页走已有 `/api/cms/home`，不加第二个读取器 |
+| V2-05 | `posts.cover_fit`（唯一新增列）+ 五 tab 页面内容 + `product_categories` 分类 tab（`categories.get/patch.ts`） |
+| V2-06 | `ai-proposal` / `ai-confirm` 两个接口 + 询盘详情 AI 面板；新 target `inquiry-summary` |
+| V2-07 | 9 张实现截图 + 差异表：`reviews/2026-11-17-BACKEND-DSH-V2-0e6e98d/04-verification/` |
 
-**DeepSeek provider：已核实为「已配置」**（2026-11-17 查 `.env`，只看了是否存在、没打印值）：
+### 5.2 需要业主拍板的四件事（不要自行决定）
 
-```
-AI_DEFAULT_PROVIDER = deepseek
-DEEPSEEK_MODEL      = deepseek-v4-flash
-DEEPSEEK_API_KEY    = 存在（35 字符，sk- 开头）
-```
+1. **产品编辑器 tab**：实现是 6 个中文 tab（基础信息/页面模块/技术参数/图片与资料/产品 FAQ/SEO），设计是 7 个英文 tab（含 Preview）。改语言会影响既有测试与导航。
+2. **Hero 图片入口**：后端已支持 `heroImage`，编辑页只有状态显示、没有选媒体入口。
+3. **测试草稿残留**：`posts` 里有一条 `DRAFT: This should not appear in public API [TEST]`（slug `test-draft-post-do-not-publish`，草稿态），是否清掉。
+4. **页面内容清单 tab 结构**：以文字规格（Home/Company/Support/Resources）为准，还是改成设计图（All page heroes / Home blocks / Product categories）。当前按文字规格实现。
 
-所以不要走"显示 Unavailable"那条分支。**但先读下面两条再动手：**
+### 5.3 还没关闭的一条业务决定
 
-1. **业主尚未确认"是否允许把真实客户询盘内容发给 DeepSeek"**（账本「待业主确认 #2」仍未关闭）。本机库里有 22 条真实询盘。做接口没问题，**不要去跑一份带真实客户数据的联调**；用 `example.invalid` 之类的合成内容验证链路。
-2. **可复用的现成设施**（不要另写一套 provider）：
-   ```
-   server/utils/aiProviderRegistry.ts        provider 注册表
-   server/utils/deepseekStructuredProvider.ts DeepSeek 结构化调用
-   server/utils/aiProposalEngine.ts           候选生成
-   server/utils/aiTargetContract.ts           契约
-   server/utils/aiContentIntake.ts            原文→源引用
-   server/api/admin/ai/providers.get.ts       已配置查询接口
-   ```
+**是否允许把真实客户询盘内容发给 DeepSeek**。功能已经可用，但目前只用合成数据（`test-only@example.invalid`）跑通过。在业主明确同意前，**不要在真实询盘上点 Generate**。
 
-硬约束（原包要求，别放宽）：`ai_recommended_products` 和 `ai_draft_reply` 一期**不填**；`ai_confidence` 无依据时为 `null`；不许自动回复 / 自动分配 / 自动生成参数；Confirm 必须是**人**按的。
+### 5.4 如果想继续往下做（V2 包之外）
 
-### V2-07：视觉验收
-
-1440 + 390 截图，与 `02-ui/` 五张图并排，填差异表。**不能用设计图冒充实现截图。**
-截图工具：`scripts/screenshot-viewport.mjs <url> <w> <h> <out.png>`，需要先起 headless Chrome 并开放 `127.0.0.1:9222`（CDP），否则报 `ECONNREFUSED 9222`。
+- 给 Hero 补媒体选择器（复用 `components/admin/media/MediaLibraryPicker.vue`，V2-05 的分类 tab 已有接入示例）。
+- `ai_recommended_products` / `ai_draft_reply` 是二期预留列，一期明确不填，不要顺手开启。
+- 任何新增数据库列，都要同步公开只读白名单（见坑 1），否则接口 503。
 
 ---
 

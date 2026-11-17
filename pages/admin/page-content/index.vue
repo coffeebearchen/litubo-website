@@ -162,7 +162,11 @@ async function withdraw(): Promise<void> {
 }
 
 watch(selectedKey, () => { if (current.value) fillFrom(current.value) })
-watch(form, () => { dirty.value = true }, { deep: true })
+// `flush: 'sync'` is load-bearing, not a preference: `fillFrom()` assigns every field and then clears
+// `dirty`, and a default (async) watcher fires AFTER that clear — so merely opening a page showed
+// "Unpublished changes" with nothing edited. Running the watcher during the assignments leaves the
+// flag false once `fillFrom()` finishes, and still turns it on for anything a person types.
+watch(form, () => { dirty.value = true }, { deep: true, flush: 'sync' })
 onMounted(load)
 
 // ── Product categories: the existing collection, edited in place ─────────────

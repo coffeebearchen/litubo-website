@@ -136,6 +136,8 @@ async function confirmProposal() {
               <h2>AI assistance</h2>
               <span v-if="aiProposal" class="ai-badge ai-badge--proposal">Unreviewed proposal</span>
               <span v-else-if="inquiry.ai_reviewed" class="ai-badge ai-badge--confirmed">Confirmed</span>
+              <!-- The design marks this panel as AI assistance even before anything is generated. -->
+              <span v-else class="ai-badge ai-badge--proposal">AI</span>
             </div>
 
             <!-- What a person already confirmed, read back from the inquiry -->

@@ -136,7 +136,7 @@ ERROR [inquiry] email notification failed { id: 35 }
 | **V2-04** Hero | ✅ 完成（13/13 页已接） | 见提交 | 13 页注册表 + `/admin/page-content` + 单行 PATCH（publish/withdraw）；13 页前台全部读覆盖；CTA 标签与路径按「成对」合并 | 8 页真实覆盖往返（建行→读 HTML→删行→恢复默认）；首页走 `/api/cms/home` 同源验证；CTA 半对用例；typecheck 0 | 关闭覆盖读取（前台回默认文案） | — |
 | **V2-05** cover_fit | ✅ 完成（含「Product categories」tab） | 见提交 | `posts.cover_fit` nullable string；按已核实清单迁移 10 篇；接口输出 coverFit；页面优先读它，null 回退旧清单；`/admin/page-content` 五 tab（Home/Company/Support/Resources + Product categories），分类 tab 直接读写 `product_categories` | 接口 coverFit=contain/cover 正确；分类读写往返 + 4 个拒绝用例；浏览器点选与深链实测 | 关新读路径、保留列不 DROP；分类 tab 不建副本、不改 slug/status | — |
 | **V2-06** 内部询盘 AI | ✅ 完成（摘要/意图/缺项 + 人工确认） | 见提交 | 新 target `inquiry-summary`；`ai-proposal` 只出候选不写库；`ai-confirm` 校验绑定/一次性/原文指纹后写 4 列；询盘详情加 AI 面板；询盘读取增加 5 个 ai 列 | 合成询盘全链路（生成不写库→确认写 4 列→重放/伪 ref/未选/原文变动全部拒绝）；浏览器点击实测；CSRF 与未登录拦截；typecheck 0、lint 0 | 关闭 AI 入口（面板消失，普通状态/备注流程不受影响），已写列保留 | 见下方「待业主确认 #2」 |
-| V2-07 视觉与合同验收 | 待做 | — | — | — | — | — |
+| **V2-07** 视觉与合同验收 | ✅ 完成（8+1 张实现截图 + 差异表） | 见提交 | 只改两处实现缺陷（见下），其余是证据；差异表在 `reviews/.../04-verification/VISUAL-DIFF.md` | CDP 真实视口实测：8 页 0 横向溢出、0 console error；与 UI-01/02/05 设计图逐项对照 | 删除 `04-verification/` 即可，不影响代码 | 4 项待决定，见下方「V2-07 视觉验收结论」 |
 
 ---
 
@@ -194,6 +194,48 @@ ERROR [inquiry] email notification failed { id: 35 }
 | **后台未读徽标** | ✅ 已加：侧栏「Customer Inquiries」显示待处理数量（当前 21） |
 
 询盘始终写入数据库；徽标让新询盘不再像空收件箱。
+
+## V2-07 视觉验收结论（本地已测）
+
+完整差异表：`docs/project/reviews/2026-11-17-BACKEND-DSH-V2-0e6e98d/04-verification/VISUAL-DIFF.md`
+实现截图 9 张在同一目录（`UI-01/02/03/04/05-*.png`），设计图仍在 `02-ui/`，两套文件分开。
+
+### 机器判定（不靠肉眼）
+
+| 项 | 结果 |
+|---|---|
+| 8 个页面在 1440 / 390 的 `documentWidth > viewport` | 全部 **false**（无横向溢出） |
+| console error | **0** |
+| 截图方式 | CDP `Emulation.setDeviceMetricsOverride`，真实布局视口，非裁切 |
+
+### 本轮修掉的两处实现缺陷（由截图对照发现，不是凭空加的）
+
+| # | 缺陷 | 修法 |
+|---|---|---|
+| 1 | `/admin/page-content` 一进入编辑页就显示「Unpublished changes」——`fillFrom()` 把 `dirty` 清成 false 后，默认异步的 `watch(form, deep)` 又把它翻回 true | `watch(form, …, { flush: 'sync' })`：填值期间同步触发，`fillFrom()` 结束时 `dirty` 保持 false；用户真正输入时仍会置 true |
+| 2 | 询盘 AI 面板空闲态没有设计要求的 AI 标识 | 空闲态补紫色 `AI` 徽标（生成后为 `Unreviewed proposal`，确认后为 `Confirmed`） |
+
+### 与设计图不一致但**有意保留**的地方
+
+- 页面内容清单的 tab 用文字规格的 Home/Company/Support/Resources，而不是设计图的 All page heroes / Home blocks。
+- Hero 编辑器不设 `Preview changes` 按钮：预览常驻右侧，再加一个切换是重复操作。
+- 询盘详情沿用既有 1.6:1 布局，本轮只加 AI 面板，没有重排整页。
+- 提案态不提供 `Regenerate` 链接：`Generate again` 就是同一件事。
+
+### 需要业主决定的四项（本轮不动）
+
+1. **产品编辑器 tab**：实现是 6 个中文 tab（基础信息/页面模块/技术参数/图片与资料/产品 FAQ/SEO），设计是 7 个英文 tab（Basics/Content/Specifications/Media/FAQ/SEO/**Preview**）。属更早模块的产物，改文案语言会影响既有测试与导航。
+2. **Hero 图片入口**：后端 PATCH 已支持 `heroImage`，编辑页只有状态显示、没有选媒体入口。
+3. **库里的测试草稿** `DRAFT: This should not appear in public API [TEST]`（slug `test-draft-post-do-not-publish`）是否清掉。
+4. **页面内容清单 tab** 最终以文字规格还是设计图为准。
+
+### 明确没验证的
+
+- UI-03 的「产品工具三链接」、UI-04 的「Structured Content 说明」在首屏以下，未逐一点击。
+- 设计图里的示例状态（`Published override · example` 等）在真实数据上无法重现，实现截图显示的是真实状态。
+- 390px 只覆盖 UI-01 / UI-02 / UI-05；设计集本身也只给了 UI-02 的手机稿。
+
+---
 
 ## V2-06 询盘 AI 实测（本地已测）
 
