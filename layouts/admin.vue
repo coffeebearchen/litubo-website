@@ -124,51 +124,44 @@ function closeMenu() {
       </div>
 
       <nav class="sidebar-nav">
-        <p class="nav-section-label">Content Management</p>
-        <NuxtLink to="/admin/products" class="nav-item" active-class="nav-item--active" @click="closeMenu">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="3" width="20" height="14" rx="2" />
-            <line x1="8" y1="21" x2="16" y2="21" />
-            <line x1="12" y1="17" x2="12" y2="21" />
-          </svg>
-          Product Center
-        </NuxtLink>
-        <NuxtLink
-          to="/admin/content-center"
-          class="nav-item"
-          :class="{ 'nav-item--active': route.path.startsWith('/admin/content-center') }"
-          @click="closeMenu"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-          </svg>
-          Content Center
-        </NuxtLink>
-        <NuxtLink to="/admin/media" class="nav-item" active-class="nav-item--active" @click="closeMenu">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <polyline points="21 15 16 10 5 21" />
-          </svg>
-          Media Library
-        </NuxtLink>
-        <NuxtLink to="/admin/inquiries" class="nav-item" active-class="nav-item--active" @click="closeMenu">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 6 9 7 9-7" /></svg>
-          Customer Inquiries
-          <span v-if="unreadInquiries > 0" class="nav-badge" :aria-label="`${unreadInquiries} new`">{{ unreadInquiries }}</span>
-        </NuxtLink>
-        <NuxtLink to="/admin/visitors" class="nav-item" active-class="nav-item--active" @click="closeMenu">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
-          Live Visitors
-        </NuxtLink>
-        <NuxtLink to="/admin/settings" class="nav-item" active-class="nav-item--active" @click="closeMenu">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M20 12h2M2 12h2M12 20v2M12 2v2" />
-          </svg>
-          Settings
-        </NuxtLink>
+        <p class="nav-section-label nav-section-label--content">Content</p>
+          <NuxtLink to="/admin/products" class="nav-item" active-class="nav-item--active" @click="closeMenu">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
+            Products
+          </NuxtLink>
+          <NuxtLink to="/admin/posts" class="nav-item" active-class="nav-item--active" @click="closeMenu">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+            Blog &amp; FAQ
+          </NuxtLink>
+          <NuxtLink to="/admin/page-content" class="nav-item" active-class="nav-item--active" @click="closeMenu">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>
+            Page Content
+          </NuxtLink>
+        <p class="nav-section-label nav-section-label--customers">Customers</p>
+          <NuxtLink to="/admin/inquiries" class="nav-item" active-class="nav-item--active" @click="closeMenu">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 6 9 7 9-7" /></svg>
+            Customer Inquiries
+            <span v-if="unreadInquiries > 0" class="nav-badge" :aria-label="`${unreadInquiries} new`">{{ unreadInquiries }}</span>
+          </NuxtLink>
+          <NuxtLink to="/admin/visitors" class="nav-item" active-class="nav-item--active" @click="closeMenu">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+            Live Visitors
+          </NuxtLink>
+        <p class="nav-section-label nav-section-label--assets">Assets</p>
+          <NuxtLink to="/admin/media" class="nav-item" active-class="nav-item--active" @click="closeMenu">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+            Media Library
+          </NuxtLink>
+        <p class="nav-section-label nav-section-label--system">System</p>
+          <NuxtLink to="/admin/settings" class="nav-item" active-class="nav-item--active" @click="closeMenu">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" /><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M20 12h2M2 12h2M12 20v2M12 2v2" /></svg>
+            Settings
+          </NuxtLink>
+        <p class="nav-section-label nav-section-label--advanced">Advanced tools</p>
+          <NuxtLink to="/admin/content-center" class="nav-item" :class="{ 'nav-item--active': route.path.startsWith('/admin/content-center') }" @click="closeMenu">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10" /></svg>
+            Structured Content
+          </NuxtLink>
       </nav>
 
       <div class="sidebar-footer">
@@ -186,6 +179,22 @@ function closeMenu() {
 </template>
 
 <style scoped>
+/* V2-02: five colour zones. The label text carries the meaning; the colour only speeds up scanning,
+   so a colour-blind reader still reads "Content" / "Customers" / "Assets" / "System" / "Advanced". */
+.nav-section-label--content { color: #2F6B3A; }
+.nav-section-label--customers { color: #2563A6; }
+.nav-section-label--assets { color: #945A20; }
+.nav-section-label--system { color: #52606D; }
+.nav-section-label--advanced { color: #7250A2; }
+
+.nav-section-label {
+  margin: 18px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.nav-section-label:first-of-type { margin-top: 0; }
 /* A count, not an alarm: sits inline with the label so the row stays one line at every width. */
 .nav-badge {
   margin-inline-start: auto;

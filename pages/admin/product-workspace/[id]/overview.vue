@@ -1,78 +1,29 @@
 <script setup lang="ts">
-import type { AdminProduct, ProductCategory } from '~/types/product-cms'
-import { workspaceHeroUrl } from '~/utils/productWorkspace'
-
-definePageMeta({ layout: 'admin' })
-
+/**
+ * V2-02 — this path is a duplicate of the unified product editor's "Basics" tab.
+ *
+ * The Workspace tool used to be a second place to edit the same record, which meant two UIs to keep
+ * in sync for one model. It now forwards to /admin/products/:id/index. The file is kept rather than
+ * deleted so an existing bookmark or a link from a saved note still lands somewhere useful.
+ */
 const route = useRoute()
-const id = String(route.params.id)
+const id = computed(() => String(route.params.id ?? ''))
 
-const [{ data: product, error: productError }, { data: cats }] = await Promise.all([
-  useFetch<AdminProduct>(`/api/admin/products/${id}`),
-  useFetch<ProductCategory[]>('/api/admin/categories'),
-])
-
-const categories = computed(() => cats.value ?? [])
-const notFound = computed(() => Boolean(productError.value) || !product.value)
-const previewHref = computed(() => `/admin/products/${id}/preview`)
+await navigateTo(`/admin/products/${id.value}`, { redirectCode: 302, replace: true })
 </script>
 
 <template>
-  <div v-if="notFound" class="ws-not-found">
-    <p class="ws-not-found-title">Product not found</p>
-    <p class="ws-not-found-hint">
-      No product record exists for ID “{{ id }}”, or it could not be loaded.
-    </p>
-    <NuxtLink to="/admin/products" class="ws-not-found-link">← Back to Product Center</NuxtLink>
+  <div class="ws-redirect">
+    <p>Opening the Basics tab of the product editor…</p>
+    <NuxtLink :to="`/admin/products/${id}`">Continue to Basics</NuxtLink>
   </div>
-
-  <WorkspaceShell
-    v-else
-    :product="(product as AdminProduct)"
-    :title="(product as AdminProduct).name_en"
-    :preview-href="previewHref"
-  >
-    <template #nav>
-      <WorkspaceModuleNav
-        :product-id="(product as AdminProduct).id"
-        :product-name="(product as AdminProduct).name_en"
-        :product-code="(product as AdminProduct).product_code"
-        :product-status="(product as AdminProduct).status"
-        :product-hero-url="workspaceHeroUrl(product as AdminProduct)"
-        active-key="overview"
-      />
-    </template>
-
-    <WorkspaceOverview :product="(product as AdminProduct)" :categories="categories" />
-  </WorkspaceShell>
 </template>
 
 <style scoped>
-.ws-not-found {
-  max-width: 480px;
-  margin: var(--space-8) auto;
-  padding: var(--space-6);
-  text-align: center;
+.ws-redirect {
+  padding: var(--space-8);
+  font-size: 16px;
+  color: #52665C;
 }
-
-.ws-not-found-title {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  color: var(--color-ink);
-  margin: 0 0 var(--space-2);
-}
-
-.ws-not-found-hint {
-  font-size: var(--text-sm);
-  color: var(--color-ink-muted);
-  margin: 0 0 var(--space-4);
-}
-
-.ws-not-found-link {
-  font-size: var(--text-sm);
-  color: var(--color-primary);
-  text-decoration: none;
-}
-
-.ws-not-found-link:hover { text-decoration: underline; }
+.ws-redirect a { color: #2F6B3A; }
 </style>
