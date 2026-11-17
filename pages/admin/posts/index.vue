@@ -22,6 +22,9 @@ interface PostRow {
   updated_at: string | null
 }
 
+const route = useRoute()
+const router = useRouter()
+
 const tab = ref<'blog' | 'faq'>('blog')
 const q = ref('')
 const rows = ref<PostRow[]>([])
@@ -64,6 +67,8 @@ async function edit(row: PostRow): Promise<void> {
     // Read the full row from the public reader so the editor and the site agree on the fields.
     const full = await $fetch<Record<string, unknown>>(`/api/cms/posts/${encodeURIComponent(row.slug)}`)
     selected.value = row
+    // 当前记录写进 URL：刷新后仍停在这篇，全局 AI 助手也能知道"当前是哪一篇"。
+    if (route.query.id !== String(row.id)) void router.replace({ query: { ...route.query, id: String(row.id) } })
     form.title_en = String(full.title ? (full.title as Record<string, string>).en ?? '' : '')
     form.excerpt_en = String(full.excerpt ? (full.excerpt as Record<string, string>).en ?? '' : '')
     form.body_en = String(full.bodyHtml ?? '')

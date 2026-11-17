@@ -175,6 +175,9 @@ function closeMenu() {
     <div class="admin-main">
       <slot />
     </div>
+
+    <!-- 全局 AI 助手：每个后台页面都在，右上角；写库前必须人工确认 -->
+    <AdminAiAssistant />
   </div>
 </template>
 
