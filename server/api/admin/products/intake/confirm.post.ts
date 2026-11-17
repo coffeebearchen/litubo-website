@@ -38,6 +38,12 @@ export default defineEventHandler(async (event) => {
   const acceptSeo = body?.acceptSeo === true
   const acceptCategory = body?.acceptCategory === true
   const acceptSpecs = body?.acceptSpecs === true
+  // A person may overrule the suggested category in the preview, and may drop individual parameter
+  // rows. Both are validated below; neither is trusted from the browser as-is.
+  const requestedCategoryId = Number(body?.categoryId ?? 0)
+  const specIndexes: number[] | null = Array.isArray(body?.specIndexes)
+    ? (body.specIndexes as unknown[]).filter((n): n is number => Number.isInteger(n) && (n as number) >= 0)
+    : null
 
   const stored = readProposal<ProductIntakeProposal, Binding>(body?.proposalRef, { subjectKey: 'product-intake', adminUserId })
   if (!stored) throw createError({ statusCode: 409, message: 'This proposal is no longer available. Generate a new one.' })
@@ -53,7 +59,7 @@ export default defineEventHandler(async (event) => {
   const name = proposal.name?.trim()
   if (!name || name.length > INTAKE_LIMITS.name) throw createError({ statusCode: 400, message: 'The proposal has no usable product name.' })
 
-  const categoryId = acceptCategory && proposal.categoryId > 0 ? proposal.categoryId : 0
+  const categoryId = acceptCategory ? (requestedCategoryId > 0 ? requestedCategoryId : proposal.categoryId) : 0
   if (!categoryId) throw createError({ statusCode: 400, message: 'Choose a technical category before creating the product.' })
 
   const fetchFn = <T>(path: string, options?: Record<string, unknown>) => adminFetch<T>(event, path, options)
@@ -98,10 +104,13 @@ export default defineEventHandler(async (event) => {
     productId = created?.data?.id ?? null
     if (!productId) throw createError({ statusCode: 502, message: 'The product record could not be created.' })
 
-    if (acceptSpecs && proposal.specs.length) {
+    const chosenSpecs = acceptSpecs
+      ? (specIndexes ? proposal.specs.filter((_, i) => specIndexes.includes(i)) : proposal.specs)
+      : []
+    if (chosenSpecs.length) {
       // One group row per distinct group name, in the order the proposal gave them.
       const byGroup = new Map<string, Array<{ parameter: string, value: string }>>()
-      for (const row of proposal.specs) {
+      for (const row of chosenSpecs) {
         const list = byGroup.get(row.group) ?? []
         list.push({ parameter: row.parameter, value: row.value })
         byGroup.set(row.group, list)

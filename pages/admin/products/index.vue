@@ -135,7 +135,8 @@ function thumbUrl(fileId: string) {
           Manage product records, track lifecycle status and keep catalogue data complete.
         </p>
       </div>
-      <NuxtLink to="/admin/products/new" class="btn btn-primary">+ New Product</NuxtLink>
+      <NuxtLink to="/admin/products/import" class="btn">从资料导入</NuxtLink>
+        <NuxtLink to="/admin/products/new" class="btn btn-primary">+ New Product</NuxtLink>
     </div>
 
     <ProductCatalogueNav />
