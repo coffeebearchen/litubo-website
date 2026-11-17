@@ -38,6 +38,44 @@ const busy = ref(false)
 const error = ref('')
 const notice = ref('')
 
+/**
+ * 拖动：面板是浮层，会挡住它本该帮着修改的表单。按住标题栏就能把它挪开，位置只活在这次会话里
+ * （刷新回到右上角），因为记住一个被拖到奇怪位置的固定面板，比每次都回到默认位置更烦人。
+ */
+const dragX = ref(0)
+const dragY = ref(0)
+const dragging = ref(false)
+let dragStart = { x: 0, y: 0, baseX: 0, baseY: 0 }
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function startDrag(event: PointerEvent) {
+  // 标题栏上的按钮（折叠、关闭）不是拖动手柄。
+  if ((event.target as HTMLElement | null)?.closest('button')) return
+  dragging.value = true
+  dragStart = { x: event.clientX, y: event.clientY, baseX: dragX.value, baseY: dragY.value }
+  window.addEventListener('pointermove', onDrag)
+  window.addEventListener('pointerup', endDrag)
+}
+
+function onDrag(event: PointerEvent) {
+  if (!dragging.value) return
+  const panel = document.getElementById('admin-ai-panel')
+  const width = panel?.offsetWidth ?? 420
+  const height = panel?.offsetHeight ?? 300
+  // 允许在视口内移动，不让面板被拖出屏幕（右上角是原点，所以 x 只能为负、y 有上下限）。
+  dragX.value = clamp(dragStart.baseX + (event.clientX - dragStart.x), -(window.innerWidth - width - 32), 0)
+  dragY.value = clamp(dragStart.baseY + (event.clientY - dragStart.y), -(window.innerHeight - height - 24), 160)
+}
+
+function endDrag() {
+  dragging.value = false
+  window.removeEventListener('pointermove', onDrag)
+  window.removeEventListener('pointerup', endDrag)
+}
+
 const proposalRef = ref('')
 const draftTitle = ref('')
 const draftDescription = ref('')
@@ -425,7 +463,11 @@ async function saveBatchRow(row: BatchRow) {
 </script>
 
 <template>
-  <div class="ai-assist">
+  <div
+    class="ai-assist"
+    :class="{ 'is-dragging': dragging }"
+    :style="{ transform: `translate(${dragX}px, ${dragY}px)` }"
+  >
     <button
       type="button"
       class="ai-assist__launch"
@@ -443,7 +485,7 @@ async function saveBatchRow(row: BatchRow) {
       class="ai-assist__panel"
       aria-label="LITUBO AI assistant"
     >
-      <header class="ai-assist__head">
+      <header class="ai-assist__head" title="拖动可移动面板" @pointerdown="startDrag">
         <div>
           <p class="ai-assist__title">LITUBO AI</p>
           <p class="ai-assist__context">
@@ -667,11 +709,27 @@ async function saveBatchRow(row: BatchRow) {
   border: 1px solid #E6D9C6;
   border-top: 4px solid #F0208C;
   border-radius: 10px;
-  box-shadow: 0 18px 48px rgb(24 51 43 / 22%);
+  box-shadow:
+    0 28px 64px rgb(24 51 43 / 30%),
+    0 6px 16px rgb(24 51 43 / 16%),
+    0 0 0 1px rgb(24 51 43 / 6%);
+
   padding: 16px;
 }
 
-.ai-assist__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.ai-assist__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.ai-assist.is-dragging .ai-assist__head { cursor: grabbing; }
+.ai-assist.is-dragging { user-select: none; }
+.ai-assist { transition: none; }
 .ai-assist__title { margin: 0; font-size: 16px; font-weight: 700; color: #18332B; letter-spacing: 0.02em; }
 .ai-assist__context { margin: 4px 0 0; font-size: 12px; color: #4A5E58; display: flex; align-items: center; gap: 6px; }
 .ai-assist__context-dot { width: 7px; height: 7px; border-radius: 50%; background: #FF7A00; display: inline-block; }
