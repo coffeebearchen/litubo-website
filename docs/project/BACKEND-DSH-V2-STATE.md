@@ -195,6 +195,38 @@ ERROR [inquiry] email notification failed { id: 35 }
 
 询盘始终写入数据库；徽标让新询盘不再像空收件箱。
 
+## 追加批次（业主 2026-11-17）：产品中心 AI —— 摘要 / SEO / 分类建议
+
+> 这一批**不属于 V2 包**，是业主要求"AI 参与产品中心的工作"后新增的模块。
+
+| 文件 | 作用 |
+|---|---|
+| `server/utils/aiTargets/productListingTarget.ts` | 新 target `product-listing`：输出只有 `summary` / `seoTitle` / `seoDescription` / `categoryId` 四项；分类必须来自服务端给定的 id 列表 |
+| `server/utils/productListingAi.ts` | 产品指纹（名称/编码/系列/摘要/分类的 sha256）与 prompt 输入 |
+| `server/api/admin/products/[id]/ai-listing-proposal.post.ts` | 只生成候选，不写库；**产品必须是 Draft**，否则 409；复用限速与提案机制 |
+| `server/api/admin/products/[id]/ai-listing-confirm.post.ts` | 校验绑定/一次性/原文指纹后，只写 `summary_en`、`seo_title_en`、`seo_description_en`、`category_id` |
+| `pages/admin/products/[id]/index.vue` | 基础信息右侧新增「AI 协助」卡片：生成建议 → 四项勾选 → 保存勾选项 / 丢弃 |
+
+**硬边界**：不改 `name_en`、`slug`、`product_code`、`status`、`published_at`、媒体；不发布；分类必须来自现有 `product_categories`；SEO 标题/描述沿用人工编辑器的 120/320 字符上限。
+
+**实测（draft 产品 19，测后逐字段还原并核对一致）**
+
+| 用例 | 结果 |
+|---|---|
+| 生成建议 | 200，四项齐全（摘要 / SEO 标题 / SEO 描述 / 技术分类 X-Ray Inspection） |
+| 保存勾选项 | 200，写库四项；界面提示 `Saved 4 field(s).` |
+| 已发布产品生成 | **409** `AI suggestions are available only while this product is a Draft.` |
+| 生成后改产品名称再确认 | **409** `The product changed since this suggestion was generated.` |
+| 一项都不选 | **400** |
+| 伪造 ref | **409** |
+| 未登录 | **401** |
+| 还原 | 四个字段逐字一致 |
+| console error | 0 |
+
+**说明**：验证时把该 draft 产品的真实产品信息发给了 DeepSeek（属于公司自有目录数据，与"客户询盘内容"不是同一类数据）。**客户询盘是否可发 provider，仍待业主决定。**
+
+---
+
 ## 追加批次（业主 2026-11-17 指定）：测试草稿清理 + Hero 媒体选择器
 
 ### 1. 删除测试草稿
