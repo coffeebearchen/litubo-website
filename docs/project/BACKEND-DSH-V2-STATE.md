@@ -195,6 +195,44 @@ ERROR [inquiry] email notification failed { id: 35 }
 
 询盘始终写入数据库；徽标让新询盘不再像空收件箱。
 
+## 追加批次（业主 2026-11-17 指定）：测试草稿清理 + Hero 媒体选择器
+
+### 1. 删除测试草稿
+
+| 项 | 值 |
+|---|---|
+| 对象 | `posts` id=5，slug `test-draft-post-do-not-publish`，status `draft` |
+| 先备份 | `backup/2026-11-17/test-draft-post-id5-deleted.json`（整行 JSON） |
+| 删除前检查 | 状态确为 draft；无封面；`/relations` 显示没有任何集合通过关系引用 `posts` |
+| 结果 | 按 slug 复查不存在；按 id 复查不存在；`posts` 33 → 32 |
+| 回退 | 从备份 JSON 重新 POST 即可恢复该行 |
+
+### 2. Hero 编辑页的 Media Library 选择器
+
+| 项 | 说明 |
+|---|---|
+| 前端 | `/admin/page-content` 的 Hero image 区块改为：缩略图 + `Select from Media Library` + `Remove image`；右侧预览同步显示所选图片 |
+| 一个选择器两个目标 | `MediaLibraryPicker` 只挂载一次（共享浏览器状态，挂两个会联动开合），`pickerTarget` 记录这次选择填哪个字段；分类编辑器复用同一个实例 |
+| 后端 | `PATCH /api/admin/page-content` 的 `heroImage` 从「任意 ≤64 字符」收紧为**必须是合法文件 id**，否则 400（`hero_image` 是 uuid 列，原来非法值会变成数据库错误） |
+
+**实测（浏览器 + 数据库）**
+
+| 用例 | 结果 |
+|---|---|
+| 点 `Select from Media Library` | 弹层打开，标题为「Select a hero image from Media Library」，48 个媒体卡片 |
+| 选中一张 | 弹层关闭；字段出现缩略图；右侧预览出现图片；文案变 `Media Library image selected`；出现 `Remove image` |
+| 点 `Publish changes` | 提示 `Published. The public page now uses these values.`，状态变 `Published override` |
+| 库中值 | `site_content` 行 `hero_image = 48abc396-…`，与所选文件 id **完全一致** |
+| 公开接口 | `/api/cms/page-hero?page=company.about` 返回 `imageUrl=/api/cms/media/48abc396-…`，实际取图 `200 image/webp` |
+| 非法 id | `PATCH` 带 `heroImage:'not-a-uuid'` → **400** `The hero image must be a Media Library file id` |
+| 回归：分类选择器 | 从分类编辑器打开，标题为「Select a category image from Media Library」（同一实例按目标路由） |
+| console error | 0 |
+| 清理 | 测试覆盖行已删除；`site_content` 回到 9 行；`page-hero` 回到 `hero: null`；`/company/about` 默认标题仍在 |
+
+**仍然存在的缺口（如实记录）**：`hero_image` 会被保存、会被 `/api/cms/page-hero` 返回，但**目前没有任何前台页面渲染 `hero.imageUrl`**（13 页的 hero 布局各自使用自己的图片位）。要把所选图片真正显示在页面上，需要按页面接布局——这是独立的一批设计决定，本轮未做。
+
+---
+
 ## V2-07 视觉验收结论（本地已测）
 
 完整差异表：`docs/project/reviews/2026-11-17-BACKEND-DSH-V2-0e6e98d/04-verification/VISUAL-DIFF.md`

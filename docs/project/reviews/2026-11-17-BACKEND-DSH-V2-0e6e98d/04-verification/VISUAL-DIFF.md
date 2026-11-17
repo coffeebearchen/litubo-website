@@ -115,8 +115,10 @@ node scripts/screenshot-viewport.mjs http://localhost:3000/admin/page-content 14
 
 - 八个实现页面**全部无横向溢出**，无 console error，入口与主要语义与设计一致。
 - 修掉两处实现缺陷：编辑页一打开就显示「有未发布改动」；AI 面板空闲态缺少 AI 标识。
-- **需要业主决定的四项**：
+- **业主已指定并完成的两项**（2026-11-17 后续批次）：
+  - Hero 编辑页补上了 Media Library 选择器（同一场次验证：选图→预览→发布→库中 `hero_image` 一致→公开接口可取图；非法 id 返回 400）。
+  - 清掉了测试草稿 `DRAFT: This should not appear in public API [TEST]`（id=5，备份在 `backup/2026-11-17/`）。
+- **仍需注意**：`hero_image` 会被保存并由 `/api/cms/page-hero` 返回，但**目前没有任何前台页面渲染 `hero.imageUrl`**（各页 hero 布局用的是自己的图片位）。要让图片真正出现在页面上，需要按页面逐个接布局。
+- **仍需业主决定的两项**：
   1. 产品编辑器 tab 是否改成 7 个英文 tab（含 Preview）；
-  2. Hero 图片是否需要在前台补「选择媒体」入口；
-  3. 库里那条 `DRAFT: This should not appear in public API [TEST]` 测试草稿是否清掉；
-  4. 页面内容清单的 tab 结构以文字规格（Home/Company/Support/Resources）为准，还是改成设计图的（All page heroes / Home blocks / Product categories）。
+  2. 页面内容清单的 tab 结构以文字规格（Home/Company/Support/Resources）为准，还是改成设计图的（All page heroes / Home blocks / Product categories）。

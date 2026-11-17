@@ -50,6 +50,21 @@ function sitePath(value: unknown): string | null {
   return s
 }
 
+/**
+ * A hero image must be a Media Library file id. `hero_image` is a uuid column, so anything else used to
+ * surface as a database error; refusing it here turns that into a message a person can act on, and
+ * matches the check the category endpoint already makes.
+ */
+function fileId(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  const s = String(value).trim()
+  if (!s) return null
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) {
+    throw createError({ statusCode: 400, message: 'The hero image must be a Media Library file id' })
+  }
+  return s
+}
+
 export default defineEventHandler(async (event) => {
   setHeader(event, 'Cache-Control', 'private, no-store')
 
@@ -92,7 +107,7 @@ export default defineEventHandler(async (event) => {
     eyebrow_en: eyebrow,
     title_en: title,
     body_en: text(body.body, MAX.body),
-    hero_image: text(body.heroImage, 64),
+    hero_image: fileId(body.heroImage),
     cta_primary_label_en: text(body.ctaPrimaryLabel, MAX.cta),
     cta_primary_path: sitePath(body.ctaPrimaryPath),
     cta_secondary_label_en: text(body.ctaSecondaryLabel, MAX.cta),

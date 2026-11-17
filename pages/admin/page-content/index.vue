@@ -235,12 +235,27 @@ function closeCategory(): void {
   catNotice.value = ''
 }
 
-function pickCategoryImage(fileId: string): void {
-  categoryForm.heroImage = fileId
+/**
+ * One picker, two editors. The Media Library browser is shared state, so a second mounted picker would
+ * open and close in lockstep with the first; instead the opener records which field is being filled and
+ * the single `pick-file` event is routed to it.
+ */
+type PickerTarget = 'hero' | 'category'
+const pickerTarget = ref<PickerTarget>('hero')
+
+function openPicker(target: PickerTarget): void {
+  pickerTarget.value = target
+  void browser.openLibrary('image')
+}
+
+function pickFile(fileId: string): void {
+  if (pickerTarget.value === 'hero') form.heroImage = fileId
+  else categoryForm.heroImage = fileId
   browser.closeLibrary()
 }
 
-function categoryThumb(id: string): string {
+/** The same thumbnail URL the Media Library itself shows, so a chosen file is recognisable. */
+function mediaThumb(id: string): string {
   return workspaceMediaThumbUrl(id, { width: 320, height: 168 }) ?? ''
 }
 
@@ -358,10 +373,10 @@ async function saveCategory(): Promise<void> {
             <div class="field">
               <span>Category image</span>
               <div class="imgbox">
-                <img v-if="categoryForm.heroImage" :src="categoryThumb(categoryForm.heroImage)" alt="" class="imgbox__thumb">
+                <img v-if="categoryForm.heroImage" :src="mediaThumb(categoryForm.heroImage)" alt="" class="imgbox__thumb">
                 <p class="imgbox__value">{{ categoryForm.heroImage ? 'Media Library image selected' : 'No image — the page renders without a category picture' }}</p>
                 <div class="imgbox__actions">
-                  <button type="button" class="btn" @click="browser.openLibrary('image')">Select from Media Library</button>
+                  <button type="button" class="btn" @click="openPicker('category')">Select from Media Library</button>
                   <button v-if="categoryForm.heroImage" type="button" class="link-btn" @click="categoryForm.heroImage = ''">Remove image</button>
                 </div>
                 <p class="hint">Alt text comes from the existing media title; editing that title affects every use of the file.</p>
@@ -379,7 +394,7 @@ async function saveCategory(): Promise<void> {
             <h3>Page preview</h3>
             <p class="hint">Uses the same category presentation. Local preview — not live.</p>
             <div class="preview">
-              <img v-if="categoryForm.heroImage" :src="categoryThumb(categoryForm.heroImage)" alt="" class="preview__img">
+              <img v-if="categoryForm.heroImage" :src="mediaThumb(categoryForm.heroImage)" alt="" class="preview__img">
               <p class="preview__title">{{ categoryForm.name || selectedCategory.name }}</p>
               <p class="preview__body">{{ categoryForm.intro || 'No introduction yet' }}</p>
             </div>
@@ -387,30 +402,6 @@ async function saveCategory(): Promise<void> {
           </aside>
         </div>
       </template>
-
-      <MediaLibraryPicker
-        :open="browser.open.value"
-        :files="browser.files.value"
-        :loading="browser.loading.value"
-        :error="browser.error.value"
-        :total="browser.total.value"
-        :search="browser.search.value"
-        :type-filter="browser.typeFilter.value"
-        :folders="browser.folders.value"
-        :folders-error="browser.foldersError.value"
-        :folder-id="browser.folderId.value"
-        :linked-file-ids="categoryForm.heroImage ? [categoryForm.heroImage] : []"
-        title="Select a category image from Media Library"
-        linked-title="Current category image"
-        @close="browser.closeLibrary"
-        @update-search="browser.updateSearch"
-        @update-type-filter="browser.updateTypeFilter"
-        @navigate-folder="browser.navigateFolder"
-        @retry-folders="browser.loadFolders"
-        @retry-files="browser.loadFiles(true)"
-        @load-more="browser.loadFiles(false)"
-        @pick-file="pickCategoryImage"
-      />
     </template>
 
     <!-- Page list -->
@@ -461,7 +452,12 @@ async function saveCategory(): Promise<void> {
           <div class="field">
             <span>Hero image</span>
             <div class="imgbox">
-              <p class="imgbox__value">{{ form.heroImage ? 'Existing media selected' : 'No image — the page uses its approved default' }}</p>
+              <img v-if="form.heroImage" :src="mediaThumb(form.heroImage)" alt="" class="imgbox__thumb">
+              <p class="imgbox__value">{{ form.heroImage ? 'Media Library image selected' : 'No image — the page uses its approved default' }}</p>
+              <div class="imgbox__actions">
+                <button type="button" class="btn" @click="openPicker('hero')">Select from Media Library</button>
+                <button v-if="form.heroImage" type="button" class="link-btn" @click="form.heroImage = ''">Remove image</button>
+              </div>
               <p class="hint">Alt text comes from the existing media title; editing that title affects every use of the file.</p>
             </div>
           </div>
@@ -487,6 +483,7 @@ async function saveCategory(): Promise<void> {
           <h3>Page preview</h3>
           <p class="hint">Uses the same Hero presentation. Local preview — not live.</p>
           <div class="preview">
+            <img v-if="form.heroImage" :src="mediaThumb(form.heroImage)" alt="" class="preview__img">
             <p class="preview__eyebrow">{{ form.eyebrow || current.defaults.eyebrow }}</p>
             <p class="preview__title">{{ form.title || current.defaults.title }}</p>
             <p class="preview__body">{{ form.body || current.defaults.body }}</p>
@@ -496,6 +493,34 @@ async function saveCategory(): Promise<void> {
         </aside>
       </div>
     </template>
+    <!--
+      One Media Library picker for both editors, mounted once at the page root: it is driven by shared
+      browser state, so a second instance would open and close in lockstep with the first. `pickerTarget`
+      records which field the next selection fills.
+    -->
+    <MediaLibraryPicker
+      :open="browser.open.value"
+      :files="browser.files.value"
+      :loading="browser.loading.value"
+      :error="browser.error.value"
+      :total="browser.total.value"
+      :search="browser.search.value"
+      :type-filter="browser.typeFilter.value"
+      :folders="browser.folders.value"
+      :folders-error="browser.foldersError.value"
+      :folder-id="browser.folderId.value"
+      :linked-file-ids="(pickerTarget === 'category' ? categoryForm.heroImage : form.heroImage) ? [pickerTarget === 'category' ? categoryForm.heroImage : form.heroImage] : []"
+      :title="pickerTarget === 'category' ? 'Select a category image from Media Library' : 'Select a hero image from Media Library'"
+      :linked-title="pickerTarget === 'category' ? 'Current category image' : 'Current hero image'"
+      @close="browser.closeLibrary"
+      @update-search="browser.updateSearch"
+      @update-type-filter="browser.updateTypeFilter"
+      @navigate-folder="browser.navigateFolder"
+      @retry-folders="browser.loadFolders"
+      @retry-files="browser.loadFiles(true)"
+      @load-more="browser.loadFiles(false)"
+      @pick-file="pickFile"
+    />
   </div>
 </template>
 

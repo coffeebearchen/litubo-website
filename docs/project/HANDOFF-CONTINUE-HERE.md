@@ -108,20 +108,26 @@ V2-00 ~ V2-07 全部完成，实现细节、实测记录与边界都写在 `BACK
 | V2-06 | `ai-proposal` / `ai-confirm` 两个接口 + 询盘详情 AI 面板；新 target `inquiry-summary` |
 | V2-07 | 9 张实现截图 + 差异表：`reviews/2026-11-17-BACKEND-DSH-V2-0e6e98d/04-verification/` |
 
-### 5.2 需要业主拍板的四件事（不要自行决定）
+### 5.2 需要业主拍板的两件事（不要自行决定）
 
 1. **产品编辑器 tab**：实现是 6 个中文 tab（基础信息/页面模块/技术参数/图片与资料/产品 FAQ/SEO），设计是 7 个英文 tab（含 Preview）。改语言会影响既有测试与导航。
-2. **Hero 图片入口**：后端已支持 `heroImage`，编辑页只有状态显示、没有选媒体入口。
-3. **测试草稿残留**：`posts` 里有一条 `DRAFT: This should not appear in public API [TEST]`（slug `test-draft-post-do-not-publish`，草稿态），是否清掉。
-4. **页面内容清单 tab 结构**：以文字规格（Home/Company/Support/Resources）为准，还是改成设计图（All page heroes / Home blocks / Product categories）。当前按文字规格实现。
+2. **页面内容清单 tab 结构**：以文字规格（Home/Company/Support/Resources）为准，还是改成设计图（All page heroes / Home blocks / Product categories）。当前按文字规格实现。
+
+> 原先列在这里的另外两项已于 2026-11-17 完成：
+> - 测试草稿 `DRAFT: This should not appear in public API [TEST]` 已删除（备份 `backup/2026-11-17/`），`posts` 33 → 32。
+> - Hero 编辑页已补 Media Library 选择器（实测选图→发布→库中值一致→公开接口可取图）。
 
 ### 5.3 还没关闭的一条业务决定
 
 **是否允许把真实客户询盘内容发给 DeepSeek**。功能已经可用，但目前只用合成数据（`test-only@example.invalid`）跑通过。在业主明确同意前，**不要在真实询盘上点 Generate**。
 
+### 5.25 一个已知缺口：Hero 图片存了但前台还没显示
+
+`hero_image` 会保存、`/api/cms/page-hero` 会返回，但**目前没有任何前台页面渲染 `hero.imageUrl`**——13 页各自的 hero 布局都在用自己写死的图片位。要让编辑选的图真正出现在页面上，需要按页面接布局（哪个页面、放哪个位置、contain 还是 cover），属于独立一批工作，别当成 bug 顺手改。
+
 ### 5.4 如果想继续往下做（V2 包之外）
 
-- 给 Hero 补媒体选择器（复用 `components/admin/media/MediaLibraryPicker.vue`，V2-05 的分类 tab 已有接入示例）。
+- 把 Hero 图片接到前台各页布局（先定页面与位置，再动模板）。
 - `ai_recommended_products` / `ai_draft_reply` 是二期预留列，一期明确不填，不要顺手开启。
 - 任何新增数据库列，都要同步公开只读白名单（见坑 1），否则接口 503。
 
