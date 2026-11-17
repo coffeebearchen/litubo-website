@@ -146,6 +146,15 @@ const ls = (en: string | null, es: string | null, pt: string | null) => ({
 const mediaUrl = (uuid: string | null): string =>
   uuid ? `/api/cms/media/${uuid}` : ''
 
+/**
+ * The Media Library title of a file, shaped as a per-locale alt. Used only as a fallback, so a file
+ * described once in the Media Library gives every public appearance of it a description.
+ */
+const fileTitleFor = (files: ReadonlyMap<string, PublicFile>, fileId: string | null): { en: string, es: string, pt: string } => {
+  const title = fileId ? files.get(fileId.toLowerCase())?.title ?? '' : ''
+  return { en: title, es: '', pt: '' }
+}
+
 const DOWNLOAD_ROLES = new Set(['brochure', 'datasheet', 'drawing', 'manual', 'certificate'])
 
 // ─── Event handler ─────────────────────────────────────────────────────────
@@ -331,7 +340,9 @@ export default defineEventHandler(async (event) => {
             media = {
               id: fileId,
               url: mediaUrl(fileId),
-              alt: ls(m.alt_en, null, null),
+              // The link's own alt wins; otherwise the file's Media Library title, so one alt written
+              // for the file covers every place it appears.
+              alt: ls(m.alt_en, null, null) || fileTitleFor(publicFiles, m.directus_files_id),
             }
           }
         }

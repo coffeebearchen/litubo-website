@@ -236,7 +236,7 @@ function imageOf(ref: ContentSnapshotFileRef | null | undefined, files: Map<stri
   if (!file) return null
   return {
     url: publicMediaUrl(file.id),
-    alt: typeof ref.alt === 'string' ? ref.alt : '',
+    alt: (typeof ref.alt === 'string' && ref.alt.trim()) ? ref.alt : (file.title ?? ''),
     caption: typeof ref.caption === 'string' && ref.caption.trim() ? ref.caption : null,
   }
 }

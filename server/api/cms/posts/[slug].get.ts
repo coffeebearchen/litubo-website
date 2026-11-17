@@ -63,6 +63,8 @@ function toPost(r: DirectusPostDetail, slug: string, files: ReadonlyMap<string, 
     relatedProductSlugs: r.related_product_slugs ?? [],
     relatedApplicationSlugs: r.related_application_slugs ?? [],
     coverImageUrl: coverFileId ? `/api/cms/media/${coverFileId}?v=2` : '',
+    // The cover's own description: the file title an editor wrote in the Media Library, if any.
+    coverAlt: coverFileId ? (files.get(coverFileId.toLowerCase())?.title ?? '') : '',
     // V2-05: the fit now comes from the record. Null means "no opinion yet", and the page keeps its
     // previous behaviour for that article rather than being forced to a value.
     coverFit: r.cover_fit === 'contain' || r.cover_fit === 'cover' ? r.cover_fit : null,

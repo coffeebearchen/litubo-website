@@ -45,6 +45,19 @@ const altDraft = ref('')
 
 const savedText = ref('')
 
+// 批量：媒体页可用，一次最多 5 张，逐条确认后才写
+interface BatchRow {
+  fileId: string
+  filename: string
+  productName: string | null
+  altText: string
+  proposalRef: string
+  error: string
+}
+const batchBusy = ref(false)
+const batchRows = ref<BatchRow[]>([])
+const batchMeta = ref<{ scanned: number, undescribed: number } | null>(null)
+
 const TITLE_IDEAL = { min: 30, max: 65 }
 const DESCRIPTION_IDEAL = { min: 70, max: 165 }
 const ALT_IDEAL = 125
@@ -219,6 +232,54 @@ async function saveAlt() {
     busy.value = false
   }
 }
+
+async function runBatch() {
+  if (batchBusy.value) return
+  batchBusy.value = true
+  error.value = ''
+  notice.value = ''
+  batchRows.value = []
+  batchMeta.value = null
+  try {
+    const res = await $fetch<{
+      ok: boolean
+      unavailable?: boolean
+      error?: string
+      scanned: number
+      undescribed: number
+      rows: BatchRow[]
+    }>('/api/admin/ai/media-alt-batch', { method: 'POST', body: { limit: 5 } })
+    if (!res.ok) {
+      error.value = res.unavailable ? 'AI is not configured on this server yet.' : (res.error ?? 'The batch could not run.')
+      return
+    }
+    batchRows.value = res.rows
+    batchMeta.value = { scanned: res.scanned, undescribed: res.undescribed }
+  }
+  catch (e: unknown) {
+    error.value = describeError(e, 'The batch could not run.')
+  }
+  finally {
+    batchBusy.value = false
+  }
+}
+
+async function saveBatchRow(row: BatchRow) {
+  if (!row.proposalRef || !row.altText.trim()) return
+  error.value = ''
+  try {
+    await $fetch('/api/admin/ai/media-alt-confirm', {
+      method: 'POST',
+      body: { fileId: row.fileId, proposalRef: row.proposalRef, altText: row.altText },
+    })
+    row.proposalRef = ''
+    row.error = ''
+    notice.value = `Saved: ${row.filename}`
+  }
+  catch (e: unknown) {
+    row.error = describeError(e, 'Saving failed.')
+  }
+}
 </script>
 
 <template>
@@ -278,6 +339,35 @@ async function saveAlt() {
           <p v-if="!context" class="ai-assist__hint">
             Open an article, a content item or a media file to use the assistant. This page has nothing to write to.
           </p>
+        </div>
+
+        <!-- 媒体库：批量描述没有 alt 的文件（逐条确认） -->
+        <div v-if="route.path.startsWith('/admin/media')" class="ai-assist__batch">
+          <div class="ai-assist__batch-head">
+            <span class="ai-assist__label">Files with no alt text</span>
+            <button type="button" class="ai-assist__ghost" :disabled="batchBusy" @click="runBatch">
+              {{ batchBusy ? 'Working…' : 'Describe up to 5' }}
+            </button>
+          </div>
+          <p v-if="batchMeta" class="ai-assist__hint">
+            {{ batchMeta.undescribed }} of {{ batchMeta.scanned }} files have no description. Showing the next {{ batchRows.length }}.
+          </p>
+          <div v-for="row in batchRows" :key="row.fileId" class="ai-assist__batch-row">
+            <p class="ai-assist__batch-name">{{ row.filename }}</p>
+            <input v-model="row.altText" type="text" maxlength="160">
+            <p v-if="row.error" class="ai-assist__batch-error">{{ row.error }}</p>
+            <div class="ai-assist__row">
+              <button
+                type="button"
+                class="ai-assist__save"
+                :disabled="!row.proposalRef || !row.altText.trim()"
+                @click="saveBatchRow(row)"
+              >
+                {{ row.proposalRef ? 'Save this one' : 'Saved' }}
+              </button>
+            </div>
+          </div>
+          <p class="ai-assist__hint">Each row is confirmed separately. Nothing is written until you press save on that row.</p>
         </div>
 
         <!-- 文章 / 内容项：SEO -->
@@ -447,6 +537,25 @@ async function saveAlt() {
 
 .ai-assist__saved { margin-top: 14px; border-top: 1px dashed #E6D9C6; padding-top: 12px; }
 .ai-assist__saved-line { margin: 0 0 4px; font-size: 13px; color: #18332B; }
+
+.ai-assist__batch { margin-top: 14px; border-top: 1px dashed #E6D9C6; padding-top: 12px; }
+.ai-assist__batch-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.ai-assist__batch-row { padding: 8px 0; border-bottom: 1px solid #F3ECDF; }
+.ai-assist__batch-row:last-child { border-bottom: 0; }
+.ai-assist__batch-name { margin: 0 0 4px; font-size: 11px; color: #4A5E58; word-break: break-all; }
+.ai-assist__batch-row input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #D8CFC0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #18332B;
+  background: #FFFDF8;
+  margin-bottom: 6px;
+}
+.ai-assist__batch-error { margin: 0 0 6px; font-size: 12px; color: #B42318; }
 
 @media (max-width: 640px) {
   .ai-assist { top: 60px; right: 12px; }

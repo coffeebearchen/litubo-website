@@ -87,6 +87,8 @@ export interface PostListItem {
   author: string | null
   topics: PostTopic[]
   coverImageUrl: string
+  /** The cover file's own description (Media Library title), when the file has one. */
+  coverAlt?: string
   /** V2-05 — how the cover is fitted. Null keeps the previous per-slug behaviour. */
   coverFit?: 'contain' | 'cover' | null
   title: LocalizedString

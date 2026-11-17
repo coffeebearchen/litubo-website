@@ -53,7 +53,9 @@ const coverFit = computed(() => {
 })
 
 /** A08 - the cover carried no alt text at all. The article title describes it truthfully. */
-const coverAlt = computed(() => (resolved?.title[l] || resolved?.title.en || ''))
+// The file's own description (written once in the Media Library) wins over the article title, because
+// it describes the picture rather than the page.
+const coverAlt = computed(() => (resolved?.coverAlt || resolved?.title[l] || resolved?.title.en || ''))
 
 function formatDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
