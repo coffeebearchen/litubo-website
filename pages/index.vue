@@ -246,9 +246,6 @@ const steps = computed(() => [1, 2, 3].map(n => ({
               fetchpriority="high"
             >
             <div v-else class="home-hero__showroom-placeholder img-placeholder img-placeholder--warm-light" aria-hidden="true" />
-            <span v-if="showroom" class="home-hero__showroom-label">
-              {{ showroom.name.en }} · X-ray inspection
-            </span>
           </div>
           <figcaption class="home-hero__caption">
             Product image shown as supplied; the exact configuration is confirmed with your team.
@@ -569,13 +566,6 @@ const steps = computed(() => [1, 2, 3].map(n => ({
   min-height: 0;
 }
 .home-hero__showroom-placeholder { width: 100%; height: 100%; }
-.home-hero__showroom-label {
-  position: absolute;
-  bottom: var(--space-4);
-  left: var(--space-6);
-  font-size: var(--text-xs);
-  color: #6C5E46;
-}
 .home-hero__caption {
   margin-top: var(--space-3);
   font-size: var(--text-xs);
