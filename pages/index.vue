@@ -247,9 +247,6 @@ const steps = computed(() => [1, 2, 3].map(n => ({
             >
             <div v-else class="home-hero__showroom-placeholder img-placeholder img-placeholder--warm-light" aria-hidden="true" />
           </div>
-          <figcaption class="home-hero__caption">
-            Product image shown as supplied; the exact configuration is confirmed with your team.
-          </figcaption>
         </figure>
       </div>
     </section>
@@ -554,24 +551,23 @@ const steps = computed(() => [1, 2, 3].map(n => ({
   height: 490px;
   display: grid;
   place-items: center;
-  padding: var(--space-8);
-  background: #FFFCF5;
-  border: 1px solid #D8BD86;
+  /* The photograph has its own white background; a white card with a gold border around it made a
+     visible second frame inside the warm hero. No card, no border - the picture sits on the band. */
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
-/* Contain only: the product photo is never scaled or cropped. */
+/* Contain only: the product photo is never scaled or cropped.
+   Multiply drops the photograph's white background into the warm band, so the machine appears to stand
+   on the section rather than in a white box. The machine itself is mid-grey and reads unchanged. */
 .home-hero__showroom img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   min-height: 0;
+  mix-blend-mode: multiply;
 }
 .home-hero__showroom-placeholder { width: 100%; height: 100%; }
-.home-hero__caption {
-  margin-top: var(--space-3);
-  font-size: var(--text-xs);
-  color: var(--color-ink-muted);
-}
-
 /* ─── Family grid ──────────────────────────────────────────── */
 .family-reveal-grid {
   display: grid;
