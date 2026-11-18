@@ -106,24 +106,6 @@ const companyLinks = [
               <a :href="`mailto:${email}`" class="site-footer__contact-link">{{ email }}</a>
               <span class="site-footer__address">Kunshan, Jiangsu Province, China</span>
             </address>
-            <div v-if="socialLinks.length" class="site-footer__social-block">
-              <p class="site-footer__social-label">Follow LITUBO</p>
-              <div class="site-footer__social" aria-label="Social media">
-                <a
-                  v-for="link in socialLinks"
-                  :key="link.platform"
-                  :href="link.url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  :aria-label="`LITUBO on ${link.platform}`"
-                  :title="link.platform"
-                >
-                  <svg v-if="SOCIAL_ICONS[link.platform]" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path :d="SOCIAL_ICONS[link.platform]" />
-                  </svg>
-                </a>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -177,6 +159,23 @@ const companyLinks = [
           <NuxtLink :to="localePath('/privacy-policy')">{{ t('footer.privacy') }}</NuxtLink>
           <NuxtLink :to="localePath('/terms-of-use')">{{ t('footer.terms') }}</NuxtLink>
         </nav>
+
+        <!-- 自媒体入口：圆形图标，右下角。只渲染站点设置里真正配置了的平台。 -->
+        <div v-if="socialLinks.length" class="site-footer__social" aria-label="Social media">
+          <a
+            v-for="link in socialLinks"
+            :key="link.platform"
+            :href="link.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            :aria-label="`LITUBO on ${link.platform}`"
+            :title="link.platform"
+          >
+            <svg v-if="SOCIAL_ICONS[link.platform]" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path :d="SOCIAL_ICONS[link.platform]" />
+            </svg>
+          </a>
+        </div>
       </div>
     </div>
   </footer>
@@ -248,18 +247,12 @@ const companyLinks = [
 .site-footer__address { font-size: var(--text-xs); color: rgba(255, 255, 255, 0.55); }
 
 /* Social row replaces the old "Contact" CTA (which duplicated the CTA band above the footer). */
-.site-footer__social-block { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
 
-.site-footer__social-label {
-  font-size: calc(11px * var(--type-scale));
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0;
-}
 
-.site-footer__social { display: flex; gap: var(--space-3); }
+.site-footer__social { display: flex; gap: var(--space-3); flex: none; }
+/* The icons sit at the right end of the bottom bar; on a narrow screen the bar wraps and they
+   move to their own line, still right-aligned. */
+.site-footer__bottom-inner .site-footer__social { margin-left: auto; }
 
 .site-footer__social a {
   display: grid;
